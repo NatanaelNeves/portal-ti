@@ -1,0 +1,119 @@
+.status-timeline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: var(--sombra-card);
+  margin-bottom: 2rem;
+  position: relative;
+}
+
+.timeline-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  flex: 1;
+  z-index: 2;
+}
+
+.step-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  margin-bottom: 0.75rem;
+  transition: all 0.3s ease;
+  position: relative;
+  z-index: 3;
+}
+
+.timeline-step.completed .step-icon {
+  background: var(--verde-nazareno);
+  color: white;
+  box-shadow: 0 4px 12px rgba(0, 122, 51, 0.3);
+}
+
+.timeline-step.current .step-icon {
+  background: var(--laranja-acolhedor);
+  color: white;
+  box-shadow: 0 4px 16px rgba(242, 140, 56, 0.4);
+  animation: pulse 2s infinite;
+}
+
+.timeline-step.pending .step-icon {
+  background: #e9ecef;
+  color: #adb5bd;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 4px 16px rgba(242, 140, 56, 0.4);
+  }
+  50% {
+    box-shadow: 0 4px 24px rgba(242, 140, 56, 0.6);
+  }
+}
+
+.step-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: center;
+  color: #495057;
+  max-width: 100px;
+}
+
+.timeline-step.completed .step-label {
+  color: var(--verde-nazareno);
+}
+
+.timeline-step.current .step-label {
+  color: var(--laranja-acolhedor);
+  font-weight: 700;
+}
+
+.timeline-step.pending .step-label {
+  color: #adb5bd;
+}
+
+.step-connector {
+  position: absolute;
+  top: 28px;
+  left: 50%;
+  width: 100%;
+  height: 3px;
+  background: #e9ecef;
+  z-index: 1;
+}
+
+.timeline-step.completed .step-connector {
+  background: var(--verde-nazareno);
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .status-timeline {
+    padding: 1.5rem 1rem;
+    overflow-x: auto;
+  }
+
+  .step-icon {
+    width: 48px;
+    height: 48px;
+    font-size: 1.25rem;
+  }
+
+  .step-label {
+    font-size: 0.75rem;
+    max-width: 80px;
+  }
+
+  .step-connector {
+    top: 24px;
+  }
+}

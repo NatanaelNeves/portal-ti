@@ -1,0 +1,131 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import InventoryLayout from '../components/InventoryLayout';
+import '../styles/EquipmentPage.css';
+
+interface Equipment {
+  id: string;
+  internal_code: string;
+  type: string;
+  brand: string;
+  model: string;
+  current_status: string;
+  current_location: string;
+  serial_number: string;
+  created_at: string;
+}
+
+export default function EquipmentPage() {
+  const [equipments, setEquipments] = useState<Equipment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    fetchEquipments();
+  }, [statusFilter]);
+
+  const fetchEquipments = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('internal_token');
+      const params = statusFilter ? `?status=${statusFilter}` : '';
+      
+      const response = await fetch(`/api/inventory/equipment${params}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao carregar equipamentos');
+      }
+
+      const data = await response.json();
+      setEquipments(data.equipment || []);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return <InventoryLayout><div className="equipment-page"><div className="loading">Carregando...</div></div></InventoryLayout>;
+  }
+
+  return (
+    <InventoryLayout>
+      <div className="equipment-page">
+        <div className="page-header">
+          <h1>🖥️ Equipamentos</h1>
+          <p>Inventário geral da instituição</p>
+        </div>
+
+        {error && <div className="alert alert-error">{error}</div>}
+
+        <div className="filters">
+          <select 
+            value={statusFilter} 
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="filter-select"
+          >
+            <option value="">Todos os status</option>
+            <option value="in_use">Em uso</option>
+            <option value="in_stock">Em estoque</option>
+            <option value="in_maintenance">Manutenção</option>
+          </select>
+        </div>
+
+        <div className="equipment-container">
+          <table className="equipment-table">
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Tipo</th>
+                <th>Marca / Modelo</th>
+                <th>Status</th>
+                <th>Local</th>
+                <th>Data de entrada</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {equipments.map((eq) => (
+                <tr key={eq.id} className={`status-${eq.current_status}`}>
+                  <td className="code-cell"><strong>{eq.internal_code}</strong></td>
+                  <td>{eq.type}</td>
+                  <td>{eq.brand} {eq.model}</td>
+                  <td>
+                    <span className={`status-badge status-${eq.current_status}`}>
+                      {eq.current_status === 'in_use' && '✓ Em uso'}
+                      {eq.current_status === 'in_stock' && '📦 Em estoque'}
+                      {eq.current_status === 'in_maintenance' && '🔧 Manutenção'}
+                    </span>
+                  </td>
+                  <td>{eq.current_location || '-'}</td>
+                  <td>{new Date(eq.created_at).toLocaleDateString('pt-BR')}</td>
+                  <td>
+                    <button 
+                      className="btn-action"
+                      onClick={() => navigate(`/inventario/equipamento/${eq.id}`)}
+                    >
+                      Ver histórico
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="quick-actions">
+          <button className="btn btn-primary" onClick={() => navigate('/inventario/novo-equipamento')}>
+            + Novo equipamento
+          </button>
+        </div>
+      </div>
+    </InventoryLayout>
+  );
+}

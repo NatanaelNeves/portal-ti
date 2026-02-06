@@ -1,0 +1,284 @@
+.open-ticket-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, var(--cinza-claro) 0%, #c3cfe2 100%);
+  padding: 40px 20px;
+}
+
+.ticket-form-container {
+  max-width: 700px;
+  margin: 0 auto;
+  background: var(--branco);
+  border-radius: var(--border-radius);
+  box-shadow: var(--sombra-card);
+  padding: 40px;
+}
+
+.form-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.form-header h1 {
+  font-size: 2rem;
+  color: var(--texto-principal);
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+
+.form-header p {
+  color: var(--cinza-escuro);
+  font-size: 1rem;
+}
+
+/* Success Message */
+.success-message {
+  text-align: center;
+  padding: 2rem;
+  animation: slideIn 0.5s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.success-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  animation: bounce 0.6s ease;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+
+.success-message h2 {
+  font-size: 1.8rem;
+  color: var(--verde-nazareno);
+  margin-bottom: 2rem;
+  font-weight: 700;
+}
+
+.ticket-code-display {
+  background: var(--cinza-claro);
+  padding: 2rem;
+  border-radius: var(--border-radius);
+  margin-bottom: 2rem;
+}
+
+.code-label {
+  font-size: 0.95rem;
+  color: var(--cinza-escuro);
+  margin-bottom: 1rem;
+  font-weight: 500;
+}
+
+.code-box {
+  font-family: 'Courier New', monospace;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--verde-nazareno);
+  background: var(--branco);
+  padding: 1.5rem;
+  border-radius: var(--border-radius-small);
+  border: 3px solid var(--verde-nazareno);
+  letter-spacing: 0.2rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 4px 12px rgba(0, 122, 51, 0.2);
+}
+
+.code-hint {
+  font-size: 0.9rem;
+  color: var(--laranja-acolhedor);
+  margin-top: 1rem;
+  font-weight: 500;
+}
+
+.success-actions {
+  margin-top: 2rem;
+}
+
+.redirect-message {
+  font-size: 0.95rem;
+  color: var(--cinza-escuro);
+  margin-bottom: 0.5rem;
+  font-style: italic;
+}
+
+.or-message {
+  font-size: 0.9rem;
+  color: var(--cinza-escuro);
+  margin: 1rem 0;
+  font-weight: 500;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.btn-secondary {
+  background: var(--cinza-medio);
+  color: var(--texto-principal);
+  padding: 12px 24px;
+  border-radius: var(--border-radius-small);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+}
+
+.btn-secondary:hover {
+  background: var(--cinza-escuro);
+  color: var(--branco);
+  transform: translateY(-2px);
+  box-shadow: var(--sombra-hover);
+}
+
+/* Alerts */
+.alert {
+  padding: 15px 20px;
+  border-radius: var(--border-radius-small);
+  margin-bottom: 20px;
+  font-weight: 500;
+}
+
+.alert-error {
+  background: #FFE9E9;
+  color: #C62828;
+  border-left: 4px solid var(--coral-suave);
+}
+
+.alert-success {
+  background: #E8F5E9;
+  color: #2E7D32;
+  border-left: 4px solid var(--verde-claro);
+}
+
+/* Form */
+.ticket-form {
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+}
+
+.form-section {
+  border: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.form-section legend {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--texto-principal);
+  margin-bottom: 10px;
+  padding: 0;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-weight: 600;
+  color: var(--texto-principal);
+  font-size: 0.95rem;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+  padding: 12px 15px;
+  border: 2px solid var(--cinza-medio);
+  border-radius: var(--border-radius-small);
+  font-size: 0.95rem;
+  font-family: inherit;
+  transition: all 0.3s ease;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--verde-nazareno);
+  box-shadow: var(--sombra-foco);
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+/* Buttons */
+.btn {
+  padding: 12px 30px;
+  border: none;
+  border-radius: var(--border-radius-small);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-primary {
+  background: var(--verde-nazareno);
+  color: var(--branco);
+  width: 100%;
+  margin-top: 10px;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--verde-nazareno-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--sombra-hover);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .ticket-form-container {
+    padding: 25px;
+  }
+
+  .form-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+  }
+
+  .code-box {
+    font-size: 1.8rem;
+    padding: 1rem;
+  }
+}
