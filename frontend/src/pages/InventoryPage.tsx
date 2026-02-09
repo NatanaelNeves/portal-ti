@@ -1,253 +1,413 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import InventoryLayout from '../components/InventoryLayout';
 import '../styles/InventoryPage.css';
 
-interface InventoryItem {
+type TabType = 'notebooks' | 'peripherals';
+
+interface Notebook {
   id: string;
-  name: string;
-  item_type: string;
+  internal_code: string;
+  brand: string;
+  model: string;
   serial_number: string;
-  status: string;
-  location: string;
-  assigned_to_id?: string;
+  processor?: string;
+  ram?: string;
+  storage?: string;
+  screen_size?: string;
+  operating_system?: string;
+  current_unit: string;
+  current_status: string;
+  physical_condition: string;
+  current_responsible_name?: string;
+}
+
+interface Peripheral {
+  id: string;
+  internal_code: string;
+  type: string;
+  brand: string;
+  model: string;
+  serial_number: string;
+  current_unit: string;
+  current_status: string;
+  physical_condition?: string;
+  acquisition_date?: string;
 }
 
 export default function InventoryPage() {
   const navigate = useNavigate();
-  const [items, setItems] = useState<InventoryItem[]>([]);
+  const [activeTab, setActiveTab] = useState<TabType>('notebooks');
+  const [notebooks, setNotebooks] = useState<Notebook[]>([]);
+  const [peripherals, setPeripherals] = useState<Peripheral[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    item_type: '',
-    serial_number: '',
-    location: '',
-  });
+  
+  // Filtros
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [unitFilter, setUnitFilter] = useState('all');
+
+  const units = [
+    'Unidade Agapito',
+    'Unidade Senador',
+    'Unidade Caucaia',
+    'Unidade Maracanau',
+    'Unidade VP',
+    'Unidade Maranguape'
+  ];
 
   useEffect(() => {
-    const token = localStorage.getItem('internal_token');
-    if (!token) {
-      navigate('/admin/login');
-      return;
-    }
+    fetchData();
+  }, [activeTab]);
 
-    fetchItems(token);
-  }, [filterStatus, navigate]);
-
-  const fetchItems = async (token: string) => {
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams();
-      if (filterStatus !== 'all') params.append('status', filterStatus);
+      setError('');
+      const token = localStorage.getItem('internal_token');
+      
+      const endpoint = activeTab === 'notebooks' 
+        ? '/api/inventory/notebooks'
+        : '/api/inventory/peripherals';
 
-      const response = await fetch(`/api/inventory?${params.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      const response = await fetch(endpoint, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      if (!response.ok) {
-        throw new Error('Erro ao carregar inventário');
-      }
+      if (!response.ok) throw new Error('Erro ao carregar dados');
 
       const data = await response.json();
-      setItems(data.items || []);
+      
+      if (activeTab === 'notebooks') {
+        setNotebooks(data.notebooks || []);
+      } else {
+        setPeripherals(data.peripherals || []);
+      }
     } catch (err: any) {
-      setError(err.message || 'Erro ao carregar inventário');
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAddItem = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const token = localStorage.getItem('internal_token');
-    if (!token) return;
+  // Filtrar notebooks
+  const filteredNotebooks = notebooks.filter(nb => {
+    const matchesSearch = searchQuery === '' || 
+      nb.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      nb.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      nb.internal_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (nb.serial_number && nb.serial_number.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    const matchesStatus = statusFilter === 'all' || nb.current_status === statusFilter;
+    const matchesUnit = unitFilter === 'all' || nb.current_unit === unitFilter;
+    
+    return matchesSearch && matchesStatus && matchesUnit;
+  });
 
-    try {
-      const response = await fetch('/api/inventory', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(formData),
-      });
-
-      if (!response.ok) {
-        throw new Error('Erro ao adicionar item');
-      }
-
-      setFormData({
-        name: '',
-        item_type: '',
-        serial_number: '',
-        location: '',
-      });
-      setShowForm(false);
-      fetchItems(token);
-    } catch (err: any) {
-      setError(err.message || 'Erro ao adicionar item');
-    }
-  };
+  // Filtrar periféricos
+  const filteredPeripherals = peripherals.filter(per => {
+    const matchesSearch = searchQuery === '' || 
+      per.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      per.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      per.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      per.internal_code.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesStatus = statusFilter === 'all' || per.current_status === statusFilter;
+    const matchesUnit = unitFilter === 'all' || per.current_unit === unitFilter;
+    
+    return matchesSearch && matchesStatus && matchesUnit;
+  });
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'available':
-        return 'status-available';
-      case 'in_use':
-        return 'status-in-use';
-      case 'maintenance':
-        return 'status-maintenance';
-      case 'retired':
-        return 'status-retired';
-      default:
-        return '';
-    }
+    const colors: Record<string, string> = {
+      'available': '#10b981',
+      'in_use': '#3b82f6',
+      'in_maintenance': '#f59e0b',
+      'lowered': '#ef4444'
+    };
+    return colors[status] || '#6b7280';
   };
 
   const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'available':
-        return 'Disponível';
-      case 'in_use':
-        return 'Em Uso';
-      case 'maintenance':
-        return 'Manutenção';
-      case 'retired':
-        return 'Descartado';
-      default:
-        return status;
-    }
+    const labels: Record<string, string> = {
+      'available': '✓ Disponível',
+      'in_use': '👤 Em Uso',
+      'in_maintenance': '🔧 Manutenção',
+      'lowered': '🗑️ Baixado'
+    };
+    return labels[status] || status;
   };
 
-  if (!localStorage.getItem('internal_token')) {
-    return null;
-  }
+  const getConditionIcon = (condition: string) => {
+    const icons: Record<string, string> = {
+      'new': '⭐',
+      'good': '✓',
+      'regular': '~',
+      'bad': '✗'
+    };
+    return icons[condition] || '';
+  };
 
   return (
-    <div className="inventory-page">
-      <div className="page-header">
-        <h1>📦 Estoque de TI</h1>
-        <p>Gerenciar equipamentos e recursos</p>
-        <button
-          className="btn btn-primary"
-          onClick={() => setShowForm(!showForm)}
-        >
-          {showForm ? '✕ Cancelar' : '+ Adicionar Equipamento'}
-        </button>
-      </div>
-
-      {error && <div className="alert alert-error">{error}</div>}
-
-      {showForm && (
-        <form onSubmit={handleAddItem} className="add-item-form">
-          <div className="form-row">
-            <div className="form-group">
-              <label>Nome do Equipamento</label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                required
-              />
+    <InventoryLayout>
+      <div className="inventory-page">
+        
+        {/* HEADER */}
+        <div className="page-header-inventory">
+          <div className="header-top">
+            <div>
+              <h1>📦 Inventário de Equipamentos</h1>
+              <p>Gerenciar notebooks, periféricos e equipamentos</p>
             </div>
-            <div className="form-group">
-              <label>Tipo</label>
-              <input
-                type="text"
-                value={formData.item_type}
-                onChange={(e) =>
-                  setFormData({ ...formData, item_type: e.target.value })
-                }
-                required
-              />
-            </div>
+            <button 
+              className="btn-add-equipment"
+              onClick={() => navigate('/inventario/novo-equipamento')}
+            >
+              ➕ Novo Equipamento
+            </button>
           </div>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label>Serial Number</label>
-              <input
-                type="text"
-                value={formData.serial_number}
-                onChange={(e) =>
-                  setFormData({ ...formData, serial_number: e.target.value })
-                }
-              />
-            </div>
-            <div className="form-group">
-              <label>Localização</label>
-              <input
-                type="text"
-                value={formData.location}
-                onChange={(e) =>
-                  setFormData({ ...formData, location: e.target.value })
-                }
-                required
-              />
-            </div>
+          {/* TABS */}
+          <div className="tabs-inventory">
+            <button
+              className={`tab-btn-inventory ${activeTab === 'notebooks' ? 'active' : ''}`}
+              onClick={() => {
+                setActiveTab('notebooks');
+                setSearchQuery('');
+                setStatusFilter('all');
+                setUnitFilter('all');
+              }}
+            >
+              <span className="tab-icon">💻</span>
+              <span className="tab-label">Notebooks</span>
+              <span className="tab-count">{notebooks.length}</span>
+            </button>
+            <button
+              className={`tab-btn-inventory ${activeTab === 'peripherals' ? 'active' : ''}`}
+              onClick={() => {
+                setActiveTab('peripherals');
+                setSearchQuery('');
+                setStatusFilter('all');
+                setUnitFilter('all');
+              }}
+            >
+              <span className="tab-icon">🖱️</span>
+              <span className="tab-label">Periféricos</span>
+              <span className="tab-count">{peripherals.length}</span>
+            </button>
           </div>
-
-          <button type="submit" className="btn btn-primary">
-            Adicionar Equipamento
-          </button>
-        </form>
-      )}
-
-      <div className="filters-section">
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="filter-select"
-        >
-          <option value="all">Todos os Status</option>
-          <option value="available">Disponível</option>
-          <option value="in_use">Em Uso</option>
-          <option value="maintenance">Manutenção</option>
-          <option value="retired">Descartado</option>
-        </select>
-      </div>
-
-      {loading ? (
-        <div className="loading">Carregando inventário...</div>
-      ) : items.length === 0 ? (
-        <div className="empty-state">
-          <p>Nenhum equipamento encontrado</p>
         </div>
-      ) : (
-        <div className="inventory-grid">
-          {items.map((item) => (
-            <div key={item.id} className="inventory-card">
-              <div className="card-header">
-                <h3>{item.name}</h3>
-                <span className={`status-badge ${getStatusColor(item.status)}`}>
-                  {getStatusLabel(item.status)}
-                </span>
-              </div>
-              <div className="card-body">
-                <p><strong>Tipo:</strong> {item.item_type}</p>
-                {item.serial_number && (
-                  <p><strong>Serial:</strong> {item.serial_number}</p>
-                )}
-                <p><strong>Localização:</strong> {item.location}</p>
-              </div>
-              <div className="card-footer">
-                <button
-                  className="btn btn-small btn-primary"
-                  onClick={() => navigate(`/admin/estoque/${item.id}`)}
-                >
-                  Editar
+
+        {error && <div className="alert-error">⚠️ {error}</div>}
+
+        {/* FILTROS */}
+        <div className="filters-bar">
+          <div className="search-box">
+            <span className="search-icon">🔍</span>
+            <input
+              type="text"
+              placeholder={activeTab === 'notebooks' ? 'Buscar por marca, modelo, código...' : 'Buscar por tipo, marca, modelo...'}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button className="clear-search" onClick={() => setSearchQuery('')}>✕</button>
+            )}
+          </div>
+
+          <select
+            className="filter-select"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="all">Todos os Status</option>
+            <option value="available">Disponível</option>
+            <option value="in_use">Em Uso</option>
+            <option value="in_maintenance">Manutenção</option>
+            <option value="lowered">Baixado</option>
+          </select>
+
+          <select
+            className="filter-select"
+            value={unitFilter}
+            onChange={(e) => setUnitFilter(e.target.value)}
+          >
+            <option value="all">Todas as Unidades</option>
+            {units.map(unit => (
+              <option key={unit} value={unit}>{unit}</option>
+            ))}
+          </select>
+
+          <button className="btn-reset-filters" onClick={() => {
+            setSearchQuery('');
+            setStatusFilter('all');
+            setUnitFilter('all');
+          }}>
+            🔄 Limpar Filtros
+          </button>
+        </div>
+
+        {/* CONTEÚDO */}
+        {loading ? (
+          <div className="loading-state">
+            <div className="spinner"></div>
+            <p>Carregando {activeTab === 'notebooks' ? 'notebooks' : 'periféricos'}...</p>
+          </div>
+        ) : activeTab === 'notebooks' ? (
+          // NOTEBOOKS TABLE VIEW
+          <div className="notebooks-section">
+            {filteredNotebooks.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-icon">📭</div>
+                <h3>Nenhum notebook encontrado</h3>
+                <p>Adicione notebooks ao inventário ou ajuste os filtros</p>
+                <button className="btn-primary" onClick={() => navigate('/inventario/novo-equipamento')}>
+                  ➕ Adicionar Notebook
                 </button>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+            ) : (
+              <div className="notebooks-table-container">
+                <table className="notebooks-table">
+                  <thead>
+                    <tr>
+                      <th>Código</th>
+                      <th>Marca/Modelo</th>
+                      <th>Especificações</th>
+                      <th>Unidade</th>
+                      <th>Status</th>
+                      <th>Responsável</th>
+                      <th>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredNotebooks.map(notebook => (
+                      <tr key={notebook.id} onClick={() => navigate(`/inventario/equipamento/${notebook.id}`)} className="clickable-row">
+                        <td>
+                          <code className="equipment-code">{notebook.internal_code}</code>
+                        </td>
+                        <td>
+                          <div className="equipment-info">
+                            <strong>{notebook.brand} {notebook.model}</strong>
+                            <small>{notebook.serial_number}</small>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="specs">
+                            {notebook.processor && <span className="spec-badge">🔹 {notebook.processor}</span>}
+                            {notebook.ram && <span className="spec-badge">💾 {notebook.ram}</span>}
+                            {notebook.storage && <span className="spec-badge">💿 {notebook.storage}</span>}
+                            {notebook.screen_size && <span className="spec-badge">📺 {notebook.screen_size}</span>}
+                          </div>
+                        </td>
+                        <td>
+                          <span className="unit-badge">{notebook.current_unit}</span>
+                        </td>
+                        <td>
+                          <span 
+                            className="status-badge-inline"
+                            style={{ backgroundColor: getStatusColor(notebook.current_status) }}
+                          >
+                            {getStatusLabel(notebook.current_status)}
+                          </span>
+                        </td>
+                        <td>
+                          {notebook.current_responsible_name ? (
+                            <span className="responsible-name">👤 {notebook.current_responsible_name}</span>
+                          ) : (
+                            <span className="no-responsible">—</span>
+                          )}
+                        </td>
+                        <td>
+                          <button 
+                            className="btn-table-action"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/inventario/equipamento/${notebook.id}`);
+                            }}
+                          >
+                            📄 Ver
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        ) : (
+          // PERIPHERALS CARDS VIEW
+          <div className="peripherals-section">
+            {filteredPeripherals.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-icon">📭</div>
+                <h3>Nenhum periférico encontrado</h3>
+                <p>Adicione periféricos ao inventário ou ajuste os filtros</p>
+                <button className="btn-primary" onClick={() => navigate('/inventario/novo-equipamento')}>
+                  ➕ Adicionar Periférico
+                </button>
+              </div>
+            ) : (
+              <div className="peripherals-grid">
+                {filteredPeripherals.map(peripheral => (
+                  <div 
+                    key={peripheral.id} 
+                    className="peripheral-card"
+                    onClick={() => navigate(`/inventario/equipamento/${peripheral.id}`)}
+                  >
+                    <div className="card-header-peripheral">
+                      <div className="card-type">
+                        <span className="type-icon">🖱️</span>
+                        <span className="type-label">{peripheral.type}</span>
+                      </div>
+                      <span 
+                        className="status-badge-card"
+                        style={{ backgroundColor: getStatusColor(peripheral.current_status) }}
+                      >
+                        {getStatusLabel(peripheral.current_status)}
+                      </span>
+                    </div>
+
+                    <div className="card-body-peripheral">
+                      <h3>{peripheral.brand} {peripheral.model}</h3>
+                      <div className="card-details">
+                        <div className="detail-row">
+                          <span className="detail-label">Código:</span>
+                          <code>{peripheral.internal_code}</code>
+                        </div>
+                        <div className="detail-row">
+                          <span className="detail-label">Unidade:</span>
+                          <span>{peripheral.current_unit}</span>
+                        </div>
+                        {peripheral.physical_condition && (
+                          <div className="detail-row">
+                            <span className="detail-label">Condição:</span>
+                            <span>{getConditionIcon(peripheral.physical_condition)} {peripheral.physical_condition}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="card-footer-peripheral">
+                      <button 
+                        className="btn-card-action"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/inventario/equipamento/${peripheral.id}`);
+                        }}
+                      >
+                        📄 Ver Detalhes
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+      </div>
+    </InventoryLayout>
   );
 }

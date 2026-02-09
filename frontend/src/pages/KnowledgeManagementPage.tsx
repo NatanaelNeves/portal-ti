@@ -227,7 +227,7 @@ export default function KnowledgeManagementPage() {
                 <div className="article-footer">
                   <span className="article-views">👁️ {article.views_count} visualizações</span>
                   <span className="article-date">
-                    {new Date(article.created_at).toLocaleDateString('pt-BR')}
+                    {article.created_at ? new Date(article.created_at).toLocaleDateString('pt-BR') : '-'}
                   </span>
                 </div>
                 <div className="article-actions">

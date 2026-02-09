@@ -30,20 +30,53 @@ export default function EquipmentPage() {
     try {
       setLoading(true);
       const token = localStorage.getItem('internal_token');
-      const params = statusFilter ? `?status=${statusFilter}` : '';
       
-      const response = await fetch(`/api/inventory/equipment${params}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      // Buscar notebooks e periféricos separadamente
+      const [notebooksRes, peripheralsRes] = await Promise.all([
+        fetch('/api/inventory/notebooks', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch('/api/inventory/peripherals', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+      ]);
 
-      if (!response.ok) {
+      if (!notebooksRes.ok || !peripheralsRes.ok) {
         throw new Error('Erro ao carregar equipamentos');
       }
 
-      const data = await response.json();
-      setEquipments(data.equipment || []);
+      const notebooksData = await notebooksRes.json();
+      const peripheralsData = await peripheralsRes.json();
+      
+      // Combinar e formatar para o formato esperado
+      const allEquipments = [
+        ...(notebooksData.notebooks || []).map((nb: any) => ({
+          id: nb.id,
+          internal_code: nb.internal_code,
+          type: 'Notebook',
+          brand: nb.brand,
+          model: nb.model,
+          current_unit: nb.current_unit,
+          current_status: nb.current_status,
+          current_responsible_name: nb.current_responsible_name
+        })),
+        ...(peripheralsData.peripherals || []).map((per: any) => ({
+          id: per.id,
+          internal_code: per.internal_code,
+          type: per.type,
+          brand: per.brand,
+          model: per.model,
+          current_unit: per.current_unit,
+          current_status: per.current_status
+        }))
+      ];
+      
+      // Aplicar filtro de status se houver
+      const filtered = statusFilter 
+        ? allEquipments.filter(eq => eq.current_status === statusFilter)
+        : allEquipments;
+      
+      setEquipments(filtered);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -105,7 +138,7 @@ export default function EquipmentPage() {
                     </span>
                   </td>
                   <td>{eq.current_location || '-'}</td>
-                  <td>{new Date(eq.created_at).toLocaleDateString('pt-BR')}</td>
+                  <td>{eq.created_at ? new Date(eq.created_at).toLocaleDateString('pt-BR') : '-'}</td>
                   <td>
                     <button 
                       className="btn-action"
@@ -121,7 +154,7 @@ export default function EquipmentPage() {
         </div>
 
         <div className="quick-actions">
-          <button className="btn btn-primary" onClick={() => navigate('/inventario/novo-equipamento')}>
+          <button className="btn btn-primary" onClick={() => navigate('/inventario/equipamentos/novo')}>
             + Novo equipamento
           </button>
         </div>

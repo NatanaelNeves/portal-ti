@@ -36,6 +36,27 @@
   margin: 0;
 }
 
+.nav-section {
+  margin: 0.5rem 0;
+}
+
+.nav-section-title {
+  padding: 0.75rem 1.5rem 0.5rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.nav-section .nav-item {
+  padding-left: 2rem;
+}
+
+.nav-section .nav-item.active {
+  padding-left: calc(2rem - 3px);
+}
+
 .nav-item {
   display: flex;
   align-items: center;

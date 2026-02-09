@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import InventoryLayout from '../components/InventoryLayout';
+import PhotoUploader from '../components/PhotoUploader';
+import DocumentUploader from '../components/DocumentUploader';
 import '../styles/EquipmentDetailPage.css';
 
 interface Movement {
@@ -18,6 +20,21 @@ interface ResponsibilityTerm {
   issued_date: string;
   returned_date?: string;
   status: 'active' | 'returned' | 'cancelled';
+}
+
+interface Photo {
+  url: string;
+  filename: string;
+}
+
+interface Document {
+  filename: string;
+  url: string;
+  type: string;
+  description: string;
+  uploaded_at: string;
+  size: number;
+  mimetype: string;
 }
 
 interface Equipment {
@@ -42,9 +59,11 @@ export default function EquipmentDetailPage() {
   const [equipment, setEquipment] = useState<Equipment | null>(null);
   const [movements, setMovements] = useState<Movement[]>([]);
   const [terms, setTerms] = useState<ResponsibilityTerm[]>([]);
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'overview' | 'movements' | 'terms'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'movements' | 'terms' | 'uploads'>('overview');
 
   useEffect(() => {
     fetchEquipmentDetails();
@@ -63,6 +82,8 @@ export default function EquipmentDetailPage() {
 
       const data = await response.json();
       setEquipment(data.equipment);
+      setPhotos(data.photos || []);
+      setDocuments(data.documents || []);
       setMovements(data.movements || []);
       setTerms(data.terms || []);
     } catch (err: any) {
@@ -127,11 +148,12 @@ export default function EquipmentDetailPage() {
 
         {/* Tabs */}
         <div className="tabs-nav">
-          {['overview', 'movements', 'terms'].map(tab => (
+          {['overview', 'movements', 'terms', 'uploads'].map(tab => (
             <button key={tab} className={`tab-btn ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab as any)}>
               {tab === 'overview' && <>📋 Visão Geral</>}
               {tab === 'movements' && <>📊 Histórico <span className="badge">{movements.length}</span></>}
               {tab === 'terms' && <>📝 Termos <span className="badge">{terms.length}</span></>}
+              {tab === 'uploads' && <>📎 Arquivos <span className="badge">{photos.length + documents.length}</span></>}
             </button>
           ))}
         </div>
@@ -158,7 +180,7 @@ export default function EquipmentDetailPage() {
                     <dt>Localização</dt><dd>{equipment.current_location || '-'}</dd>
                     <dt>Responsável</dt><dd>{equipment.current_responsible_name || '-'}</dd>
                     <dt>Aquisição</dt><dd>{equipment.acquisition_date ? new Date(equipment.acquisition_date).toLocaleDateString('pt-BR') : '-'}</dd>
-                    <dt>Garantia</dt><dd>{equipment.warranty_expiration ? new Date(equipment.warranty_expiration).toLocaleDateString('pt-BR') : 'Expirada'}</dd>
+                    <dt>Garantia</dt><dd>{equipment.warranty_expiration ? (new Date(equipment.warranty_expiration) > new Date() ? new Date(equipment.warranty_expiration).toLocaleDateString('pt-BR') : `Expirada em ${new Date(equipment.warranty_expiration).toLocaleDateString('pt-BR')}`) : 'Sem garantia'}</dd>
                   </dl>
                 </div>
               </div>
@@ -167,6 +189,7 @@ export default function EquipmentDetailPage() {
                 <div className="action-buttons">
                   <button className="btn btn-primary" onClick={() => navigate(`/inventario/equipamento/${equipmentId}/assinar-termo`)}>✍️ Novo Termo</button>
                   <button className="btn btn-secondary" onClick={() => navigate(`/inventario/equipamento/${equipmentId}/movimentar`)}>↔️ Movimentar</button>
+                  <button className="btn btn-outline" onClick={() => navigate(`/inventario/equipamento/${equipmentId}/qrcode`)}>📱 Gerar QR Code</button>
                   <button className="btn btn-outline" onClick={() => window.print()}>🖨️ Imprimir</button>
                 </div>
               </div>
@@ -190,7 +213,7 @@ export default function EquipmentDetailPage() {
                       </div>
                       <div className="timeline-card">
                         <h4>{m.movement_type}</h4>
-                        <time>{new Date(m.movement_date).toLocaleDateString('pt-BR')}</time>
+                        <time>{m.movement_date ? new Date(m.movement_date).toLocaleDateString('pt-BR') : '-'}</time>
                         <p><strong>De:</strong> {m.from_location}</p>
                         <p><strong>Para:</strong> {m.to_location}</p>
                         {m.reason && <p><strong>Motivo:</strong> {m.reason}</p>}
@@ -211,21 +234,56 @@ export default function EquipmentDetailPage() {
                   {terms.map(t => (
                     <div key={t.id} className={`term-card status-${t.status}`}>
                       <div className="term-main">
-                        <div><h4>{t.responsible_name}</h4><p>{new Date(t.issued_date).toLocaleDateString('pt-BR')} {t.returned_date && `- ${new Date(t.returned_date).toLocaleDateString('pt-BR')}`}</p></div>
+                        <div><h4>{t.responsible_name}</h4><p>{t.issued_date ? new Date(t.issued_date).toLocaleDateString('pt-BR') : '-'} {t.returned_date && `- ${new Date(t.returned_date).toLocaleDateString('pt-BR')}`}</p></div>
                         <span className={`badge badge-${t.status}`}>
                           {t.status === 'active' && '✓ Ativo'}
                           {t.status === 'returned' && '📥 Devolvido'}
                           {t.status === 'cancelled' && '❌ Cancelado'}
+                          {t.status === 'transferred' && '↔️ Transferido'}
                         </span>
                       </div>
                       <div className="term-actions">
-                        <button className="btn btn-small" onClick={() => navigate(`/inventario/termo/${t.id}/pdf`)}>📄 Ver</button>
+                        <button 
+                          className="btn btn-small" 
+                          onClick={() => {
+                            const token = localStorage.getItem('internal_token');
+                            window.open(`/api/inventory/terms/${t.id}/delivery-pdf?token=${token}`, '_blank');
+                          }}
+                        >
+                          📄 Ver PDF
+                        </button>
                         {t.status === 'active' && <button className="btn btn-small btn-danger" onClick={() => navigate(`/inventario/termo/${t.id}/devolucao`)}>📥 Devolver</button>}
                       </div>
                     </div>
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === 'uploads' && (
+            <div className="tab-pane">
+              <div className="uploads-section">
+                <div className="card">
+                  <h3>📸 Fotos do Equipamento</h3>
+                  <p className="help-text">Adicione fotos para documentar o estado físico e identificação do equipamento</p>
+                  <PhotoUploader
+                    equipmentId={equipmentId!}
+                    photos={photos}
+                    onPhotosChange={setPhotos}
+                  />
+                </div>
+
+                <div className="card">
+                  <h3>📄 Documentos Anexados</h3>
+                  <p className="help-text">Anexe notas fiscais, manuais, garantias ou outros documentos relacionados</p>
+                  <DocumentUploader
+                    equipmentId={equipmentId!}
+                    documents={documents}
+                    onDocumentsChange={setDocuments}
+                  />
+                </div>
+              </div>
             </div>
           )}
         </div>

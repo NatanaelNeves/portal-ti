@@ -1,14 +1,13 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
-import { UserRole } from '../types';
-import { useState } from 'react';
+// import { UserRole } from '../types';
+import GlobalSearch from './GlobalSearch';
 import '../styles/Navigation.css';
 
 export default function Navigation() {
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
+  const { logout } = useAuthStore();
   const isInternalUser = !!localStorage.getItem('internal_token');
-  const [showInventoryMenu, setShowInventoryMenu] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -88,33 +87,9 @@ export default function Navigation() {
           </button>
         )}
         {showAssetsLink && (
-          <div className="nav-dropdown">
-            <button 
-              onClick={() => setShowInventoryMenu(!showInventoryMenu)} 
-              className="nav-link"
-            >
-              📦 Inventário ▼
-            </button>
-            {showInventoryMenu && (
-              <div className="dropdown-menu">
-                <button onClick={() => { navigate('/inventario'); setShowInventoryMenu(false); }} className="dropdown-item">
-                  📊 Painel do Inventário
-                </button>
-                <button onClick={() => { navigate('/inventario/equipamentos'); setShowInventoryMenu(false); }} className="dropdown-item">
-                  🖥️ Equipamentos
-                </button>
-                <button onClick={() => { navigate('/inventario/responsabilidades'); setShowInventoryMenu(false); }} className="dropdown-item">
-                  📤 Entrega de Equipamentos
-                </button>
-                <button onClick={() => { navigate('/inventario/recebimento'); setShowInventoryMenu(false); }} className="dropdown-item">
-                  📥 Recebimento de Equipamentos
-                </button>
-                <button onClick={() => { navigate('/inventario/compras'); setShowInventoryMenu(false); }} className="dropdown-item">
-                  🛒 Requisições de Compra
-                </button>
-              </div>
-            )}
-          </div>
+          <button onClick={() => navigate('/inventario')} className="nav-link">
+            📦 Inventário
+          </button>
         )}
         {showUsersLink && (
           <button onClick={() => navigate('/admin/usuarios')} className="nav-link">
@@ -122,6 +97,11 @@ export default function Navigation() {
           </button>
         )}
       </div>
+      {showAssetsLink && (
+        <div className="navbar-search">
+          <GlobalSearch />
+        </div>
+      )}
       <div className="navbar-user">
         <span className="user-info">{userData?.name}</span>
         <button onClick={handleLogout} className="logout-btn">

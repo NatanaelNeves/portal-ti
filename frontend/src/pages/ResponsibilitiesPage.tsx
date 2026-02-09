@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import InventoryLayout from '../components/InventoryLayout';
+import { ExcelExportService } from '../services/excelExportService';
 import '../styles/ResponsibilitiesPage.css';
 
 interface Equipment {
@@ -58,8 +59,43 @@ export default function ResponsibilitiesPage() {
     <InventoryLayout>
       <div className="responsibilities-page">
         <div className="page-header">
-          <h1>👤 Responsabilidades</h1>
-          <p>Quem está com cada equipamento</p>
+          <div>
+            <h1>👤 Responsabilidades</h1>
+            <p>Quem está com cada equipamento</p>
+          </div>
+          <button
+            className="btn btn-secondary"
+            onClick={() => {
+              const exportData = equipments.map(eq => ({
+                responsible_name: eq.responsible_name || 'Sem responsável',
+                department: eq.department || '-',
+                equipment_type: eq.type,
+                brand: eq.brand,
+                model: eq.model,
+                internal_code: eq.internal_code,
+                issued_date: eq.issued_date,
+                current_status: eq.current_status
+              }));
+              ExcelExportService.exportToExcel(
+                exportData,
+                [
+                  { header: 'Responsável', field: 'responsible_name', width: 25 },
+                  { header: 'Setor', field: 'department', width: 20 },
+                  { header: 'Tipo', field: 'equipment_type', width: 15 },
+                  { header: 'Marca', field: 'brand', width: 15 },
+                  { header: 'Modelo', field: 'model', width: 20 },
+                  { header: 'Código', field: 'internal_code', width: 15 },
+                  { header: 'Desde', field: 'issued_date', width: 15, format: (v) => v ? new Date(v).toLocaleDateString('pt-BR') : '-' },
+                  { header: 'Status', field: 'current_status', width: 15 }
+                ],
+                'responsabilidades',
+                'Responsabilidades'
+              );
+            }}
+            disabled={equipments.length === 0}
+          >
+            📊 Exportar Excel
+          </button>
         </div>
 
         {error && <div className="alert alert-error">{error}</div>}
@@ -74,7 +110,6 @@ export default function ResponsibilitiesPage() {
                 <th>Código</th>
                 <th>Desde</th>
                 <th>Status</th>
-                <th>Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -86,7 +121,7 @@ export default function ResponsibilitiesPage() {
                   <td>{eq.department || '-'}</td>
                   <td>{eq.brand} {eq.model}</td>
                   <td className="code-cell">{eq.internal_code}</td>
-                  <td>{new Date(eq.issued_date).toLocaleDateString('pt-BR')}</td>
+                  <td>{eq.issued_date ? new Date(eq.issued_date).toLocaleDateString('pt-BR') : '-'}</td>
                   <td>
                     <span className={`status-badge status-${eq.current_status}`}>
                       {eq.current_status === 'in_use' && 'Em uso'}
@@ -94,14 +129,14 @@ export default function ResponsibilitiesPage() {
                       {eq.current_status === 'in_maintenance' && 'Manutenção'}
                     </span>
                   </td>
-                  <td>
+                  {/* <td>
                     <button 
                       className="btn-action"
                       onClick={() => navigate(`/inventario/responsabilidades/${eq.id}`)}
                     >
                       Ver detalhes
                     </button>
-                  </td>
+                  </td> */}
                 </tr>
               ))}
             </tbody>
@@ -109,10 +144,10 @@ export default function ResponsibilitiesPage() {
         </div>
 
         <div className="quick-actions">
-          <button className="btn btn-primary" onClick={() => navigate('/inventario/movimentar')}>
-            + Entregar equipamento
+          <button className="btn btn-primary" onClick={() => navigate('/inventario/equipamentos')}>
+            + Ver equipamentos
           </button>
-          <button className="btn btn-secondary" onClick={() => navigate('/inventario/devolver')}>
+          <button className="btn btn-secondary" onClick={() => navigate('/inventario/recebimento')}>
             ↩ Receber devolução
           </button>
         </div>

@@ -1,29 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config/environment';
-
-// Tipos de usuário
-export enum Role {
-  ADMIN = 'admin',
-  TI = 'it_staff',
-  COORDENADOR = 'manager',
-  USER_INTERNAL = 'user_internal',
-}
-
-// Interface para o usuário autenticado
-export interface AuthenticatedUser {
-  id: string;
-  email: string;
-  name: string;
-  role: Role;
-  type: 'internal';
-}
+import { AuthUser, UserRole } from '../types/enums';
 
 // Extend Express Request
 declare global {
   namespace Express {
     interface Request {
-      user?: AuthenticatedUser;
+      user?: AuthUser;
     }
   }
 }
@@ -34,36 +18,36 @@ declare global {
  */
 export const PERMISSIONS = {
   // Chamados
-  'tickets:view:all': [Role.TI, Role.COORDENADOR, Role.ADMIN],
-  'tickets:update': [Role.TI, Role.ADMIN],
-  'tickets:delete': [Role.ADMIN],
-  'tickets:assign': [Role.TI, Role.ADMIN],
+  'tickets:view:all': [UserRole.IT_STAFF, UserRole.MANAGER, UserRole.ADMIN],
+  'tickets:update': [UserRole.IT_STAFF, UserRole.ADMIN],
+  'tickets:delete': [UserRole.ADMIN],
+  'tickets:assign': [UserRole.IT_STAFF, UserRole.ADMIN],
   
   // Estoque
-  'inventory:view': [Role.TI, Role.ADMIN],
-  'inventory:create': [Role.TI, Role.ADMIN],
-  'inventory:update': [Role.TI, Role.ADMIN],
-  'inventory:delete': [Role.ADMIN],
+  'inventory:view': [UserRole.IT_STAFF, UserRole.ADMIN],
+  'inventory:create': [UserRole.IT_STAFF, UserRole.ADMIN],
+  'inventory:update': [UserRole.IT_STAFF, UserRole.ADMIN],
+  'inventory:delete': [UserRole.ADMIN],
   
   // Compras
-  'purchases:create': [Role.TI, Role.ADMIN],
-  'purchases:approve': [Role.COORDENADOR, Role.ADMIN],
-  'purchases:view': [Role.TI, Role.COORDENADOR, Role.ADMIN],
+  'purchases:create': [UserRole.IT_STAFF, UserRole.ADMIN],
+  'purchases:approve': [UserRole.MANAGER, UserRole.ADMIN],
+  'purchases:view': [UserRole.IT_STAFF, UserRole.MANAGER, UserRole.ADMIN],
   
   // Relatórios
-  'reports:view': [Role.COORDENADOR, Role.ADMIN],
+  'reports:view': [UserRole.MANAGER, UserRole.ADMIN],
   
   // Usuários
-  'users:create': [Role.ADMIN],
-  'users:update': [Role.ADMIN],
-  'users:delete': [Role.ADMIN],
-  'users:view:all': [Role.ADMIN],
+  'users:create': [UserRole.ADMIN],
+  'users:update': [UserRole.ADMIN],
+  'users:delete': [UserRole.ADMIN],
+  'users:view:all': [UserRole.ADMIN],
   
   // Dashboard
-  'dashboard:admin': [Role.ADMIN],
-  'dashboard:ti': [Role.TI, Role.ADMIN],
-  'dashboard:coordenador': [Role.COORDENADOR, Role.ADMIN],
-} as Record<string, Role[]>;
+  'dashboard:admin': [UserRole.ADMIN],
+  'dashboard:ti': [UserRole.IT_STAFF, UserRole.ADMIN],
+  'dashboard:coordenador': [UserRole.MANAGER, UserRole.ADMIN],
+} as Record<string, UserRole[]>;
 
 /**
  * Middleware de autenticação
@@ -82,19 +66,12 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
     
     const decoded = jwt.verify(token, config.jwt.secret as string) as any;
     
-    // Validar que é um token interno
-    if (decoded.type !== 'internal') {
-      res.status(401).json({ error: 'Tipo de token inválido' });
-      return;
-    }
-
     // Adicionar usuário na requisição
     req.user = {
       id: decoded.id,
       email: decoded.email,
       name: decoded.name,
-      role: decoded.role as Role,
-      type: 'internal',
+      role: decoded.role as UserRole,
     };
 
     next();
@@ -148,7 +125,7 @@ export function requireOwnership(
       }
 
       // Admin e TI podem acessar qualquer recurso
-      if ([Role.ADMIN, Role.TI].includes(req.user.role)) {
+      if ([UserRole.ADMIN, UserRole.IT_STAFF].includes(req.user.role)) {
         next();
         return;
       }
@@ -173,7 +150,7 @@ export function requireOwnership(
 /**
  * Helper para verificar se usuário tem papel específico
  */
-export function hasRole(user: AuthenticatedUser | undefined, ...roles: Role[]): boolean {
+export function hasRole(user: AuthUser | undefined, ...roles: UserRole[]): boolean {
   if (!user) return false;
   return roles.includes(user.role);
 }
@@ -182,7 +159,7 @@ export function hasRole(user: AuthenticatedUser | undefined, ...roles: Role[]): 
  * Helper para verificar permissão
  */
 export function hasPermission(
-  user: AuthenticatedUser | undefined, 
+  user: AuthUser | undefined, 
   permission: keyof typeof PERMISSIONS
 ): boolean {
   if (!user) return false;

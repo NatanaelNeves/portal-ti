@@ -1,0 +1,102 @@
+/* Peripherals Page Styles */
+.peripherals-page {
+  padding: 2rem;
+}
+
+.header-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.type-summary {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.type-summary h3 {
+  margin: 0 0 1rem 0;
+  color: #2c3e50;
+  font-size: 1.25rem;
+}
+
+.type-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.type-card {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 1rem;
+  border-left: 4px solid #3498db;
+}
+
+.type-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.type-icon {
+  font-size: 1.5rem;
+}
+
+.type-name {
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 0.938rem;
+}
+
+.type-stats {
+  font-size: 0.813rem;
+  color: #555;
+  line-height: 1.6;
+}
+
+.type-stats strong {
+  color: #2c3e50;
+}
+
+.type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.peripherals-table {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow-x: auto;
+}
+
+.peripherals-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.peripherals-table th {
+  background: #f8f9fa;
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #2c3e50;
+  border-bottom: 2px solid #e9ecef;
+  white-space: nowrap;
+}
+
+.peripherals-table td {
+  padding: 1rem;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.peripherals-table tbody tr:hover {
+  background: #f8f9fa;
+}

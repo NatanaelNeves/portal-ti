@@ -239,7 +239,7 @@ export default function UsersManagementPage() {
                         {user.is_active ? 'Ativo' : 'Inativo'}
                       </span>
                     </td>
-                    <td>{new Date(user.created_at).toLocaleDateString('pt-BR')}</td>
+                    <td>{user.created_at ? new Date(user.created_at).toLocaleDateString('pt-BR') : '-'}</td>
                   </tr>
                 ))}
               </tbody>

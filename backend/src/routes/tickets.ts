@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { database } from '../database/connection';
-import { authenticate, authorize, Role } from '../middleware/authorization';
+import { authenticate, authorize } from '../middleware/authorization';
+import { UserRole } from '../types/enums';
 
 const ticketsRouter = Router();
 
@@ -52,7 +53,7 @@ ticketsRouter.get('/', async (req: Request, res: Response) => {
         const decoded = jwt.verify(token, config.jwt.secret) as any;
         
         // Validar permissão para ver todos os chamados
-        const allowedRoles = [Role.TI, Role.COORDENADOR, Role.ADMIN];
+        const allowedRoles = [UserRole.IT_STAFF, UserRole.MANAGER, UserRole.ADMIN];
         if (!allowedRoles.includes(decoded.role)) {
           return res.status(403).json({ 
             error: 'Acesso negado',
@@ -148,7 +149,7 @@ ticketsRouter.get('/:id', async (req: Request, res: Response) => {
         const decoded = jwt.verify(token, config.jwt.secret) as any;
         
         // TI, Coordenador e Admin podem ver qualquer chamado
-        const allowedRoles = [Role.TI, Role.COORDENADOR, Role.ADMIN];
+        const allowedRoles = [UserRole.IT_STAFF, UserRole.MANAGER, UserRole.ADMIN];
         if (!allowedRoles.includes(decoded.role)) {
           return res.status(403).json({ error: 'Acesso negado' });
         }
@@ -260,7 +261,7 @@ ticketsRouter.get('/:id/messages', async (req: Request, res: Response) => {
         const decoded = jwt.verify(token, config.jwt.secret) as any;
         
         // TI, Coordenador e Admin podem ver mensagens de qualquer chamado
-        const allowedRoles = [Role.TI, Role.COORDENADOR, Role.ADMIN];
+        const allowedRoles = [UserRole.IT_STAFF, UserRole.MANAGER, UserRole.ADMIN];
         if (!allowedRoles.includes(decoded.role)) {
           return res.status(403).json({ error: 'Acesso negado' });
         }
@@ -375,7 +376,7 @@ ticketsRouter.patch('/:id', async (req: Request, res: Response) => {
       const decoded = jwt.verify(token, config.jwt.secret) as any;
       
       // AUTORIZAÇÃO: Apenas TI e Admin podem atualizar
-      if (![Role.TI, Role.ADMIN].includes(decoded.role)) {
+      if (![UserRole.IT_STAFF, UserRole.ADMIN].includes(decoded.role)) {
         return res.status(403).json({ 
           error: 'Acesso negado',
           message: 'Apenas TI e Administradores podem atualizar chamados'

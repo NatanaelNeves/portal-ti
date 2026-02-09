@@ -28,19 +28,38 @@ export default function InventoryLayout({ children }: InventoryLayoutProps) {
             <span className="icon">📊</span>
             <span>Visão Geral</span>
           </button>
+          
+          <div className="nav-section">
+            <div className="nav-section-title">Equipamentos</div>
+            <button 
+              className={`nav-item ${isActive('/inventario/equipamentos')}`}
+              onClick={() => navigate('/inventario/equipamentos')}
+            >
+              <span className="icon">📦</span>
+              <span>Todos</span>
+            </button>
+            <button 
+              className={`nav-item ${isActive('/inventario/notebooks')}`}
+              onClick={() => navigate('/inventario/notebooks')}
+            >
+              <span className="icon">💻</span>
+              <span>Notebooks</span>
+            </button>
+            <button 
+              className={`nav-item ${isActive('/inventario/perifericos')}`}
+              onClick={() => navigate('/inventario/perifericos')}
+            >
+              <span className="icon">🖱️</span>
+              <span>Periféricos</span>
+            </button>
+          </div>
+
           <button 
             className={`nav-item ${isActive('/inventario/responsabilidades')}`}
             onClick={() => navigate('/inventario/responsabilidades')}
           >
             <span className="icon">👤</span>
             <span>Responsabilidades</span>
-          </button>
-          <button 
-            className={`nav-item ${isActive('/inventario/equipamentos')}`}
-            onClick={() => navigate('/inventario/equipamentos')}
-          >
-            <span className="icon">🖥️</span>
-            <span>Equipamentos</span>
           </button>
           <button 
             className={`nav-item ${isActive('/inventario/compras')}`}

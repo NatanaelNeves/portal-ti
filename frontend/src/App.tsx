@@ -26,37 +26,32 @@ import UsersManagementPage from './pages/UsersManagementPage';
 import InventoryDashboardPage from './pages/InventoryDashboardPage';
 import ResponsibilitiesPage from './pages/ResponsibilitiesPage';
 import EquipmentPage from './pages/EquipmentPage';
+import NotebooksPage from './pages/NotebooksPage';
+import PeripheralsPage from './pages/PeripheralsPage';
 import PurchasesPage from './pages/PurchasesPage';
 import EquipmentDetailPage from './pages/EquipmentDetailPage';
 import SignTermPage from './pages/SignTermPage';
 import ReturnTermPage from './pages/ReturnTermPage';
 import CreateEquipmentPage from './pages/CreateEquipmentPage';
 import ReceiveEquipmentPage from './pages/ReceiveEquipmentPage';
+import CreatePurchasePage from './pages/CreatePurchasePage';
+import DeliverEquipmentPage from './pages/DeliverEquipmentPage';
+import ReturnEquipmentPage from './pages/ReturnEquipmentPage';
+import QRCodeGeneratorPage from './pages/QRCodeGeneratorPage';
+import MoveEquipmentPage from './pages/MoveEquipmentPage';
 
 // Components
 import Navigation from './components/Navigation';
+import InternalProtectedRoute from './components/InternalProtectedRoute';
 
 function App() {
   const { loadStoredUser } = useAuthStore();
   const [isReady, setIsReady] = useState(false);
-  const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
     loadStoredUser();
-    const internalUser = localStorage.getItem('internal_user');
-    if (internalUser) {
-      try {
-        const user = JSON.parse(internalUser);
-        setUserRole(user.role);
-      } catch (e) {
-        console.error('Failed to parse internal_user');
-      }
-    }
     setIsReady(true);
   }, [loadStoredUser]);
-
-  const isInternalUser = !!localStorage.getItem('internal_token');
-  const isITStaff = userRole === 'it_staff';
 
   if (!isReady) {
     return <div>Carregando...</div>;
@@ -74,46 +69,40 @@ function App() {
             <Route path="/meus-chamados" element={<MyTicketsPage />} />
             <Route path="/chamado/:id" element={<TicketDetailPage />} />
             <Route path="/central" element={<InformationCenterPage />} />
-
-            {/* Internal Login */}
+   {/* Internal Login */}
             <Route path="/admin/login" element={<InternalLoginPage />} />
 
             {/* IT Staff Routes */}
-            {isInternalUser && (
-              <>
-                <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
-                <Route path="/admin/chamados" element={<AdminTicketsPage />} />
-                <Route path="/admin/chamados/:id" element={<AdminTicketDetailPage />} />
-                <Route path="/admin/conhecimento" element={<KnowledgeManagementPage />} />
-                <Route path="/admin/usuarios" element={<UsersManagementPage />} />
-                <Route path="/admin/estoque" element={<InventoryPage />} />
-                <Route path="/admin/documentos" element={<DashboardPage />} />
-                <Route path="/admin/relatorios" element={<DashboardPage />} />
-              </>
-            )}
+            <Route path="/admin/dashboard" element={<InternalProtectedRoute><AdminDashboardPage /></InternalProtectedRoute>} />
+            <Route path="/admin/chamados" element={<InternalProtectedRoute><AdminTicketsPage /></InternalProtectedRoute>} />
+            <Route path="/admin/chamados/:id" element={<InternalProtectedRoute><AdminTicketDetailPage /></InternalProtectedRoute>} />
+            <Route path="/admin/conhecimento" element={<InternalProtectedRoute><KnowledgeManagementPage /></InternalProtectedRoute>} />
+            <Route path="/admin/usuarios" element={<InternalProtectedRoute><UsersManagementPage /></InternalProtectedRoute>} />
+            <Route path="/admin/estoque" element={<InternalProtectedRoute><InventoryPage /></InternalProtectedRoute>} />
+            <Route path="/admin/documentos" element={<InternalProtectedRoute><DashboardPage /></InternalProtectedRoute>} />
+            <Route path="/admin/relatorios" element={<InternalProtectedRoute><DashboardPage /></InternalProtectedRoute>} />
 
             {/* Inventory Module Routes - IT Staff Only */}
-            {isITStaff && (
-              <>
-                <Route path="/inventario" element={<InventoryDashboardPage />} />
-                <Route path="/inventario/responsabilidades" element={<ResponsibilitiesPage />} />
-                <Route path="/inventario/equipamentos" element={<EquipmentPage />} />
-                <Route path="/inventario/equipamentos/novo" element={<CreateEquipmentPage />} />
-                <Route path="/inventario/recebimento" element={<ReceiveEquipmentPage />} />
-                <Route path="/inventario/compras" element={<PurchasesPage />} />
-                <Route path="/inventario/equipamento/:equipmentId" element={<EquipmentDetailPage />} />
-                <Route path="/inventario/equipamento/:equipmentId/assinar-termo" element={<SignTermPage />} />
-                <Route path="/inventario/termo/:termId/devolucao" element={<ReturnTermPage />} />
-              </>
-            )}
+            <Route path="/inventario" element={<InternalProtectedRoute requireITStaff={true}><InventoryDashboardPage /></InternalProtectedRoute>} />
+            <Route path="/inventario/responsabilidades" element={<InternalProtectedRoute requireITStaff={true}><ResponsibilitiesPage /></InternalProtectedRoute>} />
+            <Route path="/inventario/equipamentos" element={<InternalProtectedRoute requireITStaff={true}><EquipmentPage /></InternalProtectedRoute>} />
+            <Route path="/inventario/notebooks" element={<InternalProtectedRoute requireITStaff={true}><NotebooksPage /></InternalProtectedRoute>} />
+            <Route path="/inventario/perifericos" element={<InternalProtectedRoute requireITStaff={true}><PeripheralsPage /></InternalProtectedRoute>} />
+            <Route path="/inventario/equipamentos/novo" element={<InternalProtectedRoute requireITStaff={true}><CreateEquipmentPage /></InternalProtectedRoute>} />
+            <Route path="/inventario/equipamentos/entregar" element={<InternalProtectedRoute requireITStaff={true}><DeliverEquipmentPage /></InternalProtectedRoute>} />
+            <Route path="/inventario/equipamentos/devolver" element={<InternalProtectedRoute requireITStaff={true}><ReturnEquipmentPage /></InternalProtectedRoute>} />
+            <Route path="/inventario/recebimento" element={<InternalProtectedRoute requireITStaff={true}><ReceiveEquipmentPage /></InternalProtectedRoute>} />
+            <Route path="/inventario/compras" element={<InternalProtectedRoute requireITStaff={true}><PurchasesPage /></InternalProtectedRoute>} />
+            <Route path="/inventario/compras/nova" element={<InternalProtectedRoute requireITStaff={true}><CreatePurchasePage /></InternalProtectedRoute>} />
+            <Route path="/inventario/equipamento/:equipmentId" element={<InternalProtectedRoute requireITStaff={true}><EquipmentDetailPage /></InternalProtectedRoute>} />
+            <Route path="/inventario/equipamento/:equipmentId/movimentar" element={<InternalProtectedRoute requireITStaff={true}><MoveEquipmentPage /></InternalProtectedRoute>} />
+            <Route path="/inventario/equipamento/:id/qrcode" element={<InternalProtectedRoute requireITStaff={true}><QRCodeGeneratorPage /></InternalProtectedRoute>} />
+            <Route path="/inventario/equipamento/:equipmentId/assinar-termo" element={<InternalProtectedRoute requireITStaff={true}><SignTermPage /></InternalProtectedRoute>} />
+            <Route path="/inventario/termo/:termId/devolucao" element={<InternalProtectedRoute requireITStaff={true}><ReturnTermPage /></InternalProtectedRoute>} />
 
             {/* Gestor/Manager Routes */}
-            {isInternalUser && (
-              <>
-                <Route path="/gestor/dashboard" element={<GestorDashboardPage />} />
-                <Route path="/gestor/solicitacoes" element={<GestorTicketsPage />} />
-              </>
-            )}
+            <Route path="/gestor/dashboard" element={<InternalProtectedRoute><GestorDashboardPage /></InternalProtectedRoute>} />
+            <Route path="/gestor/solicitacoes" element={<InternalProtectedRoute><GestorTicketsPage /></InternalProtectedRoute>} />
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />

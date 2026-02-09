@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+// import { useNavigate } from 'react-router-dom';
+import InventoryLayout from '../components/InventoryLayout';
 import '../styles/ReceiveEquipmentPage.css';
 
 interface Equipment {
@@ -24,7 +25,7 @@ export default function ReceiveEquipmentPage() {
     notes: ''
   });
   const [submitting, setSubmitting] = useState(false);
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
 
   useEffect(() => {
     fetchEquipments();
@@ -107,15 +108,16 @@ export default function ReceiveEquipmentPage() {
     }
   };
 
-  if (loading) return <div className="container"><p>Carregando...</p></div>;
+  if (loading) return <InventoryLayout><div className="container"><p>Carregando...</p></div></InventoryLayout>;
 
   return (
-    <div className="receive-equipment-page">
-      <div className="container">
-        <header className="page-header">
-          <h1>📥 Recebimento de Equipamentos</h1>
-          <p>Registre o recebimento de equipamentos devolvidos ou novos</p>
-        </header>
+    <InventoryLayout>
+      <div className="receive-equipment-page">
+        <div className="container">
+          <header className="page-header">
+            <h1>📥 Recebimento de Equipamentos</h1>
+            <p>Registre o recebimento de equipamentos devolvidos ou novos</p>
+          </header>
 
         {error && <div className="error-message">{error}</div>}
 
@@ -240,5 +242,6 @@ export default function ReceiveEquipmentPage() {
         </div>
       </div>
     </div>
+    </InventoryLayout>
   );
 }

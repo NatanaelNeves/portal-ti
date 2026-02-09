@@ -127,37 +127,41 @@ export default function SignTermPage() {
       setLoading(true);
       setError('');
       const token = localStorage.getItem('internal_token');
+      const currentUser = JSON.parse(localStorage.getItem('internal_user') || '{}');
 
-      const response = await fetch('/api/inventory/terms', {
+      // Buscar ID do responsável se existir na base
+      // Por enquanto, vamos usar um ID temporário ou criar usuário externo
+      const deliveryData = {
+        equipment_id: equipmentId,
+        responsible_id: null, // Pode ser null se for usuário externo
+        responsible_name: formData.responsible_name,
+        responsible_department: formData.responsible_department,
+        responsible_unit: formData.responsible_department, // Usar o mesmo valor
+        responsible_email: '', // Pode adicionar campo no form se necessário
+        responsible_phone: '', // Pode adicionar campo no form se necessário
+        responsible_cpf: formData.responsible_cpf,
+        delivery_reason: `Entrega de equipamento - ${formData.responsible_position}`,
+        delivery_notes: `Acessórios: ${Object.entries(formData.accessories).filter(([_, v]) => v).map(([k]) => k).join(', ')}`,
+        issued_by_id: currentUser.id,
+        issued_by_name: currentUser.name
+      };
+
+      const response = await fetch('/api/inventory/movements/deliver', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          equipment_id: equipmentId,
-          responsible_name: formData.responsible_name,
-          responsible_cpf: formData.responsible_cpf,
-          responsible_position: formData.responsible_position,
-          responsible_department: formData.responsible_department,
-          equipment_details: {
-            code: formData.equipment_code,
-            brand: formData.equipment_brand,
-            model: formData.equipment_model,
-            serial: formData.equipment_serial,
-            processor: formData.equipment_processor,
-            ram: formData.equipment_ram,
-          },
-          accessories: formData.accessories,
-          signature_method: formData.signature_method,
-          signature_date: formData.signature_date,
-        }),
+        body: JSON.stringify(deliveryData),
       });
 
       if (!response.ok) {
-        throw new Error('Erro ao criar termo de responsabilidade');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao criar termo de responsabilidade');
       }
 
+      const result = await response.json();
+      alert('Termo criado com sucesso!');
       navigate(`/inventario/equipamento/${equipmentId}`);
     } catch (err: any) {
       setError(err.message);

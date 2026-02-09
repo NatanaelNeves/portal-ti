@@ -31,7 +31,7 @@ export default function PurchasesPage() {
       const token = localStorage.getItem('internal_token');
       const params = statusFilter ? `?status=${statusFilter}` : '';
       
-      const response = await fetch(`/api/inventory/purchases${params}`, {
+      const response = await fetch(`/api/inventory/requisitions${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -99,7 +99,6 @@ export default function PurchasesPage() {
                 <th>Fornecedor</th>
                 <th>Previsão</th>
                 <th>Status</th>
-                <th>Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -120,14 +119,14 @@ export default function PurchasesPage() {
                       {getStatusLabel(purchase.status)}
                     </span>
                   </td>
-                  <td>
+                  {/* <td>
                     <button 
                       className="btn-action"
                       onClick={() => navigate(`/inventario/compra/${purchase.id}`)}
                     >
                       Detalhes
                     </button>
-                  </td>
+                  </td> */}
                 </tr>
               ))}
             </tbody>
@@ -135,8 +134,8 @@ export default function PurchasesPage() {
         </div>
 
         <div className="quick-actions">
-          <button className="btn btn-primary" onClick={() => navigate('/inventario/nova-compra')}>
-            + Nova solicitação
+          <button className="btn btn-primary" onClick={() => navigate('/inventario/compras/nova')}>
+            + Nova Solicitação
           </button>
         </div>
       </div>

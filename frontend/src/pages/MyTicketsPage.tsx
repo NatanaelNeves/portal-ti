@@ -359,7 +359,7 @@ export default function MyTicketsPage() {
                     Impacto: {getPriorityLabel(ticket.priority)}
                   </span>
                   <span className="date">
-                    Aberta em: {new Date(ticket.created_at).toLocaleDateString('pt-BR')}
+                    Aberta em: {ticket.created_at ? new Date(ticket.created_at).toLocaleDateString('pt-BR') : '-'}
                   </span>
                 </div>
                 <div className="ticket-code">
