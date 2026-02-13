@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { database } from '../database/connection';
 import { PDFService } from '../services/pdfService';
-import { QRCodeService } from '../services/qrcodeService';
 import { uploadEquipmentPhoto, uploadDocument, getFileUrl, deleteFile } from '../services/uploadService';
 
 const inventoryRouter = Router();
@@ -95,9 +94,9 @@ inventoryRouter.get('/notebooks', async (req: Request, res: Response) => {
     const { status, unit } = req.query;
 
     let query = `
-      SELECT 
+      SELECT DISTINCT ON (ie.id)
         ie.*,
-        iu.name as responsible_name,
+        COALESCE(iu.name, rt.responsible_name) as responsible_name,
         rt.issued_date as in_use_since
       FROM inventory_equipment ie
       LEFT JOIN internal_users iu ON ie.current_responsible_id = iu.id
@@ -117,7 +116,7 @@ inventoryRouter.get('/notebooks', async (req: Request, res: Response) => {
       query += ` AND ie.current_unit = $${params.length}`;
     }
 
-    query += ` ORDER BY ie.internal_code ASC`;
+    query += ` ORDER BY ie.id, ie.internal_code ASC`;
 
     const result = await database.query(query, params);
     res.json({ notebooks: result.rows, total: result.rows.length });
@@ -168,9 +167,9 @@ inventoryRouter.get('/peripherals', async (req: Request, res: Response) => {
     const { status, type, unit } = req.query;
 
     let query = `
-      SELECT 
+      SELECT DISTINCT ON (ie.id)
         ie.*,
-        iu.name as responsible_name,
+        COALESCE(iu.name, rt.responsible_name) as responsible_name,
         rt.issued_date as in_use_since
       FROM inventory_equipment ie
       LEFT JOIN internal_users iu ON ie.current_responsible_id = iu.id
@@ -195,7 +194,7 @@ inventoryRouter.get('/peripherals', async (req: Request, res: Response) => {
       query += ` AND ie.current_unit = $${params.length}`;
     }
 
-    query += ` ORDER BY ie.type ASC, ie.internal_code ASC`;
+    query += ` ORDER BY ie.id, ie.type ASC, ie.internal_code ASC`;
 
     const result = await database.query(query, params);
     
@@ -257,9 +256,9 @@ inventoryRouter.get('/equipment', async (req: Request, res: Response) => {
     const { status, unit, search } = req.query;
 
     let query = `
-      SELECT 
+      SELECT DISTINCT ON (ie.id)
         ie.*,
-        iu.name as responsible_name,
+        COALESCE(iu.name, rt.responsible_name) as responsible_name,
         rt.issued_date as in_use_since
       FROM inventory_equipment ie
       LEFT JOIN internal_users iu ON ie.current_responsible_id = iu.id
@@ -284,11 +283,11 @@ inventoryRouter.get('/equipment', async (req: Request, res: Response) => {
       query += ` AND (ie.internal_code ILIKE $${params.length} OR ie.brand ILIKE $${params.length} OR ie.model ILIKE $${params.length})`;
     }
 
-    query += ` ORDER BY ie.internal_code ASC`;
+    query += ` ORDER BY ie.id, ie.internal_code ASC`;
 
     const result = await database.query(query, params);
     
-    res.json(result.rows);
+    res.json({ equipment: result.rows, total: result.rows.length });
   } catch (error: any) {
     console.error('Error fetching equipment:', error);
     res.status(500).json({ error: 'Failed to fetch equipment' });
@@ -342,10 +341,11 @@ inventoryRouter.get('/equipment/:id', async (req: Request, res: Response) => {
     const equipment = await database.query(`
       SELECT 
         ie.*,
-        iu.name as responsible_name,
+        COALESCE(iu.name, rt.responsible_name) as responsible_name,
         iu.email as responsible_email
       FROM inventory_equipment ie
       LEFT JOIN internal_users iu ON ie.current_responsible_id = iu.id
+      LEFT JOIN responsibility_terms rt ON ie.id = rt.equipment_id AND rt.status = 'active'
       WHERE ie.id = $1
     `, [id]);
 
@@ -388,6 +388,8 @@ inventoryRouter.get('/equipment/:id', async (req: Request, res: Response) => {
 // POST - Entregar equipamento
 inventoryRouter.post('/movements/deliver', async (req: Request, res: Response) => {
   try {
+    console.log('📦 Deliver equipment request:', req.body);
+    
     const {
       equipment_id,
       responsible_id,
@@ -422,16 +424,16 @@ inventoryRouter.post('/movements/deliver', async (req: Request, res: Response) =
 
     const movement_number = await generateMovementNumber();
 
-    // Criar termo de responsabilidade
+    // Criar termo de responsabilidade (responsible_id é opcional - pode ser funcionário externo)
     const term = await database.query(`
       INSERT INTO responsibility_terms (
-        equipment_id, responsible_id, responsible_name, responsible_department,
+        equipment_id, responsible_name, responsible_department,
         responsible_unit, responsible_email, responsible_phone, responsible_cpf,
         issued_date, delivery_reason, delivery_notes, issued_by_id, issued_by_name, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_DATE, $9, $10, $11, $12, 'active')
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_DATE, $8, $9, $10, $11, 'active')
       RETURNING *
     `, [
-      equipment_id, responsible_id, responsible_name, responsible_department,
+      equipment_id, responsible_name, responsible_department,
       responsible_unit, responsible_email, responsible_phone, responsible_cpf,
       delivery_reason, delivery_notes, issued_by_id, issued_by_name
     ]);
@@ -440,11 +442,11 @@ inventoryRouter.post('/movements/deliver', async (req: Request, res: Response) =
     await database.query(`
       INSERT INTO equipment_movements (
         movement_number, equipment_id, term_id, movement_type, movement_date,
-        to_user_id, to_user_name, to_unit, to_department,
+        to_user_name, to_unit, to_department,
         reason, registered_by_id, registered_by_name
-      ) VALUES ($1, $2, $3, 'delivery', CURRENT_TIMESTAMP, $4, $5, $6, $7, $8, $9, $10)
+      ) VALUES ($1, $2, $3, 'delivery', CURRENT_TIMESTAMP, $4, $5, $6, $7, $8, $9)
     `, [
-      movement_number, equipment_id, term.rows[0].id, responsible_id,
+      movement_number, equipment_id, term.rows[0].id,
       responsible_name, responsible_unit, responsible_department,
       delivery_reason, issued_by_id, issued_by_name
     ]);
@@ -453,28 +455,37 @@ inventoryRouter.post('/movements/deliver', async (req: Request, res: Response) =
     await database.query(`
       UPDATE inventory_equipment 
       SET current_status = 'in_use', 
-          current_responsible_id = $1,
-          current_responsible_name = $2,
-          current_location = $3,
-          current_unit = $4,
+          current_responsible_name = $1,
+          current_location = $2,
+          current_unit = $3,
           updated_at = CURRENT_TIMESTAMP
-      WHERE id = $5
+      WHERE id = $4
     `, [
-      responsible_id, 
       responsible_name,
       `${responsible_department} - ${responsible_unit}`, 
       responsible_unit, 
       equipment_id
     ]);
 
+    console.log('✅ Equipment delivered successfully:', {
+      termId: term.rows[0].id,
+      movement_number,
+      equipment_id
+    });
+
     res.status(201).json({ 
+      termId: term.rows[0].id,
       term: term.rows[0],
       movement_number,
       message: 'Equipment delivered successfully'
     });
   } catch (error: any) {
-    console.error('Error delivering equipment:', error);
-    res.status(500).json({ error: 'Failed to deliver equipment' });
+    console.error('❌ Error delivering equipment:', error.message);
+    console.error('Stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Failed to deliver equipment',
+      details: error.message 
+    });
   }
 });
 
@@ -612,7 +623,7 @@ inventoryRouter.post('/movements/return', async (req: Request, res: Response) =>
           return_problems = $3,
           return_destination = $4,
           received_by_id = $5,
-          received_by_name = $6,
+          received_by = $6,
           status = 'returned',
           updated_at = CURRENT_TIMESTAMP
       WHERE id = $7
@@ -626,12 +637,12 @@ inventoryRouter.post('/movements/return', async (req: Request, res: Response) =>
       INSERT INTO equipment_movements (
         movement_number, equipment_id, term_id, movement_type, movement_date,
         from_user_id, from_user_name, from_unit, from_department,
-        condition_after, reason, registered_by_id, registered_by_name, notes
-      ) VALUES ($1, $2, $3, 'return', CURRENT_TIMESTAMP, $4, $5, $6, $7, $8, 'Devolução', $9, $10, $11)
+        condition_after, reason, registered_by_id, registered_by_name
+      ) VALUES ($1, $2, $3, 'return', CURRENT_TIMESTAMP, $4, $5, $6, $7, $8, $9, $10, $11)
     `, [
       movement_number, equipment_id, term.id,
       term.responsible_id, term.responsible_name, term.responsible_unit, term.responsible_department,
-      return_condition, received_by_id, received_by_name, return_problems
+      return_condition, return_problems || 'Devolução', received_by_id, received_by_name
     ]);
 
     // Atualizar status do equipamento
@@ -659,6 +670,119 @@ inventoryRouter.post('/movements/return', async (req: Request, res: Response) =>
   } catch (error: any) {
     console.error('Error returning equipment:', error);
     res.status(500).json({ error: 'Failed to return equipment' });
+  }
+});
+
+// POST - Processar devolução de um termo específico (fluxo alternativo)
+inventoryRouter.post('/terms/:termId/devolucao', async (req: Request, res: Response) => {
+  try {
+    const { termId } = req.params;
+    const {
+      return_date,
+      return_reason,
+      reason_other,
+      received_by,
+      equipment_condition,
+      checklist,
+      damage_description,
+      witness_name
+    } = req.body;
+
+    // Buscar termo ativo
+    const termResult = await database.query(`
+      SELECT * FROM responsibility_terms 
+      WHERE id = $1 AND status = 'active'
+    `, [termId]);
+
+    if (termResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Active term not found' });
+    }
+
+    const term = termResult.rows[0];
+    const equipment_id = term.equipment_id;
+
+    // Buscar equipamento
+    const equipment = await database.query(`
+      SELECT * FROM inventory_equipment WHERE id = $1
+    `, [equipment_id]);
+
+    if (equipment.rows.length === 0) {
+      return res.status(404).json({ error: 'Equipment not found' });
+    }
+
+    const movement_number = await generateMovementNumber();
+
+    // Determinar motivo e destino
+    let return_problems = damage_description || 'Nenhum problema relatado';
+    if (return_reason === 'outro' && reason_other) {
+      return_problems = reason_other;
+    }
+
+    let return_destination = 'available';
+    if (equipment_condition === 'avarias' || return_reason === 'manutencao') {
+      return_destination = 'maintenance';
+    }
+
+    // Atualizar termo de responsabilidade
+    await database.query(`
+      UPDATE responsibility_terms
+      SET returned_date = $1,
+          return_condition = $2,
+          return_checklist = $3,
+          return_problems = $4,
+          return_destination = $5,
+          received_by = $6,
+          status = 'returned',
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $7
+    `, [
+      return_date || new Date().toISOString().split('T')[0],
+      equipment_condition,
+      JSON.stringify(checklist),
+      return_problems,
+      return_destination,
+      received_by,
+      termId
+    ]);
+
+    // Criar movimentação de devolução
+    await database.query(`
+      INSERT INTO equipment_movements (
+        movement_number, equipment_id, term_id, movement_type, movement_date,
+        from_user_id, from_user_name, from_unit, from_department,
+        condition_after, reason, registered_by_name
+      ) VALUES ($1, $2, $3, 'return', CURRENT_TIMESTAMP, $4, $5, $6, $7, $8, $9, $10)
+    `, [
+      movement_number, equipment_id, termId,
+      term.responsible_id, term.responsible_name, term.responsible_unit, term.responsible_department,
+      equipment_condition, return_problems, received_by
+    ]);
+
+    // Atualizar status do equipamento
+    await database.query(`
+      UPDATE inventory_equipment 
+      SET current_status = $1,
+          current_responsible_id = NULL,
+          current_responsible_name = NULL,
+          current_location = $2,
+          physical_condition = $3,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $4
+    `, [
+      return_destination,
+      `Estoque TI - ${equipment.rows[0].current_unit}`,
+      equipment_condition,
+      equipment_id
+    ]);
+
+    res.status(200).json({ 
+      message: 'Equipment returned successfully',
+      movement_number,
+      term_id: termId
+    });
+  } catch (error: any) {
+    console.error('Error processing return term:', error);
+    res.status(500).json({ error: 'Failed to process return' });
   }
 });
 
@@ -727,7 +851,7 @@ inventoryRouter.get('/terms/:termId/return-pdf', async (req: Request, res: Respo
       returnReason: 'Devolução regular',
       returnDestination: term.return_destination,
       receivedBy: {
-        name: term.received_by_name
+        name: term.received_by
       },
       location: `Maracanaú/CE`
     };
@@ -801,9 +925,9 @@ inventoryRouter.post('/movements/transfer', async (req: Request, res: Response) 
             UPDATE responsibility_terms
             SET status = 'transferred',
                 returned_date = CURRENT_DATE,
-                return_notes = $1,
+                return_problems = $1,
                 received_by_id = $2,
-                received_by_name = $3
+                received_by = $3
             WHERE id = $4
           `, [
             `Transferido para ${new_responsible_name}`,
@@ -1070,31 +1194,50 @@ inventoryRouter.get('/requisitions', async (req: Request, res: Response) => {
 // POST - Criar requisição
 inventoryRouter.post('/requisitions', async (req: Request, res: Response) => {
   try {
+    console.log('📝 Recebendo requisição de compra:', req.body);
+    
     const {
       requested_by_id, requester_name, requester_department, requester_unit,
       item_type, item_description, specifications, quantity, priority,
-      reason, needed_by_date, estimated_value
+      reason, needed_by_date, estimated_value, supplier, expected_delivery_date, notes
     } = req.body;
 
+    console.log('📋 Campos extraídos:', {
+      requested_by_id,
+      requester_name,
+      requester_department,
+      requester_unit,
+      item_type,
+      item_description,
+      quantity,
+      priority,
+      reason,
+      supplier,
+      expected_delivery_date
+    });
+
     const request_number = await generateRequestNumber();
+    console.log('🔢 Request number gerado:', request_number);
 
     const result = await database.query(`
       INSERT INTO purchase_requisitions (
         request_number, requested_by_id, requester_name, requester_department, requester_unit,
         item_type, item_description, specifications, quantity, priority,
-        reason, needed_by_date, estimated_value, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'pending')
+        reason, needed_by_date, estimated_value, supplier, expected_delivery_date, notes, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'pending')
       RETURNING *
     `, [
       request_number, requested_by_id, requester_name, requester_department, requester_unit,
       item_type, item_description, specifications, quantity, priority || 'normal',
-      reason, needed_by_date, estimated_value
+      reason, needed_by_date, estimated_value, supplier, expected_delivery_date, notes
     ]);
 
+    console.log('✅ Requisição criada com sucesso');
     res.status(201).json({ requisition: result.rows[0] });
   } catch (error: any) {
-    console.error('Error creating requisition:', error);
-    res.status(500).json({ error: 'Failed to create requisition' });
+    console.error('❌ Erro ao criar requisição:', error);
+    console.error('Stack trace:', error.stack);
+    res.status(500).json({ error: 'Failed to create requisition', details: error.message });
   }
 });
 
@@ -1397,7 +1540,7 @@ inventoryRouter.get('/alerts', async (req: Request, res: Response) => {
 inventoryRouter.get('/responsibilities', async (req: Request, res: Response) => {
   try {
     const result = await database.query(`
-      SELECT 
+      SELECT DISTINCT ON (ie.id)
         ie.id,
         ie.internal_code,
         ie.type,
@@ -1406,6 +1549,7 @@ inventoryRouter.get('/responsibilities', async (req: Request, res: Response) => 
         ie.current_responsible_name as responsible_name,
         ie.current_responsible_id as responsible_id,
         ie.current_unit as department,
+        rt.id as term_id,
         rt.issued_date,
         ie.current_status,
         rt.status as term_status
@@ -1413,12 +1557,13 @@ inventoryRouter.get('/responsibilities', async (req: Request, res: Response) => 
       LEFT JOIN responsibility_terms rt ON ie.id = rt.equipment_id AND rt.status = 'active'
       WHERE ie.current_status = 'in_use'
         AND ie.current_responsible_name IS NOT NULL
-      ORDER BY ie.current_responsible_name, ie.type
+      ORDER BY ie.id, rt.issued_date DESC NULLS LAST
     `);
 
     res.json({ 
       responsibilities: result.rows.map((row: any) => ({
         id: row.id,
+        term_id: row.term_id,
         internal_code: row.internal_code,
         type: row.type,
         brand: row.brand,
@@ -1564,119 +1709,6 @@ inventoryRouter.get('/search', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Error performing search:', error);
     res.status(500).json({ error: 'Failed to perform search' });
-  }
-});
-
-// ===== QR CODES =====
-
-// Gerar QR Code para um equipamento
-inventoryRouter.get('/equipment/:id/qrcode', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    
-    console.log('Generating QR code for equipment:', id);
-    
-    // Buscar informações do equipamento
-    const result = await database.query(
-      'SELECT id, internal_code FROM inventory_equipment WHERE id = $1',
-      [id]
-    );
-    
-    if (result.rows.length === 0) {
-      console.log('Equipment not found:', id);
-      return res.status(404).json({ error: 'Equipment not found' });
-    }
-    
-    const equipment = result.rows[0];
-    console.log('Equipment found:', equipment.internal_code);
-    
-    // Gerar QR code
-    console.log('Calling QRCodeService.generateEquipmentQRCode...');
-    const qrCodeDataURL = await QRCodeService.generateEquipmentQRCode(
-      equipment.internal_code,
-      equipment.id
-    );
-    
-    console.log('QR code generated successfully, length:', qrCodeDataURL.length);
-    
-    // Atualizar o campo qr_code no banco
-    await database.query(
-      'UPDATE inventory_equipment SET qr_code = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-      [qrCodeDataURL, id]
-    );
-    
-    console.log('QR code saved to database');
-    
-    res.json({
-      equipment_id: id,
-      equipment_code: equipment.internal_code,
-      qr_code: qrCodeDataURL
-    });
-    
-  } catch (error: any) {
-    console.error('Error generating equipment QR code:', error);
-    console.error('Error stack:', error.stack);
-    res.status(500).json({ error: 'Failed to generate QR code', details: error.message });
-  }
-});
-
-// Gerar QR Codes em lote
-inventoryRouter.post('/qrcodes/batch', async (req: Request, res: Response) => {
-  try {
-    const { equipment_ids } = req.body;
-    
-    if (!Array.isArray(equipment_ids) || equipment_ids.length === 0) {
-      return res.status(400).json({ error: 'equipment_ids array is required' });
-    }
-    
-    const results = [];
-    
-    for (const id of equipment_ids) {
-      try {
-        const result = await database.query(
-          'SELECT id, internal_code FROM inventory_equipment WHERE id = $1',
-          [id]
-        );
-        
-        if (result.rows.length === 0) {
-          results.push({ id, success: false, error: 'Equipment not found' });
-          continue;
-        }
-        
-        const equipment = result.rows[0];
-        const qrCodeDataURL = await QRCodeService.generateEquipmentQRCode(
-          equipment.internal_code,
-          equipment.id
-        );
-        
-        await database.query(
-          'UPDATE inventory_equipment SET qr_code = $1 WHERE id = $2',
-          [qrCodeDataURL, id]
-        );
-        
-        results.push({
-          id,
-          success: true,
-          equipment_code: equipment.internal_code,
-          qr_code: qrCodeDataURL
-        });
-      } catch (error) {
-        results.push({ id, success: false, error: 'Failed to generate QR code' });
-      }
-    }
-    
-    const successCount = results.filter(r => r.success).length;
-    
-    res.json({
-      total: equipment_ids.length,
-      success: successCount,
-      failed: equipment_ids.length - successCount,
-      results
-    });
-    
-  } catch (error: any) {
-    console.error('Error generating batch QR codes:', error);
-    res.status(500).json({ error: 'Failed to generate QR codes' });
   }
 });
 

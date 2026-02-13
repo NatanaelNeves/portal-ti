@@ -47,60 +47,103 @@ informationRouter.get("/information-articles/:id", async (req: Request, res: Res
 // Protected routes for TI/Admin - Manage knowledge base
 informationRouter.get("/knowledge", async (req: Request, res: Response) => {
   try {
+    console.log('\n🔍 GET /knowledge - Início');
     const authHeader = req.headers['authorization'] as string;
     
     if (!authHeader) {
+      console.log('❌ Token não fornecido');
       return res.status(401).json({ error: "Token não fornecido" });
     }
 
     const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, config.jwt.secret) as any;
+    console.log('Token extraído:', token.substring(0, 20) + '...');
+    
+    let decoded;
+    try {
+      decoded = jwt.verify(token, config.jwt.secret) as any;
+    } catch (tokenError: any) {
+      if (tokenError.name === 'TokenExpiredError') {
+        console.log('❌ Token expirado');
+        return res.status(401).json({ error: "Token expirado" });
+      }
+      console.log('❌ Token inválido:', tokenError.message);
+      return res.status(401).json({ error: "Token inválido" });
+    }
+    
+    console.log('Token decodificado:', { id: decoded.id, email: decoded.email, role: decoded.role, type: decoded.type });
     
     // Only TI and Admin can access
     if (decoded.role !== UserRole.ADMIN && decoded.role !== UserRole.IT_STAFF) {
+      console.log('❌ Acesso negado - Role:', decoded.role, 'Expected:', UserRole.ADMIN, 'or', UserRole.IT_STAFF);
       return res.status(403).json({ error: "Acesso negado" });
     }
 
+    console.log('✅ Buscando artigos...');
     const result = await database.query(
       "SELECT id, title, content, category, is_public, created_at, views_count FROM information_articles ORDER BY created_at DESC"
     );
+    console.log(`✅ ${result.rows.length} artigos encontrados`);
     res.json({ articles: result.rows });
   } catch (error) {
-    console.error("Error fetching articles:", error);
-    res.status(500).json({ error: "Failed to fetch articles" });
+    console.error("❌ Error fetching articles:", error);
+    console.error("Stack:", error instanceof Error ? error.stack : 'No stack');
+    res.status(500).json({ error: "Failed to fetch articles", details: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 
 informationRouter.post("/knowledge", async (req: Request, res: Response) => {
   try {
+    console.log('\n🔍 POST /knowledge - Início');
+    console.log('Headers:', req.headers.authorization);
+    
     const authHeader = req.headers['authorization'] as string;
     
     if (!authHeader) {
+      console.log('❌ Token não fornecido');
       return res.status(401).json({ error: "Token não fornecido" });
     }
 
     const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, config.jwt.secret) as any;
+    console.log('Token extraído:', token.substring(0, 20) + '...');
+    
+    let decoded;
+    try {
+      decoded = jwt.verify(token, config.jwt.secret) as any;
+    } catch (tokenError: any) {
+      if (tokenError.name === 'TokenExpiredError') {
+        console.log('❌ Token expirado');
+        return res.status(401).json({ error: "Token expirado" });
+      }
+      console.log('❌ Token inválido:', tokenError.message);
+      return res.status(401).json({ error: "Token inválido" });
+    }
+    console.log('Token decodificado:', { id: decoded.id, email: decoded.email, role: decoded.role });
     
     if (decoded.role !== UserRole.ADMIN && decoded.role !== UserRole.IT_STAFF) {
+      console.log('❌ Acesso negado - Role:', decoded.role);
       return res.status(403).json({ error: "Acesso negado" });
     }
 
     const { title, content, category, is_public } = req.body;
+    console.log('Body:', { title, content: content?.substring(0, 50) + '...', category, is_public });
 
     if (!title || !content) {
+      console.log('❌ Título ou conteúdo faltando');
       return res.status(400).json({ error: "Título e conteúdo são obrigatórios" });
     }
 
+    console.log('Executando INSERT...', { title, category, is_public, created_by_id: decoded.id });
     const result = await database.query(
-      "INSERT INTO information_articles (title, content, category, is_public, views_count) VALUES ($1, $2, $3, $4, 0) RETURNING *",
-      [title, content, category || null, is_public !== false]
+      "INSERT INTO information_articles (title, content, category, is_public, created_by_id, views_count) VALUES ($1, $2, $3, $4, $5, 0) RETURNING *",
+      [title, content, category || null, is_public !== false, decoded.id]
     );
 
+    console.log('✅ Artigo criado com sucesso:', result.rows[0].id);
     res.status(201).json(result.rows[0]);
   } catch (error) {
-    console.error("Error creating article:", error);
-    res.status(500).json({ error: "Failed to create article" });
+    console.error("❌ Error creating article:", error);
+    console.error("Stack:", error instanceof Error ? error.stack : 'No stack');
+    res.status(500).json({ error: "Failed to create article", details: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 

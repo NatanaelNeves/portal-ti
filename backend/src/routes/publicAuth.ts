@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import crypto from 'crypto';
 import { database } from '../database/connection';
+import { validate, publicAccessSchema } from '../middleware/validation';
 
 const router = express.Router();
 
@@ -10,9 +11,9 @@ function generateUserToken(): string {
 }
 
 // Register/Access as public user (without login)
-router.post('/public-access', async (req: Request, res: Response) => {
+router.post('/public-access', validate(publicAccessSchema), async (req: Request, res: Response) => {
   try {
-    const { email, name } = req.body;
+    const { email, name, department, unit } = req.body;
 
     if (!email || !name) {
       res.status(400).json({ error: 'Email and name are required' });
@@ -26,14 +27,28 @@ router.post('/public-access', async (req: Request, res: Response) => {
     );
 
     if (user.rows.length > 0) {
-      // User exists, return their token
+      // User exists, update department/unit if provided and return token
       const existingUser = user.rows[0];
+      
+      if (department || unit) {
+        await database.query(
+          `UPDATE public_users 
+           SET department = COALESCE($1, department), 
+               unit = COALESCE($2, unit),
+               last_access = CURRENT_TIMESTAMP
+           WHERE email = $3`,
+          [department, unit, email]
+        );
+      }
+      
       res.json({
         user_token: existingUser.user_token,
         user: {
           id: existingUser.id,
           email: existingUser.email,
           name: existingUser.name,
+          department: department || existingUser.department,
+          unit: unit || existingUser.unit,
           user_token: existingUser.user_token
         },
         message: 'Welcome back!',
@@ -44,10 +59,10 @@ router.post('/public-access', async (req: Request, res: Response) => {
     // Create new public user
     const userToken = generateUserToken();
     const result = await database.query(
-      `INSERT INTO public_users (email, name, user_token, last_access)
-       VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
-       RETURNING id, email, name, user_token`,
-      [email, name, userToken]
+      `INSERT INTO public_users (email, name, department, unit, user_token, last_access)
+       VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+       RETURNING id, email, name, department, unit, user_token`,
+      [email, name, department || null, unit || null, userToken]
     );
 
     res.status(201).json({

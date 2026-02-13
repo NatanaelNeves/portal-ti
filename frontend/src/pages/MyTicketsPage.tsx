@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import ConfirmDialog from '../components/ConfirmDialog';
 import '../styles/MyTicketsPage.css';
 
 interface Ticket {
@@ -21,16 +22,19 @@ export default function MyTicketsPage() {
   const [searchEmail, setSearchEmail] = useState('');
   const [searchCode, setSearchCode] = useState('');
   const [codeEmail, setCodeEmail] = useState('');
+  const [changeEmailConfirm, setChangeEmailConfirm] = useState(false);
 
   const handleChangeEmail = () => {
-    if (confirm('Deseja usar outro email? Isso irá limpar os dados do email atual.')) {
-      localStorage.removeItem('user_token');
-      localStorage.removeItem('ticket_email');
-      setEmail('');
-      setTickets([]);
-      setShowEmailForm(true);
-      setError('');
-    }
+    setChangeEmailConfirm(true);
+  };
+
+  const confirmChangeEmail = () => {
+    localStorage.removeItem('user_token');
+    localStorage.removeItem('ticket_email');
+    setEmail('');
+    setTickets([]);
+    setShowEmailForm(true);
+    setError('');
   };
 
   useEffect(() => {
@@ -145,7 +149,14 @@ export default function MyTicketsPage() {
         return;
       }
 
-      const userTickets = await ticketsResponse.json();
+      const ticketsData = await ticketsResponse.json();
+      
+      // Normalizar resposta (pode vir como {data: [...]} ou [...])
+      const userTickets = ticketsData.data && Array.isArray(ticketsData.data) 
+        ? ticketsData.data 
+        : Array.isArray(ticketsData) 
+        ? ticketsData 
+        : [];
       
       if (userTickets.length === 0) {
         setError('Nenhuma solicitação encontrada para este email');
@@ -189,6 +200,7 @@ export default function MyTicketsPage() {
         'X-User-Token': token,
       };
 
+      console.log('Buscando tickets com token:', token.substring(0, 20) + '...');
       const response = await fetch('/api/tickets', { headers });
 
       if (!response.ok) {
@@ -196,8 +208,22 @@ export default function MyTicketsPage() {
       }
 
       const data = await response.json();
-      setTickets(Array.isArray(data) ? data : []);
+      console.log('Resposta do backend:', data);
+      
+      // Backend retorna {data: [...], pagination: {...}} para usuários públicos
+      // ou apenas [...] para alguns endpoints
+      if (data.data && Array.isArray(data.data)) {
+        console.log('Tickets encontrados:', data.data.length);
+        setTickets(data.data);
+      } else if (Array.isArray(data)) {
+        console.log('Tickets encontrados (array direto):', data.length);
+        setTickets(data);
+      } else {
+        console.warn('Formato inesperado:', data);
+        setTickets([]);
+      }
     } catch (err: any) {
+      console.error('Erro ao buscar tickets:', err);
       setError(err.message || 'Erro ao carregar solicitações');
     } finally {
       setLoading(false);
@@ -370,6 +396,17 @@ export default function MyTicketsPage() {
           </div>
         )}
       </div>
+      
+      <ConfirmDialog
+        isOpen={changeEmailConfirm}
+        title="Usar Outro Email"
+        message="Deseja usar outro email? Isso irá limpar os dados do email atual e você precisará fazer login novamente."
+        confirmText="Sim, trocar email"
+        cancelText="Cancelar"
+        type="warning"
+        onConfirm={confirmChangeEmail}
+        onCancel={() => setChangeEmailConfirm(false)}
+      />
     </div>
   );
 }

@@ -77,12 +77,12 @@ const ReturnEquipmentPage: React.FC = () => {
 
   const fetchInUseEquipment = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:3001/api/inventory/equipment', {
+      const token = localStorage.getItem('internal_token');
+      const response = await axios.get('/api/inventory/equipment', {
         headers: { Authorization: `Bearer ${token}` },
         params: { status: 'in_use' }
       });
-      setInUseEquipment(response.data);
+      setInUseEquipment(response.data.equipment || []);
     } catch (err: any) {
       console.error('Erro ao buscar equipamentos:', err);
       setError('Erro ao carregar equipamentos em uso');
@@ -120,18 +120,31 @@ const ReturnEquipmentPage: React.FC = () => {
     setSuccess('');
 
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('internal_token');
+      const currentUser = JSON.parse(localStorage.getItem('internal_user') || '{}');
+      
+      // Format payload with snake_case field names to match backend
+      const payload = {
+        equipment_id: formData.equipmentId,
+        return_condition: formData.returnCondition,
+        return_checklist: formData.checklist,
+        return_problems: formData.returnProblems || 'Nenhum problema relatado',
+        return_destination: formData.returnDestination,
+        received_by_id: currentUser.id,
+        received_by_name: currentUser.name
+      };
+
       const response = await axios.post(
-        'http://localhost:3001/api/inventory/movements/return',
-        formData,
+        '/api/inventory/movements/return',
+        payload,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
       setSuccess('Equipamento devolvido com sucesso! Termo de devolução gerado.');
       
       // Abrir PDF do termo em nova aba
-      const termId = response.data.termId;
-      window.open(`http://localhost:3001/api/inventory/terms/${termId}/return-pdf`, '_blank');
+      const termId = response.data.term_id;
+      window.open(`/api/inventory/terms/${termId}/return-pdf`, '_blank');
 
       // Redirecionar após 2 segundos
       setTimeout(() => {

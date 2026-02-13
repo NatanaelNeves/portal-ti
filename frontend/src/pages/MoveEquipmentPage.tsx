@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import InventoryLayout from '../components/InventoryLayout';
+import { showToast } from '../utils/toast';
 import '../styles/MoveEquipmentPage.css';
 
 interface Equipment {
@@ -12,7 +13,7 @@ interface Equipment {
   brand: string;
   model: string;
   current_status: string;
-  current_responsible_name?: string;
+  responsible_name?: string;
   current_location?: string;
   current_unit?: string;
 }
@@ -73,7 +74,7 @@ export default function MoveEquipmentPage() {
         try {
           const token = localStorage.getItem('internal_token');
           const response = await axios.get(
-            '/api/internal-auth/usuarios',
+            '/api/internal-auth/users',
             { headers: { Authorization: `Bearer ${token}` } }
           );
           setUsers(response.data);
@@ -143,7 +144,7 @@ export default function MoveEquipmentPage() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      alert('Equipamento movimentado com sucesso!');
+      showToast.success('Equipamento movimentado com sucesso!');
       navigate(`/inventario/equipamento/${equipmentId}`);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Erro ao movimentar equipamento');
@@ -177,8 +178,8 @@ export default function MoveEquipmentPage() {
           <h3>📦 {equipment.internal_code}</h3>
           <p>{equipment.brand} {equipment.model} ({equipment.type})</p>
           <p><strong>Status:</strong> {equipment.current_status}</p>
-          {equipment.current_responsible_name && (
-            <p><strong>Responsável Atual:</strong> {equipment.current_responsible_name}</p>
+          {equipment.responsible_name && (
+            <p><strong>Responsável Atual:</strong> {equipment.responsible_name}</p>
           )}
           {equipment.current_location && (
             <p><strong>Localização Atual:</strong> {equipment.current_location}</p>

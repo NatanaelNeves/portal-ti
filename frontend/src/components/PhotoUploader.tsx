@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import axios from 'axios';
+import ConfirmDialog from './ConfirmDialog';
 import '../styles/PhotoUploader.css';
 
 interface Photo {
@@ -17,6 +18,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({ equipmentId, photos, onPh
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; filename: string | null }>({ isOpen: false, filename: null });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDrag = (e: React.DragEvent) => {
@@ -99,9 +101,11 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({ equipmentId, photos, onPh
   };
 
   const handleDelete = async (filename: string) => {
-    if (!confirm('Tem certeza que deseja deletar esta foto?')) {
-      return;
-    }
+    setDeleteConfirm({ isOpen: true, filename });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm.filename) return;
 
     try {
       const token = localStorage.getItem('token');
@@ -110,12 +114,12 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({ equipmentId, photos, onPh
         `http://localhost:3001/api/inventory/equipment/${equipmentId}/photo`,
         {
           headers: { 'Authorization': `Bearer ${token}` },
-          data: { filename }
+          data: { filename: deleteConfirm.filename }
         }
       );
 
       // Remover foto da lista
-      onPhotosChange(photos.filter(p => p.filename !== filename));
+      onPhotosChange(photos.filter(p => p.filename !== deleteConfirm.filename));
       
     } catch (err: any) {
       console.error('Erro ao deletar foto:', err);
@@ -205,8 +209,17 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({ equipmentId, photos, onPh
         <div className="no-photos">
           <p>Nenhuma foto adicionada ainda</p>
         </div>
-      )}
-    </div>
+      )}      
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        title="Deletar Foto"
+        message="Tem certeza que deseja deletar esta foto? Esta ação não pode ser desfeita."
+        confirmText="Deletar"
+        cancelText="Cancelar"
+        type="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirm({ isOpen: false, filename: null })}
+      />    </div>
   );
 };
 

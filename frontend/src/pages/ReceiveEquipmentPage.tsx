@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 // import { useNavigate } from 'react-router-dom';
 import InventoryLayout from '../components/InventoryLayout';
+import { showToast } from '../utils/toast';
 import '../styles/ReceiveEquipmentPage.css';
 
 interface Equipment {
@@ -92,7 +93,7 @@ export default function ReceiveEquipmentPage() {
 
       if (!response.ok) throw new Error('Erro ao registrar recebimento');
 
-      alert('✅ Equipamento recebido com sucesso!');
+      showToast.success('✅ Equipamento recebido com sucesso!');
       setSelectedEquipment(null);
       setFormData({
         received_date: new Date().toISOString().split('T')[0],

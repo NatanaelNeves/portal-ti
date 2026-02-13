@@ -12,8 +12,9 @@ if (!fs.existsSync(uploadDir)) {
 const equipmentPhotosDir = path.join(uploadDir, 'equipment-photos');
 const documentsDir = path.join(uploadDir, 'documents');
 const termsDir = path.join(uploadDir, 'terms');
+const ticketAttachmentsDir = path.join(uploadDir, 'ticket-attachments');
 
-[equipmentPhotosDir, documentsDir, termsDir].forEach(dir => {
+[equipmentPhotosDir, documentsDir, termsDir, ticketAttachmentsDir].forEach(dir => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -31,6 +32,8 @@ const storage = multer.diskStorage({
       uploadPath = documentsDir;
     } else if (file.fieldname === 'term') {
       uploadPath = termsDir;
+    } else if (file.fieldname === 'attachment') {
+      uploadPath = ticketAttachmentsDir;
     }
     
     cb(null, uploadPath);
@@ -84,6 +87,9 @@ export const uploadEquipmentPhoto = upload.single('equipmentPhoto');
 
 // Middleware para documento
 export const uploadDocument = upload.single('document');
+
+// Middleware para anexo de ticket
+export const uploadTicketAttachment = upload.single('attachment');
 
 // Helper para deletar arquivo
 export const deleteFile = (filePath: string): boolean => {

@@ -26,15 +26,19 @@ export default function InternalLoginPage() {
         throw new Error(data.error || 'Erro ao fazer login');
       }
 
-      const { token, user } = await response.json();
+      const { token, refreshToken, user } = await response.json();
 
       // Limpar tokens públicos (se existir)
       localStorage.removeItem('user_token');
       localStorage.removeItem('ticket_email');
 
-      // Store token interno
+      // Store token interno e refresh token
       localStorage.setItem('internal_token', token);
       localStorage.setItem('internal_user', JSON.stringify(user));
+      
+      if (refreshToken) {
+        localStorage.setItem('refreshToken', refreshToken);
+      }
 
       // Redirect based on role
       if (user.role === 'it_staff') {

@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';import StatusTimeline from '../components/StatusTimeline';import '../styles/AdminTicketDetailPage.css';
+import { useParams, useNavigate } from 'react-router-dom';
+import { showToast } from '../utils/toast';
+import StatusTimeline from '../components/StatusTimeline';
+import TicketAttachments from '../components/TicketAttachments';
+import '../styles/AdminTicketDetailPage.css';
 
 interface TicketDetail {
   id: string;
@@ -12,6 +16,10 @@ interface TicketDetail {
   updated_at: string;
   resolved_at?: string;
   requester_type: string;
+  requester_name?: string;
+  requester_email?: string;
+  requester_department?: string;
+  requester_unit?: string;
   assigned_to?: string; // UUID do usuário interno
 }
 
@@ -152,9 +160,11 @@ export default function AdminTicketDetailPage() {
       await fetchTicket(id);
       setIsEditing(false);
       setError('');
+      showToast.success('Chamado atualizado com sucesso!');
     } catch (err: any) {
       console.error('Erro ao atualizar:', err);
       setError(err.message || 'Erro ao atualizar chamado');
+      showToast.error(err.message || 'Erro ao atualizar chamado');
     } finally {
       setSubmitting(false);
     }
@@ -185,8 +195,10 @@ export default function AdminTicketDetailPage() {
       setNewMessage('');
       setIsInternalNote(false);
       await fetchTicket(id);
+      showToast.success(isInternalNote ? 'Nota interna adicionada' : 'Mensagem enviada');
     } catch (err: any) {
       setError(err.message || 'Erro ao adicionar mensagem');
+      showToast.error(err.message || 'Erro ao adicionar mensagem');
     } finally {
       setSubmitting(false);
     }
@@ -360,6 +372,31 @@ export default function AdminTicketDetailPage() {
               <label>📝 Descrição:</label>
               <div className="value value-description">{ticket.description}</div>
             </div>
+
+            {/* Informações do Solicitante */}
+            {ticket.requester_type === 'public' && (
+              <>
+                <div className="info-item">
+                  <label>👤 Solicitante:</label>
+                  <div className="value">{ticket.requester_name || 'Não informado'}</div>
+                </div>
+
+                <div className="info-item">
+                  <label>📧 Email:</label>
+                  <div className="value">{ticket.requester_email || 'Não informado'}</div>
+                </div>
+
+                <div className="info-item">
+                  <label>🏢 Setor:</label>
+                  <div className="value">{ticket.requester_department || 'Não informado'}</div>
+                </div>
+
+                <div className="info-item">
+                  <label>🏛️ Unidade:</label>
+                  <div className="value">{ticket.requester_unit || 'Não informado'}</div>
+                </div>
+              </>
+            )}
 
             <div className="info-item">
               <label>🏷️ Tipo:</label>
@@ -541,6 +578,12 @@ export default function AdminTicketDetailPage() {
             </button>
           </form>
         </div>
+
+        {/* Anexos */}
+        <TicketAttachments 
+          ticketId={ticket.id}
+          authToken={internalToken || ''}
+        />
       </div>
     </div>
   );

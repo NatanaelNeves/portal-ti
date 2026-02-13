@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import InventoryLayout from '../components/InventoryLayout';
 import '../styles/PeripheralsPage.css';
+import '../styles/InventoryButtons.css';
 
 interface Peripheral {
   id: string;
@@ -72,11 +73,13 @@ export default function PeripheralsPage() {
   const getStatusBadge = (status: string) => {
     const badges: any = {
       available: { icon: '🟢', text: 'Disponível', class: 'status-available' },
+      in_stock: { icon: '🟢', text: 'Em Estoque', class: 'status-available' },
       in_use: { icon: '🔵', text: 'Em Uso', class: 'status-in-use' },
       maintenance: { icon: '🟡', text: 'Manutenção', class: 'status-maintenance' },
+      in_maintenance: { icon: '🟡', text: 'Manutenção', class: 'status-maintenance' },
       retired: { icon: '🔴', text: 'Baixado', class: 'status-retired' }
     };
-    return badges[status] || badges.available;
+    return badges[status] || { icon: '⚫', text: status, class: 'status-unknown' };
   };
 
   const getTypeIcon = (type: string) => {
@@ -119,16 +122,11 @@ export default function PeripheralsPage() {
           </div>
           <div className="header-actions">
             <button
-              className="btn btn-primary"
+              className="btn btn-outline"
               onClick={() => navigate('/inventario/equipamentos/novo')}
+              title="Cadastrar novo periférico"
             >
-              ➕ Cadastrar Periférico
-            </button>
-            <button
-              className="btn btn-secondary"
-              onClick={() => navigate('/inventario/perifericos/lote')}
-            >
-              📦 Cadastro em Lote
+              <span className="btn-icon">➕</span> Cadastrar Periférico
             </button>
           </div>
         </div>
@@ -242,12 +240,12 @@ export default function PeripheralsPage() {
               </tr>
             </thead>
             <tbody>
-              {peripherals.map((peripheral) => {
+              {peripherals.map((peripheral, index) => {
                 const status = getStatusBadge(peripheral.current_status);
                 const typeIcon = getTypeIcon(peripheral.type);
 
                 return (
-                  <tr key={peripheral.id}>
+                  <tr key={`${peripheral.id}-${index}`}>
                     <td>
                       <strong>{peripheral.internal_code}</strong>
                     </td>
@@ -287,28 +285,42 @@ export default function PeripheralsPage() {
                     </td>
                     <td>{peripheral.current_unit || '-'}</td>
                     <td className="actions">
-                      <button
-                        className="btn btn-sm btn-secondary"
-                        onClick={() => navigate(`/inventario/equipamento/${peripheral.id}`)}
-                      >
-                        📋
-                      </button>
-                      {peripheral.current_status === 'available' && (
+                      <div className="btn-group">
                         <button
-                          className="btn btn-sm btn-primary"
-                          onClick={() => navigate(`/inventario/equipamentos/entregar?equipment=${peripheral.id}`)}
+                          className="btn btn-sm btn-view"
+                          onClick={() => navigate(`/inventario/equipamento/${peripheral.id}`)}
+                          title="Ver detalhes"
                         >
-                          📤 Entregar
+                          <span className="btn-icon">📋</span> Detalhes
                         </button>
-                      )}
-                      {peripheral.current_status === 'in_use' && (
-                        <button
-                          className="btn btn-sm btn-warning"
-                          onClick={() => navigate(`/inventario/equipamentos/devolver?equipment=${peripheral.id}`)}
-                        >
-                          ↩️
-                        </button>
-                      )}
+                        {(peripheral.current_status === 'available' || peripheral.current_status === 'in_stock') && (
+                          <button
+                            className="btn btn-sm btn-deliver"
+                            onClick={() => navigate('/inventario/equipamentos/entregar')}
+                            title="Entregar equipamento"
+                          >
+                            <span className="btn-icon">📤</span> Entregar
+                          </button>
+                        )}
+                        {peripheral.current_status === 'in_use' && (
+                          <>
+                            <button
+                              className="btn btn-sm btn-move"
+                              onClick={() => navigate(`/inventario/equipamento/${peripheral.id}/movimentar`)}
+                              title="Transferir equipamento"
+                            >
+                              <span className="btn-icon">🔄</span> Transferir
+                            </button>
+                            <button
+                              className="btn btn-sm btn-return"
+                              onClick={() => navigate(`/inventario/equipamentos/devolver?equipment=${peripheral.id}`)}
+                              title="Devolver equipamento"
+                            >
+                              <span className="btn-icon">📥</span> Devolver
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

@@ -11,6 +11,8 @@ class Database {
       user: config.database.user,
       password: config.database.password,
       database: config.database.database,
+      // Forçar encoding UTF-8 para suportar caracteres especiais
+      client_encoding: 'UTF8',
     });
 
     this.pool.on('error', (err) => {

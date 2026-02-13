@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import InventoryLayout from '../components/InventoryLayout';
 import { ExcelExportService } from '../services/excelExportService';
 import '../styles/NotebooksPage.css';
+import '../styles/InventoryButtons.css';
 
 interface Notebook {
   id: string;
@@ -65,11 +66,13 @@ export default function NotebooksPage() {
   const getStatusBadge = (status: string) => {
     const badges: any = {
       available: { icon: '🟢', text: 'Disponível', class: 'status-available' },
+      in_stock: { icon: '🟢', text: 'Em Estoque', class: 'status-available' },
       in_use: { icon: '🔵', text: 'Em Uso', class: 'status-in-use' },
       maintenance: { icon: '🟡', text: 'Manutenção', class: 'status-maintenance' },
+      in_maintenance: { icon: '🟡', text: 'Manutenção', class: 'status-maintenance' },
       retired: { icon: '🔴', text: 'Baixado', class: 'status-retired' }
     };
-    return badges[status] || badges.available;
+    return badges[status] || { icon: '⚫', text: status, class: 'status-unknown' };
   };
 
   const getConditionBadge = (condition: string) => {
@@ -109,17 +112,19 @@ export default function NotebooksPage() {
           </div>
           <div className="header-actions">
             <button
-              className="btn btn-secondary"
+              className="btn btn-outline"
               onClick={() => ExcelExportService.exportNotebooks(notebooks)}
               disabled={notebooks.length === 0}
+              title="Exportar lista para Excel"
             >
-              📊 Exportar Excel
+              <span className="btn-icon">📊</span> Exportar Excel
             </button>
             <button
               className="btn btn-primary"
               onClick={() => navigate('/inventario/equipamentos/novo')}
+              title="Cadastrar novo notebook"
             >
-              ➕ Cadastrar Notebook
+              <span className="btn-icon">➕</span> Cadastrar Notebook
             </button>
           </div>
         </div>
@@ -197,12 +202,12 @@ export default function NotebooksPage() {
               </tr>
             </thead>
             <tbody>
-              {notebooks.map((notebook) => {
+              {notebooks.map((notebook, index) => {
                 const status = getStatusBadge(notebook.current_status);
                 const condition = getConditionBadge(notebook.physical_condition);
 
                 return (
-                  <tr key={notebook.id}>
+                  <tr key={`${notebook.id}-${index}`}>
                     <td>
                       <strong>{notebook.internal_code}</strong>
                       <br />
@@ -244,28 +249,42 @@ export default function NotebooksPage() {
                     </td>
                     <td>{notebook.current_unit || '-'}</td>
                     <td className="actions">
-                      <button
-                        className="btn btn-sm btn-secondary"
-                        onClick={() => navigate(`/inventario/equipamento/${notebook.id}`)}
-                      >
-                        📋 Detalhes
-                      </button>
-                      {notebook.current_status === 'available' && (
+                      <div className="btn-group">
                         <button
-                          className="btn btn-sm btn-primary"
-                          onClick={() => navigate(`/inventario/equipamentos/entregar?equipment=${notebook.id}`)}
+                          className="btn btn-sm btn-view"
+                          onClick={() => navigate(`/inventario/equipamento/${notebook.id}`)}
+                          title="Ver detalhes"
                         >
-                          📤 Entregar
+                          <span className="btn-icon">📋</span> Detalhes
                         </button>
-                      )}
-                      {notebook.current_status === 'in_use' && (
-                        <button
-                          className="btn btn-sm btn-warning"
-                          onClick={() => navigate(`/inventario/equipamentos/devolver?equipment=${notebook.id}`)}
-                        >
-                          ↩️ Devolver
-                        </button>
-                      )}
+                        {(notebook.current_status === 'available' || notebook.current_status === 'in_stock') && (
+                          <button
+                            className="btn btn-sm btn-deliver"
+                            onClick={() => navigate('/inventario/equipamentos/entregar')}
+                            title="Entregar equipamento"
+                          >
+                            <span className="btn-icon">📤</span> Entregar
+                          </button>
+                        )}
+                        {notebook.current_status === 'in_use' && (
+                          <>
+                            <button
+                              className="btn btn-sm btn-move"
+                              onClick={() => navigate(`/inventario/equipamento/${notebook.id}/movimentar`)}
+                              title="Transferir equipamento"
+                            >
+                              <span className="btn-icon">🔄</span> Transferir
+                            </button>
+                            <button
+                              className="btn btn-sm btn-return"
+                              onClick={() => navigate(`/inventario/equipamentos/devolver?equipment=${notebook.id}`)}
+                              title="Devolver equipamento"
+                            >
+                              <span className="btn-icon">📥</span> Devolver
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

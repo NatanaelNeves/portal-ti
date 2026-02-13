@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import api from '../services/api';
+import ConfirmDialog from '../components/ConfirmDialog';
 import '../styles/KnowledgeManagementPage.css';
 
 interface Article {
@@ -19,6 +21,7 @@ export default function KnowledgeManagementPage() {
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingArticle, setEditingArticle] = useState<Article | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; articleId: string | null }>({ isOpen: false, articleId: null });
   const [formData, setFormData] = useState({
     title: '',
     content: '',
@@ -38,19 +41,14 @@ export default function KnowledgeManagementPage() {
   const fetchArticles = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('internal_token');
-      const response = await fetch('/api/knowledge', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setArticles(data.articles || []);
-      }
-    } catch (err) {
-      setError('Erro ao carregar artigos');
+      console.log('📚 Carregando artigos...');
+      const response = await api.get('/knowledge');
+      console.log('✅ Artigos carregados:', response.data.articles?.length || 0);
+      setArticles(response.data.articles || []);
+      setError('');
+    } catch (err: any) {
+      console.error('❌ Erro ao carregar artigos:', err);
+      setError(err.response?.data?.error || 'Erro ao carregar artigos');
     } finally {
       setLoading(false);
     }
@@ -58,37 +56,32 @@ export default function KnowledgeManagementPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const token = localStorage.getItem('internal_token');
+    
+    if (!formData.title.trim() || !formData.content.trim()) {
+      setError('Título e conteúdo são obrigatórios');
+      return;
+    }
 
     try {
-      const url = editingArticle 
-        ? `/api/knowledge/${editingArticle.id}` 
-        : '/api/knowledge';
-      const method = editingArticle ? 'PUT' : 'POST';
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(formData),
-      });
-
-      if (response.ok) {
-        setShowForm(false);
-        setEditingArticle(null);
-        setFormData({ title: '', content: '', category: '', is_public: true });
-        fetchArticles();
+      if (editingArticle) {
+        await api.put(`/knowledge/${editingArticle.id}`, formData);
       } else {
-        setError('Erro ao salvar artigo');
+        await api.post('/knowledge', formData);
       }
-    } catch (err) {
-      setError('Erro ao salvar artigo');
+      
+      setShowForm(false);
+      setEditingArticle(null);
+      setFormData({ title: '', content: '', category: '', is_public: true });
+      setError('');
+      fetchArticles();
+    } catch (err: any) {
+      console.error('Erro ao salvar artigo:', err);
+      setError(err.response?.data?.error || 'Erro ao salvar artigo');
     }
   };
 
   const handleEdit = (article: Article) => {
+    console.log('🔧 Editando artigo:', article.id, article.title);
     setEditingArticle(article);
     setFormData({
       title: article.title,
@@ -97,25 +90,24 @@ export default function KnowledgeManagementPage() {
       is_public: article.is_public,
     });
     setShowForm(true);
+    // Scroll para o formulário
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Deseja realmente excluir este artigo?')) return;
+    setDeleteConfirm({ isOpen: true, articleId: id });
+  };
 
-    const token = localStorage.getItem('internal_token');
+  const confirmDelete = async () => {
+    if (!deleteConfirm.articleId) return;
+
     try {
-      const response = await fetch(`/api/knowledge/${id}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        fetchArticles();
-      }
-    } catch (err) {
-      setError('Erro ao excluir artigo');
+      await api.delete(`/knowledge/${deleteConfirm.articleId}`);
+      setError('');
+      fetchArticles();
+    } catch (err: any) {
+      console.error('Erro ao excluir artigo:', err);
+      setError(err.response?.data?.error || 'Erro ao excluir artigo');
     }
   };
 
@@ -233,13 +225,24 @@ export default function KnowledgeManagementPage() {
                 <div className="article-actions">
                   <button
                     className="btn btn-secondary btn-sm"
-                    onClick={() => handleEdit(article)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      console.log('🖱️ Botão editar clicado para:', article.title);
+                      handleEdit(article);
+                    }}
+                    type="button"
                   >
                     ✏️ Editar
                   </button>
                   <button
                     className="btn btn-danger btn-sm"
-                    onClick={() => handleDelete(article.id)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleDelete(article.id);
+                    }}
+                    type="button"
                   >
                     🗑️ Excluir
                   </button>
@@ -249,6 +252,17 @@ export default function KnowledgeManagementPage() {
           )}
         </div>
       )}
+      
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        title="Excluir Artigo"
+        message="Deseja realmente excluir este artigo? Esta ação não pode ser desfeita."
+        confirmText="Excluir"
+        cancelText="Cancelar"
+        type="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirm({ isOpen: false, articleId: null })}
+      />
     </div>
   );
 }

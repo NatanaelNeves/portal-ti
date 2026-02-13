@@ -10,6 +10,8 @@ export async function initializeDatabase(): Promise<void> {
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         email VARCHAR(255) NOT NULL,
         name VARCHAR(255) NOT NULL,
+        department VARCHAR(255),
+        unit VARCHAR(255),
         user_token VARCHAR(255) UNIQUE NOT NULL,
         is_active BOOLEAN DEFAULT true,
         last_access TIMESTAMP,
@@ -31,6 +33,27 @@ export async function initializeDatabase(): Promise<void> {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
+    `);
+
+    // Tabela de refresh tokens para renovação automática de JWT
+    await database.query(`
+      CREATE TABLE IF NOT EXISTS refresh_tokens (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES internal_users(id) ON DELETE CASCADE,
+        token VARCHAR(500) UNIQUE NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        is_revoked BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Índice para melhorar performance na busca de tokens
+    await database.query(`
+      CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens(token);
+    `);
+
+    await database.query(`
+      CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
     `);
 
     // Legacy users table (mantendo para compatibilidade)
@@ -678,6 +701,23 @@ export async function initializeDatabase(): Promise<void> {
       END $$;
     `);
     console.log('✓ Colunas do responsibility_terms atualizadas');
+
+    // Migração 013: Adicionar department e unit aos public_users
+    await database.query(`
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name='public_users' AND column_name='department') THEN
+          ALTER TABLE public_users ADD COLUMN department VARCHAR(255);
+        END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name='public_users' AND column_name='unit') THEN
+          ALTER TABLE public_users ADD COLUMN unit VARCHAR(255);
+        END IF;
+      END $$;
+    `);
+    console.log('✓ Colunas department e unit adicionadas em public_users');
 
     // Criar novos índices para inventário
     await database.query(`

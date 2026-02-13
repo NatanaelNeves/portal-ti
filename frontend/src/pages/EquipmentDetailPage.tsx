@@ -4,14 +4,52 @@ import InventoryLayout from '../components/InventoryLayout';
 import PhotoUploader from '../components/PhotoUploader';
 import DocumentUploader from '../components/DocumentUploader';
 import '../styles/EquipmentDetailPage.css';
+import '../styles/InventoryButtons.css';
+
+// Função para traduzir tipos de movimentação
+const translateMovementType = (type: string): string => {
+  const translations: { [key: string]: string } = {
+    'delivery': 'Entrega',
+    'return': 'Devolução',
+    'transfer': 'Transferência',
+    'maintenance': 'Manutenção',
+    'disposal': 'Baixa',
+    'entrega': 'Entrega',
+    'devolução': 'Devolução',
+    'transferência': 'Transferência',
+    'manutenção': 'Manutenção',
+    'baixa': 'Baixa'
+  };
+  return translations[type] || type;
+};
+
+// Função para traduzir motivos comuns
+const translateReason = (reason: string): string => {
+  const translations: { [key: string]: string } = {
+    'uso_diario': 'Uso diário',
+    'daily_use': 'Uso diário',
+    'home_office': 'Home office',
+    'new_hire': 'Novo contratado',
+    'replacement': 'Substituição',
+    'project': 'Projeto específico',
+    'Devolução': 'Devolução'
+  };
+  return translations[reason] || reason;
+};
 
 interface Movement {
   id: string;
   movement_type: string;
-  from_location: string;
-  to_location: string;
-  reason: string;
+  movement_number: string;
+  from_user_name?: string;
+  to_user_name?: string;
+  from_location?: string;
+  to_location?: string;
+  from_unit?: string;
+  to_unit?: string;
+  reason?: string;
   movement_date: string;
+  registered_by_name?: string;
 }
 
 interface ResponsibilityTerm {
@@ -47,7 +85,7 @@ interface Equipment {
   physical_condition: string;
   current_status: string;
   current_location: string;
-  current_responsible_name: string;
+  responsible_name?: string;
   acquisition_date: string;
   warranty_expiration: string;
 }
@@ -178,19 +216,24 @@ export default function EquipmentDetailPage() {
                   <dl className="info-list">
                     <dt>Status</dt><dd><span className="badge" style={{ backgroundColor: statusColors[equipment.current_status] }}>{statusLabels[equipment.current_status]}</span></dd>
                     <dt>Localização</dt><dd>{equipment.current_location || '-'}</dd>
-                    <dt>Responsável</dt><dd>{equipment.current_responsible_name || '-'}</dd>
+                    <dt>Responsável</dt><dd>{equipment.responsible_name || '-'}</dd>
                     <dt>Aquisição</dt><dd>{equipment.acquisition_date ? new Date(equipment.acquisition_date).toLocaleDateString('pt-BR') : '-'}</dd>
                     <dt>Garantia</dt><dd>{equipment.warranty_expiration ? (new Date(equipment.warranty_expiration) > new Date() ? new Date(equipment.warranty_expiration).toLocaleDateString('pt-BR') : `Expirada em ${new Date(equipment.warranty_expiration).toLocaleDateString('pt-BR')}`) : 'Sem garantia'}</dd>
                   </dl>
                 </div>
               </div>
               <div className="card card-actions">
-                <h3>⚡ Ações</h3>
-                <div className="action-buttons">
-                  <button className="btn btn-primary" onClick={() => navigate(`/inventario/equipamento/${equipmentId}/assinar-termo`)}>✍️ Novo Termo</button>
-                  <button className="btn btn-secondary" onClick={() => navigate(`/inventario/equipamento/${equipmentId}/movimentar`)}>↔️ Movimentar</button>
-                  <button className="btn btn-outline" onClick={() => navigate(`/inventario/equipamento/${equipmentId}/qrcode`)}>📱 Gerar QR Code</button>
-                  <button className="btn btn-outline" onClick={() => window.print()}>🖨️ Imprimir</button>
+                <h3>⚡ Ações Rápidas</h3>
+                <div className="action-buttons-grid">
+                  <button className="btn btn-new-term" onClick={() => navigate(`/inventario/equipamento/${equipmentId}/assinar-termo`)}>
+                    <span className="btn-icon">✍️</span> Novo Termo
+                  </button>
+                  <button className="btn btn-move" onClick={() => navigate(`/inventario/equipamento/${equipmentId}/movimentar`)}>
+                    <span className="btn-icon">↔️</span> Movimentar
+                  </button>
+                  <button className="btn btn-print" onClick={() => window.print()}>
+                    <span className="btn-icon">🖨️</span> Imprimir
+                  </button>
                 </div>
               </div>
             </div>
@@ -202,24 +245,31 @@ export default function EquipmentDetailPage() {
                 <div className="empty-state">📭 Sem movimentações</div>
               ) : (
                 <div className="timeline">
-                  {movements.map(m => (
-                    <div key={m.id} className="timeline-item">
-                      <div className="timeline-marker">
-                        {m.movement_type === 'entrega' && '📤'}
-                        {m.movement_type === 'devolução' && '📥'}
-                        {m.movement_type === 'transferência' && '↔️'}
-                        {m.movement_type === 'manutenção' && '🔧'}
-                        {m.movement_type === 'baixa' && '🗑️'}
+                  {movements.map(m => {
+                    const typeTranslated = translateMovementType(m.movement_type);
+                    const fromInfo = m.from_user_name || m.from_location || 'Estoque TI';
+                    const toInfo = m.to_user_name || m.to_location || 'Estoque TI';
+                    
+                    return (
+                      <div key={m.id} className="timeline-item">
+                        <div className="timeline-marker">
+                          {['delivery', 'entrega'].includes(m.movement_type) && '📤'}
+                          {['return', 'devolução'].includes(m.movement_type) && '📥'}
+                          {['transfer', 'transferência'].includes(m.movement_type) && '↔️'}
+                          {['maintenance', 'manutenção'].includes(m.movement_type) && '🔧'}
+                          {['disposal', 'baixa'].includes(m.movement_type) && '🗑️'}
+                        </div>
+                        <div className="timeline-card">
+                          <h4>{typeTranslated}</h4>
+                          <time>{m.movement_date ? new Date(m.movement_date).toLocaleDateString('pt-BR') : '-'}</time>
+                          <p><strong>De:</strong> {fromInfo}{m.from_unit ? ` (${m.from_unit})` : ''}</p>
+                          <p><strong>Para:</strong> {toInfo}{m.to_unit ? ` (${m.to_unit})` : ''}</p>
+                          {m.reason && <p><strong>Motivo:</strong> {translateReason(m.reason)}</p>}
+                          {m.registered_by_name && <p className="text-muted"><small>Registrado por: {m.registered_by_name}</small></p>}
+                        </div>
                       </div>
-                      <div className="timeline-card">
-                        <h4>{m.movement_type}</h4>
-                        <time>{m.movement_date ? new Date(m.movement_date).toLocaleDateString('pt-BR') : '-'}</time>
-                        <p><strong>De:</strong> {m.from_location}</p>
-                        <p><strong>Para:</strong> {m.to_location}</p>
-                        {m.reason && <p><strong>Motivo:</strong> {m.reason}</p>}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

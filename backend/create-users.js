@@ -25,7 +25,7 @@ async function createUsers() {
       {
         email: 'ti@opequenonazareno.org.br',
         name: 'Suporte TI',
-        password: 'ti123',
+        password: 'ti1234',
         role: 'it_staff'
       },
       {
@@ -74,7 +74,7 @@ async function createUsers() {
     console.log('EQUIPE DE TI:');
     console.log('  URL: http://localhost:3000/login-interno');
     console.log('  Email: ti@opequenonazareno.org.br');
-    console.log('  Senha: ti123\n');
+    console.log('  Senha: ti1234\n');
     
     console.log('GESTOR:');
     console.log('  URL: http://localhost:3000/login-interno');

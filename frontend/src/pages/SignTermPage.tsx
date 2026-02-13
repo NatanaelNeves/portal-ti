@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import InventoryLayout from '../components/InventoryLayout';
+import { showToast } from '../utils/toast';
 import '../styles/SignTermPage.css';
 
 interface FormData {
@@ -160,8 +161,8 @@ export default function SignTermPage() {
         throw new Error(errorData.error || 'Erro ao criar termo de responsabilidade');
       }
 
-      const result = await response.json();
-      alert('Termo criado com sucesso!');
+      await response.json();
+      showToast.success('Termo criado com sucesso!');
       navigate(`/inventario/equipamento/${equipmentId}`);
     } catch (err: any) {
       setError(err.message);

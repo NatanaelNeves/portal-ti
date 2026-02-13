@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { showToast } from '../utils/toast';
 import '../styles/OpenTicketPage.css';
 
 interface FormData {
   email: string;
   name: string;
+  department: string;
+  unit: string;
   title: string;
   description: string;
   type: string;
@@ -16,6 +19,8 @@ export default function OpenTicketPage() {
   const [formData, setFormData] = useState<FormData>({
     email: '',
     name: '',
+    department: '',
+    unit: '',
     title: '',
     description: '',
     type: 'incident',
@@ -38,6 +43,30 @@ export default function OpenTicketPage() {
     setSuccess('');
     setLoading(true);
 
+    // Validação client-side
+    if (formData.title.length < 5) {
+      setError('Título deve ter no mínimo 5 caracteres');
+      showToast.error('Título deve ter no mínimo 5 caracteres');
+      setLoading(false);
+      return;
+    }
+
+    if (formData.description.length < 10) {
+      setError('Descrição deve ter no mínimo 10 caracteres');
+      showToast.error('Descrição deve ter no mínimo 10 caracteres');
+      setLoading(false);
+      return;
+    }
+
+    console.log('Iniciando criação de chamado...', {
+      email: formData.email,
+      name: formData.name,
+      title: formData.title,
+      type: formData.type,
+      priority: formData.priority,
+      descLength: formData.description.length
+    });
+
     try {
       // First, get access token for public user
       const accessResponse = await fetch('/api/public-auth/public-access', {
@@ -46,14 +75,19 @@ export default function OpenTicketPage() {
         body: JSON.stringify({
           email: formData.email,
           name: formData.name,
+          department: formData.department,
+          unit: formData.unit,
         }),
       });
 
       if (!accessResponse.ok) {
-        throw new Error('Erro ao registrar usuário');
+        const errorData = await accessResponse.json().catch(() => ({}));
+        console.error('Erro ao obter token:', errorData);
+        throw new Error(errorData.error || 'Erro ao registrar usuário');
       }
 
       const { user_token } = await accessResponse.json();
+      console.log('Token obtido com sucesso');
 
       // Create ticket
       const ticketResponse = await fetch('/api/tickets', {
@@ -71,7 +105,12 @@ export default function OpenTicketPage() {
       });
 
       if (!ticketResponse.ok) {
-        throw new Error('Erro ao criar chamado');
+        const errorData = await ticketResponse.json().catch(() => ({}));
+        console.error('Erro ao criar chamado:', errorData);
+        const errorMessage = errorData.details 
+          ? `${errorData.error}: ${errorData.details}` 
+          : errorData.error || 'Erro ao criar chamado';
+        throw new Error(errorMessage);
       }
 
       const { id } = await ticketResponse.json();
@@ -83,6 +122,7 @@ export default function OpenTicketPage() {
       
       const ticketCode = id.substring(0, 8).toUpperCase();
       setSuccess(ticketCode);
+      showToast.success(`Chamado #${ticketCode} criado com sucesso!`);
 
       // Redirect after 4 seconds
       setTimeout(() => {
@@ -90,6 +130,7 @@ export default function OpenTicketPage() {
       }, 4000);
     } catch (err: any) {
       setError(err.message || 'Erro ao criar chamado');
+      showToast.error(err.message || 'Erro ao criar chamado. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -151,7 +192,7 @@ export default function OpenTicketPage() {
                   placeholder="seu@email.com"
                 />
               </div>
-              <div className="form-group">
+               <div className="form-group">
                 <label htmlFor="name">Nome Completo</label>
                 <input
                   id="name"
@@ -161,6 +202,30 @@ export default function OpenTicketPage() {
                   onChange={handleChange}
                   required
                   placeholder="Seu Nome"
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="department">Setor</label>
+                <input
+                  id="department"
+                  type="text"
+                  name="department"
+                  value={formData.department}
+                  onChange={handleChange}
+                  placeholder="Ex: Educação, Saúde, Administração"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="unit">Unidade</label>
+                <input
+                  id="unit"
+                  type="text"
+                  name="unit"
+                  value={formData.unit}
+                  onChange={handleChange}
+                  placeholder="Ex: CAPS, Escola Municipal X"
                 />
               </div>
             </div>
@@ -207,6 +272,7 @@ export default function OpenTicketPage() {
                   <option value="incident">Problema Técnico</option>
                   <option value="request">Pedido de Material/Serviço</option>
                   <option value="change">Alteração de Configuração</option>
+                  <option value="problem">Investigação de Problema</option>
                 </select>
               </div>
 
@@ -221,7 +287,6 @@ export default function OpenTicketPage() {
                   <option value="low">Baixo - Pode esperar alguns dias</option>
                   <option value="medium">Médio - Afeta minhas atividades</option>
                   <option value="high">Alto - Dificulta muito o trabalho</option>
-                  <option value="critical">Crítico - Impede o atendimento</option>
                 </select>
               </div>
             </div>

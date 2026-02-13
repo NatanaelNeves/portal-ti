@@ -74,12 +74,28 @@ const DeliverEquipmentPage: React.FC = () => {
 
   const fetchAvailableEquipment = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:3001/api/inventory/equipment', {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { status: 'available' }
+      const token = localStorage.getItem('internal_token');
+      
+      // Buscar todos os equipamentos e filtrar os disponíveis
+      const response = await axios.get('/api/inventory/equipment', {
+        headers: { Authorization: `Bearer ${token}` }
       });
-      setAvailableEquipment(response.data);
+      
+      const allEquipment = response.data.equipment || [];
+      
+      // Filtrar equipamentos disponíveis (in_stock ou available)
+      const available = allEquipment.filter((eq: Equipment) => 
+        eq.current_status === 'in_stock' || eq.current_status === 'available'
+      );
+      
+      console.log('Total equipment:', allEquipment.length);
+      console.log('Available equipment:', available.length);
+      
+      setAvailableEquipment(available);
+      
+      if (available.length === 0) {
+        setError('Nenhum equipamento disponível para entrega no momento');
+      }
     } catch (err: any) {
       console.error('Erro ao buscar equipamentos:', err);
       setError('Erro ao carregar equipamentos disponíveis');
@@ -132,25 +148,60 @@ const DeliverEquipmentPage: React.FC = () => {
 
     try {
       const token = localStorage.getItem('internal_token');
+      const userStr = localStorage.getItem('internalUser');
+      const user = userStr ? JSON.parse(userStr) : null;
+
+      // Enviar dados no formato que o backend espera (snake_case)
+      const payload = {
+        equipment_id: formData.equipmentId,
+        responsible_name: formData.responsibleName,
+        responsible_cpf: formData.responsibleCpf,
+        responsible_email: formData.responsibleEmail,
+        responsible_phone: formData.responsiblePhone,
+        responsible_department: formData.responsibleDepartment,
+        responsible_unit: formData.responsibleUnit,
+        delivery_reason: formData.deliveryReason,
+        delivery_notes: formData.deliveryNotes,
+        issued_by_id: user?.id || null,
+        issued_by_name: user?.full_name || 'Sistema'
+      };
+
+      console.log('📤 Enviando requisição:', payload);
+
       const response = await axios.post(
         '/api/inventory/movements/deliver',
-        formData,
+        payload,
         { headers: { Authorization: `Bearer ${token}` } }
       );
+
+      console.log('✅ Resposta recebida:', response.data);
 
       setSuccess('Equipamento entregue com sucesso! Termo de responsabilidade gerado.');
       
       // Abrir PDF do termo em nova aba
-      const termId = response.data.termId;
-      window.open(`/api/inventory/terms/${termId}/delivery-pdf`, '_blank');
+      const termId = response.data.termId || response.data.term?.id;
+      console.log('📄 Term ID:', termId);
+      
+      if (termId) {
+        window.open(`/api/inventory/terms/${termId}/delivery-pdf?token=${token}`, '_blank');
+      } else {
+        console.error('❌ termId não encontrado na resposta');
+      }
 
       // Redirecionar após 2 segundos
       setTimeout(() => {
-        navigate('/inventario');
+        navigate('/inventario/responsabilidades');
       }, 2000);
     } catch (err: any) {
-      console.error('Erro ao entregar equipamento:', err);
-      setError(err.response?.data?.message || 'Erro ao entregar equipamento');
+      console.error('❌ Erro ao entregar equipamento:', err);
+      console.error('Detalhes:', err.response?.data);
+      
+      const errorMsg = err.response?.data?.details || 
+                       err.response?.data?.error || 
+                       err.response?.data?.message || 
+                       'Erro ao entregar equipamento';
+      
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }

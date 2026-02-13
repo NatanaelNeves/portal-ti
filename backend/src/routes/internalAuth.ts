@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { database } from '../database/connection';
 import { config } from '../config/environment';
+import { validate, loginSchema, registerSchema } from '../middleware/validation';
 
 const router = express.Router();
 
@@ -14,7 +15,7 @@ interface InternalUser {
 }
 
 // Login for internal staff
-router.post('/internal-login', async (req: Request, res: Response) => {
+router.post('/internal-login', validate(loginSchema), async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
 
@@ -44,7 +45,7 @@ router.post('/internal-login', async (req: Request, res: Response) => {
       return;
     }
 
-    // Generate JWT token
+    // Generate JWT token (7 dias - sem refresh token)
     const token = jwt.sign(
       {
         id: user.id,
@@ -54,7 +55,7 @@ router.post('/internal-login', async (req: Request, res: Response) => {
         type: 'internal',
       },
       config.jwt.secret as string,
-      { expiresIn: config.jwt.expiration } as any
+      { expiresIn: '7d' }
     );
 
     res.json({
@@ -73,7 +74,7 @@ router.post('/internal-login', async (req: Request, res: Response) => {
 });
 
 // Create internal user (admin and IT staff)
-router.post('/internal-register', async (req: Request, res: Response) => {
+router.post('/internal-register', validate(registerSchema), async (req: Request, res: Response) => {
   try {
     const { email, name, password, role = 'it_staff' } = req.body;
     const token = req.headers.authorization?.split(' ')[1];
@@ -166,6 +167,8 @@ router.post('/verify-internal-token', async (req: Request, res: Response) => {
   }
 });
 
+// Endpoint de refresh removido - usando JWT de 7 dias sem renovação
+
 // Get all internal users (admin only)
 router.get('/users', async (req: Request, res: Response) => {
   try {
@@ -176,25 +179,176 @@ router.get('/users', async (req: Request, res: Response) => {
       return;
     }
 
+    try {
+      const decoded = jwt.verify(token, config.jwt.secret as string) as InternalUser & {
+        role: string;
+      };
+
+      // Admins, IT staff, and managers can list users
+      if (decoded.role !== 'admin' && decoded.role !== 'it_staff' && decoded.role !== 'manager') {
+        res.status(403).json({ error: 'Access denied' });
+        return;
+      }
+
+      const result = await database.query(
+        `SELECT id, email, name, role, is_active, created_at 
+         FROM internal_users 
+         ORDER BY created_at DESC`
+      );
+
+      res.json(result.rows);
+    } catch (jwtError: any) {
+      // Se o erro for token expirado ou inválido, retornar 401
+      if (jwtError.name === 'TokenExpiredError' || jwtError.name === 'JsonWebTokenError') {
+        res.status(401).json({ error: 'Token expired or invalid' });
+        return;
+      }
+      throw jwtError;
+    }
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update user (admin only)
+router.put('/users/:id', async (req: Request, res: Response) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    const userId = req.params.id;
+    const { name, email, role } = req.body;
+
+    if (!token) {
+      res.status(401).json({ error: 'No token provided' });
+      return;
+    }
+
     const decoded = jwt.verify(token, config.jwt.secret as string) as InternalUser & {
       role: string;
     };
 
-    // Admins, IT staff, and managers can list users
-    if (decoded.role !== 'admin' && decoded.role !== 'it_staff' && decoded.role !== 'manager') {
-      res.status(403).json({ error: 'Access denied' });
+    // Only admins can update users
+    if (decoded.role !== 'admin') {
+      res.status(403).json({ error: 'Only admins can update users' });
       return;
     }
 
     const result = await database.query(
-      `SELECT id, email, name, role, is_active, created_at 
-       FROM internal_users 
-       ORDER BY created_at DESC`
+      `UPDATE internal_users 
+       SET name = $1, email = $2, role = $3 
+       WHERE id = $4 
+       RETURNING id, email, name, role, is_active, created_at`,
+      [name, email, role, userId]
     );
 
-    res.json(result.rows);
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    res.json(result.rows[0]);
   } catch (error) {
-    console.error('Error fetching users:', error);
+    console.error('Error updating user:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Toggle user active status (admin only)
+router.patch('/users/:id/toggle-status', async (req: Request, res: Response) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    const userId = req.params.id;
+
+    if (!token) {
+      res.status(401).json({ error: 'No token provided' });
+      return;
+    }
+
+    const decoded = jwt.verify(token, config.jwt.secret as string) as InternalUser & {
+      role: string;
+    };
+
+    // Only admins can toggle user status
+    if (decoded.role !== 'admin') {
+      res.status(403).json({ error: 'Only admins can change user status' });
+      return;
+    }
+
+    const result = await database.query(
+      `UPDATE internal_users 
+       SET is_active = NOT is_active 
+       WHERE id = $1 
+       RETURNING id, email, name, role, is_active, created_at`,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error toggling user status:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Reset user password (admin only)
+router.post('/users/:id/reset-password', async (req: Request, res: Response) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    const userId = req.params.id;
+    const { newPassword } = req.body;
+
+    if (!token) {
+      res.status(401).json({ error: 'No token provided' });
+      return;
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+      res.status(400).json({ error: 'Password must be at least 6 characters' });
+      return;
+    }
+
+    const decoded = jwt.verify(token, config.jwt.secret as string) as InternalUser & {
+      role: string;
+    };
+
+    // Only admins can reset passwords
+    if (decoded.role !== 'admin') {
+      res.status(403).json({ error: 'Only admins can reset passwords' });
+      return;
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    const result = await database.query(
+      `UPDATE internal_users 
+       SET password_hash = $1 
+       WHERE id = $2 
+       RETURNING id, email, name`,
+      [hashedPassword, userId]
+    );
+
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    res.json({ message: 'Password reset successfully', user: result.rows[0] });
+  } catch (error) {
+    console.error('Error resetting password:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Logout - sem necessidade de revogar token (frontend apenas limpa localStorage)
+router.post('/logout', async (req: Request, res: Response) => {
+  try {
+    res.json({ message: 'Logged out successfully' });
+  } catch (error) {
+    console.error('Error logging out:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

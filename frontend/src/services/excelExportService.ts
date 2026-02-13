@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { showToast } from '../utils/toast';
 
 export interface ExportColumn {
   header: string;
@@ -22,7 +23,7 @@ export class ExcelExportService {
     sheetName: string = 'Dados'
   ): void {
     if (data.length === 0) {
-      alert('Não há dados para exportar');
+      showToast.warning('Não há dados para exportar');
       return;
     }
 

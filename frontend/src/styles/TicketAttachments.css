@@ -1,0 +1,222 @@
+/* Ticket Attachments Component */
+.ticket-attachments {
+  margin: 20px 0;
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.attachments-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.attachments-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 18px;
+}
+
+.btn-upload {
+  padding: 8px 16px;
+  background: #007A33;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.3s;
+}
+
+.btn-upload:hover {
+  background: #005a24;
+}
+
+.btn-upload:active {
+  transform: scale(0.98);
+}
+
+.alert {
+  padding: 12px 16px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  font-size: 14px;
+}
+
+.alert-error {
+  background: #ffebee;
+  color: #c62828;
+  border-left: 4px solid #c62828;
+}
+
+.alert-success {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border-left: 4px solid #2e7d32;
+}
+
+.attachments-info {
+  background: #f5f5f5;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+}
+
+.attachments-info small {
+  color: #666;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.attachments-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #999;
+}
+
+.attachments-empty .empty-icon {
+  font-size: 48px;
+  display: block;
+  margin-bottom: 10px;
+}
+
+.attachments-empty p {
+  margin: 10px 0 5px;
+  font-size: 16px;
+  color: #666;
+}
+
+.attachments-empty small {
+  color: #999;
+  font-size: 13px;
+}
+
+.attachments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.attachment-card {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+  transition: all 0.2s;
+}
+
+.attachment-card:hover {
+  background: #f0f0f0;
+  border-color: #007A33;
+  box-shadow: 0 2px 6px rgba(0, 122, 51, 0.1);
+}
+
+.attachment-icon {
+  font-size: 32px;
+  min-width: 40px;
+  text-align: center;
+}
+
+.attachment-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.attachment-name {
+  font-weight: 500;
+  color: #333;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+
+.attachment-meta {
+  display: flex;
+  gap: 8px;
+  color: #666;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+
+.attachment-meta span {
+  white-space: nowrap;
+}
+
+.attachment-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-download,
+.btn-delete {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 18px;
+  transition: all 0.2s;
+  text-decoration: none;
+}
+
+.btn-download {
+  background: #4A90E2;
+  color: white;
+}
+
+.btn-download:hover {
+  background: #357ABD;
+}
+
+.btn-delete {
+  background: #dc3545;
+  color: white;
+}
+
+.btn-delete:hover {
+  background: #c82333;
+}
+
+.btn-download:active,
+.btn-delete:active {
+  transform: scale(0.95);
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  .attachments-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .btn-upload {
+    width: 100%;
+    text-align: center;
+  }
+
+  .attachment-card {
+    flex-wrap: wrap;
+  }
+
+  .attachment-icon {
+    font-size: 24px;
+    min-width: 30px;
+  }
+
+  .attachment-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

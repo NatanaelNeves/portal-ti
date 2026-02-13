@@ -5,8 +5,13 @@ import '../styles/CreatePurchasePage.css';
 
 export default function CreatePurchasePage() {
   const [formData, setFormData] = useState({
+    item_type: '',
     item_description: '',
+    specifications: '',
     quantity: 1,
+    priority: 'normal',
+    reason: '',
+    needed_by_date: '',
     estimated_value: '',
     supplier: '',
     expected_delivery_date: '',
@@ -28,14 +33,21 @@ export default function CreatePurchasePage() {
     setSuccess(false);
 
     // Validação
-    if (!formData.item_description || !formData.quantity) {
-      setError('Preenchimento obrigatório: Descrição e Quantidade');
+    if (!formData.item_type || !formData.item_description || !formData.reason || !formData.quantity) {
+      setError('Preenchimento obrigatório: Tipo, Descrição, Motivo e Quantidade');
       return;
     }
 
     try {
       setLoading(true);
       const token = localStorage.getItem('internal_token');
+      const userData = localStorage.getItem('internal_user');
+      
+      if (!userData) {
+        throw new Error('Usuário não autenticado');
+      }
+      
+      const user = JSON.parse(userData);
 
       const response = await fetch('/api/inventory/requisitions', {
         method: 'POST',
@@ -44,18 +56,38 @@ export default function CreatePurchasePage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ...formData,
+          requested_by_id: user.id,
+          requester_name: user.name,
+          requester_department: user.department || '',
+          requester_unit: user.unit || 'Unidade Central',
+          item_type: formData.item_type,
+          item_description: formData.item_description,
+          specifications: formData.specifications || null,
           quantity: parseInt(formData.quantity.toString()),
+          priority: formData.priority,
+          reason: formData.reason,
+          needed_by_date: formData.needed_by_date || null,
           estimated_value: formData.estimated_value ? parseFloat(formData.estimated_value) : null,
+          supplier: formData.supplier || null,
+          expected_delivery_date: formData.expected_delivery_date || null,
+          notes: formData.notes || null,
         }),
       });
 
-      if (!response.ok) throw new Error('Erro ao criar solicitação de compra');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao criar solicitação de compra');
+      }
 
       setSuccess(true);
       setFormData({
+        item_type: '',
         item_description: '',
+        specifications: '',
         quantity: 1,
+        priority: 'normal',
+        reason: '',
+        needed_by_date: '',
         estimated_value: '',
         supplier: '',
         expected_delivery_date: '',
@@ -87,6 +119,31 @@ export default function CreatePurchasePage() {
           <div className="form-container">
             <form onSubmit={handleSubmit} className="create-form">
               <div className="form-group">
+                <label htmlFor="item_type">Tipo de Item *</label>
+                <select
+                  id="item_type"
+                  name="item_type"
+                  value={formData.item_type}
+                  onChange={handleInputChange as any}
+                  required
+                >
+                  <option value="">Selecione o tipo</option>
+                  <option value="Notebook">Notebook</option>
+                  <option value="Desktop">Desktop</option>
+                  <option value="Monitor">Monitor</option>
+                  <option value="Mouse">Mouse</option>
+                  <option value="Teclado">Teclado</option>
+                  <option value="Headset">Headset</option>
+                  <option value="Webcam">Webcam</option>
+                  <option value="Impressora">Impressora</option>
+                  <option value="Switch">Switch</option>
+                  <option value="Roteador">Roteador</option>
+                  <option value="Nobreak">Nobreak</option>
+                  <option value="Outro">Outro</option>
+                </select>
+              </div>
+
+              <div className="form-group">
                 <label htmlFor="item_description">Descrição do Item *</label>
                 <input
                   id="item_description"
@@ -95,6 +152,31 @@ export default function CreatePurchasePage() {
                   placeholder="ex: Notebook Dell Latitude 5520"
                   value={formData.item_description}
                   onChange={handleInputChange}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="specifications">Especificações Técnicas</label>
+                <textarea
+                  id="specifications"
+                  name="specifications"
+                  placeholder="ex: Intel i7, 16GB RAM, 512GB SSD, Tela 15.6 Full HD"
+                  value={formData.specifications}
+                  onChange={handleInputChange}
+                  rows={2}
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="reason">Motivo da Solicitação *</label>
+                <textarea
+                  id="reason"
+                  name="reason"
+                  placeholder="Explique por que este item é necessário..."
+                  value={formData.reason}
+                  onChange={handleInputChange}
+                  rows={3}
                   required
                 />
               </div>
@@ -115,6 +197,21 @@ export default function CreatePurchasePage() {
                 </div>
 
                 <div className="form-group">
+                  <label htmlFor="priority">Prioridade</label>
+                  <select
+                    id="priority"
+                    name="priority"
+                    value={formData.priority}
+                    onChange={handleInputChange as any}
+                  >
+                    <option value="low">Baixa</option>
+                    <option value="normal">Normal</option>
+                    <option value="high">Alta</option>
+                    <option value="urgent">Urgente</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
                   <label htmlFor="estimated_value">Valor Estimado (R$)</label>
                   <input
                     id="estimated_value"
@@ -130,6 +227,17 @@ export default function CreatePurchasePage() {
               </div>
 
               <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="needed_by_date">Necessário Até</label>
+                  <input
+                    id="needed_by_date"
+                    type="date"
+                    name="needed_by_date"
+                    value={formData.needed_by_date}
+                    onChange={handleInputChange}
+                  />
+                </div>
+
                 <div className="form-group">
                   <label htmlFor="supplier">Fornecedor Sugerido</label>
                   <input
@@ -155,14 +263,14 @@ export default function CreatePurchasePage() {
               </div>
 
               <div className="form-group">
-                <label htmlFor="notes">Observações</label>
+                <label htmlFor="notes">Observações Adicionais</label>
                 <textarea
                   id="notes"
                   name="notes"
-                  placeholder="Adicione observações sobre a solicitação..."
+                  placeholder="Outras informações relevantes..."
                   value={formData.notes}
                   onChange={handleInputChange}
-                  rows={4}
+                  rows={3}
                 />
               </div>
 

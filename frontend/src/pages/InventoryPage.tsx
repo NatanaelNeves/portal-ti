@@ -19,7 +19,7 @@ interface Notebook {
   current_unit: string;
   current_status: string;
   physical_condition: string;
-  current_responsible_name?: string;
+  responsible_name?: string;
 }
 
 interface Peripheral {
@@ -312,8 +312,8 @@ export default function InventoryPage() {
                           </span>
                         </td>
                         <td>
-                          {notebook.current_responsible_name ? (
-                            <span className="responsible-name">👤 {notebook.current_responsible_name}</span>
+                          {notebook.responsible_name ? (
+                            <span className="responsible-name">👤 {notebook.responsible_name}</span>
                           ) : (
                             <span className="no-responsible">—</span>
                           )}

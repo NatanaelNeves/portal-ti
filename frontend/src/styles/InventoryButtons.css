@@ -1,0 +1,223 @@
+/* Estilos Globais para Botões do Inventário */
+
+/* Botões de Ação */
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.action-buttons-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-top: 15px;
+}
+
+/* Botões Base */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none;
+  white-space: nowrap;
+  background: #667eea;
+  color: white;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  filter: brightness(1.1);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* Tamanhos */
+.btn-sm {
+  padding: 8px 14px;
+  font-size: 13px;
+  gap: 5px;
+}
+
+.btn-lg {
+  padding: 12px 24px;
+  font-size: 15px;
+}
+
+/* Cores Padronizadas */
+.btn-primary {
+  background: #667eea;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #5568d3;
+}
+
+.btn-secondary {
+  background: #4facfe;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #3d96e8;
+}
+
+.btn-success {
+  background: #10b981;
+  color: white;
+}
+
+.btn-success:hover {
+  background: #059669;
+}
+
+.btn-warning {
+  background: #f59e0b;
+  color: white;
+}
+
+.btn-warning:hover {
+  background: #d97706;
+}
+
+.btn-danger {
+  background: #ef4444;
+  color: white;
+}
+
+.btn-danger:hover {
+  background: #dc2626;
+}
+
+.btn-info {
+  background: #3b82f6;
+  color: white;
+}
+
+.btn-info:hover {
+  background: #2563eb;
+}
+
+/* Outline */
+.btn-outline {
+  background: white;
+  border: 1.5px solid #d1d5db;
+  color: #6b7280;
+}
+
+.btn-outline:hover {
+  background: #f9fafb;
+  border-color: #667eea;
+  color: #667eea;
+}
+
+/* Botões específicos - cores únicas e consistentes */
+.btn-view {
+  background: #3b82f6;
+  color: white;
+}
+
+.btn-view:hover {
+  background: #2563eb;
+}
+
+.btn-deliver {
+  background: #10b981;
+  color: white;
+}
+
+.btn-deliver:hover {
+  background: #059669;
+}
+
+.btn-move {
+  background: #f59e0b;
+  color: white;
+}
+
+.btn-move:hover {
+  background: #d97706;
+}
+
+.btn-return {
+  background: #ef4444;
+  color: white;
+}
+
+.btn-return:hover {
+  background: #dc2626;
+}
+
+.btn-new-term {
+  background: #667eea;
+  color: white;
+}
+
+.btn-new-term:hover {
+  background: #5568d3;
+}
+
+.btn-print {
+  background: white;
+  border: 1.5px solid #d1d5db;
+  color: #6b7280;
+}
+
+.btn-print:hover {
+  background: #f9fafb;
+  border-color: #6b7280;
+}
+
+/* Grupo de Botões */
+.btn-group {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Ícones */
+.btn-icon {
+  display: inline;
+  font-size: 1em;
+  line-height: 1;
+  margin-right: 2px;
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  .action-buttons-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .btn-group {
+    width: 100%;
+  }
+  
+  .btn-group .btn {
+    flex: 1;
+    min-width: 0;
+  }
+}

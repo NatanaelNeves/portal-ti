@@ -34,8 +34,19 @@ dashboardRouter.get("/admin", async (req: Request, res: Response) => {
 
       if (status === 'open') openTickets = count;
       else if (status === 'in_progress') inProgressTickets = count;
-      else if (status === 'resolved' || status === 'closed') resolvedTickets += count;
+      // NÃO mais contar resolved/closed aqui - será contado abaixo apenas os de HOJE
     });
+
+    // Contar tickets resolvidos HOJE (não todos)
+    const resolvedTodayResult = await database.query(`
+      SELECT COUNT(*) as count 
+      FROM tickets 
+      WHERE (status = 'resolved' OR status = 'closed')
+        AND DATE(updated_at) = CURRENT_DATE
+    `);
+    resolvedTickets = parseInt(resolvedTodayResult.rows[0].count || 0);
+    
+    console.log(`Resolvidos HOJE: ${resolvedTickets}`);
 
     // Chamados por prioridade
     const priorityResult = await database.query(`
@@ -100,8 +111,17 @@ dashboardRouter.get("/gestor", async (req: Request, res: Response) => {
 
       if (status === 'open') openTickets = count;
       else if (status === 'in_progress') inProgressTickets = count;
-      else if (status === 'resolved' || status === 'closed') resolvedTickets += count;
+      // NÃO mais contar resolved/closed aqui - será contado abaixo apenas os de HOJE
     });
+
+    // Contar tickets resolvidos HOJE (não todos)
+    const resolvedTodayResult = await database.query(`
+      SELECT COUNT(*) as count 
+      FROM tickets 
+      WHERE (status = 'resolved' OR status = 'closed')
+        AND DATE(updated_at) = CURRENT_DATE
+    `);
+    resolvedTickets = parseInt(resolvedTodayResult.rows[0].count || 0);
 
     // Chamados por prioridade
     const priorityResult = await database.query(`

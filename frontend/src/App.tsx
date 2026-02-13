@@ -2,6 +2,7 @@ import './styles/App.css';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useAuthStore } from './stores/authStore';
+import { Toaster } from 'react-hot-toast';
 
 // Public Pages
 import HomePage from './pages/HomePage';
@@ -21,6 +22,7 @@ import GestorTicketsPage from './pages/GestorTicketsPage';
 import DashboardPage from './pages/DashboardPage';
 import KnowledgeManagementPage from './pages/KnowledgeManagementPage';
 import UsersManagementPage from './pages/UsersManagementPage';
+import ReportsPage from './pages/ReportsPage';
 
 // Inventory Module Pages
 import InventoryDashboardPage from './pages/InventoryDashboardPage';
@@ -37,7 +39,6 @@ import ReceiveEquipmentPage from './pages/ReceiveEquipmentPage';
 import CreatePurchasePage from './pages/CreatePurchasePage';
 import DeliverEquipmentPage from './pages/DeliverEquipmentPage';
 import ReturnEquipmentPage from './pages/ReturnEquipmentPage';
-import QRCodeGeneratorPage from './pages/QRCodeGeneratorPage';
 import MoveEquipmentPage from './pages/MoveEquipmentPage';
 
 // Components
@@ -60,6 +61,7 @@ function App() {
   return (
     <Router>
       <div className="app">
+        <Toaster />
         <Navigation />
         <main className="main-content">
           <Routes>
@@ -80,7 +82,7 @@ function App() {
             <Route path="/admin/usuarios" element={<InternalProtectedRoute><UsersManagementPage /></InternalProtectedRoute>} />
             <Route path="/admin/estoque" element={<InternalProtectedRoute><InventoryPage /></InternalProtectedRoute>} />
             <Route path="/admin/documentos" element={<InternalProtectedRoute><DashboardPage /></InternalProtectedRoute>} />
-            <Route path="/admin/relatorios" element={<InternalProtectedRoute><DashboardPage /></InternalProtectedRoute>} />
+            <Route path="/admin/relatorios" element={<InternalProtectedRoute><ReportsPage /></InternalProtectedRoute>} />
 
             {/* Inventory Module Routes - IT Staff Only */}
             <Route path="/inventario" element={<InternalProtectedRoute requireITStaff={true}><InventoryDashboardPage /></InternalProtectedRoute>} />
@@ -96,7 +98,6 @@ function App() {
             <Route path="/inventario/compras/nova" element={<InternalProtectedRoute requireITStaff={true}><CreatePurchasePage /></InternalProtectedRoute>} />
             <Route path="/inventario/equipamento/:equipmentId" element={<InternalProtectedRoute requireITStaff={true}><EquipmentDetailPage /></InternalProtectedRoute>} />
             <Route path="/inventario/equipamento/:equipmentId/movimentar" element={<InternalProtectedRoute requireITStaff={true}><MoveEquipmentPage /></InternalProtectedRoute>} />
-            <Route path="/inventario/equipamento/:id/qrcode" element={<InternalProtectedRoute requireITStaff={true}><QRCodeGeneratorPage /></InternalProtectedRoute>} />
             <Route path="/inventario/equipamento/:equipmentId/assinar-termo" element={<InternalProtectedRoute requireITStaff={true}><SignTermPage /></InternalProtectedRoute>} />
             <Route path="/inventario/termo/:termId/devolucao" element={<InternalProtectedRoute requireITStaff={true}><ReturnTermPage /></InternalProtectedRoute>} />
 
