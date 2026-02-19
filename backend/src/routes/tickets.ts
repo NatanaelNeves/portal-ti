@@ -980,5 +980,60 @@ ticketsRouter.delete('/:id/attachments/:attachmentId', async (req: Request, res:
   }
 });
 
+/**
+ * GET /:id/history - Buscar histórico de um ticket
+ */
+ticketsRouter.get('/:id/history', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userToken = req.headers['x-user-token'] as string;
+    const authHeader = req.headers['authorization'] as string;
+
+    if (!userToken && !authHeader) {
+      return res.status(401).json({ error: 'Autenticação necessária' });
+    }
+
+    // Verificar se ticket existe
+    const ticket = await database.query('SELECT * FROM tickets WHERE id = $1', [id]);
+    if (!ticket.rows.length) {
+      return res.status(404).json({ error: 'Chamado não encontrado' });
+    }
+
+    // Se for usuário público, verificar se é o dono do ticket
+    if (userToken) {
+      const publicUser = await database.query(
+        'SELECT id FROM public_users WHERE user_token = $1',
+        [userToken]
+      );
+
+      if (!publicUser.rows.length || ticket.rows[0].requester_id !== publicUser.rows[0].id) {
+        return res.status(403).json({ error: 'Acesso negado' });
+      }
+    }
+
+    // Buscar histórico
+    const history = await database.query(
+      `SELECT 
+        h.*,
+        CASE 
+          WHEN h.changed_by_id IS NOT NULL THEN
+            COALESCE(u.name, pu.name, 'Sistema')
+          ELSE 'Sistema'
+        END as changed_by_name
+       FROM ticket_history h
+       LEFT JOIN users u ON u.id = h.changed_by_id
+       LEFT JOIN public_users pu ON pu.id = h.changed_by_id
+       WHERE h.ticket_id = $1 
+       ORDER BY h.created_at DESC`,
+      [id]
+    );
+
+    res.json({ history: history.rows });
+  } catch (error) {
+    console.error('Error fetching ticket history:', error);
+    res.status(500).json({ error: 'Failed to fetch ticket history' });
+  }
+});
+
 export default ticketsRouter;
 

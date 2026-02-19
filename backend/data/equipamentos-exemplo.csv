@@ -1,0 +1,11 @@
+code,type,brand,model,serial_number,processor,ram,storage,status,location,notes
+NB-001,notebook,Dell,Latitude 5420,SN001ABC,Intel i5 11th Gen,16GB,512GB SSD,available,TI,Novo - em estoque
+NB-002,notebook,Lenovo,ThinkPad E14,SN002DEF,Intel i5 10th Gen,8GB,256GB SSD,in_use,Administrativo,Em uso pela secretaria
+NB-003,notebook,HP,ProBook 450,SN003GHI,Intel i7 11th Gen,16GB,1TB SSD,available,TI,Recém chegado
+DT-001,desktop,Dell,OptiPlex 3080,SN004JKL,Intel i3 10th Gen,8GB,500GB HDD,in_use,Recepção,Desktop recepção
+DT-002,desktop,HP,EliteDesk 800,SN005MNO,Intel i5 10th Gen,16GB,512GB SSD,available,TI,Disponível
+MN-001,monitor,LG,24MK430H,SN006PQR,N/A,N/A,N/A,in_use,Administrativo,Monitor 24" LED
+MN-002,monitor,Samsung,S24F350,SN007STU,N/A,N/A,N/A,available,TI,Monitor 24" disponível
+KB-001,keyboard,Logitech,K120,SN008VWX,N/A,N/A,N/A,available,TI,Teclado USB
+MS-001,mouse,Logitech,M170,SN009YZA,N/A,N/A,N/A,available,TI,Mouse wireless
+PR-001,printer,HP,LaserJet Pro M404dn,SN010BCD,N/A,N/A,N/A,in_use,Administrativo,Impressora laser

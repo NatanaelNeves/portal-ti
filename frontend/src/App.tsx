@@ -44,6 +44,7 @@ import MoveEquipmentPage from './pages/MoveEquipmentPage';
 // Components
 import Navigation from './components/Navigation';
 import InternalProtectedRoute from './components/InternalProtectedRoute';
+import ToastContainer from './components/ToastContainer';
 
 function App() {
   const { loadStoredUser } = useAuthStore();
@@ -62,6 +63,7 @@ function App() {
     <Router>
       <div className="app">
         <Toaster />
+        <ToastContainer />
         <Navigation />
         <main className="main-content">
           <Routes>

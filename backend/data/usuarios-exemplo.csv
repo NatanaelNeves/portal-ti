@@ -1,0 +1,6 @@
+email,name,role,password
+ti@pequeno-nazareno.org,Equipe TI,it_staff,ti2024!
+coordenador@pequeno-nazareno.org,Maria Coordenadora,manager,coord123
+admin@pequeno-nazareno.org,Administrador Sistema,admin,admin456
+suporte1@pequeno-nazareno.org,João Técnico,it_staff,suporte123
+suporte2@pequeno-nazareno.org,Ana Técnica,it_staff,suporte123
