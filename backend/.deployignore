@@ -1,0 +1,11 @@
+web.config
+.git
+.github
+.vscode
+*.md
+tests
+coverage
+src
+tsconfig.json
+*.ts
+!dist/**/*

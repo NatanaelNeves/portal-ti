@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  NODE_VERSION: '18.x'
+  NODE_VERSION: '20.x'
 
 jobs:
   build-and-deploy-backend:
@@ -25,16 +25,21 @@ jobs:
     
     - name: Install dependencies
       working-directory: ./backend
-      run: npm ci
+      run: npm ci --production
     
     - name: Build application
       working-directory: ./backend
       run: npm run build
     
-    - name: Zip artifact for deployment
+    - name: Create deployment package
       working-directory: ./backend
       run: |
-        zip -r ../backend-deploy.zip . -x "node_modules/*" -x ".git/*"
+        mkdir -p deploy
+        cp -r dist deploy/
+        cp -r node_modules deploy/
+        cp package*.json deploy/
+        cd deploy
+        zip -r ../../backend-deploy.zip .
     
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v2
