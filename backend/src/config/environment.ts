@@ -11,6 +11,7 @@ export const config = {
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || '123',
     database: process.env.DB_NAME || 'portal_ti',
+    ssl: process.env.DB_SSL === 'true',
   },
   jwt: {
     secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',

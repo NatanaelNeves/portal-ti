@@ -17,6 +17,7 @@ async function initDatabase() {
       host: process.env.DB_HOST,
       port: parseInt(process.env.DB_PORT || '5432'),
       database: process.env.DB_NAME,
+      ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
     });
 
     const client = await pool.connect();

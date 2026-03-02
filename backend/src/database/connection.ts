@@ -13,6 +13,8 @@ class Database {
       database: config.database.database,
       // Forçar encoding UTF-8 para suportar caracteres especiais
       client_encoding: 'UTF8',
+      // SSL para Azure PostgreSQL
+      ssl: config.database.ssl ? { rejectUnauthorized: false } : false,
     });
 
     this.pool.on('error', (err) => {
