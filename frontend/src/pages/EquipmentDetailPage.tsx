@@ -289,7 +289,6 @@ export default function EquipmentDetailPage() {
                           {t.status === 'active' && '✓ Ativo'}
                           {t.status === 'returned' && '📥 Devolvido'}
                           {t.status === 'cancelled' && '❌ Cancelado'}
-                          {t.status === 'transferred' && '↔️ Transferido'}
                         </span>
                       </div>
                       <div className="term-actions">
