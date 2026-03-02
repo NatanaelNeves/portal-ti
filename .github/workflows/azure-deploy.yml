@@ -25,11 +25,17 @@ jobs:
     
     - name: Install dependencies
       working-directory: ./backend
-      run: npm ci --production
+      run: npm ci
     
     - name: Build application
       working-directory: ./backend
       run: npm run build
+    
+    - name: Install production dependencies
+      working-directory: ./backend
+      run: |
+        rm -rf node_modules
+        npm ci --production
     
     - name: Create deployment package
       working-directory: ./backend
