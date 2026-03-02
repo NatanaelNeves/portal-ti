@@ -1,0 +1,383 @@
+<step title="Incoming Request" date="2026-03-02T13:52:33.607" instance="d48e77" url="/api/publish?type=zip&amp;async=False" method="POST" type="request" pid="831,1,19" Accept="*/*" Host="portal-ti-backend.scm.azurewebsites.net" User-Agent="AZURECLI/2.83.0 (MSI)" Accept-Encoding="gzip, deflate" Authorization="Bea..." Cache-Control="no-cache" Content-Type="application/octet-stream" Cookie="ARRAffinity=d48e7722c44716b2d3b260fd39937cd26b4df2c1aad200418e83e1648d9c8bd5; ARRAffinitySameSite=d48e7722c44716b2d3b260fd39937cd26b4df2c1aad200418e83e1648d9c8bd5" Content-Length="130212" x-ms-client-request-id="09957083-163f-11f1-9b28-d027885dde40" x-ms-artifact-checksum="1e783d06085ad6f89c3d5027413c662e00f0781915f820ec7debd57575e9820b" X-ARR-LOG-ID="09957083-163f-11f1-9b28-d027885dde40" CLIENT-IP="168.232.86.116:56809" X-SITE-DEPLOYMENT-ID="portal-ti-backend" WAS-DEFAULT-HOSTNAME="portal-ti-backend.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/api/publish?type=zip&amp;async=False" X-Client-IP="168.232.86.116" X-Client-Port="56809" >
+  <step title="Cleanup Xml Logs" date="2026-03-02T13:52:33.618" /><!-- duration: 31ms -->
+  <step title="OneDeploy" date="2026-03-02T13:52:34.060" >
+    <step title="None repository commit" date="2026-03-02T13:52:34.102" >
+      <step title="Commit id: 29f0679d-6c22-41b3-a70c-560d1b34929c" date="2026-03-02T13:52:34.128" Message="N/A" AuthorName="N/A" AuthorEmail="N/A" /><!-- duration: 20ms -->
+    </step><!-- duration: 66ms -->
+    <step title="Starting PushDeployAsync" date="2026-03-02T13:52:34.192" /><!-- duration: 14ms -->
+    <step title="Writing artifact to /tmp/zipdeploy/5a36d02a-0d13-44d5-9f71-dce59d42d0cd.zip" date="2026-03-02T13:52:34.309" >
+      <step title="Writing multipart request body to /tmp/zipdeploy/5a36d02a-0d13-44d5-9f71-dce59d42d0cd.zip" date="2026-03-02T13:52:34.341" /><!-- duration: 18ms -->
+    </step><!-- duration: 364ms -->
+    <step title="Attempting to fetch target branch HEAD" date="2026-03-02T13:52:34.855" /><!-- duration: 14ms -->
+    <step title="Acquiring Deployment Lock" date="2026-03-02T13:52:34.904" /><!-- duration: 38ms -->
+    <step title="Acquired Deployment Lock" date="2026-03-02T13:52:35.158" /><!-- duration: 18ms -->
+    <step title="Performing fetch based deployment" date="2026-03-02T13:52:35.236" >
+      <step title="Creating temporary deployment" date="2026-03-02T13:52:35.288" /><!-- duration: 380ms -->
+      <step title="Releasing Deployment Lock" date="2026-03-02T13:52:37.224" /><!-- duration: 14ms -->
+      <step title="Cleaning up temp folders from previous zip deployments and extracting pushed zip file /tmp/zipdeploy/5a36d02a-0d13-44d5-9f71-dce59d42d0cd.zip (0.12 MB) to /tmp/zipdeploy/extracted" date="2026-03-02T13:52:37.317" >
+        <step title="ChmodRecursive Process exited with total time taken in ms: 75" date="2026-03-02T13:52:37.655" /><!-- duration: 10ms -->
+      </step><!-- duration: 355ms -->
+      <step title="None repository commit" date="2026-03-02T13:52:37.677" >
+        <step title="Commit id: 29f0679d-6c22-41b3-a70c-560d1b34929c" date="2026-03-02T13:52:37.683" Message="OneDeploy" AuthorName="N/A" AuthorEmail="N/A" /><!-- duration: 4ms -->
+      </step><!-- duration: 15ms -->
+      <step title="Deployment timer started" date="2026-03-02T13:52:39.697" >
+        <step title="DeploymentManager.Deploy(id:29f0679d-6c22-41b3-a70c-560d1b34929c)" date="2026-03-02T13:52:39.706" >
+          <step title="Collecting changeset information" date="2026-03-02T13:52:39.729" /><!-- duration: 82ms -->
+          <step title="Updating submodules" date="2026-03-02T13:52:39.822" /><!-- duration: 1142ms -->
+          <step title="Determining deployment builder" date="2026-03-02T13:52:41.280" >
+            <step title="Builder is OneDeployBuilder" date="2026-03-02T13:52:41.300" /><!-- duration: 5ms -->
+          </step><!-- duration: 31ms -->
+          <step title="PreDeployment: context.CleanOutputPath False" date="2026-03-02T13:52:41.384" >
+            <step title="PreDeployment: context.OutputPath /home/site/wwwroot" date="2026-03-02T13:52:41.527" >
+              <step title="Building" date="2026-03-02T13:52:41.864" >
+                <step title="Executing external process" date="2026-03-02T13:52:43.111" type="process" path="starter.sh" arguments="/opt/Kudu/Scripts/parallel_rsync.sh /tmp/zipdeploy/extracted /home/site/wwwroot 8 /tmp/ False False  " >
+                  <step title="Process dump" date="2026-03-02T13:53:28.101" exitCode="123" type="processOutput" /><!-- duration: 6ms -->
+                </step><!-- duration: 45009ms -->
+                <step title="Error occurred" date="2026-03-02T13:53:28.330" type="error" text="rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\index.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\auth.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\rateLimiter.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\validation.test.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\database\connection.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\Asset.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\rateLimiter.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\rateLimiter.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\database\schema.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\index.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\User.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\auth.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\Asset.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\RefreshToken.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\RefreshToken.test.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\Ticket.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\User.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\assets.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\dashboard.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\knowledge.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\knowledge.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\tickets.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\excelReportService.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\websocketService.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\auth.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\authorization.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\validation.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\validation.test.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\RefreshToken.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\config\environment.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\database\connection.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\index.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\authorization.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\validation.test.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\RefreshToken.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\RefreshToken.test.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\RefreshToken.test.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\Ticket.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\assets.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\auth.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\internalAuth.test.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\publicAuth.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\dashboard.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\inventory.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\publicAuth.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\publicAuth.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\purchases.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\emailService.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\qrcodeService.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\RefreshToken.test.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\Ticket.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\excelReportService.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\excelReportService.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\pdfService.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\pdfService.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\qrcodeService.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\qrcodeService.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\dashboard.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\internalAuth.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\uploadService.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\websocketService.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\config\environment.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\types\enums.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\inventory.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\publicAuth.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\database\connection.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\tickets.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\types\enums.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\types\enums.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\validation.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\RefreshToken.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\User.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\assets.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\dashboard.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\internalAuth.test.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\internalAuth.test.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\internalAuth.test.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\inventory.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\config\environment.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\purchases.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\purchases.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\tickets.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\pdfService.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\websocketService.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\database\schema.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\auth.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\database\connection.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\database\schema.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\types\enums.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\authorization.d.ts.map&quot;: Invalid argument (22)
+rsync error: some files/attrs were not transferred (see previous errors) (code 23) at main.c(1338) [sender=3.2.7]
+rsync error: some files/attrs were not transferred (see previous errors) (code 23) at main.c(1338) [sender=3.2.7]
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\authorization.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\database\schema.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\index.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\validation.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\Asset.js&quot;: Invalid argument (22)
+rsync error: some files/attrs were not transferred (see previous errors) (code 23) at main.c(1338) [sender=3.2.7]
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\User.d.ts&quot;: Invalid argument (22)
+rsync error: some files/attrs were not transferred (see previous errors) (code 23) at main.c(1338) [sender=3.2.7]
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\auth.js.map&quot;: Invalid argument (22)
+rsync error: some files/attrs were not transferred (see previous errors) (code 23) at main.c(1338) [sender=3.2.7]
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\internalAuth.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\validation.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\validation.test.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\inventory.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\knowledge.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\Asset.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\Ticket.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\reports.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\reports.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\assets.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\internalAuth.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\knowledge.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\reports.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\reports.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\tickets.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\emailService.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\pdfService.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\uploadService.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\excelReportService.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\qrcodeService.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\websocketService.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\config\environment.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\auth.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\rateLimiter.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\auth.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\internalAuth.d.ts.map&quot;: Invalid argument (22)
+rsync error: some files/attrs were not transferred (see previous errors) (code 23) at main.c(1338) [sender=3.2.7]
+rsync error: some files/attrs were not transferred (see previous errors) (code 23) at main.c(1338) [sender=3.2.7]
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\purchases.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\emailService.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\emailService.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\uploadService.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\uploadService.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\config\environment.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\database\connection.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\index.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\authorization.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\validation.test.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\RefreshToken.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\RefreshToken.test.d.ts.map&quot;: Invalid argument (22)
+rsync error: some files/attrs were not transferred (see previous errors) (code 23) at main.c(1338) [sender=3.2.7]
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\RefreshToken.test.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\Ticket.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\assets.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\auth.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\internalAuth.test.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\publicAuth.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\excelReportService.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\excelReportService.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\pdfService.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\pdfService.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\database\connection.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\database\schema.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\index.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\auth.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\authorization.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\validation.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\validation.test.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\RefreshToken.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\RefreshToken.test.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\Ticket.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\dashboard.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\internalAuth.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\inventory.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\publicAuth.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\tickets.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\types\enums.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\types\enums.js.map&quot;: Invalid argument (22)
+rsync error: some files/attrs were not transferred (see previous errors) (code 23) at main.c(1338) [sender=3.2.7]
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\rateLimiter.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\validation.test.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\Asset.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\User.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\auth.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\database\schema.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\auth.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\authorization.d.ts.map&quot;: Invalid argument (22)
+rsync error: some files/attrs were not transferred (see previous errors) (code 23) at main.c(1338) [sender=3.2.7]
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\dashboard.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\inventory.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\publicAuth.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\publicAuth.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\purchases.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\emailService.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\qrcodeService.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\qrcodeService.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\qrcodeService.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\uploadService.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\websocketService.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\types\enums.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\config\environment.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\database\connection.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\index.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\auth.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\rateLimiter.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\config\environment.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\database\connection.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\validation.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\RefreshToken.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\User.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\assets.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\dashboard.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\internalAuth.test.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\internalAuth.test.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\authorization.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\validation.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\validation.test.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\database\schema.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\internalAuth.test.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\rateLimiter.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\inventory.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\purchases.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\purchases.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\Asset.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\tickets.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\Asset.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\RefreshToken.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\Ticket.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\assets.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\internalAuth.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\knowledge.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\RefreshToken.test.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\reports.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\Ticket.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\User.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\assets.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\dashboard.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\knowledge.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\database\schema.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\pdfService.d.ts.map&quot;: Invalid argument (22)
+rsync error: some files/attrs were not transferred (see previous errors) (code 23) at main.c(1338) [sender=3.2.7]
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\knowledge.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\reports.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\tickets.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\emailService.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\pdfService.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\uploadService.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\index.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\validation.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\Asset.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\models\User.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\auth.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\internalAuth.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\inventory.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\knowledge.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\reports.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\reports.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\excelReportService.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\qrcodeService.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\websocketService.js.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\websocketService.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\types\enums.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\tickets.d.ts&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\excelReportService.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\websocketService.d.ts.map&quot;: Invalid argument (22)
+rsync error: some files/attrs were not transferred (see previous errors) (code 23) at main.c(1338) [sender=3.2.7]
+rsync error: some files/attrs were not transferred (see previous errors) (code 23) at main.c(1338) [sender=3.2.7]
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\config\environment.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\auth.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\middleware\rateLimiter.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\auth.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\internalAuth.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\routes\purchases.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\emailService.d.ts.map&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\emailService.js&quot;: Invalid argument (22)
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\uploadService.d.ts.map&quot;: Invalid argument (22)
+rsync error: some files/attrs were not transferred (see previous errors) (code 23) at main.c(1338) [sender=3.2.7]
+rsync: [generator] recv_generator: failed to stat &quot;/home/site/wwwroot/dist\services\uploadService.js.map&quot;: Invalid argument (22)
+rsync error: some files/attrs were not transferred (see previous errors) (code 23) at main.c(1338) [sender=3.2.7]
+rsync error: some files/attrs were not transferred (see previous errors) (code 23) at main.c(1338) [sender=3.2.7]
+/opt/Kudu/Scripts/starter.sh /opt/Kudu/Scripts/parallel_rsync.sh /tmp/zipdeploy/extracted /home/site/wwwroot 8 /tmp/ False False  " stackTrace="   at Kudu.Core.Infrastructure.Executable.ExecuteInternal(ITracer tracer, Func`2 onWriteOutput, Func`2 onWriteError, CancellationToken token, Encoding encoding, String arguments, Object[] args) in /tmp/KuduLite/Kudu.Core/Infrastructure/Executable.cs:line 239
+   at Kudu.Core.Infrastructure.Executable.ExecuteWithProgressWriter(ILogger logger, ITracer tracer, CancellationToken token, String arguments, Object[] args) in /tmp/KuduLite/Kudu.Core/Infrastructure/Executable.cs:line 118
+   at Kudu.Core.Deployment.Generator.ExternalCommandBuilder.RunCommand(DeploymentContext context, String command, Boolean ignoreManifest, CancellationToken token, String message) in /tmp/KuduLite/Kudu.Core/Deployment/Generator/ExternalCommandBuilder.cs:line 135" /><!-- duration: 46ms -->
+                <step title="Error occurred" date="2026-03-02T13:53:29.060" type="error" text="Invalid argument : &apos;/home/site/wwwroot/dist\middleware\authorization.js&apos;" stackTrace="   at Interop.ThrowExceptionForIoErrno(ErrorInfo errorInfo, String path, Boolean isDirError)
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, UnixFileMode openPermissions, Int64&amp; fileLength, UnixFileMode&amp; filePermissions, Boolean failForSymlink, Boolean&amp; wasSymlink, Func`4 createOpenException)
+   at System.IO.FileSystem.CopyFile(String sourceFullPath, String destFullPath, Boolean overwrite)
+   at Kudu.Core.Infrastructure.FileSystemHelpers.CopyDirectoryRecursive(String sourceDirPath, String destinationDirPath, Boolean overwrite) in /tmp/KuduLite/Kudu.Core/Infrastructure/FileSystemHelpers.cs:line 239
+   at Kudu.Core.Deployment.Generator.OneDeployBuilder.Build(DeploymentContext context, CancellationToken token) in /tmp/KuduLite/Kudu.Core/Deployment/Generator/OneDeployBuilder.cs:line 108
+   at Kudu.Core.Deployment.DeploymentManager.Build(ChangeSet changeSet, ITracer tracer, IDisposable deployStep, IRepository repository, DeploymentInfoBase deploymentInfo, DeploymentAnalytics deploymentAnalytics, Boolean fullBuildByDefault, CancellationToken cancellationToken) in /tmp/KuduLite/Kudu.Core/Deployment/DeploymentManager.cs:line 771" /><!-- duration: 10ms -->
+              </step><!-- duration: 47732ms -->
+            </step><!-- duration: 48098ms -->
+            <step title="Error occurred" date="2026-03-02T13:53:29.697" type="error" text="Invalid argument : &apos;/home/site/wwwroot/dist\middleware\authorization.js&apos;" stackTrace="   at Interop.ThrowExceptionForIoErrno(ErrorInfo errorInfo, String path, Boolean isDirError)
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, UnixFileMode openPermissions, Int64&amp; fileLength, UnixFileMode&amp; filePermissions, Boolean failForSymlink, Boolean&amp; wasSymlink, Func`4 createOpenException)
+   at System.IO.FileSystem.CopyFile(String sourceFullPath, String destFullPath, Boolean overwrite)
+   at Kudu.Core.Infrastructure.FileSystemHelpers.CopyDirectoryRecursive(String sourceDirPath, String destinationDirPath, Boolean overwrite) in /tmp/KuduLite/Kudu.Core/Infrastructure/FileSystemHelpers.cs:line 239
+   at Kudu.Core.Deployment.Generator.OneDeployBuilder.Build(DeploymentContext context, CancellationToken token) in /tmp/KuduLite/Kudu.Core/Deployment/Generator/OneDeployBuilder.cs:line 108
+   at Kudu.Core.Deployment.DeploymentManager.Build(ChangeSet changeSet, ITracer tracer, IDisposable deployStep, IRepository repository, DeploymentInfoBase deploymentInfo, DeploymentAnalytics deploymentAnalytics, Boolean fullBuildByDefault, CancellationToken cancellationToken) in /tmp/KuduLite/Kudu.Core/Deployment/DeploymentManager.cs:line 771
+   at Kudu.Core.Deployment.DeploymentManager.Build(ChangeSet changeSet, ITracer tracer, IDisposable deployStep, IRepository repository, DeploymentInfoBase deploymentInfo, DeploymentAnalytics deploymentAnalytics, Boolean fullBuildByDefault, CancellationToken cancellationToken) in /tmp/KuduLite/Kudu.Core/Deployment/DeploymentManager.cs:line 840" /><!-- duration: 6ms -->
+            <step title="Cleaning up temp files" date="2026-03-02T13:53:29.912" /><!-- duration: 30ms -->
+            <step title="Cleaning up temp files" date="2026-03-02T13:53:29.955" /><!-- duration: 526ms -->
+            <step title="Error occurred" date="2026-03-02T13:53:30.547" type="error" text="Invalid argument : &apos;/home/site/wwwroot/dist\middleware\authorization.js&apos;" stackTrace="   at Interop.ThrowExceptionForIoErrno(ErrorInfo errorInfo, String path, Boolean isDirError)
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, UnixFileMode openPermissions, Int64&amp; fileLength, UnixFileMode&amp; filePermissions, Boolean failForSymlink, Boolean&amp; wasSymlink, Func`4 createOpenException)
+   at System.IO.FileSystem.CopyFile(String sourceFullPath, String destFullPath, Boolean overwrite)
+   at Kudu.Core.Infrastructure.FileSystemHelpers.CopyDirectoryRecursive(String sourceDirPath, String destinationDirPath, Boolean overwrite) in /tmp/KuduLite/Kudu.Core/Infrastructure/FileSystemHelpers.cs:line 239
+   at Kudu.Core.Deployment.Generator.OneDeployBuilder.Build(DeploymentContext context, CancellationToken token) in /tmp/KuduLite/Kudu.Core/Deployment/Generator/OneDeployBuilder.cs:line 108
+   at Kudu.Core.Deployment.DeploymentManager.Build(ChangeSet changeSet, ITracer tracer, IDisposable deployStep, IRepository repository, DeploymentInfoBase deploymentInfo, DeploymentAnalytics deploymentAnalytics, Boolean fullBuildByDefault, CancellationToken cancellationToken) in /tmp/KuduLite/Kudu.Core/Deployment/DeploymentManager.cs:line 771
+   at Kudu.Core.Deployment.DeploymentManager.Build(ChangeSet changeSet, ITracer tracer, IDisposable deployStep, IRepository repository, DeploymentInfoBase deploymentInfo, DeploymentAnalytics deploymentAnalytics, Boolean fullBuildByDefault, CancellationToken cancellationToken) in /tmp/KuduLite/Kudu.Core/Deployment/DeploymentManager.cs:line 840
+   at Kudu.Core.Deployment.DeploymentManager.DeployAsync(IRepository repository, ChangeSet changeSet, String deployer, Boolean clean, DeploymentInfoBase deploymentInfo, Boolean needFileUpdate, Boolean fullBuildByDefault) in /tmp/KuduLite/Kudu.Core/Deployment/DeploymentManager.cs:line 266" /><!-- duration: 12ms -->
+          </step><!-- duration: 49207ms -->
+          <step title="Reloading status file with latest updates" date="2026-03-02T13:53:30.635" >
+            <step title="WebHooksManager.PublishEventAsync: PostDeployment" date="2026-03-02T13:53:30.660" /><!-- duration: 189ms -->
+          </step><!-- duration: 229ms -->
+          <step title="Error occurred" date="2026-03-02T13:53:30.874" type="error" text="Invalid argument : &apos;/home/site/wwwroot/dist\middleware\authorization.js&apos;" stackTrace="   at Interop.ThrowExceptionForIoErrno(ErrorInfo errorInfo, String path, Boolean isDirError)
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, UnixFileMode openPermissions, Int64&amp; fileLength, UnixFileMode&amp; filePermissions, Boolean failForSymlink, Boolean&amp; wasSymlink, Func`4 createOpenException)
+   at System.IO.FileSystem.CopyFile(String sourceFullPath, String destFullPath, Boolean overwrite)
+   at Kudu.Core.Infrastructure.FileSystemHelpers.CopyDirectoryRecursive(String sourceDirPath, String destinationDirPath, Boolean overwrite) in /tmp/KuduLite/Kudu.Core/Infrastructure/FileSystemHelpers.cs:line 239
+   at Kudu.Core.Deployment.Generator.OneDeployBuilder.Build(DeploymentContext context, CancellationToken token) in /tmp/KuduLite/Kudu.Core/Deployment/Generator/OneDeployBuilder.cs:line 108
+   at Kudu.Core.Deployment.DeploymentManager.Build(ChangeSet changeSet, ITracer tracer, IDisposable deployStep, IRepository repository, DeploymentInfoBase deploymentInfo, DeploymentAnalytics deploymentAnalytics, Boolean fullBuildByDefault, CancellationToken cancellationToken) in /tmp/KuduLite/Kudu.Core/Deployment/DeploymentManager.cs:line 771
+   at Kudu.Core.Deployment.DeploymentManager.Build(ChangeSet changeSet, ITracer tracer, IDisposable deployStep, IRepository repository, DeploymentInfoBase deploymentInfo, DeploymentAnalytics deploymentAnalytics, Boolean fullBuildByDefault, CancellationToken cancellationToken) in /tmp/KuduLite/Kudu.Core/Deployment/DeploymentManager.cs:line 840
+   at Kudu.Core.Deployment.DeploymentManager.DeployAsync(IRepository repository, ChangeSet changeSet, String deployer, Boolean clean, DeploymentInfoBase deploymentInfo, Boolean needFileUpdate, Boolean fullBuildByDefault) in /tmp/KuduLite/Kudu.Core/Deployment/DeploymentManager.cs:line 266" /><!-- duration: 5ms -->
+          <step title="Marking deployment as failed and cleaning up the temp deployment" date="2026-03-02T13:53:30.968" /><!-- duration: 21ms -->
+        </step><!-- duration: 51493ms -->
+      </step><!-- duration: 51528ms -->
+      <step title="Error occurred" date="2026-03-02T13:53:31.337" type="error" text="Deployment failed" stackTrace="   at Kudu.Core.Deployment.DeploymentManager.DeployAsync(IRepository repository, ChangeSet changeSet, String deployer, Boolean clean, DeploymentInfoBase deploymentInfo, Boolean needFileUpdate, Boolean fullBuildByDefault) in /tmp/KuduLite/Kudu.Core/Deployment/DeploymentManager.cs:line 307
+   at Kudu.Core.Deployment.FetchDeploymentManager.PerformDeployment(DeploymentInfoBase deploymentInfo, IDisposable tempDeployment, ChangeSet tempChangeSet, DeployStatusApiResult updateStatusObj) in /tmp/KuduLite/Kudu.Core/Deployment/FetchDeploymentManager.cs:line 230
+   at Kudu.Core.Deployment.FetchDeploymentManager.&lt;&gt;c__DisplayClass17_0.&lt;&lt;FetchDeploy&gt;b__0&gt;d.MoveNext() in /tmp/KuduLite/Kudu.Core/Deployment/FetchDeploymentManager.cs:line 131
+--- End of stack trace from previous location ---
+   at Kudu.Core.Deployment.FetchDeploymentManager.FetchDeploy(DeploymentInfoBase deployInfo, Boolean asyncRequested, Uri requestUri, String targetBranch) in /tmp/KuduLite/Kudu.Core/Deployment/FetchDeploymentManager.cs:line 124
+   at Kudu.Services.Deployment.PushDeploymentController.PushDeployAsync(ArtifactDeploymentInfo deploymentInfo, Boolean isAsync, HttpContext context, JObject requestJson) in /tmp/KuduLite/Kudu.Services/Deployment/PushDeploymentController.cs:line 802
+   at Kudu.Services.Deployment.PushDeploymentController.OneDeploy(String type, Boolean async, String path, Nullable`1 restart, Nullable`1 clean, Boolean ignoreStack, Boolean trackDeploymentProgress, Boolean trackStatus, Boolean reset) in /tmp/KuduLite/Kudu.Services/Deployment/PushDeploymentController.cs:line 624
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ActionMethodExecutor.TaskOfIActionResultExecutor.Execute(ActionContext actionContext, IActionResultTypeMapper mapper, ObjectMethodExecutor executor, Object controller, Object[] arguments)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.&lt;InvokeActionMethodAsync&gt;g__Awaited|12_0(ControllerActionInvoker invoker, ValueTask`1 actionResultValueTask)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.&lt;InvokeNextActionFilterAsync&gt;g__Awaited|10_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Rethrow(ActionExecutedContextSealed context)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State&amp; next, Scope&amp; scope, Object&amp; state, Boolean&amp; isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.&lt;InvokeInnerFilterAsync&gt;g__Awaited|13_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.&lt;InvokeNextResourceFilter&gt;g__Awaited|25_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.Rethrow(ResourceExecutedContextSealed context)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.Next(State&amp; next, Scope&amp; scope, Object&amp; state, Boolean&amp; isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.&lt;InvokeFilterPipelineAsync&gt;g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.&lt;InvokeAsync&gt;g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.&lt;InvokeAsync&gt;g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+   at Microsoft.AspNetCore.Builder.RouterMiddleware.Invoke(HttpContext httpContext)
+   at Kudu.Services.Web.Startup.&lt;&gt;c.&lt;&lt;Configure&gt;b__11_7&gt;d.MoveNext() in /tmp/KuduLite/Kudu.Services.Web/Startup.cs:line 428
+--- End of stack trace from previous location ---
+   at Kudu.Services.Web.Tracing.TraceMiddleware.Invoke(HttpContext context) in /tmp/KuduLite/Kudu.Services.Web/Tracing/TraceMiddleware.cs:line 101" innerText="Invalid argument : &apos;/home/site/wwwroot/dist\middleware\authorization.js&apos;" innerStackTrace="   at Interop.ThrowExceptionForIoErrno(ErrorInfo errorInfo, String path, Boolean isDirError)
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, UnixFileMode openPermissions, Int64&amp; fileLength, UnixFileMode&amp; filePermissions, Boolean failForSymlink, Boolean&amp; wasSymlink, Func`4 createOpenException)
+   at System.IO.FileSystem.CopyFile(String sourceFullPath, String destFullPath, Boolean overwrite)
+   at Kudu.Core.Infrastructure.FileSystemHelpers.CopyDirectoryRecursive(String sourceDirPath, String destinationDirPath, Boolean overwrite) in /tmp/KuduLite/Kudu.Core/Infrastructure/FileSystemHelpers.cs:line 239
+   at Kudu.Core.Deployment.Generator.OneDeployBuilder.Build(DeploymentContext context, CancellationToken token) in /tmp/KuduLite/Kudu.Core/Deployment/Generator/OneDeployBuilder.cs:line 108
+   at Kudu.Core.Deployment.DeploymentManager.Build(ChangeSet changeSet, ITracer tracer, IDisposable deployStep, IRepository repository, DeploymentInfoBase deploymentInfo, DeploymentAnalytics deploymentAnalytics, Boolean fullBuildByDefault, CancellationToken cancellationToken) in /tmp/KuduLite/Kudu.Core/Deployment/DeploymentManager.cs:line 771
+   at Kudu.Core.Deployment.DeploymentManager.Build(ChangeSet changeSet, ITracer tracer, IDisposable deployStep, IRepository repository, DeploymentInfoBase deploymentInfo, DeploymentAnalytics deploymentAnalytics, Boolean fullBuildByDefault, CancellationToken cancellationToken) in /tmp/KuduLite/Kudu.Core/Deployment/DeploymentManager.cs:line 840
+   at Kudu.Core.Deployment.DeploymentManager.DeployAsync(IRepository repository, ChangeSet changeSet, String deployer, Boolean clean, DeploymentInfoBase deploymentInfo, Boolean needFileUpdate, Boolean fullBuildByDefault) in /tmp/KuduLite/Kudu.Core/Deployment/DeploymentManager.cs:line 266" /><!-- duration: 16ms -->
+      <step title="Incoming Request" date="2026-03-02T13:53:31.867" url="/Error?type=zip&amp;async=False" method="POST" type="request" pid="831,1,3" Accept="*/*" Host="portal-ti-backend.scm.azurewebsites.net" User-Agent="AZURECLI/2.83.0 (MSI)" Accept-Encoding="gzip, deflate" Authorization="Bea..." Cache-Control="no-cache" Content-Type="application/octet-stream" Cookie="ARRAffinity=d48e7722c44716b2d3b260fd39937cd26b4df2c1aad200418e83e1648d9c8bd5; ARRAffinitySameSite=d48e7722c44716b2d3b260fd39937cd26b4df2c1aad200418e83e1648d9c8bd5" Content-Length="130212" x-ms-client-request-id="09957083-163f-11f1-9b28-d027885dde40" x-ms-artifact-checksum="1e783d06085ad6f89c3d5027413c662e00f0781915f820ec7debd57575e9820b" X-ARR-LOG-ID="09957083-163f-11f1-9b28-d027885dde40" CLIENT-IP="168.232.86.116:56809" X-SITE-DEPLOYMENT-ID="portal-ti-backend" WAS-DEFAULT-HOSTNAME="portal-ti-backend.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/api/publish?type=zip&amp;async=False" X-Client-IP="168.232.86.116" X-Client-Port="56809" >
+        <step title="Outgoing response" date="2026-03-02T13:53:31.991" type="response" statusCode="400" statusText="BadRequest" /><!-- duration: 5ms -->
+      </step><!-- duration: 136ms -->
