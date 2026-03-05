@@ -96,7 +96,7 @@ inventoryRouter.get('/notebooks', async (req: Request, res: Response) => {
     let query = `
       SELECT DISTINCT ON (ie.id)
         ie.*,
-        COALESCE(iu.name, rt.responsible_name) as responsible_name,
+        COALESCE(iu.name, rt.responsible_name, ie.current_responsible_name) as responsible_name,
         rt.issued_date as in_use_since
       FROM inventory_equipment ie
       LEFT JOIN internal_users iu ON ie.current_responsible_id = iu.id
@@ -169,7 +169,7 @@ inventoryRouter.get('/peripherals', async (req: Request, res: Response) => {
     let query = `
       SELECT DISTINCT ON (ie.id)
         ie.*,
-        COALESCE(iu.name, rt.responsible_name) as responsible_name,
+        COALESCE(iu.name, rt.responsible_name, ie.current_responsible_name) as responsible_name,
         rt.issued_date as in_use_since
       FROM inventory_equipment ie
       LEFT JOIN internal_users iu ON ie.current_responsible_id = iu.id
