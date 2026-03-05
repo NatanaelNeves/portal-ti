@@ -849,11 +849,11 @@ export async function initializeDatabase(): Promise<void> {
       if (adminCheck.rows.length === 0) {
         const hash = await bcrypt.hash('admin123', 10);
         const ins = await database.query(
-          `INSERT INTO internal_users (email, name, password_hash, role, department, is_active)
-           VALUES ($1, $2, $3, $4, $5, true)
+          `INSERT INTO internal_users (email, name, password_hash, role, is_active)
+           VALUES ($1, $2, $3, $4, true)
            ON CONFLICT (email) DO UPDATE SET password_hash = $3, is_active = true
            RETURNING id`,
-          ['admin@opequenonazareno.org.br', 'Administrador', hash, 'admin', 'TI']
+          ['admin@opequenonazareno.org.br', 'Administrador', hash, 'admin']
         );
         seedAdminId = ins.rows[0]?.id ?? null;
         console.log('✓ Admin user seeded');
