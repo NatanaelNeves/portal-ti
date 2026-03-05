@@ -91,6 +91,11 @@ export default function Navigation() {
             📦 Inventário
           </button>
         )}
+        {showKnowledgeLink && (
+          <button onClick={() => navigate('/admin/relatorios')} className="nav-link">
+            📊 Relatórios
+          </button>
+        )}
         {showUsersLink && (
           <button onClick={() => navigate('/admin/usuarios')} className="nav-link">
             Equipe

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { BACKEND_URL } from '../services/api';
 import InventoryLayout from '../components/InventoryLayout';
 import '../styles/InventoryPage.css';
 
@@ -68,8 +69,8 @@ export default function InventoryPage() {
       const token = localStorage.getItem('internal_token');
       
       const endpoint = activeTab === 'notebooks' 
-        ? '/api/inventory/notebooks'
-        : '/api/inventory/peripherals';
+        ? `${BACKEND_URL}/api/inventory/notebooks`
+        : `${BACKEND_URL}/api/inventory/peripherals`;
 
       const response = await fetch(endpoint, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -162,7 +163,7 @@ export default function InventoryPage() {
             </div>
             <button 
               className="btn-add-equipment"
-              onClick={() => navigate('/inventario/novo-equipamento')}
+              onClick={() => navigate('/inventario/equipamentos/novo')}
             >
               ➕ Novo Equipamento
             </button>
@@ -262,7 +263,7 @@ export default function InventoryPage() {
                 <div className="empty-icon">📭</div>
                 <h3>Nenhum notebook encontrado</h3>
                 <p>Adicione notebooks ao inventário ou ajuste os filtros</p>
-                <button className="btn-primary" onClick={() => navigate('/inventario/novo-equipamento')}>
+                <button className="btn-primary" onClick={() => navigate('/inventario/equipamentos/novo')}>
                   ➕ Adicionar Notebook
                 </button>
               </div>
@@ -344,7 +345,7 @@ export default function InventoryPage() {
                 <div className="empty-icon">📭</div>
                 <h3>Nenhum periférico encontrado</h3>
                 <p>Adicione periféricos ao inventário ou ajuste os filtros</p>
-                <button className="btn-primary" onClick={() => navigate('/inventario/novo-equipamento')}>
+                <button className="btn-primary" onClick={() => navigate('/inventario/equipamentos/novo')}>
                   ➕ Adicionar Periférico
                 </button>
               </div>
