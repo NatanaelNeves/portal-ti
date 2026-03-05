@@ -1,7 +1,13 @@
 import axios from 'axios';
 
+// Em produção usa VITE_API_URL (backend separado no Azure)
+// Em desenvolvimento usa '/api' que é proxied pelo Vite para localhost:3001
+const API_BASE_URL = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : '/api';
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE_URL,
 });
 
 // Request interceptor - adiciona token em todas as requisições
