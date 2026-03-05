@@ -38,6 +38,7 @@ api.interceptors.response.use(
       localStorage.removeItem('user');
       localStorage.removeItem('internal_token');
       localStorage.removeItem('internal_user');
+      localStorage.removeItem('refreshToken');
 
       // Redirecionar para login
       if (window.location.pathname !== '/login-interno' && window.location.pathname !== '/admin/login') {

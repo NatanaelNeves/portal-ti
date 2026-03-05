@@ -147,36 +147,72 @@ const ReportsPage: React.FC = () => {
     }
   };
 
-  const handleExportTickets = () => {
-    const token = localStorage.getItem('token');
+  const handleExportTickets = async () => {
+    const token = localStorage.getItem('internal_token') || localStorage.getItem('token');
     const params = new URLSearchParams();
     if (dateFrom) params.append('date_from', dateFrom);
     if (dateTo) params.append('date_to', dateTo);
     
-    window.open(
-      `${BACKEND_URL}/api/reports/export/excel/tickets?${params.toString()}&token=${token}`,
-      '_blank'
-    );
+    try {
+      const response = await fetch(
+        `${BACKEND_URL}/api/reports/export/excel/tickets?${params.toString()}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!response.ok) throw new Error('Export failed');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `tickets_${new Date().toISOString().slice(0,10)}.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export error:', err);
+    }
   };
 
-  const handleExportTechnicians = () => {
-    const token = localStorage.getItem('token');
+  const handleExportTechnicians = async () => {
+    const token = localStorage.getItem('internal_token') || localStorage.getItem('token');
     const params = new URLSearchParams();
     if (dateFrom) params.append('date_from', dateFrom);
     if (dateTo) params.append('date_to', dateTo);
     
-    window.open(
-      `${BACKEND_URL}/api/reports/export/excel/technicians?${params.toString()}&token=${token}`,
-      '_blank'
-    );
+    try {
+      const response = await fetch(
+        `${BACKEND_URL}/api/reports/export/excel/technicians?${params.toString()}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!response.ok) throw new Error('Export failed');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `technicians_${new Date().toISOString().slice(0,10)}.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export error:', err);
+    }
   };
 
-  const handleExportConsolidated = () => {
-    const token = localStorage.getItem('token');
-    window.open(
-      `${BACKEND_URL}/api/reports/export/excel/consolidated?token=${token}`,
-      '_blank'
-    );
+  const handleExportConsolidated = async () => {
+    const token = localStorage.getItem('internal_token') || localStorage.getItem('token');
+    try {
+      const response = await fetch(
+        `${BACKEND_URL}/api/reports/export/excel/consolidated`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!response.ok) throw new Error('Export failed');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `consolidated_${new Date().toISOString().slice(0,10)}.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export error:', err);
+    }
   };
 
   const mergeChartData = (

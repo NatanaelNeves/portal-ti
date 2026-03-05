@@ -1675,12 +1675,12 @@ inventoryRouter.get('/search', async (req: Request, res: Response) => {
         em.movement_date,
         ie.internal_code as equipment_code,
         ie.type as equipment_type,
-        em.responsible_name
+        COALESCE(em.to_user_name, em.from_user_name, em.registered_by_name) as responsible_name
       FROM equipment_movements em
       JOIN inventory_equipment ie ON em.equipment_id = ie.id
       WHERE 
         LOWER(em.movement_number) LIKE $1
-        OR LOWER(em.responsible_name) LIKE $1
+        OR LOWER(COALESCE(em.to_user_name, em.from_user_name, em.registered_by_name, '')) LIKE $1
         OR LOWER(ie.internal_code) LIKE $1
       ORDER BY em.movement_date DESC
       LIMIT 10

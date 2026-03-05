@@ -116,6 +116,26 @@ export async function initializeDatabase(): Promise<void> {
       )
     `);
 
+    // Tabela de anexos de chamados
+    await database.query(`
+      CREATE TABLE IF NOT EXISTS ticket_attachments (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        ticket_id UUID NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+        filename VARCHAR(255) NOT NULL,
+        original_name VARCHAR(255) NOT NULL,
+        file_path VARCHAR(500) NOT NULL,
+        file_size INTEGER NOT NULL DEFAULT 0,
+        mime_type VARCHAR(100) NOT NULL DEFAULT 'application/octet-stream',
+        uploaded_by_type VARCHAR(20) NOT NULL DEFAULT 'public',
+        uploaded_by_id UUID NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await database.query(`
+      CREATE INDEX IF NOT EXISTS idx_ticket_attachments_ticket_id ON ticket_attachments(ticket_id);
+    `);
+
     // Tabela de ativos (inventário)
     await database.query(`
       CREATE TABLE IF NOT EXISTS inventory_items (
@@ -289,6 +309,7 @@ export async function initializeDatabase(): Promise<void> {
         current_location VARCHAR(255),
         current_unit VARCHAR(100),
         current_responsible_id UUID REFERENCES internal_users(id),
+        current_responsible_name VARCHAR(255),
         
         acquisition_date DATE,
         purchase_value DECIMAL(12, 2),
@@ -334,6 +355,7 @@ export async function initializeDatabase(): Promise<void> {
         return_term_pdf VARCHAR(500),
         return_term_signed_pdf VARCHAR(500),
         received_by_id UUID REFERENCES internal_users(id),
+        received_by VARCHAR(255),
         
         status VARCHAR(50) NOT NULL DEFAULT 'active',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -366,6 +388,7 @@ export async function initializeDatabase(): Promise<void> {
         to_department VARCHAR(255),
         
         reason TEXT,
+        notes TEXT,
         condition_before VARCHAR(50),
         condition_after VARCHAR(50),
         
@@ -527,6 +550,10 @@ export async function initializeDatabase(): Promise<void> {
                        WHERE table_name='equipment_movements' AND column_name='registered_by_name') THEN
           ALTER TABLE equipment_movements ADD COLUMN registered_by_name VARCHAR(255);
         END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name='equipment_movements' AND column_name='notes') THEN
+          ALTER TABLE equipment_movements ADD COLUMN notes TEXT;
+        END IF;
       END $$;
     `);
     console.log('✓ Colunas de equipment_movements atualizadas');
@@ -642,6 +669,11 @@ export async function initializeDatabase(): Promise<void> {
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
                        WHERE table_name='inventory_equipment' AND column_name='internal_code') THEN
           ALTER TABLE inventory_equipment ADD COLUMN internal_code VARCHAR(50) UNIQUE NOT NULL DEFAULT 'TEMP-' || gen_random_uuid()::text;
+        END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name='inventory_equipment' AND column_name='current_responsible_name') THEN
+          ALTER TABLE inventory_equipment ADD COLUMN current_responsible_name VARCHAR(255);
         END IF;
       END $$;
     `);
@@ -765,6 +797,11 @@ export async function initializeDatabase(): Promise<void> {
                        WHERE table_name='responsibility_terms' AND column_name='received_by_id') THEN
           ALTER TABLE responsibility_terms ADD COLUMN received_by_id UUID REFERENCES internal_users(id);
         END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name='responsibility_terms' AND column_name='received_by') THEN
+          ALTER TABLE responsibility_terms ADD COLUMN received_by VARCHAR(255);
+        END IF;
       END $$;
     `);
     console.log('✓ Colunas do responsibility_terms atualizadas');
@@ -841,13 +878,16 @@ export async function initializeDatabase(): Promise<void> {
     `);
 
     // ── Seed: admin user ─────────────────────────────────────────────
+    // Only seeds if NO admin exists. In production, users are created via API.
     let seedAdminId: string | null = null;
     try {
       const adminCheck = await database.query(
         `SELECT id FROM internal_users WHERE role = 'admin' LIMIT 1`
       );
       if (adminCheck.rows.length === 0) {
-        const hash = await bcrypt.hash('admin123', 10);
+        // Use environment variable or generate a random password (never hardcoded weak passwords)
+        const seedPassword = process.env.ADMIN_SEED_PASSWORD || require('crypto').randomBytes(16).toString('hex');
+        const hash = await bcrypt.hash(seedPassword, 12);
         const ins = await database.query(
           `INSERT INTO internal_users (email, name, password_hash, role, is_active)
            VALUES ($1, $2, $3, $4, true)
@@ -856,7 +896,12 @@ export async function initializeDatabase(): Promise<void> {
           ['admin@opequenonazareno.org.br', 'Administrador', hash, 'admin']
         );
         seedAdminId = ins.rows[0]?.id ?? null;
-        console.log('✓ Admin user seeded');
+        if (process.env.ADMIN_SEED_PASSWORD) {
+          console.log('✓ Admin user seeded with configured password');
+        } else {
+          console.log('✓ Admin user seeded with random password:', seedPassword);
+          console.log('  ⚠ Save this password! It will not be shown again.');
+        }
       } else {
         seedAdminId = adminCheck.rows[0].id;
       }

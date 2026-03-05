@@ -16,8 +16,18 @@ const httpServer = http.createServer(app);
 
 console.log('✓ Express app created');
 
+// Trust Azure reverse proxy (required for rate limiter, secure cookies, etc.)
+if (config.nodeEnv === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // Middleware
-app.use(cors({ origin: config.cors.origin }));
+app.use(cors({
+  origin: config.cors.origin,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-token'],
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

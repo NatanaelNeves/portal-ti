@@ -2,6 +2,21 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+// Validate critical env vars in production
+const isProduction = (process.env.NODE_ENV || 'development') === 'production';
+if (isProduction) {
+  const requiredVars = ['DB_HOST', 'DB_PASSWORD', 'JWT_SECRET', 'CORS_ORIGIN'];
+  const missing = requiredVars.filter(v => !process.env[v]);
+  if (missing.length > 0) {
+    console.error(`FATAL: Missing required environment variables: ${missing.join(', ')}`);
+    process.exit(1);
+  }
+  if (process.env.JWT_SECRET === 'your-secret-key-change-in-production') {
+    console.error('FATAL: JWT_SECRET must be changed from the default value in production');
+    process.exit(1);
+  }
+}
+
 export const config = {
   port: parseInt(process.env.PORT || '3001', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
