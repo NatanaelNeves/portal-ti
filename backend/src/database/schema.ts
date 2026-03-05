@@ -1,4 +1,5 @@
 import { database } from './connection';
+import bcrypt from 'bcryptjs';
 
 export async function initializeDatabase(): Promise<void> {
   try {
@@ -838,6 +839,82 @@ export async function initializeDatabase(): Promise<void> {
         END IF;
       END $$;
     `);
+
+    // ── Seed: admin user ─────────────────────────────────────────────
+    try {
+      const adminCheck = await database.query(
+        `SELECT COUNT(*) FROM internal_users WHERE role = 'admin'`
+      );
+      if (parseInt(adminCheck.rows[0].count, 10) === 0) {
+        const hash = await bcrypt.hash('admin123', 10);
+        await database.query(
+          `INSERT INTO internal_users (email, name, password_hash, role, department, is_active)
+           VALUES ($1, $2, $3, $4, $5, true)
+           ON CONFLICT (email) DO UPDATE SET password_hash = $3, is_active = true`,
+          ['admin@opequenonazareno.org.br', 'Administrador', hash, 'admin', 'TI']
+        );
+        console.log('✓ Admin user seeded');
+      }
+    } catch (e) {
+      console.warn('⚠ Could not seed admin user:', e);
+    }
+
+    // ── Seed: information articles ────────────────────────────────────
+    try {
+      const artCheck = await database.query(
+        `SELECT COUNT(*) FROM information_articles`
+      );
+      if (parseInt(artCheck.rows[0].count, 10) === 0) {
+        const articles = [
+          {
+            title: 'Como abrir um chamado de TI',
+            category: 'getting-started',
+            content: 'Para abrir um chamado de TI: 1) Acesse o Portal de TI pelo link disponibilizado. 2) Clique em "Novo Chamado". 3) Descreva o problema com o máximo de detalhes possível. 4) Selecione a categoria e prioridade. 5) Clique em "Enviar". Nossa equipe responderá em até 24 horas úteis.',
+          },
+          {
+            title: 'Primeiro acesso ao sistema',
+            category: 'getting-started',
+            content: 'No primeiro acesso ao Portal de TI, utilize o link enviado por e-mail pelo departamento de TI. Informe seu CPF e o token de acesso fornecido. Caso não tenha recebido o link, entre em contato com a equipe de TI pelo ramal interno ou pelo e-mail ti@opequenonazareno.org.br.',
+          },
+          {
+            title: 'Computador lento — o que fazer?',
+            category: 'troubleshooting',
+            content: 'Se o computador está lento: 1) Reinicie a máquina. 2) Verifique se há muitos programas abertos ao mesmo tempo. 3) Limpe arquivos temporários (Disco C → Propriedades → Limpeza de Disco). 4) Verifique se há atualização do Windows pendente. Se o problema persistir, abra um chamado de TI.',
+          },
+          {
+            title: 'Problemas com impressora',
+            category: 'troubleshooting',
+            content: 'Erros comuns de impressora: 1) Verifique se a impressora está ligada e conectada à rede. 2) Cancele trabalhos de impressão pendentes. 3) Reinicie o serviço de spooler: Win+R → services.msc → Print Spooler → Reiniciar. 4) Reinstale o driver se necessário. Para suporte adicional, abra um chamado.',
+          },
+          {
+            title: 'Perguntas frequentes sobre senhas',
+            category: 'faq',
+            content: 'P: Esqueci minha senha. O que faço? R: Entre em contato com a TI pelo ramal ou abra um chamado de redefinição de senha.\n\nP: Com que frequência devo trocar minha senha? R: Recomendamos a troca a cada 90 dias.\n\nP: Posso usar a mesma senha em vários sistemas? R: Não recomendamos. Utilize senhas diferentes para cada sistema.',
+          },
+          {
+            title: 'Como usar o Microsoft Teams',
+            category: 'tutorials',
+            content: 'O Microsoft Teams é a plataforma oficial de comunicação da instituição. Para começar: 1) Acesse teams.microsoft.com ou abra o app instalado. 2) Faça login com seu e-mail institucional. 3) Participe dos canais do seu departamento. 4) Para reuniões, clique em "Reunir agora" ou agende pelo calendário integrado. 5) Compartilhe arquivos diretamente nas conversas.',
+          },
+          {
+            title: 'Política de uso dos recursos de TI',
+            category: 'institutional',
+            content: 'Os recursos de TI da instituição devem ser utilizados exclusivamente para fins profissionais. É proibido: instalar softwares sem autorização da TI, acessar sites inadequados, compartilhar senhas com terceiros e remover equipamentos do local sem autorização. O descumprimento desta política pode resultar em medidas disciplinares. Dúvidas? Consulte o departamento de TI.',
+          },
+        ];
+
+        for (const a of articles) {
+          await database.query(
+            `INSERT INTO information_articles (title, content, category, is_public, views_count)
+             VALUES ($1, $2, $3, true, 0)`,
+            [a.title, a.content, a.category]
+          );
+        }
+        console.log(`✓ Seeded ${articles.length} information articles`);
+      }
+    } catch (e) {
+      console.warn('⚠ Could not seed information articles:', e);
+    }
 
     console.log('✓ Database schema initialized successfully');
   } catch (error) {
