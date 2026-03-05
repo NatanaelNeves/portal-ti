@@ -1,10 +1,10 @@
 import axios from 'axios';
 
-// Em produção usa VITE_API_URL (backend separado no Azure)
-// Em desenvolvimento usa '/api' que é proxied pelo Vite para localhost:3001
-const API_BASE_URL = import.meta.env.VITE_API_URL
-  ? `${import.meta.env.VITE_API_URL}/api`
-  : '/api';
+// Backend base URL — em produção usa VITE_API_URL, em dev usa localhost
+export const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+// Full API base URL (usado pelo axios instance)
+const API_BASE_URL = `${BACKEND_URL}/api`;
 
 const api = axios.create({
   baseURL: API_BASE_URL,

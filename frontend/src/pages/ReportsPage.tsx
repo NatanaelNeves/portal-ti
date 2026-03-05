@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import '../styles/ReportsPage.css';
+import { BACKEND_URL } from '../services/api';
 import {
   LineChart, Line, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -98,7 +99,7 @@ const ReportsPage: React.FC = () => {
       
       if (activeTab === 'overview') {
         const response = await fetch(
-          `http://localhost:3001/api/reports/stats/overview${queryString ? '?' + queryString : ''}`,
+          `${BACKEND_URL}/api/reports/stats/overview${queryString ? '?' + queryString : ''}`,
           {
             headers: { Authorization: `Bearer ${token}` }
           }
@@ -107,7 +108,7 @@ const ReportsPage: React.FC = () => {
         setOverviewStats(data);
       } else if (activeTab === 'technicians') {
         const response = await fetch(
-          `http://localhost:3001/api/reports/stats/technicians${queryString ? '?' + queryString : ''}`,
+          `${BACKEND_URL}/api/reports/stats/technicians${queryString ? '?' + queryString : ''}`,
           {
             headers: { Authorization: `Bearer ${token}` }
           }
@@ -116,7 +117,7 @@ const ReportsPage: React.FC = () => {
         setTechnicianStats(data);
       } else if (activeTab === 'sla') {
         const response = await fetch(
-          `http://localhost:3001/api/reports/stats/sla${queryString ? '?' + queryString : ''}`,
+          `${BACKEND_URL}/api/reports/stats/sla${queryString ? '?' + queryString : ''}`,
           {
             headers: { Authorization: `Bearer ${token}` }
           }
@@ -131,7 +132,7 @@ const ReportsPage: React.FC = () => {
         setSlaStats(data);
       } else if (activeTab === 'trends') {
         const response = await fetch(
-          `http://localhost:3001/api/reports/stats/trends?period=${trendsPeriod}`,
+          `${BACKEND_URL}/api/reports/stats/trends?period=${trendsPeriod}`,
           {
             headers: { Authorization: `Bearer ${token}` }
           }
@@ -153,7 +154,7 @@ const ReportsPage: React.FC = () => {
     if (dateTo) params.append('date_to', dateTo);
     
     window.open(
-      `http://localhost:3001/api/reports/export/excel/tickets?${params.toString()}&token=${token}`,
+      `${BACKEND_URL}/api/reports/export/excel/tickets?${params.toString()}&token=${token}`,
       '_blank'
     );
   };
@@ -165,7 +166,7 @@ const ReportsPage: React.FC = () => {
     if (dateTo) params.append('date_to', dateTo);
     
     window.open(
-      `http://localhost:3001/api/reports/export/excel/technicians?${params.toString()}&token=${token}`,
+      `${BACKEND_URL}/api/reports/export/excel/technicians?${params.toString()}&token=${token}`,
       '_blank'
     );
   };
@@ -173,7 +174,7 @@ const ReportsPage: React.FC = () => {
   const handleExportConsolidated = () => {
     const token = localStorage.getItem('token');
     window.open(
-      `http://localhost:3001/api/reports/export/excel/consolidated?token=${token}`,
+      `${BACKEND_URL}/api/reports/export/excel/consolidated?token=${token}`,
       '_blank'
     );
   };

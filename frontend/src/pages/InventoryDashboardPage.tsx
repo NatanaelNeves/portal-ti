@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import InventoryLayout from '../components/InventoryLayout';
-import axios from 'axios';
+import api from '../services/api';
 import '../styles/InventoryDashboardPage.css';
 
 interface DashboardData {
@@ -48,25 +48,18 @@ export default function InventoryDashboardPage() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      
       // Buscar dados do dashboard
-      const summaryResponse = await axios.get('/api/inventory/dashboard/summary', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const summaryResponse = await api.get('/inventory/dashboard/summary');
       setDashboard(summaryResponse.data);
 
       // Buscar atividades recentes (últimas movimentações)
-      const movementsResponse = await axios.get('/api/inventory/movements/recent', {
-        headers: { Authorization: `Bearer ${token}` },
+      const movementsResponse = await api.get('/inventory/movements/recent', {
         params: { limit: 10 }
       });
       setRecentActivities(movementsResponse.data || []);
 
       // Buscar alertas
-      const alertsResponse = await axios.get('/api/inventory/alerts', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const alertsResponse = await api.get('/inventory/alerts');
       setAlerts(alertsResponse.data || []);
 
     } catch (err: any) {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api, { BACKEND_URL } from '../services/api';
 import '../styles/DeliverEquipmentPage.css';
 
 interface Equipment {
@@ -74,12 +74,8 @@ const DeliverEquipmentPage: React.FC = () => {
 
   const fetchAvailableEquipment = async () => {
     try {
-      const token = localStorage.getItem('internal_token');
-      
       // Buscar todos os equipamentos e filtrar os disponíveis
-      const response = await axios.get('/api/inventory/equipment', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/inventory/equipment');
       
       const allEquipment = response.data.equipment || [];
       
@@ -168,10 +164,9 @@ const DeliverEquipmentPage: React.FC = () => {
 
       console.log('📤 Enviando requisição:', payload);
 
-      const response = await axios.post(
-        '/api/inventory/movements/deliver',
-        payload,
-        { headers: { Authorization: `Bearer ${token}` } }
+      const response = await api.post(
+        '/inventory/movements/deliver',
+        payload
       );
 
       console.log('✅ Resposta recebida:', response.data);
@@ -183,7 +178,7 @@ const DeliverEquipmentPage: React.FC = () => {
       console.log('📄 Term ID:', termId);
       
       if (termId) {
-        window.open(`/api/inventory/terms/${termId}/delivery-pdf?token=${token}`, '_blank');
+        window.open(`${BACKEND_URL}/api/inventory/terms/${termId}/delivery-pdf?token=${token}`, '_blank');
       } else {
         console.error('❌ termId não encontrado na resposta');
       }

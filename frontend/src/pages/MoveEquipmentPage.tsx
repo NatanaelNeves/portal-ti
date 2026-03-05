@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api';
 import InventoryLayout from '../components/InventoryLayout';
 import { showToast } from '../utils/toast';
 import '../styles/MoveEquipmentPage.css';
@@ -52,10 +52,8 @@ export default function MoveEquipmentPage() {
   useEffect(() => {
     const fetchEquipment = async () => {
       try {
-        const token = localStorage.getItem('internal_token');
-        const response = await axios.get(
-          `/api/inventory/equipment/${equipmentId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+        const response = await api.get(
+          `/inventory/equipment/${equipmentId}`
         );
         setEquipment(response.data.equipment);
       } catch (err: any) {
@@ -72,10 +70,8 @@ export default function MoveEquipmentPage() {
     if (transferType === 'employee') {
       const fetchUsers = async () => {
         try {
-          const token = localStorage.getItem('internal_token');
-          const response = await axios.get(
-            '/api/internal-auth/users',
-            { headers: { Authorization: `Bearer ${token}` } }
+          const response = await api.get(
+            '/internal-auth/users'
           );
           setUsers(response.data);
         } catch (err: any) {
@@ -138,10 +134,9 @@ export default function MoveEquipmentPage() {
         };
       }
 
-      await axios.post(
-        '/api/inventory/movements/transfer',
-        payload,
-        { headers: { Authorization: `Bearer ${token}` } }
+      await api.post(
+        '/inventory/movements/transfer',
+        payload
       );
 
       showToast.success('Equipamento movimentado com sucesso!');

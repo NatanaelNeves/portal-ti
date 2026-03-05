@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { BACKEND_URL } from '../services/api';
 import InventoryLayout from '../components/InventoryLayout';
 import PhotoUploader from '../components/PhotoUploader';
 import DocumentUploader from '../components/DocumentUploader';
@@ -296,7 +297,7 @@ export default function EquipmentDetailPage() {
                           className="btn btn-small" 
                           onClick={() => {
                             const token = localStorage.getItem('internal_token');
-                            window.open(`/api/inventory/terms/${t.id}/delivery-pdf?token=${token}`, '_blank');
+                            window.open(`${BACKEND_URL}/api/inventory/terms/${t.id}/delivery-pdf?token=${token}`, '_blank');
                           }}
                         >
                           📄 Ver PDF

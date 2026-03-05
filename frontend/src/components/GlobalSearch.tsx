@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api';
 import '../styles/GlobalSearch.css';
 
 interface SearchResult {
@@ -80,10 +80,8 @@ const GlobalSearch: React.FC = () => {
   const performSearch = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await axios.get<SearchResponse>(
-        `http://localhost:3001/api/inventory/search?q=${encodeURIComponent(query)}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+      const response = await api.get<SearchResponse>(
+        `/inventory/search?q=${encodeURIComponent(query)}`
       );
       setResults(response.data);
       setIsOpen(true);

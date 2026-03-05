@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import ConfirmDialog from './ConfirmDialog';
 import '../styles/PhotoUploader.css';
 
@@ -71,17 +71,10 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({ equipmentId, photos, onPh
 
     try {
       setUploading(true);
-      const token = localStorage.getItem('token');
       
-      const response = await axios.post(
-        `http://localhost:3001/api/inventory/equipment/${equipmentId}/photo`,
-        formData,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data'
-          }
-        }
+      const response = await api.post(
+        `/inventory/equipment/${equipmentId}/photo`,
+        formData
       );
 
       // Adicionar nova foto à lista
@@ -108,14 +101,10 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({ equipmentId, photos, onPh
     if (!deleteConfirm.filename) return;
 
     try {
-      const token = localStorage.getItem('token');
       
-      await axios.delete(
-        `http://localhost:3001/api/inventory/equipment/${equipmentId}/photo`,
-        {
-          headers: { 'Authorization': `Bearer ${token}` },
-          data: { filename: deleteConfirm.filename }
-        }
+      await api.delete(
+        `/inventory/equipment/${equipmentId}/photo`,
+        { data: { filename: deleteConfirm.filename } }
       );
 
       // Remover foto da lista

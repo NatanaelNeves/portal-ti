@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api, { BACKEND_URL } from '../services/api';
 import '../styles/ReturnEquipmentPage.css';
 
 interface Equipment {
@@ -77,9 +77,7 @@ const ReturnEquipmentPage: React.FC = () => {
 
   const fetchInUseEquipment = async () => {
     try {
-      const token = localStorage.getItem('internal_token');
-      const response = await axios.get('/api/inventory/equipment', {
-        headers: { Authorization: `Bearer ${token}` },
+      const response = await api.get('/inventory/equipment', {
         params: { status: 'in_use' }
       });
       setInUseEquipment(response.data.equipment || []);
@@ -134,17 +132,16 @@ const ReturnEquipmentPage: React.FC = () => {
         received_by_name: currentUser.name
       };
 
-      const response = await axios.post(
-        '/api/inventory/movements/return',
-        payload,
-        { headers: { Authorization: `Bearer ${token}` } }
+      const response = await api.post(
+        '/inventory/movements/return',
+        payload
       );
 
       setSuccess('Equipamento devolvido com sucesso! Termo de devolução gerado.');
       
       // Abrir PDF do termo em nova aba
       const termId = response.data.term_id;
-      window.open(`/api/inventory/terms/${termId}/return-pdf`, '_blank');
+      window.open(`${BACKEND_URL}/api/inventory/terms/${termId}/return-pdf`, '_blank');
 
       // Redirecionar após 2 segundos
       setTimeout(() => {

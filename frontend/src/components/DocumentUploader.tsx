@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import '../styles/DocumentUploader.css';
 
 interface Document {
@@ -71,23 +71,15 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
 
     try {
       setUploading(true);
-      const token = localStorage.getItem('token');
 
-      await axios.post(
-        `http://localhost:3001/api/inventory/equipment/${equipmentId}/document`,
-        formData,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data'
-          }
-        }
+      await api.post(
+        `/inventory/equipment/${equipmentId}/document`,
+        formData
       );
 
       // Buscar documentos atualizados
-      const docsResponse = await axios.get(
-        `http://localhost:3001/api/inventory/equipment/${equipmentId}`,
-        { headers: { 'Authorization': `Bearer ${token}` } }
+      const docsResponse = await api.get(
+        `/inventory/equipment/${equipmentId}`
       );
 
       if (docsResponse.data.documents) {
