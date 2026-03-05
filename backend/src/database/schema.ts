@@ -435,10 +435,18 @@ export async function initializeDatabase(): Promise<void> {
     // ===== MIGRAÇÕES =====
     console.log('Aplicando migrações...');
 
-    // Migração: Corrigir constraint assigned_to_id da tabela tickets
+    // Migração: Adicionar coluna assigned_to_id e corrigir constraint na tabela tickets
     await database.query(`
       DO $$ 
       BEGIN
+        -- Adicionar coluna assigned_to_id se não existir
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'tickets' AND column_name = 'assigned_to_id'
+        ) THEN
+          ALTER TABLE tickets ADD COLUMN assigned_to_id UUID;
+        END IF;
+
         -- Dropar constraint antiga se existir
         IF EXISTS (
           SELECT 1 FROM pg_constraint 
@@ -460,9 +468,67 @@ export async function initializeDatabase(): Promise<void> {
         END IF;
       END $$;
     `);
-    console.log('✓ Constraint assigned_to_id corrigida');
+    console.log('✓ Coluna e constraint assigned_to_id corrigidas');
 
-    // Migrations - Add missing columns if they don't exist
+    // Migração: Adicionar colunas faltantes em equipment_movements
+    await database.query(`
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name='equipment_movements' AND column_name='movement_date') THEN
+          ALTER TABLE equipment_movements ADD COLUMN movement_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name='equipment_movements' AND column_name='movement_type') THEN
+          ALTER TABLE equipment_movements ADD COLUMN movement_type VARCHAR(50) NOT NULL DEFAULT 'transfer';
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name='equipment_movements' AND column_name='from_user_name') THEN
+          ALTER TABLE equipment_movements ADD COLUMN from_user_name VARCHAR(255);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name='equipment_movements' AND column_name='to_user_name') THEN
+          ALTER TABLE equipment_movements ADD COLUMN to_user_name VARCHAR(255);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name='equipment_movements' AND column_name='from_location') THEN
+          ALTER TABLE equipment_movements ADD COLUMN from_location VARCHAR(255);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name='equipment_movements' AND column_name='to_location') THEN
+          ALTER TABLE equipment_movements ADD COLUMN to_location VARCHAR(255);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name='equipment_movements' AND column_name='from_unit') THEN
+          ALTER TABLE equipment_movements ADD COLUMN from_unit VARCHAR(100);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name='equipment_movements' AND column_name='to_unit') THEN
+          ALTER TABLE equipment_movements ADD COLUMN to_unit VARCHAR(100);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name='equipment_movements' AND column_name='from_department') THEN
+          ALTER TABLE equipment_movements ADD COLUMN from_department VARCHAR(255);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name='equipment_movements' AND column_name='to_department') THEN
+          ALTER TABLE equipment_movements ADD COLUMN to_department VARCHAR(255);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name='equipment_movements' AND column_name='condition_before') THEN
+          ALTER TABLE equipment_movements ADD COLUMN condition_before VARCHAR(50);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name='equipment_movements' AND column_name='condition_after') THEN
+          ALTER TABLE equipment_movements ADD COLUMN condition_after VARCHAR(50);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name='equipment_movements' AND column_name='registered_by_name') THEN
+          ALTER TABLE equipment_movements ADD COLUMN registered_by_name VARCHAR(255);
+        END IF;
+      END $$;
+    `);
+    console.log('✓ Colunas de equipment_movements atualizadas');
     await database.query(`
       DO $$ 
       BEGIN
@@ -719,19 +785,58 @@ export async function initializeDatabase(): Promise<void> {
     `);
     console.log('✓ Colunas department e unit adicionadas em public_users');
 
-    // Criar novos índices para inventário
+    // Criar novos índices para inventário (com verificação de colunas)
     await database.query(`
-      CREATE INDEX IF NOT EXISTS idx_equipment_status ON inventory_equipment(current_status);
-      CREATE INDEX IF NOT EXISTS idx_equipment_category ON inventory_equipment(category);
-      CREATE INDEX IF NOT EXISTS idx_equipment_responsible ON inventory_equipment(current_responsible_id);
-      CREATE INDEX IF NOT EXISTS idx_equipment_code ON inventory_equipment(internal_code);
-      CREATE INDEX IF NOT EXISTS idx_terms_equipment ON responsibility_terms(equipment_id);
-      CREATE INDEX IF NOT EXISTS idx_terms_responsible ON responsibility_terms(responsible_id);
-      CREATE INDEX IF NOT EXISTS idx_terms_status ON responsibility_terms(status);
-      CREATE INDEX IF NOT EXISTS idx_movements_equipment ON equipment_movements(equipment_id);
-      CREATE INDEX IF NOT EXISTS idx_movements_date ON equipment_movements(movement_date);
-      CREATE INDEX IF NOT EXISTS idx_requisitions_status ON purchase_requisitions(status);
-      CREATE INDEX IF NOT EXISTS idx_requisitions_requester ON purchase_requisitions(requested_by_id);
+      DO $$ 
+      BEGIN
+        CREATE INDEX IF NOT EXISTS idx_equipment_status ON inventory_equipment(current_status);
+        CREATE INDEX IF NOT EXISTS idx_equipment_category ON inventory_equipment(category);
+        
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='inventory_equipment' AND column_name='current_responsible_id') THEN
+          IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='idx_equipment_responsible') THEN
+            CREATE INDEX idx_equipment_responsible ON inventory_equipment(current_responsible_id);
+          END IF;
+        END IF;
+        
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='inventory_equipment' AND column_name='internal_code') THEN
+          IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='idx_equipment_code') THEN
+            CREATE INDEX idx_equipment_code ON inventory_equipment(internal_code);
+          END IF;
+        END IF;
+        
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='responsibility_terms' AND column_name='equipment_id') THEN
+          IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='idx_terms_equipment') THEN
+            CREATE INDEX idx_terms_equipment ON responsibility_terms(equipment_id);
+          END IF;
+        END IF;
+        
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='responsibility_terms' AND column_name='responsible_id') THEN
+          IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='idx_terms_responsible') THEN
+            CREATE INDEX idx_terms_responsible ON responsibility_terms(responsible_id);
+          END IF;
+        END IF;
+        
+        CREATE INDEX IF NOT EXISTS idx_terms_status ON responsibility_terms(status);
+        CREATE INDEX IF NOT EXISTS idx_movements_equipment ON equipment_movements(equipment_id);
+        
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='equipment_movements' AND column_name='movement_date') THEN
+          IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='idx_movements_date') THEN
+            CREATE INDEX idx_movements_date ON equipment_movements(movement_date);
+          END IF;
+        END IF;
+        
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='purchase_requisitions' AND column_name='status') THEN
+          IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='idx_requisitions_status') THEN
+            CREATE INDEX idx_requisitions_status ON purchase_requisitions(status);
+          END IF;
+        END IF;
+        
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='purchase_requisitions' AND column_name='requested_by_id') THEN
+          IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='idx_requisitions_requester') THEN
+            CREATE INDEX idx_requisitions_requester ON purchase_requisitions(requested_by_id);
+          END IF;
+        END IF;
+      END $$;
     `);
 
     console.log('✓ Database schema initialized successfully');
