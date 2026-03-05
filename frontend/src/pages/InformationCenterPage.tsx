@@ -60,7 +60,7 @@ export default function InformationCenterPage() {
   return (
     <div className="information-center-page">
       <div className="center-header">
-        <h1>� Central de Dúvidas</h1>
+        <h1>📚 Central de Dúvidas</h1>
         <p>Encontre respostas, tutoriais e documentação para apoiar seu trabalho</p>
       </div>
 
