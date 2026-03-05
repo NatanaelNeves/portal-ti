@@ -1,0 +1,80 @@
+2026-03-05T11:48:15.044704875Z     at Module.require (node:internal/modules/cjs/loader:1289:19)
+2026-03-05T11:48:15.044709083Z     at require (node:internal/modules/helpers:182:18)
+2026-03-05T11:48:15.044713900Z     at Object.<anonymous> (/home/site/wwwroot/dist/index.js:6:35)
+2026-03-05T11:48:15.044719229Z     at Module._compile (node:internal/modules/cjs/loader:1521:14)
+2026-03-05T11:48:15.044723957Z     at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+2026-03-05T11:48:15.044729186Z     at Module.load (node:internal/modules/cjs/loader:1266:32)
+2026-03-05T11:48:15.044733304Z     at Module._load (node:internal/modules/cjs/loader:1091:12)
+2026-03-05T11:48:15.044737471Z     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12) {
+2026-03-05T11:48:15.044742239Z   code: 'MODULE_NOT_FOUND',
+2026-03-05T11:48:15.044746506Z   requireStack: [ '/home/site/wwwroot/dist/index.js' ]
+2026-03-05T11:48:15.044750713Z }
+2026-03-05T11:48:15.044754750Z 
+2026-03-05T11:48:15.044758696Z Node.js v20.20.0
+
+2026-03-05T11:53:26.307925919Z    _____                               
+2026-03-05T11:53:26.310282190Z   /  _  \ __________ _________   ____  
+2026-03-05T11:53:26.310291649Z  /  /_\  \\___   /  |  \_  __ \_/ __ \ 
+2026-03-05T11:53:26.310296759Z /    |    \/    /|  |  /|  | \/\  ___/ 
+2026-03-05T11:53:26.310301207Z \____|__  /_____ \____/ |__|    \___  >
+2026-03-05T11:53:26.310306187Z         \/      \/                  \/ 
+2026-03-05T11:53:26.310310355Z A P P   S E R V I C E   O N   L I N U X
+2026-03-05T11:53:26.310314673Z 
+2026-03-05T11:53:26.310319313Z Documentation    : http://aka.ms/webapp-linux
+2026-03-05T11:53:26.310326747Z NodeJS quickstart: https://aka.ms/node-qs
+2026-03-05T11:53:26.310360122Z NodeJS Version   : v20.20.0
+2026-03-05T11:53:26.310366003Z Instance Name    : 10-30-0-21
+2026-03-05T11:53:26.310370151Z Instance Id      : 5fe8466bb77e67dd7875eed93845874bb5bf263fee84fd18f5ccdc99c79107f1
+2026-03-05T11:53:26.310374329Z 
+2026-03-05T11:53:26.310378197Z Note: Any data outside '/home' is not persisted
+2026-03-05T11:53:27.882242328Z Starting OpenBSD Secure Shell server: sshd.
+2026-03-05T11:53:27.896060318Z WEBSITES_INCLUDE_CLOUD_CERTS is not set to true.
+2026-03-05T11:53:27.938757383Z Updating certificates in /etc/ssl/certs...
+2026-03-05T11:53:36.639436982Z rehash: warning: skipping duplicate certificate in azl_SSL.com_TLS_ECC_Root_CA_2022.pem
+2026-03-05T11:53:36.639778140Z rehash: warning: skipping duplicate certificate in azl_SSL.com_TLS_RSA_Root_CA_2022.pem
+2026-03-05T11:53:36.704579232Z rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL
+2026-03-05T11:53:36.726014942Z 4 added, 0 removed; done.
+2026-03-05T11:53:36.726206907Z Running hooks in /etc/ca-certificates/update.d...
+2026-03-05T11:53:36.731074316Z done.
+2026-03-05T11:53:36.745685714Z CA certificates copied and updated successfully.
+2026-03-05T11:53:36.906335565Z Starting periodic command scheduler: cron.
+2026-03-05T11:53:37.017558849Z Could not find build manifest file at '/home/site/wwwroot/oryx-manifest.toml'
+2026-03-05T11:53:37.017685361Z Could not find operation ID in manifest. Generating an operation id...
+2026-03-05T11:53:37.017852025Z Build Operation ID: fd0fde75-b475-4d83-897d-308b42ca2bc0
+2026-03-05T11:53:37.590624205Z Environment Variables for Application Insight's IPA Codeless Configuration exists..
+2026-03-05T11:53:37.715091753Z Writing output script to '/opt/startup/startup.sh'
+2026-03-05T11:53:37.851811862Z Running #!/bin/sh
+2026-03-05T11:53:37.851841488Z 
+2026-03-05T11:53:37.851847600Z # Enter the source directory to make sure the script runs where the user expects
+2026-03-05T11:53:37.851853270Z cd "/home/site/wwwroot"
+2026-03-05T11:53:37.851858621Z 
+2026-03-05T11:53:37.851880502Z export NODE_PATH=/usr/local/lib/node_modules:$NODE_PATH
+2026-03-05T11:53:37.851884499Z if [ -z "$PORT" ]; then
+2026-03-05T11:53:37.851888317Z 		export PORT=8080
+2026-03-05T11:53:37.851892314Z fi
+2026-03-05T11:53:37.851896061Z 
+2026-03-05T11:53:37.851899719Z PATH="$PATH:/home/site/wwwroot" node dist/index.js
+2026-03-05T11:53:38.183773334Z node:internal/modules/cjs/loader:1210
+2026-03-05T11:53:38.183860580Z   throw err;
+2026-03-05T11:53:38.183867122Z   ^
+2026-03-05T11:53:38.183874276Z 
+2026-03-05T11:53:38.183878424Z Error: Cannot find module 'express'
+2026-03-05T11:53:38.183882281Z Require stack:
+2026-03-05T11:53:38.183886038Z - /home/site/wwwroot/dist/index.js
+2026-03-05T11:53:38.183890026Z     at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+2026-03-05T11:53:38.183894153Z     at Module._load (node:internal/modules/cjs/loader:1038:27)
+2026-03-05T11:53:38.183898061Z     at Module.require (node:internal/modules/cjs/loader:1289:19)
+2026-03-05T11:53:38.183901908Z     at require (node:internal/modules/helpers:182:18)
+2026-03-05T11:53:38.183905766Z     at Object.<anonymous> (/home/site/wwwroot/dist/index.js:6:35)
+2026-03-05T11:53:38.183951242Z     at Module._compile (node:internal/modules/cjs/loader:1521:14)
+2026-03-05T11:53:38.183956101Z     at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+2026-03-05T11:53:38.183960450Z     at Module.load (node:internal/modules/cjs/loader:1266:32)
+2026-03-05T11:53:38.183964687Z     at Module._load (node:internal/modules/cjs/loader:1091:12)
+2026-03-05T11:53:38.183968975Z     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12) {
+2026-03-05T11:53:38.183973464Z   code: 'MODULE_NOT_FOUND',
+2026-03-05T11:53:38.183977852Z   requireStack: [ '/home/site/wwwroot/dist/index.js' ]
+2026-03-05T11:53:38.183982311Z }
+2026-03-05T11:53:38.183986348Z 
+2026-03-05T11:53:38.183990436Z Node.js v20.20.0
+
+

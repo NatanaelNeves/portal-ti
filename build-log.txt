@@ -1,0 +1,8 @@
+ed754494-4e3d-4b9e-83b6-35879e24c4fb: Updating submodules.
+aa69012a-0c08-459a-ac9c-09c4fb015443: Preparing deployment for commit id 'd0bde9e2-b'.
+91ed19a3-a078-492f-9b1c-1d11a3f73ac7: PreDeployment: context.CleanOutputPath False
+d7185a5a-6f15-4431-a0c9-9db361e788b3: PreDeployment: context.OutputPath /home/site/wwwroot
+0ef40290-f65a-47a8-b5ef-6760d3bc99c8: Generating deployment script.
+0ae69306-3932-4acd-9529-24ccf8b0a6b1: Running deployment command...
+fb4568f9-2132-45e1-8880-37e133699de1: Running deployment command...
+78ec7050-1633-4ca2-9fd6-4e4699db9ce3: Deployment Failed. deployer = Push-Deployer deploymentPath = ZipDeploy. Extract zip. Remote build.
