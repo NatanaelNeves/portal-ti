@@ -118,7 +118,6 @@ const ReturnEquipmentPage: React.FC = () => {
     setSuccess('');
 
     try {
-      const token = localStorage.getItem('internal_token');
       const currentUser = JSON.parse(localStorage.getItem('internal_user') || '{}');
       
       // Format payload with snake_case field names to match backend

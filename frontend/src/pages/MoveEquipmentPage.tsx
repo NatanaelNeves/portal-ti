@@ -89,7 +89,6 @@ export default function MoveEquipmentPage() {
     setError('');
 
     try {
-      const token = localStorage.getItem('internal_token');
       const currentUser = JSON.parse(localStorage.getItem('internal_user') || '{}');
 
       let payload: any = {
