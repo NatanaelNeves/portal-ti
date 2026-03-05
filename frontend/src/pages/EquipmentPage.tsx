@@ -75,9 +75,9 @@ export default function EquipmentPage() {
 
   const stats = {
     total: equipments.length,
-    in_stock: equipments.filter(eq => eq.current_status === 'in_stock').length,
+    available: equipments.filter(eq => eq.current_status === 'available').length,
     in_use: equipments.filter(eq => eq.current_status === 'in_use').length,
-    maintenance: equipments.filter(eq => eq.current_status === 'in_maintenance').length
+    maintenance: equipments.filter(eq => eq.current_status === 'in_maintenance' || eq.current_status === 'maintenance').length
   };
 
   if (loading) {
@@ -156,8 +156,8 @@ export default function EquipmentPage() {
           </div>
           <div className="stat-card stat-available">
             <div className="stat-icon">🟢</div>
-            <div className="stat-value">{stats.in_stock}</div>
-            <div className="stat-label">Em Estoque</div>
+            <div className="stat-value">{stats.available}</div>
+            <div className="stat-label">Disponíveis</div>
           </div>
           <div className="stat-card stat-in-use">
             <div className="stat-icon">🔵</div>
@@ -180,7 +180,7 @@ export default function EquipmentPage() {
               onChange={(e) => setFilterStatus(e.target.value)}
             >
               <option value="all">Todos</option>
-              <option value="in_stock">Em Estoque</option>
+              <option value="available">Disponível</option>
               <option value="in_use">Em Uso</option>
               <option value="in_maintenance">Manutenção</option>
             </select>
