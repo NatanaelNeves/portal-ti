@@ -33,9 +33,10 @@ app.use('/api/', generalLimiter);
 // Servir arquivos estáticos (uploads)
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// Health check
+// Health check — always responds, independent of DB status
+let dbReady = false;
 app.get('/api/health', (_, res: Response) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', db: dbReady, timestamp: new Date().toISOString() });
 });
 
 // Rotas da API (authLimiter desabilitado em desenvolvimento)
@@ -56,20 +57,10 @@ app.use((err: any, req: any, res: Response, next: any) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// Start server
+// Start server — listen FIRST, connect DB after
 async function startServer(): Promise<void> {
-  try {
-    console.log('📡 Connecting to database...');
-    await database.connect();
-    console.log('✓ Initializing database schema...');
-    await initializeDatabase();
-    console.log('✓ Database initialized');
-
-    // Inicializar WebSocket
-    console.log('🔌 Initializing WebSocket...');
-    initializeWebSocket(httpServer);
-    console.log('✓ WebSocket initialized');
-
+  // Start HTTP server immediately so Azure health checks pass
+  await new Promise<void>((resolve) => {
     httpServer.listen(config.port, () => {
       console.log(`
 ╔═══════════════════════════════════════╗
@@ -78,12 +69,41 @@ async function startServer(): Promise<void> {
 ║   Environment: ${config.nodeEnv.toUpperCase().padEnd(26)}║
 ╚═══════════════════════════════════════╝
       `);
+      resolve();
     });
-  } catch (error) {
-    console.error('❌ Failed to start server:', error);
-    process.exit(1);
-  }
+  });
+
+  // Connect to DB after server is already listening
+  const connectWithRetry = async (retries = 5, delayMs = 5000): Promise<void> => {
+    for (let i = 1; i <= retries; i++) {
+      try {
+        console.log(`📡 Connecting to database (attempt ${i}/${retries})...`);
+        await database.connect();
+        console.log('✓ Initializing database schema...');
+        await initializeDatabase();
+        console.log('✓ Database initialized');
+        dbReady = true;
+
+        console.log('🔌 Initializing WebSocket...');
+        initializeWebSocket(httpServer);
+        console.log('✓ WebSocket initialized');
+        return;
+      } catch (error) {
+        console.error(`❌ DB connection attempt ${i} failed:`, error);
+        if (i < retries) {
+          console.log(`⏳ Retrying in ${delayMs / 1000}s...`);
+          await new Promise((r) => setTimeout(r, delayMs));
+        }
+      }
+    }
+    console.error('❌ Could not connect to database after all retries. API routes that require DB will fail.');
+  };
+
+  await connectWithRetry();
 }
 
 console.log('🎬 Starting server...');
-startServer();
+startServer().catch((err) => {
+  console.error('Fatal startup error:', err);
+  process.exit(1);
+});
