@@ -51,8 +51,7 @@ export default function Navigation() {
   const internalUser = localStorage.getItem('internal_user');
   const userData = internalUser ? JSON.parse(internalUser) : null;
   
-  const isITStaff = userData && userData.role === 'it_staff';
-  const showAssetsLink = isITStaff;
+  const showAssetsLink = userData && (userData.role === 'admin' || userData.role === 'it_staff');
   const showUsersLink = userData && (userData.role === 'admin' || userData.role === 'it_staff');
   const showKnowledgeLink = userData && ['it_staff', 'admin'].includes(userData.role);
 
