@@ -143,7 +143,7 @@ inventoryRouter.post('/notebooks', async (req: Request, res: Response) => {
         processor, memory_ram, storage, screen_size, operating_system,
         physical_condition, current_status, current_unit,
         acquisition_date, purchase_value, warranty_expiration, notes
-      ) VALUES ($1, 'NOTEBOOK', 'Notebook', $2, $3, $4, $5, $6, $7, $8, $9, $10, 'in_stock', $11, $12, $13, $14, $15)
+      ) VALUES ($1, 'NOTEBOOK', 'Notebook', $2, $3, $4, $5, $6, $7, $8, $9, $10, 'available', $11, $12, $13, $14, $15)
       RETURNING *
     `, [
       internal_code, brand, model, serial_number || 'S/N', 
@@ -233,7 +233,7 @@ inventoryRouter.post('/peripherals', async (req: Request, res: Response) => {
         internal_code, category, type, brand, model, description, serial_number,
         physical_condition, current_status, current_unit,
         acquisition_date, purchase_value, notes
-      ) VALUES ($1, 'PERIPHERAL', $2, $3, $4, $5, $6, $7, 'in_stock', $8, $9, $10, $11)
+      ) VALUES ($1, 'PERIPHERAL', $2, $3, $4, $5, $6, $7, 'available', $8, $9, $10, $11)
       RETURNING *
     `, [
       internal_code, type, brand, model, description, serial_number || 'S/N',
@@ -313,7 +313,7 @@ inventoryRouter.post('/peripherals/batch', async (req: Request, res: Response) =
           internal_code, category, type, brand, model, description, serial_number,
           physical_condition, current_status, current_unit,
           acquisition_date, purchase_value, notes
-        ) VALUES ($1, 'PERIPHERAL', $2, $3, $4, $5, 'S/N', $6, 'in_stock', $7, $8, $9, $10)
+        ) VALUES ($1, 'PERIPHERAL', $2, $3, $4, $5, 'S/N', $6, 'available', $7, $8, $9, $10)
         RETURNING *
       `, [
         internal_code, type, brand, model, description,
