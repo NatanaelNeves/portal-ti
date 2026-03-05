@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/GestorTicketsPage.css';
+import { BACKEND_URL } from '../services/api';
 
 interface Ticket {
   id: string;
@@ -50,7 +51,7 @@ export default function GestorTicketsPage() {
 
   const fetchUsers = async (token: string) => {
     try {
-      const response = await fetch('/api/internal-auth/users', {
+      const response = await fetch(`${BACKEND_URL}/api/internal-auth/users`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (response.ok) {
@@ -65,7 +66,7 @@ export default function GestorTicketsPage() {
   const fetchTickets = async (token: string) => {
     try {
       setLoading(true);
-      const response = await fetch('/api/tickets', {
+      const response = await fetch(`${BACKEND_URL}/api/tickets`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 

@@ -4,6 +4,7 @@ import InventoryLayout from '../components/InventoryLayout';
 import { ExcelExportService } from '../services/excelExportService';
 import '../styles/NotebooksPage.css';
 import '../styles/InventoryButtons.css';
+import { BACKEND_URL } from '../services/api';
 
 interface Notebook {
   id: string;
@@ -44,7 +45,7 @@ export default function NotebooksPage() {
       if (filterStatus !== 'all') params.append('status', filterStatus);
       if (filterUnit !== 'all') params.append('unit', filterUnit);
 
-      const response = await fetch(`/api/inventory/notebooks?${params.toString()}`, {
+      const response = await fetch(`${BACKEND_URL}/api/inventory/notebooks?${params.toString()}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },

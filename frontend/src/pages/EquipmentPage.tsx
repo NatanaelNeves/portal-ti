@@ -4,6 +4,7 @@ import InventoryLayout from '../components/InventoryLayout';
 import { ExcelExportService } from '../services/excelExportService';
 import '../styles/EquipmentPage.css';
 import '../styles/InventoryButtons.css';
+import { BACKEND_URL } from '../services/api';
 
 interface Equipment {
   id: string;
@@ -36,7 +37,7 @@ export default function EquipmentPage() {
       setLoading(true);
       const token = localStorage.getItem('internal_token');
       
-      const response = await fetch('/api/inventory/equipment', {
+      const response = await fetch(`${BACKEND_URL}/api/inventory/equipment`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 

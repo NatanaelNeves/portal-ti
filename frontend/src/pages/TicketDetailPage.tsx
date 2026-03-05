@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import StatusTimeline from '../components/StatusTimeline';
 import NextAction from '../components/NextAction';
 import '../styles/TicketDetailPage.css';
+import { BACKEND_URL } from '../services/api';
 
 interface TicketDetail {
   id: string;
@@ -62,8 +63,8 @@ export default function TicketDetailPage() {
       }
 
       const [ticketRes, messagesRes] = await Promise.all([
-        fetch(`/api/tickets/${ticketId}`, { headers }),
-        fetch(`/api/tickets/${ticketId}/messages`, { headers }),
+        fetch(`${BACKEND_URL}/api/tickets/${ticketId}`, { headers }),
+        fetch(`${BACKEND_URL}/api/tickets/${ticketId}/messages`, { headers }),
       ]);
 
       if (!ticketRes.ok) {
@@ -104,7 +105,7 @@ export default function TicketDetailPage() {
         headers['X-User-Token'] = token;
       }
 
-      const response = await fetch(`/api/tickets/${id}/messages`, {
+      const response = await fetch(`${BACKEND_URL}/api/tickets/${id}/messages`, {
         method: 'POST',
         headers,
         body: JSON.stringify({

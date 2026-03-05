@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { showToast } from '../utils/toast';
 import '../styles/OpenTicketPage.css';
+import { BACKEND_URL } from '../services/api';
 
 interface FormData {
   email: string;
@@ -69,7 +70,7 @@ export default function OpenTicketPage() {
 
     try {
       // First, get access token for public user
-      const accessResponse = await fetch('/api/public-auth/public-access', {
+      const accessResponse = await fetch(`${BACKEND_URL}/api/public-auth/public-access`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -90,7 +91,7 @@ export default function OpenTicketPage() {
       console.log('Token obtido com sucesso');
 
       // Create ticket
-      const ticketResponse = await fetch('/api/tickets', {
+      const ticketResponse = await fetch(`${BACKEND_URL}/api/tickets`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

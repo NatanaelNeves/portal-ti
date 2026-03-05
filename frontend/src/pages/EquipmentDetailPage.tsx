@@ -113,7 +113,7 @@ export default function EquipmentDetailPage() {
       setLoading(true);
       const token = localStorage.getItem('internal_token');
       
-      const response = await fetch(`/api/inventory/equipment/${equipmentId}`, {
+      const response = await fetch(`${BACKEND_URL}/api/inventory/equipment/${equipmentId}`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
 

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/GestorDashboardPage.css';
+import { BACKEND_URL } from '../services/api';
 
 interface GestorData {
   totalTickets: number;
@@ -40,7 +41,7 @@ export default function GestorDashboardPage() {
   const fetchDashboardData = async (token: string) => {
     try {
       setLoading(true);
-      const response = await fetch('/api/dashboard/gestor', {
+      const response = await fetch(`${BACKEND_URL}/api/dashboard/gestor`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

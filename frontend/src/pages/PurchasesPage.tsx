@@ -5,6 +5,7 @@ import { ExcelExportService } from '../services/excelExportService';
 import { showToast } from '../utils/toast';
 import '../styles/PurchasesPage.css';
 import '../styles/InventoryButtons.css';
+import { BACKEND_URL } from '../services/api';
 
 interface Purchase {
   id: string;
@@ -43,7 +44,7 @@ export default function PurchasesPage() {
       setLoading(true);
       const token = localStorage.getItem('internal_token');
       
-      const response = await fetch('/api/inventory/requisitions', {
+      const response = await fetch(`${BACKEND_URL}/api/inventory/requisitions`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -89,7 +90,7 @@ export default function PurchasesPage() {
       const userData = localStorage.getItem('internal_user');
       const user = JSON.parse(userData || '{}');
 
-      const response = await fetch(`/api/inventory/requisitions/${selectedPurchase.id}/approve`, {
+      const response = await fetch(`${BACKEND_URL}/api/inventory/requisitions/${selectedPurchase.id}/approve`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -124,7 +125,7 @@ export default function PurchasesPage() {
       setActionLoading(true);
       const token = localStorage.getItem('internal_token');
 
-      const response = await fetch(`/api/inventory/requisitions/${selectedPurchase.id}/reject`, {
+      const response = await fetch(`${BACKEND_URL}/api/inventory/requisitions/${selectedPurchase.id}/reject`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -157,7 +158,7 @@ export default function PurchasesPage() {
       setActionLoading(true);
       const token = localStorage.getItem('internal_token');
 
-      const response = await fetch(`/api/inventory/requisitions/${selectedPurchase.id}/purchase`, {
+      const response = await fetch(`${BACKEND_URL}/api/inventory/requisitions/${selectedPurchase.id}/purchase`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -195,7 +196,7 @@ export default function PurchasesPage() {
       const userData = localStorage.getItem('internal_user');
       const user = JSON.parse(userData || '{}');
 
-      const response = await fetch(`/api/inventory/requisitions/${selectedPurchase.id}/receive`, {
+      const response = await fetch(`${BACKEND_URL}/api/inventory/requisitions/${selectedPurchase.id}/receive`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,

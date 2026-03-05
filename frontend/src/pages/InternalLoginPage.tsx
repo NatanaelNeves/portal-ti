@@ -1,5 +1,6 @@
 import { useState } from 'react';
 // import { useNavigate } from 'react-router-dom';
+import { BACKEND_URL } from '../services/api';
 import '../styles/InternalLoginPage.css';
 
 export default function InternalLoginPage() {
@@ -15,7 +16,7 @@ export default function InternalLoginPage() {
     setLoading(true);
 
     try {
-      const response = await fetch('/api/internal-auth/internal-login', {
+      const response = await fetch(`${BACKEND_URL}/api/internal-auth/internal-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),

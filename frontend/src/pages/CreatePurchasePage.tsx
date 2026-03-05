@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import InventoryLayout from '../components/InventoryLayout';
 import '../styles/CreatePurchasePage.css';
+import { BACKEND_URL } from '../services/api';
 
 export default function CreatePurchasePage() {
   const [formData, setFormData] = useState({
@@ -49,7 +50,7 @@ export default function CreatePurchasePage() {
       
       const user = JSON.parse(userData);
 
-      const response = await fetch('/api/inventory/requisitions', {
+      const response = await fetch(`${BACKEND_URL}/api/inventory/requisitions`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

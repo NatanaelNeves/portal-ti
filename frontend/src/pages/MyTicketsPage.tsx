@@ -1,4 +1,5 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { BACKEND_URL } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import ConfirmDialog from '../components/ConfirmDialog';
 import '../styles/MyTicketsPage.css';
@@ -67,7 +68,7 @@ export default function MyTicketsPage() {
       setLoading(true);
       setError('');
 
-      const accessResponse = await fetch('/api/public-auth/public-access', {
+      const accessResponse = await fetch(`${BACKEND_URL}/api/public-auth/public-access`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -77,7 +78,7 @@ export default function MyTicketsPage() {
       });
 
       if (!accessResponse.ok) {
-        throw new Error('Email não encontrado. Você já abriu alguma solicitação com este email?');
+        throw new Error('Email n�o encontrado. Voc� j� abriu alguma solicita��o com este email?');
       }
 
       const { user_token } = await accessResponse.json();
@@ -89,7 +90,7 @@ export default function MyTicketsPage() {
       
       await fetchTickets(user_token);
     } catch (err: any) {
-      setError(err.message || 'Erro ao buscar solicitações');
+      setError(err.message || 'Erro ao buscar solicita��es');
       setLoading(false);
     }
   };
@@ -98,7 +99,7 @@ export default function MyTicketsPage() {
     e.preventDefault();
     
     if (!searchCode.trim()) {
-      setError('Por favor, informe o código da solicitação');
+      setError('Por favor, informe o c�digo da solicita��o');
       return;
     }
 
@@ -110,9 +111,9 @@ export default function MyTicketsPage() {
     const ticketCode = searchCode.toLowerCase().trim();
     const email = codeEmail.trim();
     
-    // Verificar se é um código válido (pelo menos 8 caracteres)
+    // Verificar se � um c�digo v�lido (pelo menos 8 caracteres)
     if (ticketCode.length < 8) {
-      setError('O código deve ter pelo menos 8 caracteres. Exemplo: E0743972');
+      setError('O c�digo deve ter pelo menos 8 caracteres. Exemplo: E0743972');
       return;
     }
 
@@ -120,8 +121,8 @@ export default function MyTicketsPage() {
       setLoading(true);
       setError('');
       
-      // Registrar/obter token do usuário público
-      const response = await fetch('/api/public-auth/public-access', {
+      // Registrar/obter token do usu�rio p�blico
+      const response = await fetch(`${BACKEND_URL}/api/public-auth/public-access`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, name: email.split('@')[0] }),
@@ -135,16 +136,16 @@ export default function MyTicketsPage() {
 
       const { user_token } = await response.json();
       
-      // Buscar tickets do usuário
+      // Buscar tickets do usu�rio
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'X-User-Token': user_token,
       };
       
-      const ticketsResponse = await fetch('/api/tickets', { headers });
+      const ticketsResponse = await fetch(`${BACKEND_URL}/api/tickets`, { headers });
       
       if (!ticketsResponse.ok) {
-        setError('Erro ao buscar solicitações');
+        setError('Erro ao buscar solicita��es');
         setLoading(false);
         return;
       }
@@ -159,12 +160,12 @@ export default function MyTicketsPage() {
         : [];
       
       if (userTickets.length === 0) {
-        setError('Nenhuma solicitação encontrada para este email');
+        setError('Nenhuma solicita��o encontrada para este email');
         setLoading(false);
         return;
       }
       
-      // Buscar ticket pelo código (8 chars ou UUID completo)
+      // Buscar ticket pelo c�digo (8 chars ou UUID completo)
       const foundTicket = userTickets.find((t: any) => {
         if (ticketCode.length === 8) {
           return t.id.substring(0, 8).toLowerCase() === ticketCode;
@@ -173,7 +174,7 @@ export default function MyTicketsPage() {
       });
       
       if (!foundTicket) {
-        setError('Código não encontrado. Verifique se o código pertence a uma solicitação deste email.');
+        setError('C�digo n�o encontrado. Verifique se o c�digo pertence a uma solicita��o deste email.');
         setLoading(false);
         return;
       }
@@ -186,8 +187,8 @@ export default function MyTicketsPage() {
       navigate(`/chamado/${foundTicket.id}`);
       
     } catch (err: any) {
-      console.error('Erro ao buscar solicitação:', err);
-      setError(err.message || 'Erro ao buscar solicitação');
+      console.error('Erro ao buscar solicita��o:', err);
+      setError(err.message || 'Erro ao buscar solicita��o');
       setLoading(false);
     }
   };
@@ -201,16 +202,16 @@ export default function MyTicketsPage() {
       };
 
       console.log('Buscando tickets com token:', token.substring(0, 20) + '...');
-      const response = await fetch('/api/tickets', { headers });
+      const response = await fetch(`${BACKEND_URL}/api/tickets`, { headers });
 
       if (!response.ok) {
-        throw new Error('Erro ao carregar solicitações');
+        throw new Error('Erro ao carregar solicita��es');
       }
 
       const data = await response.json();
       console.log('Resposta do backend:', data);
       
-      // Backend retorna {data: [...], pagination: {...}} para usuários públicos
+      // Backend retorna {data: [...], pagination: {...}} para usu�rios p�blicos
       // ou apenas [...] para alguns endpoints
       if (data.data && Array.isArray(data.data)) {
         console.log('Tickets encontrados:', data.data.length);
@@ -224,7 +225,7 @@ export default function MyTicketsPage() {
       }
     } catch (err: any) {
       console.error('Erro ao buscar tickets:', err);
-      setError(err.message || 'Erro ao carregar solicitações');
+      setError(err.message || 'Erro ao carregar solicita��es');
     } finally {
       setLoading(false);
     }
@@ -248,13 +249,13 @@ export default function MyTicketsPage() {
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'open':
-        return '📥 Recebido';
+        return '?? Recebido';
       case 'in_progress':
-        return '🔍 Em Análise';
+        return '?? Em An�lise';
       case 'resolved':
-        return '⚙️ Resolvendo';
+        return '?? Resolvendo';
       case 'closed':
-        return '✅ Concluído';
+        return '? Conclu�do';
       default:
         return status;
     }
@@ -265,11 +266,11 @@ export default function MyTicketsPage() {
       case 'low':
         return 'Baixo';
       case 'medium':
-        return 'Médio';
+        return 'M�dio';
       case 'high':
         return 'Alto';
       case 'critical':
-        return 'Crítico';
+        return 'Cr�tico';
       default:
         return priority;
     }
@@ -279,11 +280,11 @@ export default function MyTicketsPage() {
     <div className="my-tickets-page">
       <div className="tickets-container">
         <div className="tickets-header">
-          <h1>Minhas Solicitações</h1>
-          <p>Acompanhe o progresso das suas solicitações de apoio</p>
+          <h1>Minhas Solicita��es</h1>
+          <p>Acompanhe o progresso das suas solicita��es de apoio</p>
           {email && (
             <div className="user-info-section">
-              <p className="user-email">Solicitações de: {email}</p>
+              <p className="user-email">Solicita��es de: {email}</p>
               <button onClick={handleChangeEmail} className="btn-change-email">
                 Usar outro email
               </button>
@@ -296,15 +297,15 @@ export default function MyTicketsPage() {
         {showEmailForm && !loading && (
           <div className="search-forms">
             <div className="search-intro">
-              <h2>Como você quer encontrar suas solicitações?</h2>
-              <p>Escolha uma das opções abaixo:</p>
+              <h2>Como voc� quer encontrar suas solicita��es?</h2>
+              <p>Escolha uma das op��es abaixo:</p>
             </div>
 
             <div className="search-options">
               <div className="search-option">
-                <div className="option-icon">📧</div>
+                <div className="option-icon">??</div>
                 <h3>Buscar por Email</h3>
-                <p>Informe o email usado para abrir as solicitações</p>
+                <p>Informe o email usado para abrir as solicita��es</p>
                 <form onSubmit={handleSearchByEmail} className="search-form">
                   <input
                     type="email"
@@ -314,15 +315,15 @@ export default function MyTicketsPage() {
                     required
                   />
                   <button type="submit" className="btn btn-primary">
-                    Buscar Minhas Solicitações
+                    Buscar Minhas Solicita��es
                   </button>
                 </form>
               </div>
 
               <div className="search-option">
-                <div className="option-icon">🔍</div>
-                <h3>Buscar por Código</h3>
-                <p>Digite seu email e o código da solicitação</p>
+                <div className="option-icon">??</div>
+                <h3>Buscar por C�digo</h3>
+                <p>Digite seu email e o c�digo da solicita��o</p>
                 <form onSubmit={handleSearchByCode} className="search-form">
                   <input
                     type="email"
@@ -334,21 +335,21 @@ export default function MyTicketsPage() {
                   />
                   <input
                     type="text"
-                    placeholder="Código da solicitação (ex: E0743972)"
+                    placeholder="C�digo da solicita��o (ex: E0743972)"
                     value={searchCode}
                     onChange={(e) => setSearchCode(e.target.value.toUpperCase())}
                     className="search-input"
                     required
                   />
                   <button type="submit" className="btn btn-secondary">
-                    Buscar Solicitação
+                    Buscar Solicita��o
                   </button>
                 </form>
               </div>
             </div>
 
             <div className="search-help">
-              <p>💡 <strong>Ainda não tem uma solicitação?</strong></p>
+              <p>?? <strong>Ainda n�o tem uma solicita��o?</strong></p>
               <a href="/abrir-chamado" className="btn-link">
                 Clique aqui para solicitar apoio
               </a>
@@ -357,11 +358,11 @@ export default function MyTicketsPage() {
         )}
 
         {loading ? (
-          <div className="loading">Buscando suas solicitações...</div>
+          <div className="loading">Buscando suas solicita��es...</div>
         ) : !showEmailForm && tickets.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">📋</div>
-            <p>Você ainda não tem nenhuma solicitação de apoio</p>
+            <div className="empty-icon">??</div>
+            <p>Voc� ainda n�o tem nenhuma solicita��o de apoio</p>
             <a href="/abrir-chamado" className="btn btn-primary">
               Solicitar Apoio
             </a>
@@ -389,7 +390,7 @@ export default function MyTicketsPage() {
                   </span>
                 </div>
                 <div className="ticket-code">
-                  Código: {ticket.id.substring(0, 8).toUpperCase()}
+                  C�digo: {ticket.id.substring(0, 8).toUpperCase()}
                 </div>
               </a>
             ))}
@@ -400,7 +401,7 @@ export default function MyTicketsPage() {
       <ConfirmDialog
         isOpen={changeEmailConfirm}
         title="Usar Outro Email"
-        message="Deseja usar outro email? Isso irá limpar os dados do email atual e você precisará fazer login novamente."
+        message="Deseja usar outro email? Isso ir� limpar os dados do email atual e voc� precisar� fazer login novamente."
         confirmText="Sim, trocar email"
         cancelText="Cancelar"
         type="warning"

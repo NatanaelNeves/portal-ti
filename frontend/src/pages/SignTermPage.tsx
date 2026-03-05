@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import InventoryLayout from '../components/InventoryLayout';
 import { showToast } from '../utils/toast';
 import '../styles/SignTermPage.css';
+import { BACKEND_URL } from '../services/api';
 
 interface FormData {
   responsible_name: string;
@@ -147,7 +148,7 @@ export default function SignTermPage() {
         issued_by_name: currentUser.name
       };
 
-      const response = await fetch('/api/inventory/movements/deliver', {
+      const response = await fetch(`${BACKEND_URL}/api/inventory/movements/deliver`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

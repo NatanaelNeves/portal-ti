@@ -4,6 +4,7 @@ import { showToast } from '../utils/toast';
 import StatusTimeline from '../components/StatusTimeline';
 import TicketAttachments from '../components/TicketAttachments';
 import '../styles/AdminTicketDetailPage.css';
+import { BACKEND_URL } from '../services/api';
 
 interface TicketDetail {
   id: string;
@@ -65,7 +66,7 @@ export default function AdminTicketDetailPage() {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch('/api/internal-auth/users', {
+      const response = await fetch(`${BACKEND_URL}/api/internal-auth/users`, {
         headers: {
           'Authorization': `Bearer ${internalToken}`,
         },
@@ -87,7 +88,7 @@ export default function AdminTicketDetailPage() {
         'Authorization': `Bearer ${internalToken}`,
       };
 
-      const ticketRes = await fetch(`/api/tickets/${ticketId}`, { headers });
+      const ticketRes = await fetch(`${BACKEND_URL}/api/tickets/${ticketId}`, { headers });
 
       if (!ticketRes.ok) {
         throw new Error('Erro ao carregar chamado');
@@ -143,7 +144,7 @@ export default function AdminTicketDetailPage() {
         return;
       }
       
-      const response = await fetch(`/api/tickets/${id}`, {
+      const response = await fetch(`${BACKEND_URL}/api/tickets/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -176,7 +177,7 @@ export default function AdminTicketDetailPage() {
 
     try {
       setSubmitting(true);
-      const response = await fetch(`/api/tickets/${id}/messages`, {
+      const response = await fetch(`${BACKEND_URL}/api/tickets/${id}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import InventoryLayout from '../components/InventoryLayout';
 import '../styles/ReturnTermPage.css';
+import { BACKEND_URL } from '../services/api';
 
 interface ChecklistItem {
   name: string;
@@ -143,7 +144,7 @@ export default function ReturnTermPage() {
       setError('');
       const token = localStorage.getItem('internal_token');
 
-      const response = await fetch(`/api/inventory/terms/${termId}/devolucao`, {
+      const response = await fetch(`${BACKEND_URL}/api/inventory/terms/${termId}/devolucao`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

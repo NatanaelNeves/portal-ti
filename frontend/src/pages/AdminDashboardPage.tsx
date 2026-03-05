@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/AdminDashboardPage.css';
+import { BACKEND_URL } from '../services/api';
 
 interface DashboardData {
   totalTickets: number;
@@ -31,7 +32,7 @@ export default function AdminDashboardPage() {
   const fetchDashboardData = async (token: string) => {
     try {
       setLoading(true);
-      const response = await fetch('/api/dashboard/admin', {
+      const response = await fetch(`${BACKEND_URL}/api/dashboard/admin`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import '../styles/InformationCenterPage.css';
+import { BACKEND_URL } from '../services/api';
 
 interface Article {
   id: string;
@@ -33,7 +34,7 @@ export default function InformationCenterPage() {
   const fetchArticles = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/information-articles?public=true');
+      const response = await fetch(`${BACKEND_URL}/api/information-articles?public=true`);
 
       if (!response.ok) {
         throw new Error('Erro ao carregar artigos');

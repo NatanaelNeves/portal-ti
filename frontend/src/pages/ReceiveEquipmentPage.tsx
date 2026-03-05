@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import InventoryLayout from '../components/InventoryLayout';
 import { showToast } from '../utils/toast';
 import '../styles/ReceiveEquipmentPage.css';
+import { BACKEND_URL } from '../services/api';
 
 interface Equipment {
   id: string;
@@ -36,7 +37,7 @@ export default function ReceiveEquipmentPage() {
     try {
       setLoading(true);
       const token = localStorage.getItem('internal_token');
-      const response = await fetch('/api/inventory/equipment?status=in_use', {
+      const response = await fetch(`${BACKEND_URL}/api/inventory/equipment?status=in_use`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
 
@@ -77,7 +78,7 @@ export default function ReceiveEquipmentPage() {
       setError('');
       const token = localStorage.getItem('internal_token');
 
-      const response = await fetch(`/api/inventory/equipment/${selectedEquipment.id}/receive`, {
+      const response = await fetch(`${BACKEND_URL}/api/inventory/equipment/${selectedEquipment.id}/receive`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

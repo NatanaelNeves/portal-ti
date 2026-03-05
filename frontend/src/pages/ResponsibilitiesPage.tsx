@@ -4,6 +4,7 @@ import InventoryLayout from '../components/InventoryLayout';
 import { ExcelExportService } from '../services/excelExportService';
 import '../styles/ResponsibilitiesPage.css';
 import '../styles/InventoryButtons.css';
+import { BACKEND_URL } from '../services/api';
 
 interface Equipment {
   id: string;
@@ -35,7 +36,7 @@ export default function ResponsibilitiesPage() {
     try {
       setLoading(true);
       const token = localStorage.getItem('internal_token');
-      const response = await fetch('/api/inventory/responsibilities', {
+      const response = await fetch(`${BACKEND_URL}/api/inventory/responsibilities`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import InventoryLayout from '../components/InventoryLayout';
 import '../styles/PeripheralsPage.css';
 import '../styles/InventoryButtons.css';
+import { BACKEND_URL } from '../services/api';
 
 interface Peripheral {
   id: string;
@@ -50,7 +51,7 @@ export default function PeripheralsPage() {
       if (filterType !== 'all') params.append('type', filterType);
       if (filterUnit !== 'all') params.append('unit', filterUnit);
 
-      const response = await fetch(`/api/inventory/peripherals?${params.toString()}`, {
+      const response = await fetch(`${BACKEND_URL}/api/inventory/peripherals?${params.toString()}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },

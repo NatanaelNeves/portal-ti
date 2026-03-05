@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ConfirmDialog from '../components/ConfirmDialog';
 import '../styles/UsersManagementPage.css';
+import { BACKEND_URL } from '../services/api';
 
 interface User {
   id: string;
@@ -60,7 +61,7 @@ export default function UsersManagementPage() {
   const fetchUsers = async (token: string) => {
     try {
       setLoading(true);
-      const response = await fetch('/api/internal-auth/users', {
+      const response = await fetch(`${BACKEND_URL}/api/internal-auth/users`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -86,7 +87,7 @@ export default function UsersManagementPage() {
 
     try {
       const token = localStorage.getItem('internal_token');
-      const response = await fetch('/api/internal-auth/internal-register', {
+      const response = await fetch(`${BACKEND_URL}/api/internal-auth/internal-register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -131,7 +132,7 @@ export default function UsersManagementPage() {
 
     try {
       const token = localStorage.getItem('internal_token');
-      const response = await fetch(`/api/internal-auth/users/${selectedUser.id}`, {
+      const response = await fetch(`${BACKEND_URL}/api/internal-auth/users/${selectedUser.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -164,7 +165,7 @@ export default function UsersManagementPage() {
 
     try {
       const token = localStorage.getItem('internal_token');
-      const response = await fetch(`/api/internal-auth/users/${toggleStatusConfirm.userId}/toggle-status`, {
+      const response = await fetch(`${BACKEND_URL}/api/internal-auth/users/${toggleStatusConfirm.userId}/toggle-status`, {
         method: 'PATCH',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -204,7 +205,7 @@ export default function UsersManagementPage() {
 
     try {
       const token = localStorage.getItem('internal_token');
-      const response = await fetch(`/api/internal-auth/users/${selectedUser.id}/reset-password`, {
+      const response = await fetch(`${BACKEND_URL}/api/internal-auth/users/${selectedUser.id}/reset-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
