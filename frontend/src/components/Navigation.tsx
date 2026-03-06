@@ -1,6 +1,5 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
-// import { UserRole } from '../types';
 import GlobalSearch from './GlobalSearch';
 import '../styles/Navigation.css';
 
@@ -64,58 +63,63 @@ export default function Navigation() {
 
   const dashboardRoute = getDashboardRoute();
 
+  // Todos os links em uma única lista (sem dropdown)
+  const navLinks: Array<{ label: string; action: () => void }> = [
+    { label: 'Painel', action: () => navigate(dashboardRoute) },
+    {
+      label: 'Solicitações',
+      action: () => navigate(userData?.role === 'manager' ? '/gestor/solicitacoes' : '/admin/chamados'),
+    },
+  ];
+
+  if (showKnowledgeLink) {
+    navLinks.push({ label: 'Central de Dúvidas', action: () => navigate('/admin/conhecimento') });
+  }
+
+  if (showAssetsLink) {
+    navLinks.push({ label: 'Inventário', action: () => navigate('/inventario') });
+  }
+
+  if (showKnowledgeLink) {
+    navLinks.push({ label: 'Documentos', action: () => navigate('/admin/documentos') });
+    navLinks.push({ label: 'Relatórios', action: () => navigate('/admin/relatorios') });
+  }
+
+  if (showUsersLink) {
+    navLinks.push({ label: 'Equipe', action: () => navigate('/admin/usuarios') });
+  }
+
   return (
-    <nav className="navbar">
+    <nav className="navbar navbar-internal">
       <div className="navbar-brand" onClick={() => navigate(dashboardRoute)} style={{ cursor: 'pointer' }}>
         <h1>Central de Apoio OPN</h1>
         <small style={{ fontSize: '0.75rem', opacity: 0.9 }}>Área Interna</small>
       </div>
+
       <div className="navbar-menu">
-        <button onClick={() => navigate(dashboardRoute)} className="nav-link">
-          Painel
-        </button>
-        <button 
-          onClick={() => navigate(userData?.role === 'manager' ? '/gestor/solicitacoes' : '/admin/chamados')} 
-          className="nav-link"
-        >
-          Solicitações
-        </button>
-        {showKnowledgeLink && (
-          <button onClick={() => navigate('/admin/conhecimento')} className="nav-link">
-            Central de Dúvidas
+        {navLinks.map((link) => (
+          <button
+            key={link.label}
+            onClick={link.action}
+            className="nav-link"
+          >
+            {link.label}
           </button>
-        )}
-        {showAssetsLink && (
-          <button onClick={() => navigate('/inventario')} className="nav-link">
-            📦 Inventário
-          </button>
-        )}
-        {showKnowledgeLink && (
-          <button onClick={() => navigate('/admin/documentos')} className="nav-link">
-            📁 Documentos
-          </button>
-        )}
-        {showKnowledgeLink && (
-          <button onClick={() => navigate('/admin/relatorios')} className="nav-link">
-            📊 Relatórios
-          </button>
-        )}
-        {showUsersLink && (
-          <button onClick={() => navigate('/admin/usuarios')} className="nav-link">
-            Equipe
-          </button>
-        )}
+        ))}
       </div>
-      {showAssetsLink && (
-        <div className="navbar-search">
-          <GlobalSearch />
+
+      <div className="navbar-right">
+        {showAssetsLink && (
+          <div className="navbar-search">
+            <GlobalSearch />
+          </div>
+        )}
+        <div className="navbar-user">
+          <span className="user-info">{userData?.name}</span>
+          <button onClick={handleLogout} className="logout-btn">
+            Sair
+          </button>
         </div>
-      )}
-      <div className="navbar-user">
-        <span className="user-info">{userData?.name}</span>
-        <button onClick={handleLogout} className="logout-btn">
-          Sair
-        </button>
       </div>
     </nav>
   );

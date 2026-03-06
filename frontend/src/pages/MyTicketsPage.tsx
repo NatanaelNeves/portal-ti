@@ -78,7 +78,7 @@ export default function MyTicketsPage() {
       });
 
       if (!accessResponse.ok) {
-        throw new Error('Email n�o encontrado. Voc� j� abriu alguma solicita��o com este email?');
+        throw new Error('Email não encontrado. Você já abriu alguma solicitação com este email?');
       }
 
       const { user_token } = await accessResponse.json();
@@ -90,7 +90,7 @@ export default function MyTicketsPage() {
       
       await fetchTickets(user_token);
     } catch (err: any) {
-      setError(err.message || 'Erro ao buscar solicita��es');
+      setError(err.message || 'Erro ao buscar solicitações');
       setLoading(false);
     }
   };
@@ -99,7 +99,7 @@ export default function MyTicketsPage() {
     e.preventDefault();
     
     if (!searchCode.trim()) {
-      setError('Por favor, informe o c�digo da solicita��o');
+      setError('Por favor, informe o código da solicitação');
       return;
     }
 
@@ -111,9 +111,9 @@ export default function MyTicketsPage() {
     const ticketCode = searchCode.toLowerCase().trim();
     const email = codeEmail.trim();
     
-    // Verificar se � um c�digo v�lido (pelo menos 8 caracteres)
+    // Verificar se é um código válido (pelo menos 8 caracteres)
     if (ticketCode.length < 8) {
-      setError('O c�digo deve ter pelo menos 8 caracteres. Exemplo: E0743972');
+      setError('O código deve ter pelo menos 8 caracteres. Exemplo: E0743972');
       return;
     }
 
@@ -121,7 +121,7 @@ export default function MyTicketsPage() {
       setLoading(true);
       setError('');
       
-      // Registrar/obter token do usu�rio p�blico
+      // Registrar/obter token do usuário público
       const response = await fetch(`${BACKEND_URL}/api/public-auth/public-access`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -136,7 +136,7 @@ export default function MyTicketsPage() {
 
       const { user_token } = await response.json();
       
-      // Buscar tickets do usu�rio
+      // Buscar tickets do usuário
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'X-User-Token': user_token,
@@ -145,7 +145,7 @@ export default function MyTicketsPage() {
       const ticketsResponse = await fetch(`${BACKEND_URL}/api/tickets`, { headers });
       
       if (!ticketsResponse.ok) {
-        setError('Erro ao buscar solicita��es');
+        setError('Erro ao buscar solicitações');
         setLoading(false);
         return;
       }
@@ -160,12 +160,12 @@ export default function MyTicketsPage() {
         : [];
       
       if (userTickets.length === 0) {
-        setError('Nenhuma solicita��o encontrada para este email');
+        setError('Nenhuma solicitação encontrada para este email');
         setLoading(false);
         return;
       }
       
-      // Buscar ticket pelo c�digo (8 chars ou UUID completo)
+      // Buscar ticket pelo código (8 chars ou UUID completo)
       const foundTicket = userTickets.find((t: any) => {
         if (ticketCode.length === 8) {
           return t.id.substring(0, 8).toLowerCase() === ticketCode;
@@ -174,7 +174,7 @@ export default function MyTicketsPage() {
       });
       
       if (!foundTicket) {
-        setError('C�digo n�o encontrado. Verifique se o c�digo pertence a uma solicita��o deste email.');
+        setError('Código não encontrado. Verifique se o código pertence a uma solicitação deste email.');
         setLoading(false);
         return;
       }
@@ -187,8 +187,8 @@ export default function MyTicketsPage() {
       navigate(`/chamado/${foundTicket.id}`);
       
     } catch (err: any) {
-      console.error('Erro ao buscar solicita��o:', err);
-      setError(err.message || 'Erro ao buscar solicita��o');
+      console.error('Erro ao buscar solicitação:', err);
+      setError(err.message || 'Erro ao buscar solicitação');
       setLoading(false);
     }
   };
@@ -205,13 +205,13 @@ export default function MyTicketsPage() {
       const response = await fetch(`${BACKEND_URL}/api/tickets`, { headers });
 
       if (!response.ok) {
-        throw new Error('Erro ao carregar solicita��es');
+        throw new Error('Erro ao carregar solicitações');
       }
 
       const data = await response.json();
       console.log('Resposta do backend:', data);
       
-      // Backend retorna {data: [...], pagination: {...}} para usu�rios p�blicos
+      // Backend retorna {data: [...], pagination: {...}} para usuários públicos
       // ou apenas [...] para alguns endpoints
       if (data.data && Array.isArray(data.data)) {
         console.log('Tickets encontrados:', data.data.length);
@@ -225,7 +225,7 @@ export default function MyTicketsPage() {
       }
     } catch (err: any) {
       console.error('Erro ao buscar tickets:', err);
-      setError(err.message || 'Erro ao carregar solicita��es');
+      setError(err.message || 'Erro ao carregar solicitações');
     } finally {
       setLoading(false);
     }
@@ -249,13 +249,13 @@ export default function MyTicketsPage() {
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'open':
-        return '?? Recebido';
+        return '📋 Recebido';
       case 'in_progress':
-        return '?? Em An�lise';
+        return '⏱️ Em Análise';
       case 'resolved':
-        return '?? Resolvendo';
+        return '✅ Resolvendo';
       case 'closed':
-        return '? Conclu�do';
+        return '✔️ Concluído';
       default:
         return status;
     }
@@ -264,13 +264,13 @@ export default function MyTicketsPage() {
   const getPriorityLabel = (priority: string) => {
     switch (priority) {
       case 'low':
-        return 'Baixo';
+        return '🟢 Baixo';
       case 'medium':
-        return 'M�dio';
+        return '🟡 Médio';
       case 'high':
-        return 'Alto';
+        return '🟠 Alto';
       case 'critical':
-        return 'Cr�tico';
+        return '🔴 Crítico';
       default:
         return priority;
     }
@@ -280,11 +280,11 @@ export default function MyTicketsPage() {
     <div className="my-tickets-page">
       <div className="tickets-container">
         <div className="tickets-header">
-          <h1>Minhas Solicita��es</h1>
-          <p>Acompanhe o progresso das suas solicita��es de apoio</p>
+          <h1>Minhas Solicitações</h1>
+          <p>Acompanhe o progresso das suas solicitações de apoio</p>
           {email && (
             <div className="user-info-section">
-              <p className="user-email">Solicita��es de: {email}</p>
+              <p className="user-email">Solicitações de: {email}</p>
               <button onClick={handleChangeEmail} className="btn-change-email">
                 Usar outro email
               </button>
@@ -297,15 +297,15 @@ export default function MyTicketsPage() {
         {showEmailForm && !loading && (
           <div className="search-forms">
             <div className="search-intro">
-              <h2>Como voc� quer encontrar suas solicita��es?</h2>
-              <p>Escolha uma das op��es abaixo:</p>
+              <h2>Como você quer encontrar suas solicitações?</h2>
+              <p>Escolha uma das opções abaixo:</p>
             </div>
 
             <div className="search-options">
               <div className="search-option">
-                <div className="option-icon">??</div>
+                <div className="option-icon">✉️</div>
                 <h3>Buscar por Email</h3>
-                <p>Informe o email usado para abrir as solicita��es</p>
+                <p>Informe o email usado para abrir as solicitações</p>
                 <form onSubmit={handleSearchByEmail} className="search-form">
                   <input
                     type="email"
@@ -315,15 +315,15 @@ export default function MyTicketsPage() {
                     required
                   />
                   <button type="submit" className="btn btn-primary">
-                    Buscar Minhas Solicita��es
+                    Buscar Minhas Solicitações
                   </button>
                 </form>
               </div>
 
               <div className="search-option">
-                <div className="option-icon">??</div>
-                <h3>Buscar por C�digo</h3>
-                <p>Digite seu email e o c�digo da solicita��o</p>
+                <div className="option-icon">🔍</div>
+                <h3>Buscar por Código</h3>
+                <p>Digite seu email e o código da solicitação</p>
                 <form onSubmit={handleSearchByCode} className="search-form">
                   <input
                     type="email"
@@ -335,21 +335,21 @@ export default function MyTicketsPage() {
                   />
                   <input
                     type="text"
-                    placeholder="C�digo da solicita��o (ex: E0743972)"
+                    placeholder="Código da solicitação (ex: E0743972)"
                     value={searchCode}
                     onChange={(e) => setSearchCode(e.target.value.toUpperCase())}
                     className="search-input"
                     required
                   />
                   <button type="submit" className="btn btn-secondary">
-                    Buscar Solicita��o
+                    Buscar Solicitação
                   </button>
                 </form>
               </div>
             </div>
 
             <div className="search-help">
-              <p>?? <strong>Ainda n�o tem uma solicita��o?</strong></p>
+              <p>💡 <strong>Ainda não tem uma solicitação?</strong></p>
               <a href="/abrir-chamado" className="btn-link">
                 Clique aqui para solicitar apoio
               </a>
@@ -358,11 +358,11 @@ export default function MyTicketsPage() {
         )}
 
         {loading ? (
-          <div className="loading">Buscando suas solicita��es...</div>
+          <div className="loading">Buscando suas solicitações...</div>
         ) : !showEmailForm && tickets.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">??</div>
-            <p>Voc� ainda n�o tem nenhuma solicita��o de apoio</p>
+            <div className="empty-icon">📋</div>
+            <p>Você ainda não tem nenhuma solicitação de apoio</p>
             <a href="/abrir-chamado" className="btn btn-primary">
               Solicitar Apoio
             </a>
@@ -390,7 +390,7 @@ export default function MyTicketsPage() {
                   </span>
                 </div>
                 <div className="ticket-code">
-                  C�digo: {ticket.id.substring(0, 8).toUpperCase()}
+                  Código: {ticket.id.substring(0, 8).toUpperCase()}
                 </div>
               </a>
             ))}
@@ -401,7 +401,7 @@ export default function MyTicketsPage() {
       <ConfirmDialog
         isOpen={changeEmailConfirm}
         title="Usar Outro Email"
-        message="Deseja usar outro email? Isso ir� limpar os dados do email atual e voc� precisar� fazer login novamente."
+        message="Deseja usar outro email? Isso irá limpar os dados do email atual e você precisará fazer login novamente."
         confirmText="Sim, trocar email"
         cancelText="Cancelar"
         type="warning"

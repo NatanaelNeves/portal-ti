@@ -4,39 +4,41 @@
   max-width: 500px;
 }
 
-.search-input-wrapper {
+.global-search .search-input-wrapper {
   position: relative;
   display: flex;
   align-items: center;
 }
 
-.search-input {
+.global-search .search-input {
   width: 100%;
   padding: 10px 40px 10px 15px;
-  border: 2px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--cinza-medio);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
+  background: var(--branco);
+  color: var(--texto-principal);
   font-size: 14px;
   transition: all 0.3s ease;
 }
 
-.search-input::placeholder {
-  color: rgba(255, 255, 255, 0.7);
+.global-search .search-input::placeholder {
+  color: var(--cinza-escuro);
+  opacity: 0.75;
 }
 
-.search-input:focus {
+.global-search .search-input:focus {
   outline: none;
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.4);
+  border-color: var(--verde-nazareno);
+  box-shadow: var(--sombra-foco);
 }
 
-.search-spinner {
+.global-search .search-spinner {
   position: absolute;
   right: 12px;
   top: 50%;
   transform: translateY(-50%);
   font-size: 16px;
+  color: var(--cinza-escuro);
   animation: spin 1s linear infinite;
 }
 
@@ -45,7 +47,7 @@
   to { transform: translateY(-50%) rotate(360deg); }
 }
 
-.search-results-dropdown {
+.global-search .search-results-dropdown {
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
@@ -59,7 +61,7 @@
   border: 1px solid #e5e7eb;
 }
 
-.search-results-header {
+.global-search .search-results-header {
   padding: 12px 16px;
   border-bottom: 1px solid #e5e7eb;
   background: #f9fafb;
@@ -68,15 +70,15 @@
   font-weight: 500;
 }
 
-.results-section {
+.global-search .results-section {
   border-bottom: 1px solid #e5e7eb;
 }
 
-.results-section:last-child {
+.global-search .results-section:last-child {
   border-bottom: none;
 }
 
-.section-header {
+.global-search .section-header {
   padding: 10px 16px;
   font-size: 12px;
   font-weight: 600;
@@ -86,7 +88,7 @@
   background: #f9fafb;
 }
 
-.result-item {
+.global-search .result-item {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -95,21 +97,21 @@
   transition: background 0.2s ease;
 }
 
-.result-item:hover {
+.global-search .result-item:hover {
   background: #f3f4f6;
 }
 
-.result-icon {
+.global-search .result-icon {
   font-size: 24px;
   flex-shrink: 0;
 }
 
-.result-content {
+.global-search .result-content {
   flex: 1;
   min-width: 0;
 }
 
-.result-title {
+.global-search .result-title {
   font-size: 14px;
   color: #111827;
   margin-bottom: 4px;
@@ -118,12 +120,12 @@
   text-overflow: ellipsis;
 }
 
-.result-title strong {
+.global-search .result-title strong {
   color: #2563eb;
   font-weight: 600;
 }
 
-.result-meta {
+.global-search .result-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -131,15 +133,15 @@
   color: #6b7280;
 }
 
-.result-meta span {
+.global-search .result-meta span {
   white-space: nowrap;
 }
 
-.result-badge {
+.global-search .result-badge {
   flex-shrink: 0;
 }
 
-.status-badge {
+.global-search .status-badge {
   display: inline-block;
   padding: 4px 10px;
   border-radius: 12px;
@@ -150,38 +152,38 @@
   letter-spacing: 0.3px;
 }
 
-.no-results {
+.global-search .no-results {
   padding: 40px 20px;
   text-align: center;
   color: #6b7280;
 }
 
-.no-results p {
+.global-search .no-results p {
   margin: 0 0 8px 0;
   font-size: 14px;
   font-weight: 500;
 }
 
-.no-results small {
+.global-search .no-results small {
   font-size: 12px;
   color: #9ca3af;
 }
 
 /* Scrollbar personalizado */
-.search-results-dropdown::-webkit-scrollbar {
+.global-search .search-results-dropdown::-webkit-scrollbar {
   width: 6px;
 }
 
-.search-results-dropdown::-webkit-scrollbar-track {
+.global-search .search-results-dropdown::-webkit-scrollbar-track {
   background: #f3f4f6;
 }
 
-.search-results-dropdown::-webkit-scrollbar-thumb {
+.global-search .search-results-dropdown::-webkit-scrollbar-thumb {
   background: #d1d5db;
   border-radius: 3px;
 }
 
-.search-results-dropdown::-webkit-scrollbar-thumb:hover {
+.global-search .search-results-dropdown::-webkit-scrollbar-thumb:hover {
   background: #9ca3af;
 }
 
@@ -191,19 +193,19 @@
     max-width: 100%;
   }
 
-  .search-results-dropdown {
+  .global-search .search-results-dropdown {
     max-height: 400px;
   }
 
-  .result-item {
+  .global-search .result-item {
     padding: 10px 12px;
   }
 
-  .result-title {
+  .global-search .result-title {
     font-size: 13px;
   }
 
-  .result-meta {
+  .global-search .result-meta {
     font-size: 11px;
   }
 }
