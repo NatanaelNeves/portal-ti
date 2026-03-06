@@ -64,6 +64,7 @@
   gap: 30px;
 }
 
+/* Card completamente clicável */
 .action-card {
   background: var(--branco);
   border-radius: var(--border-radius);
@@ -71,52 +72,56 @@
   text-align: center;
   box-shadow: var(--sombra-card);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   border: 2px solid transparent;
+  
+  /* Flexbox para centralização perfeita */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  
+  /* Reset de estilos de botão */
+  font-family: inherit;
+  outline: none;
+  width: 100%;
 }
 
 .action-card:hover {
   transform: translateY(-8px);
-  box-shadow: var(--sombra-hover);
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.2);
   border-color: var(--verde-nazareno);
+  background: linear-gradient(135deg, rgba(0, 122, 51, 0.02) 0%, rgba(0, 122, 51, 0.05) 100%);
+}
+
+.action-card:active {
+  transform: translateY(-4px);
+}
+
+.action-card:focus-visible {
+  outline: 3px solid var(--verde-nazareno);
+  outline-offset: 2px;
 }
 
 .action-icon {
-  font-size: 3.5rem;
-  margin-bottom: 20px;
+  font-size: 4rem;
   line-height: 1;
+  margin: 0;
 }
 
 .action-card h3 {
   font-size: 1.5rem;
   color: var(--texto-principal);
-  margin-bottom: 10px;
+  margin: 0;
   font-weight: 600;
 }
 
 .action-card p {
   color: var(--cinza-escuro);
-  font-size: 0.95rem;
-  margin-bottom: 25px;
+  font-size: 1rem;
+  margin: 0;
   line-height: 1.5;
-}
-
-.action-button {
-  background: var(--verde-nazareno);
-  color: var(--branco);
-  border: none;
-  padding: 12px 30px;
-  border-radius: var(--border-radius-small);
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.action-button:hover {
-  background-color: var(--verde-nazareno-hover);
-  transform: scale(1.05);
-  box-shadow: var(--sombra-hover);
 }
 
 /* Info Section */

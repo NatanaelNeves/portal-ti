@@ -67,48 +67,89 @@
   margin-bottom: 2rem;
 }
 
+/* Card completamente clicável */
 .dashboard-card {
   background: var(--branco);
-  padding: 1.5rem;
+  padding: 2rem 1.5rem;
   border-radius: var(--border-radius);
   box-shadow: var(--sombra-card);
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 2px solid transparent;
+  cursor: pointer;
+  
+  /* Flexbox para centralizar todo o conteúdo */
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 0.75rem;
+  
+  /* Reset de estilos de botão */
+  font-family: inherit;
+  font-size: inherit;
+  outline: none;
 }
 
 .dashboard-card:hover {
   transform: translateY(-4px);
-  box-shadow: var(--sombra-hover);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+}
+
+.dashboard-card:active {
+  transform: translateY(-2px);
+}
+
+.dashboard-card:focus-visible {
+  outline: 2px solid var(--verde-nazareno);
+  outline-offset: 2px;
 }
 
 .card-icon {
-  font-size: 2.5rem;
+  font-size: 3rem;
   line-height: 1;
+  margin-bottom: 0.5rem;
 }
 
+/* Bordas e hover por categoria */
 .card-primary {
   border-left: 4px solid var(--verde-nazareno);
+}
+
+.card-primary:hover {
+  border-color: var(--verde-nazareno);
+  background: linear-gradient(135deg, rgba(0, 122, 51, 0.02) 0%, rgba(0, 122, 51, 0.05) 100%);
 }
 
 .card-secondary {
   border-left: 4px solid var(--azul-sereno);
 }
 
+.card-secondary:hover {
+  border-color: var(--azul-sereno);
+  background: linear-gradient(135deg, rgba(52, 152, 219, 0.02) 0%, rgba(52, 152, 219, 0.05) 100%);
+}
+
 .card-accent {
   border-left: 4px solid var(--laranja-acolhedor);
 }
 
-.card-content h3 {
-  color: var(--texto-principal);
-  margin-bottom: 0.5rem;
-  font-size: 1.1rem;
-  font-weight: 600;
+.card-accent:hover {
+  border-color: var(--laranja-acolhedor);
+  background: linear-gradient(135deg, rgba(243, 156, 18, 0.02) 0%, rgba(243, 156, 18, 0.05) 100%);
 }
 
-.card-content .stat {
-  font-size: 2.5rem;
+/* Conteúdo do card - todos diretos no card agora */
+.dashboard-card h3 {
+  color: var(--texto-principal);
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.dashboard-card .stat {
+  font-size: 3rem;
   font-weight: bold;
   color: var(--verde-nazareno);
   margin: 0.5rem 0;
@@ -123,14 +164,11 @@
   color: var(--laranja-acolhedor);
 }
 
-.card-content small {
+.dashboard-card small {
   color: var(--cinza-escuro);
   display: block;
-  font-size: 0.85rem;
-}
-
-.card-action {
-  margin-top: auto;
+  font-size: 0.9rem;
+  margin: 0;
 }
 
 .btn-card {
@@ -142,6 +180,8 @@
   font-weight: 500;
   width: 100%;
   transition: all 0.3s ease;
+  border: none;
+  cursor: pointer;
 }
 
 .btn-card:hover {

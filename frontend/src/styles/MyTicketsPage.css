@@ -131,6 +131,17 @@
   font-size: 1rem;
 }
 
+.my-tickets-page .search-input {
+  color: var(--texto-principal);
+  background: var(--branco);
+  caret-color: var(--texto-principal);
+}
+
+.my-tickets-page .search-input::placeholder {
+  color: var(--cinza-escuro);
+  opacity: 0.75;
+}
+
 .search-form input:focus {
   border-color: var(--verde-nazareno);
   box-shadow: var(--sombra-foco);

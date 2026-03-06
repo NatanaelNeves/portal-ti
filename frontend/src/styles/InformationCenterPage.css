@@ -230,12 +230,13 @@
   color: #333;
   margin-bottom: 25px;
   font-weight: 600;
+  text-align: center;
 }
 
 .quick-links {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 15px;
 }
 
 .quick-link {
@@ -245,19 +246,30 @@
   padding: 20px;
   text-decoration: none;
   color: #333;
-  border-radius: 8px;
-  background: #f9f9f9;
+  border-radius: 10px;
+  background: white;
+  border: 2px solid #e0e0e0;
   transition: all 0.3s ease;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.9rem;
 }
 
 .quick-link:hover {
-  background: #f0f0f0;
+  background: #f9f7ff;
+  border-color: #667eea;
+  box-shadow: 0 6px 15px rgba(102, 126, 234, 0.2);
   transform: translateY(-4px);
+}
+
+.quick-link:active {
+  transform: translateY(0);
 }
 
 .quick-link span {
   font-size: 2.5rem;
   margin-bottom: 10px;
+  line-height: 1;
 }
 
 .quick-link p {

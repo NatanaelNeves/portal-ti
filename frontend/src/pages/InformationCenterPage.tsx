@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import '../styles/InformationCenterPage.css';
 import { BACKEND_URL } from '../services/api';
 
@@ -11,6 +12,7 @@ interface Article {
 }
 
 export default function InformationCenterPage() {
+  const navigate = useNavigate();
   const [articles, setArticles] = useState<Article[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -138,22 +140,46 @@ export default function InformationCenterPage() {
       <section className="quick-access">
         <h3>Acesso Rápido</h3>
         <div className="quick-links">
-          <a href="/abrir-chamado" className="quick-link">
+          <button 
+            onClick={() => navigate('/abrir-chamado')}
+            className="quick-link"
+            title="Ir para nova solicitação"
+          >
             <span>📝</span>
-            <p>Como abrir um chamado</p>
-          </a>
-          <a href="#" className="quick-link">
+            <p>Como Abrir Chamado</p>
+          </button>
+          <button
+            onClick={() => {
+              setSelectedCategory('troubleshooting');
+              setSelectedArticle(null);
+              window.scrollTo({ top: 300, behavior: 'smooth' });
+            }}
+            className="quick-link"
+            title="Ver problemas comuns"
+          >
             <span>🔧</span>
-            <p>Problemas comuns</p>
-          </a>
-          <a href="#" className="quick-link">
+            <p>Problemas Comuns</p>
+          </button>
+          <button
+            onClick={() => {
+              setSelectedCategory('faq');
+              setSelectedArticle(null);
+              window.scrollTo({ top: 300, behavior: 'smooth' });
+            }}
+            className="quick-link"
+            title="Ver dicas e truques"
+          >
             <span>💡</span>
-            <p>Dicas e truques</p>
-          </a>
-          <a href="#" className="quick-link">
+            <p>Dicas e Truques</p>
+          </button>
+          <button
+            onClick={() => navigate('/abrir-chamado')}
+            className="quick-link"
+            title="Abrir um novo chamado para contato"
+          >
             <span>📞</span>
-            <p>Entrar em contato</p>
-          </a>
+            <p>Entrar em Contato</p>
+          </button>
         </div>
       </section>
     </div>

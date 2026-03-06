@@ -1,7 +1,9 @@
 import '../styles/DashboardPage.css';
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 export default function DashboardPage() {
+  const navigate = useNavigate();
   const [greeting, setGreeting] = useState('');
   const [userName, setUserName] = useState('Colaborador');
 
@@ -33,43 +35,40 @@ export default function DashboardPage() {
 
       <div className="dashboard-grid">
         {/* Card de Solicitações Ativas */}
-        <div className="dashboard-card card-primary">
+        <button 
+          className="dashboard-card card-primary"
+          onClick={() => navigate('/meus-chamados')}
+          title="Acompanhar suas solicitações de apoio"
+        >
           <div className="card-icon">🤝</div>
-          <div className="card-content">
-            <h3>Minhas Solicitações de Apoio</h3>
-            <p className="stat">0</p>
-            <small>Em andamento</small>
-          </div>
-          <div className="card-action">
-            <button className="btn-card">Ver Todas</button>
-          </div>
-        </div>
+          <h3>Minhas Solicitações de Apoio</h3>
+          <p className="stat">0</p>
+          <small>Em andamento</small>
+        </button>
 
         {/* Card de Recursos Atribuídos */}
-        <div className="dashboard-card card-secondary">
+        <button 
+          className="dashboard-card card-secondary"
+          onClick={() => navigate('/inventario')}
+          title="Ver seus equipamentos"
+        >
           <div className="card-icon">💻</div>
-          <div className="card-content">
-            <h3>Recursos Sob Minha Responsabilidade</h3>
-            <p className="stat">0</p>
-            <small>Equipamentos e materiais</small>
-          </div>
-          <div className="card-action">
-            <button className="btn-card">Ver Recursos</button>
-          </div>
-        </div>
+          <h3>Recursos Sob Minha Responsabilidade</h3>
+          <p className="stat">0</p>
+          <small>Equipamentos e materiais</small>
+        </button>
 
         {/* Card de Ações Pendentes */}
-        <div className="dashboard-card card-accent">
+        <button 
+          className="dashboard-card card-accent"
+          onClick={() => navigate('/notificacoes')}
+          title="Ver ações pendentes"
+        >
           <div className="card-icon">⏳</div>
-          <div className="card-content">
-            <h3>Aguardando Minha Ação</h3>
-            <p className="stat">0</p>
-            <small>Feedbacks e aprovações</small>
-          </div>
-          <div className="card-action">
-            <button className="btn-card">Ver Pendências</button>
-          </div>
-        </div>
+          <h3>Aguardando Minha Ação</h3>
+          <p className="stat">0</p>
+          <small>Feedbacks e aprovações</small>
+        </button>
       </div>
 
       {/* Seção de Status Recente */}
@@ -78,7 +77,12 @@ export default function DashboardPage() {
         <div className="empty-state">
           <div className="empty-icon">📋</div>
           <p>Nenhuma solicitação de apoio ativa no momento</p>
-          <button className="btn-primary">Nova Solicitação</button>
+          <button 
+            className="btn-primary"
+            onClick={() => navigate('/abrir-chamado')}
+          >
+            Nova Solicitação
+          </button>
         </div>
       </div>
 

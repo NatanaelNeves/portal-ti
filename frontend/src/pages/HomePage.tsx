@@ -38,26 +38,23 @@ export default function HomePage() {
       {/* Main Actions */}
       <section className="main-actions">
         <div className="actions-container">
-          <div className="action-card" onClick={handleOpenTicket}>
+          <button className="action-card" onClick={handleOpenTicket}>
             <div className="action-icon">🤝</div>
             <h3>Solicitar Apoio</h3>
             <p>Relate um problema ou solicite suporte para seu trabalho</p>
-            <button className="action-button">Começar</button>
-          </div>
+          </button>
 
-          <div className="action-card" onClick={handleTrackTicket}>
+          <button className="action-card" onClick={handleTrackTicket}>
             <div className="action-icon">📋</div>
             <h3>Minhas Solicitações</h3>
             <p>Acompanhe o andamento das suas solicitações de apoio</p>
-            <button className="action-button">Acompanhar</button>
-          </div>
+          </button>
 
-          <div className="action-card" onClick={handleKnowledge}>
+          <button className="action-card" onClick={handleKnowledge}>
             <div className="action-icon">💡</div>
             <h3>Central de Dúvidas</h3>
             <p>Tutoriais, FAQs e documentação institucional</p>
-            <button className="action-button">Explorar</button>
-          </div>
+          </button>
         </div>
       </section>
 
