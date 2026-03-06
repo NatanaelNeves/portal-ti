@@ -91,6 +91,11 @@ export default function Navigation() {
           </button>
         )}
         {showKnowledgeLink && (
+          <button onClick={() => navigate('/admin/documentos')} className="nav-link">
+            📁 Documentos
+          </button>
+        )}
+        {showKnowledgeLink && (
           <button onClick={() => navigate('/admin/relatorios')} className="nav-link">
             📊 Relatórios
           </button>

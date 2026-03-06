@@ -19,7 +19,7 @@ import AdminTicketDetailPage from './pages/AdminTicketDetailPage';
 import InventoryPage from './pages/InventoryPage';
 import GestorDashboardPage from './pages/GestorDashboardPage';
 import GestorTicketsPage from './pages/GestorTicketsPage';
-import DashboardPage from './pages/DashboardPage';
+import DocumentsPage from './pages/DocumentsPage';
 import KnowledgeManagementPage from './pages/KnowledgeManagementPage';
 import UsersManagementPage from './pages/UsersManagementPage';
 import ReportsPage from './pages/ReportsPage';
@@ -83,7 +83,7 @@ function App() {
             <Route path="/admin/conhecimento" element={<InternalProtectedRoute><KnowledgeManagementPage /></InternalProtectedRoute>} />
             <Route path="/admin/usuarios" element={<InternalProtectedRoute><UsersManagementPage /></InternalProtectedRoute>} />
             <Route path="/admin/estoque" element={<InternalProtectedRoute><InventoryPage /></InternalProtectedRoute>} />
-            <Route path="/admin/documentos" element={<InternalProtectedRoute><DashboardPage /></InternalProtectedRoute>} />
+            <Route path="/admin/documentos" element={<InternalProtectedRoute><DocumentsPage /></InternalProtectedRoute>} />
             <Route path="/admin/relatorios" element={<InternalProtectedRoute><ReportsPage /></InternalProtectedRoute>} />
 
             {/* Inventory Module Routes - IT Staff Only */}

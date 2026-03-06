@@ -57,6 +57,7 @@ app.use('/api/tickets', require('./routes/tickets').default);
 app.use('/api/assets', require('./routes/assets').default);
 app.use('/api/purchases', require('./routes/purchases').default);
 app.use('/api/inventory', require('./routes/inventory').default);
+app.use('/api/documents', require('./routes/documents').default);
 app.use('/api', require('./routes/knowledge').default);
 app.use('/api/dashboard', require('./routes/dashboard').default);
 app.use('/api/reports', require('./routes/reports').default);
