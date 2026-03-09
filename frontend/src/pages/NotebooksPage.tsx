@@ -1,11 +1,9 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import InventoryLayout from '../components/InventoryLayout';
 import { ExcelExportService } from '../services/excelExportService';
 import '../styles/NotebooksPage.css';
-import '../styles/InventoryButtons.css';
 import { BACKEND_URL } from '../services/api';
-import { INSTITUTION_UNITS } from '../utils/institutionOptions';
 
 interface Notebook {
   id: string;
@@ -25,261 +23,168 @@ interface Notebook {
   in_use_since?: string;
 }
 
-export default function NotebooksPage() {
-  const [notebooks, setNotebooks] = useState<Notebook[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [filterUnit, setFilterUnit] = useState('all');
-  const navigate = useNavigate();
+const STATUS_CFG: Record<string, { label: string; cls: string }> = {
+  available:      { label: 'DisponÃ­vel',  cls: 'nb-status-available' },
+  in_stock:       { label: 'Em Estoque',  cls: 'nb-status-stock' },
+  in_use:         { label: 'Em Uso',      cls: 'nb-status-inuse' },
+  maintenance:    { label: 'ManutenÃ§Ã£o',  cls: 'nb-status-maint' },
+  in_maintenance: { label: 'ManutenÃ§Ã£o',  cls: 'nb-status-maint' },
+  retired:        { label: 'Baixado',     cls: 'nb-status-retired' },
+};
 
-  useEffect(() => {
-    fetchNotebooks();
-  }, [filterStatus, filterUnit]);
+const BRAND_COLORS = [
+  { accent: '#6366f1', light: '#eef2ff', badge: '#818cf8' },
+  { accent: '#0ea5e9', light: '#f0f9ff', badge: '#38bdf8' },
+  { accent: '#10b981', light: '#ecfdf5', badge: '#34d399' },
+  { accent: '#f59e0b', light: '#fffbeb', badge: '#fbbf24' },
+  { accent: '#ec4899', light: '#fdf2f8', badge: '#f472b6' },
+  { accent: '#8b5cf6', light: '#f5f3ff', badge: '#a78bfa' },
+];
 
-  const fetchNotebooks = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('internal_token');
-      
-      const params = new URLSearchParams();
-      if (filterStatus !== 'all') params.append('status', filterStatus);
-      if (filterUnit !== 'all') params.append('unit', filterUnit);
+function getInitials(name: string) {
+  return name.split(' ').filter(Boolean).slice(0, 2).map(n => n[0]).join('').toUpperCase();
+}
+function getAvatarColor(name: string) {
+  const colors = ['#6366f1','#8b5cf6','#ec4899','#f59e0b','#10b981','#0ea5e9','#ef4444','#14b8a6'];
+  let h = 0;
+  for (const c of name) h = (h * 31 + c.charCodeAt(0)) & 0xffff;
+  return colors[h % colors.length];
+}
 
-      const response = await fetch(`${BACKEND_URL}/api/inventory/notebooks?${params.toString()}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+interface ModelGroupProps {
+  groupKey: string;
+  notebooks: Notebook[];
+  colorIdx: number;
+  search: string;
+  statusFilter: string;
+  onNavigate: (path: string) => void;
+}
 
-      if (!response.ok) {
-        throw new Error('Erro ao carregar notebooks');
-      }
+function ModelGroup({ groupKey, notebooks, colorIdx, search, statusFilter, onNavigate }: ModelGroupProps) {
+  const [expanded, setExpanded] = useState(true);
+  const color = BRAND_COLORS[colorIdx % BRAND_COLORS.length];
 
-      const data = await response.json();
-      setNotebooks(data.notebooks || []);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const filtered = useMemo(() => notebooks.filter(n => {
+    const q = search.toLowerCase();
+    const matchSearch = !q ||
+      (n.responsible_name || '').toLowerCase().includes(q) ||
+      n.current_unit.toLowerCase().includes(q) ||
+      n.internal_code.toLowerCase().includes(q) ||
+      n.serial_number.toLowerCase().includes(q);
+    const matchStatus = statusFilter === 'all' || n.current_status === statusFilter;
+    return matchSearch && matchStatus;
+  }), [notebooks, search, statusFilter]);
 
-  const getStatusBadge = (status: string) => {
-    const badges: any = {
-      available: { icon: '🟢', text: 'Disponível', class: 'status-available' },
-      in_stock: { icon: '🟢', text: 'Em Estoque', class: 'status-available' },
-      in_use: { icon: '🔵', text: 'Em Uso', class: 'status-in-use' },
-      maintenance: { icon: '🟡', text: 'Manutenção', class: 'status-maintenance' },
-      in_maintenance: { icon: '🟡', text: 'Manutenção', class: 'status-maintenance' },
-      retired: { icon: '🔴', text: 'Baixado', class: 'status-retired' }
-    };
-    return badges[status] || { icon: '⚫', text: status, class: 'status-unknown' };
-  };
+  const counts = useMemo(() => ({
+    inuse:     notebooks.filter(n => n.current_status === 'in_use').length,
+    available: notebooks.filter(n => ['available','in_stock'].includes(n.current_status)).length,
+    maint:     notebooks.filter(n => ['maintenance','in_maintenance'].includes(n.current_status)).length,
+    retired:   notebooks.filter(n => n.current_status === 'retired').length,
+  }), [notebooks]);
 
-  const getConditionBadge = (condition: string) => {
-    const badges: any = {
-      new: { icon: '⭐', text: 'Novo' },
-      good: { icon: '✓', text: 'Bom' },
-      regular: { icon: '~', text: 'Regular' },
-      bad: { icon: '✗', text: 'Ruim' }
-    };
-    return badges[condition] || badges.good;
-  };
+  // specs from first notebook
+  const ref = notebooks[0];
+  const specs = [ref?.processor, ref?.memory_ram, ref?.storage, ref?.screen_size].filter(Boolean).join(' Â· ');
 
-  const stats = {
-    total: notebooks.length,
-    available: notebooks.filter(n => n.current_status === 'available').length,
-    in_use: notebooks.filter(n => n.current_status === 'in_use').length,
-    maintenance: notebooks.filter(n => n.current_status === 'maintenance').length
-  };
-
-  if (loading) {
-    return (
-      <InventoryLayout>
-        <div className="notebooks-page">
-          <div className="loading">Carregando notebooks...</div>
-        </div>
-      </InventoryLayout>
-    );
-  }
+  if (filtered.length === 0 && (search || statusFilter !== 'all')) return null;
 
   return (
-    <InventoryLayout>
-      <div className="notebooks-page">
-        <div className="page-header">
+    <div className="nb-group">
+      <div
+        className="nb-group-header"
+        style={{ backgroundColor: color.light, borderLeft: `4px solid ${color.accent}` }}
+        onClick={() => setExpanded(e => !e)}
+      >
+        <div className="nb-group-left">
+          <div className="nb-group-icon" style={{ backgroundColor: color.accent }}>ðŸ’»</div>
           <div>
-            <h1>💻 Notebooks</h1>
-            <p>Gerenciamento de notebooks e laptops</p>
-          </div>
-          <div className="header-actions">
-            <button
-              className="btn btn-outline"
-              onClick={() => ExcelExportService.exportNotebooks(notebooks)}
-              disabled={notebooks.length === 0}
-              title="Exportar lista para Excel"
-            >
-              <span className="btn-icon">📊</span> Exportar Excel
-            </button>
-            <button
-              className="btn btn-primary"
-              onClick={() => navigate('/inventario/equipamentos/novo')}
-              title="Cadastrar novo notebook"
-            >
-              <span className="btn-icon">➕</span> Cadastrar Notebook
-            </button>
+            <div className="nb-group-title">
+              <span className="nb-group-name">{groupKey}</span>
+              <span className="nb-group-badge" style={{ backgroundColor: color.badge }}>{notebooks.length} unidades</span>
+            </div>
+            {specs && <div className="nb-group-specs">{specs}</div>}
           </div>
         </div>
-
-        {error && <div className="alert alert-error">{error}</div>}
-
-        {/* Stats Cards */}
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-icon">📊</div>
-            <div className="stat-value">{stats.total}</div>
-            <div className="stat-label">Total</div>
+        <div className="nb-group-right">
+          <div className="nb-group-counts">
+            {counts.inuse > 0     && <span className="nb-cnt nb-cnt-inuse">âœ“ {counts.inuse} em uso</span>}
+            {counts.available > 0 && <span className="nb-cnt nb-cnt-avail">ðŸ“¦ {counts.available} disponÃ­vel</span>}
+            {counts.maint > 0     && <span className="nb-cnt nb-cnt-maint">ðŸ”§ {counts.maint} manutenÃ§Ã£o</span>}
+            {counts.retired > 0   && <span className="nb-cnt nb-cnt-ret">ðŸ—‘ {counts.retired} baixado</span>}
           </div>
-          <div className="stat-card stat-available">
-            <div className="stat-icon">🟢</div>
-            <div className="stat-value">{stats.available}</div>
-            <div className="stat-label">Disponíveis</div>
-          </div>
-          <div className="stat-card stat-in-use">
-            <div className="stat-icon">🔵</div>
-            <div className="stat-value">{stats.in_use}</div>
-            <div className="stat-label">Em Uso</div>
-          </div>
-          <div className="stat-card stat-maintenance">
-            <div className="stat-icon">🟡</div>
-            <div className="stat-value">{stats.maintenance}</div>
-            <div className="stat-label">Manutenção</div>
-          </div>
+          <span className="nb-group-chevron">{expanded ? 'â–²' : 'â–¼'}</span>
         </div>
+      </div>
 
-        {/* Filters */}
-        <div className="filters-bar">
-          <div className="filter-group">
-            <label>Status:</label>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-            >
-              <option value="all">Todos</option>
-              <option value="available">Disponíveis</option>
-              <option value="in_use">Em Uso</option>
-              <option value="maintenance">Manutenção</option>
-            </select>
-          </div>
-
-          <div className="filter-group">
-            <label>Unidade:</label>
-            <select
-              value={filterUnit}
-              onChange={(e) => setFilterUnit(e.target.value)}
-            >
-              <option value="all">Todas</option>
-              {INSTITUTION_UNITS.map((unit) => (
-                <option key={unit} value={unit}>{unit}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Notebooks Table */}
-        <div className="notebooks-table">
-          <table>
+      {expanded && (
+        <div className="nb-group-table-wrap">
+          <table className="nb-table">
             <thead>
               <tr>
-                <th>Código</th>
-                <th>Marca/Modelo</th>
-                <th>Especificações</th>
-                <th>Status</th>
-                <th>Responsável</th>
+                <th>#</th>
+                <th>CÃ³digo</th>
+                <th>ResponsÃ¡vel</th>
                 <th>Unidade</th>
-                <th>Ações</th>
+                <th>Status</th>
+                <th>CondiÃ§Ã£o</th>
+                <th>AÃ§Ãµes</th>
               </tr>
             </thead>
             <tbody>
-              {notebooks.map((notebook, index) => {
-                const status = getStatusBadge(notebook.current_status);
-                const condition = getConditionBadge(notebook.physical_condition);
-
+              {filtered.map((nb, i) => {
+                const stCfg = STATUS_CFG[nb.current_status] || { label: nb.current_status, cls: '' };
                 return (
-                  <tr key={`${notebook.id}-${index}`}>
+                  <tr
+                    key={nb.id}
+                    className={`nb-row ${nb.current_status === 'retired' ? 'nb-row-dimmed' : ''}`}
+                    onClick={() => onNavigate(`/inventario/equipamento/${nb.id}`)}
+                  >
+                    <td className="nb-td-num">{i + 1}</td>
                     <td>
-                      <strong>{notebook.internal_code}</strong>
-                      <br />
-                      <small>SN: {notebook.serial_number}</small>
-                    </td>
-                    <td>
-                      <strong>{notebook.brand} {notebook.model}</strong>
-                      <br />
-                      <small>{condition.icon} {condition.text}</small>
-                    </td>
-                    <td>
-                      <div className="specs">
-                        {notebook.processor && <div>⚙️ {notebook.processor}</div>}
-                        {notebook.memory_ram && <div>🧠 {notebook.memory_ram}</div>}
-                        {notebook.storage && <div>💾 {notebook.storage}</div>}
-                        {notebook.screen_size && <div>📺 {notebook.screen_size}</div>}
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`badge ${status.class}`}>
-                        {status.icon} {status.text}
-                      </span>
-                    </td>
-                    <td>
-                      {notebook.responsible_name ? (
-                        <div>
-                          <strong>{notebook.responsible_name}</strong>
-                          {notebook.in_use_since && (
-                            <div>
-                              <small>
-                                Desde {new Date(notebook.in_use_since).toLocaleDateString('pt-BR')}
-                              </small>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-muted">-</span>
+                      <code className="nb-code">{nb.internal_code}</code>
+                      {nb.serial_number && nb.serial_number !== 'S/N' && (
+                        <div className="nb-sn">SN: {nb.serial_number}</div>
                       )}
                     </td>
-                    <td>{notebook.current_unit || '-'}</td>
-                    <td className="actions">
-                      <div className="btn-group">
-                        <button
-                          className="btn btn-sm btn-view"
-                          onClick={() => navigate(`/inventario/equipamento/${notebook.id}`)}
-                          title="Ver detalhes"
-                        >
-                          <span className="btn-icon">📋</span> Detalhes
+                    <td>
+                      {nb.responsible_name ? (
+                        <div className="nb-responsible">
+                          <div className="nb-avatar" style={{ backgroundColor: getAvatarColor(nb.responsible_name) }}>
+                            {getInitials(nb.responsible_name)}
+                          </div>
+                          <div>
+                            <div className="nb-resp-name">{nb.responsible_name}</div>
+                            {nb.in_use_since && (
+                              <div className="nb-resp-since">
+                                Desde {new Date(nb.in_use_since).toLocaleDateString('pt-BR')}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="nb-empty">â€”</span>
+                      )}
+                    </td>
+                    <td className="nb-unit">{nb.current_unit || 'â€”'}</td>
+                    <td><span className={`nb-status ${stCfg.cls}`}>{stCfg.label}</span></td>
+                    <td className="nb-condition">{nb.physical_condition || 'â€”'}</td>
+                    <td onClick={e => e.stopPropagation()}>
+                      <div className="nb-actions">
+                        <button className="nb-btn nb-btn-view" onClick={() => onNavigate(`/inventario/equipamento/${nb.id}`)}>
+                          ðŸ“‹ Ver
                         </button>
-                        {(notebook.current_status === 'available' || notebook.current_status === 'in_stock') && (
-                          <button
-                            className="btn btn-sm btn-deliver"
-                            onClick={() => navigate('/inventario/equipamentos/entregar')}
-                            title="Entregar equipamento"
-                          >
-                            <span className="btn-icon">📤</span> Entregar
+                        {(['available','in_stock'].includes(nb.current_status)) && (
+                          <button className="nb-btn nb-btn-deliver" onClick={() => onNavigate('/inventario/equipamentos/entregar')}>
+                            ðŸ“¤ Entregar
                           </button>
                         )}
-                        {notebook.current_status === 'in_use' && (
+                        {nb.current_status === 'in_use' && (
                           <>
-                            <button
-                              className="btn btn-sm btn-move"
-                              onClick={() => navigate(`/inventario/equipamento/${notebook.id}/movimentar`)}
-                              title="Transferir equipamento"
-                            >
-                              <span className="btn-icon">🔄</span> Transferir
+                            <button className="nb-btn nb-btn-move" onClick={() => onNavigate(`/inventario/equipamento/${nb.id}/movimentar`)}>
+                              ðŸ”„ Mover
                             </button>
-                            <button
-                              className="btn btn-sm btn-return"
-                              onClick={() => navigate(`/inventario/equipamentos/devolver?equipment=${notebook.id}`)}
-                              title="Devolver equipamento"
-                            >
-                              <span className="btn-icon">📥</span> Devolver
+                            <button className="nb-btn nb-btn-return" onClick={() => onNavigate(`/inventario/equipamentos/devolver?equipment=${nb.id}`)}>
+                              ðŸ“¥ Devolver
                             </button>
                           </>
                         )}
@@ -290,13 +195,180 @@ export default function NotebooksPage() {
               })}
             </tbody>
           </table>
-
-          {notebooks.length === 0 && (
-            <div className="empty-state">
-              <p>Nenhum notebook encontrado com os filtros selecionados.</p>
-            </div>
+          {filtered.length === 0 && (
+            <div className="nb-no-results">Nenhum resultado para os filtros aplicados.</div>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+export default function NotebooksPage() {
+  const [notebooks, setNotebooks] = useState<Notebook[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [brandFilter, setBrandFilter] = useState('all');
+  const navigate = useNavigate();
+
+  useEffect(() => { fetchNotebooks(); }, []);
+
+  const fetchNotebooks = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('internal_token');
+      const response = await fetch(`${BACKEND_URL}/api/inventory/notebooks`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error('Erro ao carregar notebooks');
+      const data = await response.json();
+      setNotebooks(data.notebooks || []);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Agrupar por marca + modelo
+  const groups = useMemo(() => {
+    const map = new Map<string, Notebook[]>();
+    notebooks.forEach(nb => {
+      const key = `${nb.brand} ${nb.model}`.trim() || 'Sem modelo';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(nb);
+    });
+    // ordenar por qtd decrescente
+    return Array.from(map.entries()).sort((a, b) => b[1].length - a[1].length);
+  }, [notebooks]);
+
+  const brands = useMemo(() => {
+    const set = new Set(notebooks.map(n => n.brand).filter(Boolean));
+    return Array.from(set).sort();
+  }, [notebooks]);
+
+  const filteredGroups = useMemo(() => {
+    if (brandFilter === 'all') return groups;
+    return groups.filter(([key]) => key.toLowerCase().startsWith(brandFilter.toLowerCase()));
+  }, [groups, brandFilter]);
+
+  const totals = useMemo(() => ({
+    total:     notebooks.length,
+    inuse:     notebooks.filter(n => n.current_status === 'in_use').length,
+    available: notebooks.filter(n => ['available','in_stock'].includes(n.current_status)).length,
+    maint:     notebooks.filter(n => ['maintenance','in_maintenance'].includes(n.current_status)).length,
+    retired:   notebooks.filter(n => n.current_status === 'retired').length,
+  }), [notebooks]);
+
+  if (loading) {
+    return (
+      <InventoryLayout>
+        <div className="nb-page"><div className="nb-loading">Carregando notebooks...</div></div>
+      </InventoryLayout>
+    );
+  }
+
+  return (
+    <InventoryLayout>
+      <div className="nb-page">
+
+        {/* HEADER */}
+        <div className="nb-header">
+          <div>
+            <h1 className="nb-title">ðŸ’» Notebooks</h1>
+            <p className="nb-subtitle">Agrupados por marca e modelo Â· {groups.length} modelos Â· {notebooks.length} unidades</p>
+          </div>
+          <div className="nb-header-actions">
+            <button className="nb-btn-outline" onClick={() => ExcelExportService.exportNotebooks(notebooks)} disabled={notebooks.length === 0}>
+              ðŸ“Š Exportar Excel
+            </button>
+            <button className="nb-btn-primary" onClick={() => navigate('/inventario/equipamentos/novo')}>
+              âž• Cadastrar
+            </button>
+          </div>
+        </div>
+
+        {error && <div className="nb-alert">{error}</div>}
+
+        {/* STATS */}
+        <div className="nb-stats">
+          {[
+            { label: 'Total',       value: totals.total,     icon: 'ðŸ“‹', cls: 'nb-stat-total'   },
+            { label: 'Em Uso',      value: totals.inuse,     icon: 'âœ…', cls: 'nb-stat-inuse'   },
+            { label: 'DisponÃ­vel',  value: totals.available, icon: 'ðŸ“¦', cls: 'nb-stat-avail'   },
+            { label: 'ManutenÃ§Ã£o',  value: totals.maint,     icon: 'ðŸ”§', cls: 'nb-stat-maint'   },
+            { label: 'Baixado',     value: totals.retired,   icon: 'ðŸ—‘', cls: 'nb-stat-retired' },
+          ].map(s => (
+            <div key={s.label} className={`nb-stat ${s.cls}`}>
+              <div className="nb-stat-icon">{s.icon}</div>
+              <div className="nb-stat-value">{s.value}</div>
+              <div className="nb-stat-label">{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* FILTERS */}
+        <div className="nb-filters">
+          <div className="nb-search-wrap">
+            <span className="nb-search-icon">ðŸ”</span>
+            <input
+              className="nb-search"
+              placeholder="Buscar por responsÃ¡vel, cÃ³digo, unidade..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+            {search && <button className="nb-search-clear" onClick={() => setSearch('')}>âœ•</button>}
+          </div>
+          <select className="nb-select" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+            <option value="all">Todos os status</option>
+            <option value="in_use">Em Uso</option>
+            <option value="available">DisponÃ­vel</option>
+            <option value="in_stock">Em Estoque</option>
+            <option value="maintenance">ManutenÃ§Ã£o</option>
+            <option value="retired">Baixado</option>
+          </select>
+          <div className="nb-brand-chips">
+            <button className={`nb-chip ${brandFilter === 'all' ? 'active' : ''}`} onClick={() => setBrandFilter('all')}>
+              Todas as marcas
+            </button>
+            {brands.map((b, i) => (
+              <button
+                key={b}
+                className={`nb-chip ${brandFilter === b ? 'active' : ''}`}
+                style={brandFilter === b ? { backgroundColor: BRAND_COLORS[i % BRAND_COLORS.length].accent, color: '#fff', borderColor: 'transparent' } : {}}
+                onClick={() => setBrandFilter(brandFilter === b ? 'all' : b)}
+              >
+                {b}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* MODEL GROUPS */}
+        {filteredGroups.length === 0 ? (
+          <div className="nb-empty">
+            <div className="nb-empty-icon">ðŸ“­</div>
+            <h3>Nenhum notebook encontrado</h3>
+            <p>Cadastre notebooks ou ajuste os filtros</p>
+            <button className="nb-btn-primary" onClick={() => navigate('/inventario/equipamentos/novo')}>
+              âž• Cadastrar Notebook
+            </button>
+          </div>
+        ) : (
+          filteredGroups.map(([key, nbs], idx) => (
+            <ModelGroup
+              key={key}
+              groupKey={key}
+              notebooks={nbs}
+              colorIdx={idx}
+              search={search}
+              statusFilter={statusFilter}
+              onNavigate={navigate}
+            />
+          ))
+        )}
       </div>
     </InventoryLayout>
   );
