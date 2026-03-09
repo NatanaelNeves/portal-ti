@@ -114,14 +114,14 @@ export default function InventoryPage() {
     return matchesSearch && matchesStatus && matchesUnit;
   });
 
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      'available': '#10b981',
-      'in_use': '#3b82f6',
-      'in_maintenance': '#f59e0b',
-      'lowered': '#ef4444'
+  const getStatusClass = (status: string) => {
+    const classes: Record<string, string> = {
+      'available': 'status-available',
+      'in_use': 'status-in-use',
+      'in_maintenance': 'status-maintenance',
+      'lowered': 'status-retired'
     };
-    return colors[status] || '#6b7280';
+    return classes[status] || 'status-unknown';
   };
 
   const getStatusLabel = (status: string) => {
@@ -299,10 +299,7 @@ export default function InventoryPage() {
                           <span className="unit-badge">{notebook.current_unit}</span>
                         </td>
                         <td>
-                          <span 
-                            className="status-badge-inline"
-                            style={{ backgroundColor: getStatusColor(notebook.current_status) }}
-                          >
+                          <span className={`status-badge-inline ${getStatusClass(notebook.current_status)}`}>
                             {getStatusLabel(notebook.current_status)}
                           </span>
                         </td>
@@ -356,10 +353,7 @@ export default function InventoryPage() {
                         <span className="type-icon">🖱️</span>
                         <span className="type-label">{peripheral.type}</span>
                       </div>
-                      <span 
-                        className="status-badge-card"
-                        style={{ backgroundColor: getStatusColor(peripheral.current_status) }}
-                      >
+                      <span className={`status-badge-card ${getStatusClass(peripheral.current_status)}`}>
                         {getStatusLabel(peripheral.current_status)}
                       </span>
                     </div>

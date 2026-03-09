@@ -321,13 +321,14 @@
 }
 
 .status-badge-inline {
-  padding: 6px 12px;
+  display: inline-block;
+  padding: 5px 12px;
   border-radius: 6px;
   font-size: 0.85rem;
-  font-weight: 600;
-  color: white;
-  display: inline-block;
+  font-weight: 500;
   white-space: nowrap;
+  border-width: 2px;
+  border-style: solid;
 }
 
 .responsible-name {
@@ -410,11 +411,45 @@
 }
 
 .status-badge-card {
-  padding: 6px 12px;
+  display: inline-block;
+  padding: 5px 12px;
   border-radius: 6px;
   font-size: 0.85rem;
-  font-weight: 600;
-  color: white;
+  font-weight: 500;
+  white-space: nowrap;
+  border-width: 2px;
+  border-style: solid;
+}
+
+/* Status colors - shared between notebook/peripheral badges */
+.inventory-page .status-available {
+  background: #dcfce7;
+  color: #000;
+  border-color: #22c55e;
+}
+
+.inventory-page .status-in-use {
+  background: #dbeafe;
+  color: #000;
+  border-color: #3b82f6;
+}
+
+.inventory-page .status-maintenance {
+  background: #fed7aa;
+  color: #000;
+  border-color: #f97316;
+}
+
+.inventory-page .status-retired {
+  background: #fee2e2;
+  color: #000;
+  border-color: #ef4444;
+}
+
+.inventory-page .status-unknown {
+  background: #f3f4f6;
+  color: #000;
+  border-color: #9ca3af;
 }
 
 .card-body-peripheral {
