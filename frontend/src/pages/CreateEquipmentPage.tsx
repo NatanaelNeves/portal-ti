@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import InventoryLayout from '../components/InventoryLayout';
 import '../styles/CreateEquipmentPage.css';
+import { INSTITUTION_UNITS } from '../utils/institutionOptions';
 
 type EquipmentCategory = 'NOTEBOOK' | 'PERIPHERAL';
 
@@ -23,7 +24,7 @@ export default function CreateEquipmentPage() {
     operating_system: '',
     
     // Localização e status
-    current_unit: 'Unidade Agapito',
+    current_unit: INSTITUTION_UNITS[0],
     current_status: 'available',
     physical_condition: 'new',
     
@@ -38,14 +39,7 @@ export default function CreateEquipmentPage() {
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
 
-  const units = [
-    'Unidade Agapito',
-    'Unidade Senador',
-    'Unidade Caucaia',
-    'Unidade Maracanau',
-    'Unidade VP',
-    'Unidade Maranguape'
-  ];
+  const units = INSTITUTION_UNITS;
 
   const peripheralTypes = [
     'Mouse',

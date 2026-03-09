@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api, { BACKEND_URL } from '../services/api';
 import '../styles/DeliverEquipmentPage.css';
+import { INSTITUTION_UNITS } from '../utils/institutionOptions';
 
 interface Equipment {
   id: string;
@@ -60,13 +61,7 @@ const DeliverEquipmentPage: React.FC = () => {
     { value: 'outro', label: 'Outro' }
   ];
 
-  const units = [
-    'Unidade Central',
-    'Unidade Carlos Prates',
-    'Unidade Floresta',
-    'Unidade Santa Tereza',
-    'Unidade Contagem'
-  ];
+  const units = INSTITUTION_UNITS;
 
   useEffect(() => {
     fetchAvailableEquipment();
@@ -330,13 +325,14 @@ const DeliverEquipmentPage: React.FC = () => {
               />
             </div>
             <div className="form-group">
-              <label htmlFor="responsibleDepartment">Departamento *</label>
+              <label htmlFor="responsibleDepartment">Setor/Departamento *</label>
               <input
                 type="text"
                 id="responsibleDepartment"
                 name="responsibleDepartment"
                 value={formData.responsibleDepartment}
                 onChange={handleInputChange}
+                placeholder="Ex: Educação, Administrativo, Acolhimento"
                 required
               />
             </div>

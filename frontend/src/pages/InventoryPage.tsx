@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { BACKEND_URL } from '../services/api';
 import InventoryLayout from '../components/InventoryLayout';
 import '../styles/InventoryPage.css';
+import { INSTITUTION_UNITS } from '../utils/institutionOptions';
 
 type TabType = 'notebooks' | 'peripherals';
 
@@ -49,14 +50,7 @@ export default function InventoryPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [unitFilter, setUnitFilter] = useState('all');
 
-  const units = [
-    'Unidade Agapito',
-    'Unidade Senador',
-    'Unidade Caucaia',
-    'Unidade Maracanau',
-    'Unidade VP',
-    'Unidade Maranguape'
-  ];
+  const units = INSTITUTION_UNITS;
 
   useEffect(() => {
     fetchData();

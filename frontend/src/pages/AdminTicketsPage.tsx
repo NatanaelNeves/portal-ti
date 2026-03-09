@@ -44,6 +44,7 @@ export default function AdminTicketsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterPriority, setFilterPriority] = useState<'critical' | 'high' | 'medium' | 'low' | null>(null);
   const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'mine' | 'unassigned'>('all');
   const [currentUserId, setCurrentUserId] = useState<string>('');
   const [stats, setStats] = useState<TicketStats>({
@@ -207,8 +208,9 @@ export default function AdminTicketsPage() {
       
       // Calculate stats (do total, não apenas da página)
       const today = new Date().toDateString();
+      const activeStatuses = ['open', 'in_progress', 'waiting', 'waiting_user'];
       setStats({
-        critical: ticketList.filter((t: Ticket) => t.priority === 'high' && t.status !== 'closed').length,
+        critical: ticketList.filter((t: Ticket) => (t.priority === 'critical' || t.priority === 'urgent') && activeStatuses.includes(t.status)).length,
         waitingUser: ticketList.filter((t: Ticket) => t.status === 'waiting_user').length,
         inProgress: ticketList.filter((t: Ticket) => t.status === 'in_progress').length,
         newToday: ticketList.filter((t: Ticket) => new Date(t.created_at).toDateString() === today).length,
@@ -244,10 +246,78 @@ export default function AdminTicketsPage() {
     }
   };
 
+  const getPriorityLabel = (priority: string) => {
+    switch (priority) {
+      case 'critical':
+      case 'urgent':
+        return 'Crítica';
+      case 'high':
+        return 'Alta';
+      case 'medium':
+        return 'Média';
+      case 'low':
+        return 'Baixa';
+      default:
+        return priority;
+    }
+  };
+
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case 'open':
+        return 'badge-status-open';
+      case 'in_progress':
+        return 'badge-status-progress';
+      case 'waiting_user':
+        return 'badge-status-warning';
+      case 'resolved':
+        return 'badge-status-success';
+      case 'closed':
+        return 'badge-status-neutral';
+      default:
+        return 'badge-status-neutral';
+    }
+  };
+
+  const getPriorityBadgeClass = (priority: string) => {
+    switch (priority) {
+      case 'critical':
+      case 'urgent':
+        return 'badge-priority-critical';
+      case 'high':
+        return 'badge-priority-high';
+      case 'medium':
+        return 'badge-priority-medium';
+      case 'low':
+        return 'badge-priority-low';
+      default:
+        return 'badge-priority-neutral';
+    }
+  };
+
   const getUserName = (userId?: string) => {
     if (!userId) return 'Ninguém';
     const user = users.find(u => u.id === userId);
     return user ? user.name : 'Atribuído';
+  };
+
+  const isPriorityMatch = (ticket: Ticket, priority: 'critical' | 'high' | 'medium' | 'low') => {
+    if (priority === 'critical') {
+      return ticket.priority === 'critical' || ticket.priority === 'urgent';
+    }
+
+    return ticket.priority === priority;
+  };
+
+  const getPriorityCount = (priority: 'critical' | 'high' | 'medium' | 'low') => {
+    return tickets.filter(ticket => {
+      // Só conta chamados ativos (open, in_progress ou waiting)
+      const activeStatuses = ['open', 'in_progress', 'waiting', 'waiting_user'];
+      if (!activeStatuses.includes(ticket.status)) {
+        return false;
+      }
+      return isPriorityMatch(ticket, priority);
+    }).length;
   };
 
   const getTimeAgo = (date: string) => {
@@ -262,8 +332,24 @@ export default function AdminTicketsPage() {
     return 'agora';
   };
 
+  // Verifica se há filtros avançados ativos
+  const hasAdvancedFilters = selectedStatuses.length > 0 || selectedPriorities.length > 0 || searchText.trim() !== '';
+
   // Aplicar filtro de status aos tickets
   const filteredTickets = tickets.filter(ticket => {
+    // Filtro rápido por prioridade (apenas quando filtros avançados não estão ativos)
+    if (!hasAdvancedFilters && filterPriority) {
+      // Só mostrar chamados ativos (open, in_progress ou waiting)
+      const activeStatuses = ['open', 'in_progress', 'waiting', 'waiting_user'];
+      if (!activeStatuses.includes(ticket.status)) {
+        return false;
+      }
+
+      if (!isPriorityMatch(ticket, filterPriority)) {
+        return false;
+      }
+    }
+    
     // Se há filtros avançados ativos (status OU prioridades), não aplicar filtro frontend
     // pois o backend já filtrou corretamente
     if (selectedStatuses.length > 0 || selectedPriorities.length > 0) {
@@ -273,7 +359,8 @@ export default function AdminTicketsPage() {
     // Se filterStatus for 'all' e não há filtros avançados,
     // mostra apenas tickets ativos (não resolvidos nem fechados)
     if (filterStatus === 'all') {
-      return ticket.status !== 'resolved' && ticket.status !== 'closed';
+      const activeStatuses = ['open', 'in_progress', 'waiting', 'waiting_user'];
+      return activeStatuses.includes(ticket.status);
     }
     
     // Se filterStatus for 'open', mostra apenas tickets abertos
@@ -288,6 +375,7 @@ export default function AdminTicketsPage() {
   
   console.log('🔍 Filtros ativos:', { 
     filterStatus, 
+    filterPriority,
     selectedStatuses, 
     selectedPriorities, 
     assignmentFilter,
@@ -304,8 +392,13 @@ export default function AdminTicketsPage() {
     t.status !== 'resolved'
   ).length;
 
-  // Verifica se há filtros avançados ativos
-  const hasAdvancedFilters = selectedStatuses.length > 0 || selectedPriorities.length > 0 || searchText.trim() !== '';
+  const activeFiltersCount = selectedStatuses.length + selectedPriorities.length + (searchText.trim() ? 1 : 0);
+  const formattedLastUpdate = lastUpdate
+    ? `${lastUpdate.toLocaleDateString('pt-BR')} às ${lastUpdate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+    : 'Ainda sem atualização';
+  const panelActionsBlocked = selectedTicket
+    ? selectedTicket.status === 'open' || !selectedTicket.assigned_to || selectedTicket.status === 'closed'
+    : true;
 
   if (!localStorage.getItem('internal_token')) {
     return null;
@@ -313,164 +406,179 @@ export default function AdminTicketsPage() {
 
   return (
     <div className="admin-tickets-dashboard">
-      {/* Header */}
-      <div className="dashboard-header">
-        <h1>🧑‍💻 Central Operacional TI</h1>
-        <p>Painel de atendimento em tempo real</p>
-      </div>
+      <header className="dashboard-header card">
+        <div className="dashboard-header-main">
+          <h1>🧑‍💻 Central Operacional TI</h1>
+          <p>Painel de atendimento em tempo real</p>
+        </div>
+        <div className="dashboard-header-status">
+          <span className="status-chip">
+            <span className="status-dot" aria-hidden="true"></span>
+            Última atualização: {formattedLastUpdate}
+          </span>
+          <span className="status-chip">
+            <strong>{sortedTickets.length}</strong> na fila
+          </span>
+          <span className="status-chip">
+            <strong>{myTicketsCount}</strong> meus atendimentos
+          </span>
+        </div>
+      </header>
 
       {error && <div className="alert alert-error">{error}</div>}
 
       {hasAdvancedFilters && (
-        <div style={{
-          background: '#fff3cd',
-          border: '1px solid #ffc107',
-          padding: '10px 15px',
-          borderRadius: '4px',
-          marginBottom: '15px',
-          fontSize: '14px'
-        }}>
+        <div className="filters-warning">
           ℹ️ <strong>Filtros avançados ativos.</strong> Os filtros rápidos abaixo estão desabilitados.
         </div>
       )}
 
-      {/* Timestamp de Última Atualização */}
-      {lastUpdate && (
-        <div style={{
-          textAlign: 'right',
-          fontSize: '12px',
-          color: '#6c757d',
-          marginBottom: '10px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-          gap: '8px'
-        }}>
-          <span>🕐</span>
-          <span>
-            Última atualização: {lastUpdate.toLocaleDateString('pt-BR')} às {lastUpdate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-          </span>
-        </div>
-      )}
+      {/* Filtros Rápidos por Prioridade */}
+      <div className="stats-container">
+        <div className="stats-section">
+          <h3 className="stats-section-title">Filtrar por Prioridade</h3>
+          <div className="stats-grid stats-grid-filters stats-grid-priority">
+            <button
+              type="button"
+              className={`stat-card stat-priority-critical ${hasAdvancedFilters ? 'is-disabled' : ''} ${filterPriority === 'critical' ? 'is-active' : ''}`}
+              onClick={() => {
+                if (!hasAdvancedFilters) {
+                  setFilterPriority(filterPriority === 'critical' ? null : 'critical');
+                }
+              }}
+              disabled={hasAdvancedFilters}
+              aria-pressed={filterPriority === 'critical'}
+            >
+              <span className="stat-icon-wrap" aria-hidden="true">
+                <span className="stat-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
+                </span>
+              </span>
+              <span className="stat-number">{getPriorityCount('critical')}</span>
+              <span className="stat-label">Crítica</span>
+            </button>
 
-      {/* Indicadores Rápidos */}
-      <div className="quick-stats">
-        <div 
-          className="stat-card critical"
-          onClick={() => {
-            if (!hasAdvancedFilters) {
-              setFilterStatus(filterStatus === 'open' && stats.critical > 0 ? 'all' : 'open');
-            }
-          }}
-          style={{
-            cursor: hasAdvancedFilters ? 'not-allowed' : 'pointer',
-            opacity: hasAdvancedFilters ? 0.5 : 1,
-            border: filterStatus === 'open' ? '3px solid #dc3545' : undefined,
-            boxShadow: filterStatus === 'open' ? '0 0 10px rgba(220, 53, 69, 0.3)' : undefined
-          }}
-        >
-          <div className="stat-icon">🔴</div>
-          <div className="stat-content">
-            <div className="stat-number">{stats.critical}</div>
-            <div className="stat-label">Críticos</div>
+            <button
+              type="button"
+              className={`stat-card stat-priority-high ${hasAdvancedFilters ? 'is-disabled' : ''} ${filterPriority === 'high' ? 'is-active' : ''}`}
+              onClick={() => {
+                if (!hasAdvancedFilters) {
+                  setFilterPriority(filterPriority === 'high' ? null : 'high');
+                }
+              }}
+              disabled={hasAdvancedFilters}
+              aria-pressed={filterPriority === 'high'}
+            >
+              <span className="stat-icon-wrap" aria-hidden="true">
+                <span className="stat-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12 6 12 12 16 14"/>
+                  </svg>
+                </span>
+              </span>
+              <span className="stat-number">{getPriorityCount('high')}</span>
+              <span className="stat-label">Alta</span>
+            </button>
+
+            <button
+              type="button"
+              className={`stat-card stat-priority-medium ${hasAdvancedFilters ? 'is-disabled' : ''} ${filterPriority === 'medium' ? 'is-active' : ''}`}
+              onClick={() => {
+                if (!hasAdvancedFilters) {
+                  setFilterPriority(filterPriority === 'medium' ? null : 'medium');
+                }
+              }}
+              disabled={hasAdvancedFilters}
+              aria-pressed={filterPriority === 'medium'}
+            >
+              <span className="stat-icon-wrap" aria-hidden="true">
+                <span className="stat-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#eab308" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12 6 12 12 16 14"/>
+                  </svg>
+                </span>
+              </span>
+              <span className="stat-number">{getPriorityCount('medium')}</span>
+              <span className="stat-label">Média</span>
+            </button>
+
+            <button
+              type="button"
+              className={`stat-card stat-priority-low ${hasAdvancedFilters ? 'is-disabled' : ''} ${filterPriority === 'low' ? 'is-active' : ''}`}
+              onClick={() => {
+                if (!hasAdvancedFilters) {
+                  setFilterPriority(filterPriority === 'low' ? null : 'low');
+                }
+              }}
+              disabled={hasAdvancedFilters}
+              aria-pressed={filterPriority === 'low'}
+            >
+              <span className="stat-icon-wrap" aria-hidden="true">
+                <span className="stat-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                    <polyline points="22 4 12 14.01 9 11.01"/>
+                  </svg>
+                </span>
+              </span>
+              <span className="stat-number">{getPriorityCount('low')}</span>
+              <span className="stat-label">Baixa</span>
+            </button>
           </div>
         </div>
 
-        <div 
-          className="stat-card waiting"
-          onClick={() => {
-            if (!hasAdvancedFilters) {
-              setFilterStatus(filterStatus === 'waiting_user' ? 'all' : 'waiting_user');
-            }
-          }}
-          style={{
-            cursor: hasAdvancedFilters ? 'not-allowed' : 'pointer',
-            opacity: hasAdvancedFilters ? 0.5 : 1,
-            border: filterStatus === 'waiting_user' ? '3px solid #ffc107' : undefined,
-            boxShadow: filterStatus === 'waiting_user' ? '0 0 10px rgba(255, 193, 7, 0.3)' : undefined
-          }}
-        >
-          <div className="stat-icon">🟡</div>
-          <div className="stat-content">
-            <div className="stat-number">{stats.waitingUser}</div>
-            <div className="stat-label">Aguard. Usuário</div>
-          </div>
-        </div>
+        <div className="stats-section">
+          <h3 className="stats-section-title">Resumo do Dia</h3>
+          <div className="stats-grid stats-grid-metrics">
+            <div className="stat-card new is-static">
+              <span className="stat-icon-wrap" aria-hidden="true">
+                <span className="stat-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+                  </svg>
+                </span>
+              </span>
+              <span className="stat-number">{stats.newToday}</span>
+              <span className="stat-label">Novos Hoje</span>
+            </div>
 
-        <div 
-          className="stat-card progress"
-          onClick={() => {
-            if (!hasAdvancedFilters) {
-              setFilterStatus(filterStatus === 'in_progress' ? 'all' : 'in_progress');
-            }
-          }}
-          style={{
-            cursor: hasAdvancedFilters ? 'not-allowed' : 'pointer',
-            opacity: hasAdvancedFilters ? 0.5 : 1,
-            border: filterStatus === 'in_progress' ? '3px solid #007bff' : undefined,
-            boxShadow: filterStatus === 'in_progress' ? '0 0 10px rgba(0, 123, 255, 0.3)' : undefined
-          }}
-        >
-          <div className="stat-icon">🔵</div>
-          <div className="stat-content">
-            <div className="stat-number">{stats.inProgress}</div>
-            <div className="stat-label">Em Atendimento</div>
-          </div>
-        </div>
-
-        <div className="stat-card new">
-          <div className="stat-icon">⚪</div>
-          <div className="stat-content">
-            <div className="stat-number">{stats.newToday}</div>
-            <div className="stat-label">Novos Hoje</div>
-          </div>
-        </div>
-
-        <div className="stat-card resolved">
-          <div className="stat-icon">🟢</div>
-          <div className="stat-content">
-            <div className="stat-number">{stats.resolvedToday}</div>
-            <div className="stat-label">Resolvidos Hoje</div>
+            <div className="stat-card resolved is-static">
+              <span className="stat-icon-wrap" aria-hidden="true">
+                <span className="stat-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                    <polyline points="22 4 12 14.01 9 11.01"/>
+                  </svg>
+                </span>
+              </span>
+              <span className="stat-number">{stats.resolvedToday}</span>
+              <span className="stat-label">Resolvidos Hoje</span>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Indicador de Filtro Rápido Ativo */}
-      {filterStatus !== 'all' && !hasAdvancedFilters && (
-        <div style={{
-          background: '#fff3cd',
-          border: '2px solid #ffc107',
-          borderRadius: '8px',
-          padding: '12px 20px',
-          marginBottom: '15px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '20px' }}>
-              {filterStatus === 'open' ? '🔴' : filterStatus === 'waiting_user' ? '🟡' : filterStatus === 'in_progress' ? '🔵' : '📋'}
+      {filterPriority && !hasAdvancedFilters && (
+        <div className="active-filter-banner">
+          <div className="active-filter-info">
+            <span className="active-filter-icon" aria-hidden="true">
+              {filterPriority === 'critical' ? '🔴' : filterPriority === 'high' ? '🟠' : filterPriority === 'medium' ? '🟡' : '🟢'}
             </span>
-            <span style={{ fontWeight: '600', color: '#856404' }}>
-              Filtro ativo: {getStatusLabel(filterStatus)}
+            <span>
+              Filtro ativo: Prioridade {getPriorityLabel(filterPriority)}
             </span>
           </div>
           <button
-            onClick={() => setFilterStatus('all')}
-            style={{
-              background: '#dc3545',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              padding: '6px 16px',
-              cursor: 'pointer',
-              fontWeight: '600',
-              fontSize: '14px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => setFilterPriority(null)}
           >
             ✕ Limpar Filtro
           </button>
@@ -507,39 +615,20 @@ export default function AdminTicketsPage() {
           ⚠️ Não Atribuídos
         </button>
         <button 
-          className={`filter-btn ${showFilters ? 'active' : ''}`}
+          className={`filter-btn filter-btn-toggle ${showFilters ? 'active' : ''}`}
           onClick={() => {
             setShowFilters(!showFilters);
             // Quando abrir filtros avançados, reseta o filtro rápido para evitar conflitos
             if (!showFilters) {
               setFilterStatus('all');
+              setFilterPriority(null);
             }
-          }}
-          style={{
-            marginLeft: 'auto',
-            background: showFilters ? '#4A90E2' : '#6c757d',
-            color: 'white',
-            position: 'relative'
           }}
         >
           🔍 {showFilters ? 'Ocultar' : 'Filtros Avançados'}
           {hasAdvancedFilters && (
-            <span style={{
-              position: 'absolute',
-              top: '-5px',
-              right: '-5px',
-              background: '#dc3545',
-              color: 'white',
-              borderRadius: '50%',
-              width: '20px',
-              height: '20px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '11px',
-              fontWeight: 'bold'
-            }}>
-              {(selectedStatuses.length + selectedPriorities.length + (searchText.trim() ? 1 : 0))}
+            <span className="filter-counter">
+              {activeFiltersCount}
             </span>
           )}
         </button>
@@ -547,51 +636,48 @@ export default function AdminTicketsPage() {
 
       {/* Filtros Avançados (Collapsible) */}
       {showFilters && (
-        <div className="advanced-filters" style={{
-          background: 'white',
-          padding: '20px',
-          borderRadius: '8px',
-          marginBottom: '20px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-        }}>
+        <div className="advanced-filters card">
           {hasAdvancedFilters && (
-            <div style={{
-              background: '#e7f3ff',
-              padding: '10px 15px',
-              borderRadius: '4px',
-              marginBottom: '15px',
-              border: '1px solid #4A90E2',
-              fontSize: '14px'
-            }}>
+            <div className="advanced-filters-alert">
               <strong>✅ Filtros ativos:</strong>
-              {searchText.trim() && <span style={{ marginLeft: '10px' }}>🔍 Busca: "{searchText}"</span>}
-              {selectedStatuses.length > 0 && <span style={{ marginLeft: '10px' }}>📊 Status: {selectedStatuses.length} selecionado(s)</span>}
-              {selectedPriorities.length > 0 && <span style={{ marginLeft: '10px' }}>🚨 Prioridades: {selectedPriorities.length} selecionada(s)</span>}
+              {searchText.trim() && <span>🔍 Busca: "{searchText}"</span>}
+              {selectedStatuses.length > 0 && <span>📊 Status: {selectedStatuses.length} selecionado(s)</span>}
+              {selectedPriorities.length > 0 && <span>🚨 Prioridades: {selectedPriorities.length} selecionada(s)</span>}
             </div>
           )}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
+          <div className="advanced-filters-grid">
             <div className="filter-group">
-              <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold' }}>🔍 Buscar:</label>
-              <input 
-                type="text"
-                placeholder="Título ou descrição..."
-                value={searchText}
-                onChange={(e) => {
-                  setSearchText(e.target.value);
-                  setCurrentPage(1);
-                }}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px'
-                }}
-              />
+              <label className="filter-label">🔍 Buscar:</label>
+              <div className="filter-input-wrap">
+                <input 
+                  type="text"
+                  placeholder="Buscar por título, descrição, usuário ou e-mail"
+                  value={searchText}
+                  onChange={(e) => {
+                    setSearchText(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="filter-input filter-input-search"
+                />
+                {searchText.trim() && (
+                  <button
+                    type="button"
+                    className="filter-input-clear"
+                    onClick={() => {
+                      setSearchText('');
+                      setCurrentPage(1);
+                    }}
+                    aria-label="Limpar busca"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="filter-group">
-              <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold' }}>📊 Status:</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label className="filter-label">📊 Status:</label>
+              <div className="advanced-checkbox-list">
                 {[
                   { value: 'open', label: '⚪ Aberto' },
                   { value: 'in_progress', label: '🔵 Em Atendimento' },
@@ -599,7 +685,10 @@ export default function AdminTicketsPage() {
                   { value: 'resolved', label: '✅ Resolvido' },
                   { value: 'closed', label: '🔒 Fechado' }
                 ].map(status => (
-                  <label key={status.value} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <label
+                    key={status.value}
+                    className={`advanced-checkbox-item ${selectedStatuses.includes(status.value) ? 'is-selected' : ''}`}
+                  >
                     <input
                       type="checkbox"
                       checked={selectedStatuses.includes(status.value)}
@@ -614,18 +703,23 @@ export default function AdminTicketsPage() {
                     />
                     {status.label}
                   </label>
-                ))}</div>
+                ))}
+              </div>
             </div>
 
             <div className="filter-group">
-              <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold' }}>🚨 Prioridade:</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label className="filter-label">🚨 Prioridade:</label>
+              <div className="advanced-checkbox-list">
                 {[
-                  { value: 'high', label: '🔴 Alto' },
-                  { value: 'medium', label: '🟡 Médio' },
-                  { value: 'low', label: '🟢 Baixo' }
+                  { value: 'critical', label: '🔴 Crítica' },
+                  { value: 'high', label: '🟠 Alta' },
+                  { value: 'medium', label: '🟡 Média' },
+                  { value: 'low', label: '🟢 Baixa' }
                 ].map(priority => (
-                  <label key={priority.value} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <label
+                    key={priority.value}
+                    className={`advanced-checkbox-item ${selectedPriorities.includes(priority.value) ? 'is-selected' : ''}`}
+                  >
                     <input
                       type="checkbox"
                       checked={selectedPriorities.includes(priority.value)}
@@ -645,25 +739,20 @@ export default function AdminTicketsPage() {
             </div>
           </div>
 
-          <div style={{ marginTop: '15px', textAlign: 'right' }}>
+          <div className="advanced-filters-footer">
             <button 
+              type="button"
+              className="advanced-clear-btn"
               onClick={() => {
                 setSearchText('');
                 setSelectedStatuses([]);
                 setSelectedPriorities([]);
                 setFilterStatus('all');
+                setFilterPriority(null);
                 setCurrentPage(1);
               }}
-              style={{
-                padding: '8px 16px',
-                background: '#dc3545',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
             >
-              🗑️ Limpar Filtros
+              Limpar filtros
             </button>
           </div>
         </div>
@@ -672,12 +761,13 @@ export default function AdminTicketsPage() {
       {/* Layout Principal: Fila + Painel Lateral */}
       <div className="dashboard-layout">
         {/* Fila Inteligente */}
-        <div className="ticket-queue">
-          <div className="queue-header">
+        <section className="ticket-queue card">
+          <div className="queue-header card-header">
             <h2>📋 Fila de Atendimento</h2>
             <span className="queue-count">
               {sortedTickets.length} chamados
               {filterStatus !== 'all' && ` (${getStatusLabel(filterStatus)})`}
+              {filterPriority && ` • Prioridade ${getPriorityLabel(filterPriority)}`}
             </span>
           </div>
 
@@ -692,89 +782,47 @@ export default function AdminTicketsPage() {
           ) : (
             <div className="tickets-list">
               {sortedTickets.map((ticket) => {
-                // Lógica de cor: STATUS tem precedência sobre PRIORIDADE
-                let colorIndicator = '⚪'; // Padrão: branco
-                if (ticket.status === 'in_progress') {
-                  colorIndicator = '🔵'; // AZUL - em atendimento
-                } else if (ticket.status === 'waiting_user') {
-                  colorIndicator = '🟡'; // AMARELO - aguardando usuário
-                } else if (ticket.status === 'resolved') {
-                  colorIndicator = '✅'; // VERDE - resolvido
-                } else if (ticket.status === 'closed') {
-                  colorIndicator = '🔒'; // CINZA - fechado
-                } else if (ticket.status === 'open') {
-                  // Para tickets ABERTOS, verificar prioridade
-                  if (ticket.priority === 'high') {
-                    colorIndicator = '🔴'; // VERMELHO - alta prioridade
-                  } else {
-                    colorIndicator = '⚪'; // BRANCO - normal
-                  }
-                }
-                
                 return (
                 <div
                   key={ticket.id}
-                  className={`ticket-card ticket-status-${ticket.status} ${selectedTicket?.id === ticket.id ? 'active' : ''} priority-${ticket.priority}`}
+                  className={`ticket-card ticket-status-${ticket.status} ${selectedTicket?.id === ticket.id ? 'active' : ''} ticket-priority-${ticket.priority || 'neutral'}`}
                   onClick={() => setSelectedTicket(ticket)}
                 >
-                  <div className="ticket-card-header">
-                    <div className="priority-indicator">
-                      {colorIndicator}
+                  <div className="ticket-card-top">
+                    <div className="ticket-card-main">
+                      <div className="ticket-card-title">{ticket.title}</div>
+                      <div className="ticket-card-requester">
+                        {ticket.requester_type === 'public' && ticket.requester_name ? (
+                          <>
+                            <span className="requester-name">👤 {ticket.requester_name}</span>
+                            {ticket.requester_email && (
+                              <span className="requester-meta">📧 {ticket.requester_email}</span>
+                            )}
+                            {(ticket.requester_department || ticket.requester_unit) && (
+                              <span className="requester-meta">
+                                {ticket.requester_department && `🏢 ${ticket.requester_department}`}
+                                {ticket.requester_department && ticket.requester_unit && ' • '}
+                                {ticket.requester_unit && `🏛️ ${ticket.requester_unit}`}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="requester-name">👤 Solicitante interno</span>
+                        )}
+                      </div>
                     </div>
                     <span className="time-ago">{getTimeAgo(ticket.created_at)} parado</span>
                   </div>
 
-                  {/* Badge de Prioridade */}
-                  <div style={{ 
-                    display: 'inline-block',
-                    padding: '2px 8px',
-                    borderRadius: '4px',
-                    fontSize: '11px',
-                    fontWeight: 'bold',
-                    marginBottom: '8px',
-                    background: 
-                      ticket.priority === 'high' ? '#dc3545' :
-                      ticket.priority === 'medium' ? '#ffc107' :
-                      ticket.priority === 'low' ? '#28a745' : '#6c757d',
-                    color: 
-                      ticket.priority === 'high' ? 'white' :
-                      ticket.priority === 'medium' ? '#000' : 'white'
-                  }}>
-                    {ticket.priority === 'high' && '🔴 ALTO'}
-                    {ticket.priority === 'medium' && '🟡 MÉDIO'}
-                    {ticket.priority === 'low' && '🟢 BAIXO'}
+                  <div className="ticket-card-badges">
+                    <span className="badge badge-type">{ticket.type}</span>
+                    <span className={`badge ${getPriorityBadgeClass(ticket.priority)}`}>
+                      {getPriorityLabel(ticket.priority)}
+                    </span>
+                    <span className={`badge ${getStatusBadgeClass(ticket.status)}`}>
+                      {getStatusLabel(ticket.status)}
+                    </span>
                   </div>
-
-                  <div className="ticket-card-title">{ticket.title}</div>
-                  <div className="ticket-card-type">{ticket.type}</div>
-
-                  {/* Informações do Solicitante */}
-                  {ticket.requester_type === 'public' && ticket.requester_name && (
-                    <div style={{
-                      background: '#f8f9fa',
-                      padding: '8px 10px',
-                      borderRadius: '4px',
-                      margin: '8px 0',
-                      fontSize: '13px',
-                      borderLeft: '3px solid #007A33'
-                    }}>
-                      <div style={{ fontWeight: '600', color: '#333', marginBottom: '4px' }}>
-                        👤 {ticket.requester_name}
-                      </div>
-                      {ticket.requester_email && (
-                        <div style={{ color: '#666', fontSize: '12px' }}>
-                          📧 {ticket.requester_email}
-                        </div>
-                      )}
-                      {(ticket.requester_department || ticket.requester_unit) && (
-                        <div style={{ color: '#666', fontSize: '12px', marginTop: '2px' }}>
-                          {ticket.requester_department && `🏢 ${ticket.requester_department}`}
-                          {ticket.requester_department && ticket.requester_unit && ' • '}
-                          {ticket.requester_unit && `🏛️ ${ticket.requester_unit}`}
-                        </div>
-                      )}
-                    </div>
-                  )}
 
                   <div className="ticket-card-footer">
                     <span className="assigned">
@@ -783,14 +831,16 @@ export default function AdminTicketsPage() {
                     <div className="footer-actions">
                       {!ticket.assigned_to && ticket.status === 'open' && (
                         <button
-                          className="btn-quick-assume"
+                          className="btn btn-primary btn-sm btn-assume"
                           onClick={(e) => handleQuickAssume(ticket.id, e)}
                           title="Assumir atendimento"
                         >
                           🎯 Assumir
                         </button>
                       )}
-                      <span className="status-mini">{getStatusLabel(ticket.status)}</span>
+                      <span className={`badge badge-mini ${getStatusBadgeClass(ticket.status)}`}>
+                        {getStatusLabel(ticket.status)}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -800,142 +850,169 @@ export default function AdminTicketsPage() {
 
           {/* Paginação */}
           {totalPages > 1 && (
-            <div style={{
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              gap: '10px',
-              marginTop: '20px',
-              padding: '15px',
-              background: 'white',
-              borderRadius: '8px'
-            }}>
+            <div className="pagination card">
               <button
+                type="button"
+                className="btn btn-secondary btn-sm"
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                style={{
-                  padding: '8px 16px',
-                  background: currentPage === 1 ? '#ddd' : '#007A33',
-                  color: currentPage === 1 ? '#666' : 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
-                }}
               >
                 ◀ Anterior
               </button>
               
-              <span style={{ padding: '0 15px', fontWeight: 'bold' }}>
+              <span className="pagination-info">
                 Página {currentPage} de {totalPages} 
-                <small style={{ color: '#666', marginLeft: '10px' }}>
-                  ({totalTickets} tickets)
+                <small>
+                  ({totalTickets} chamados)
                 </small>
               </span>
               
               <button
+                type="button"
+                className="btn btn-secondary btn-sm"
                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
-                style={{
-                  padding: '8px 16px',
-                  background: currentPage === totalPages ? '#ddd' : '#007A33',
-                  color: currentPage === totalPages ? '#666' : 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: currentPage === totalPages ? 'not-allowed' : 'pointer'
-                }}
               >
                 Próxima ▶
               </button>
             </div>
           )}
-        </div>
+        </section>
 
         {/* Painel Lateral do Ticket Selecionado */}
         {selectedTicket ? (
-          <div className="ticket-panel">
-            <div className="panel-header">
-              <h3>#{selectedTicket.id.substring(0, 8).toUpperCase()}</h3>
+          <aside className="ticket-panel card">
+            <div className="panel-header card-header">
+              <div className="panel-header-main">
+                <span className="panel-ticket-id">#{selectedTicket.id.substring(0, 8).toUpperCase()}</span>
+                <h3 className="panel-title">{selectedTicket.title}</h3>
+              </div>
               <button 
                 className="close-panel"
                 onClick={() => setSelectedTicket(null)}
+                aria-label="Fechar preview"
               >
                 ✕
               </button>
             </div>
 
-            <div className="panel-content">
-              <div className="panel-title">{selectedTicket.title}</div>
-              <div className="panel-status-badge">
-                <span className={`status-badge status-${selectedTicket.status}`}>
-                  {selectedTicket.status === 'open' && '🆕 Novo'}
-                  {selectedTicket.status === 'in_progress' && '⚙️ Em Andamento'}
-                  {selectedTicket.status === 'waiting_user' && '⏳ Aguardando Usuário'}
-                  {selectedTicket.status === 'resolved' && '✅ Resolvido'}
-                  {selectedTicket.status === 'closed' && '🔒 Fechado'}
+            <div className="panel-content card-body">
+              <div className="panel-badges">
+                <span className={`badge ${getStatusBadgeClass(selectedTicket.status)}`}>
+                  {getStatusLabel(selectedTicket.status)}
                 </span>
+                <span className={`badge ${getPriorityBadgeClass(selectedTicket.priority)}`}>
+                  {getPriorityLabel(selectedTicket.priority)}
+                </span>
+                <span className="badge badge-type">{selectedTicket.type}</span>
               </div>
+
               <div className="panel-meta">
-                Aberto há {getTimeAgo(selectedTicket.created_at)}
+                Aberto há {getTimeAgo(selectedTicket.created_at)} • Responsável: {getUserName(selectedTicket.assigned_to)}
               </div>
 
               <div className="panel-actions">
                 <button 
-                  className="action-btn primary full-width"
+                  className="btn btn-primary btn-block"
                   onClick={() => navigate(`/admin/chamados/${selectedTicket.id}`)}
                 >
                   🔧 Ver Detalhes Completos
                 </button>
                 <button 
-                  className="action-btn secondary"
+                  className="btn btn-warning"
                   onClick={() => handleQuickStatusChange(selectedTicket.id, 'waiting_user')}
-                  disabled={selectedTicket.status === 'closed'}
-                  title="Marcar como aguardando resposta do usuário"
+                  disabled={panelActionsBlocked}
+                  title={panelActionsBlocked ? 'Assuma o chamado primeiro para realizar esta ação.' : 'Marcar como aguardando resposta do usuário'}
                 >
                   ⏳ Aguardar
                 </button>
                 <button 
-                  className="action-btn success"
+                  className="btn btn-success"
                   onClick={() => handleQuickStatusChange(selectedTicket.id, 'resolved')}
-                  disabled={selectedTicket.status === 'closed'}
-                  title="Marcar ticket como resolvido"
+                  disabled={panelActionsBlocked}
+                  title={panelActionsBlocked ? 'Assuma o chamado primeiro para realizar esta ação.' : 'Marcar ticket como resolvido'}
                 >
                   ✅ Resolver
                 </button>
               </div>
 
-              <div className="panel-description">
+              <section className="panel-section">
                 <h4>Descrição</h4>
                 <p>{selectedTicket.description}</p>
-              </div>
+              </section>
+
+              <section className="panel-section">
+                <h4>Informações</h4>
+                <div className="panel-info">
+                  <div className="info-row">
+                    <span className="info-label">Solicitante:</span>
+                    <span className="info-value">{selectedTicket.requester_name || 'Usuário interno'}</span>
+                  </div>
+                  {selectedTicket.requester_email && (
+                    <div className="info-row">
+                      <span className="info-label">Email:</span>
+                      <span className="info-value">{selectedTicket.requester_email}</span>
+                    </div>
+                  )}
+                  {(selectedTicket.requester_department || selectedTicket.requester_unit) && (
+                    <div className="info-row">
+                      <span className="info-label">Localização:</span>
+                      <span className="info-value">
+                        {selectedTicket.requester_department || '—'}
+                        {selectedTicket.requester_department && selectedTicket.requester_unit && ' • '}
+                        {selectedTicket.requester_unit || ''}
+                      </span>
+                    </div>
+                  )}
+                  <div className="info-row">
+                    <span className="info-label">Prioridade:</span>
+                    <span className="info-value">{getPriorityLabel(selectedTicket.priority)}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="info-label">Tipo:</span>
+                    <span className="info-value">{selectedTicket.type}</span>
+                  </div>
+                  <div className="info-row">
+                    <span className="info-label">Status:</span>
+                    <span className="info-value">{getStatusLabel(selectedTicket.status)}</span>
+                  </div>
+                </div>
+              </section>
 
               <div className="panel-info">
-                <div className="info-row">
-                  <span className="info-label">Prioridade:</span>
-                  <span className="info-value">{selectedTicket.priority}</span>
-                </div>
-                <div className="info-row">
-                  <span className="info-label">Tipo:</span>
-                  <span className="info-value">{selectedTicket.type}</span>
-                </div>
-                <div className="info-row">
-                  <span className="info-label">Status:</span>
-                  <span className="info-value">{getStatusLabel(selectedTicket.status)}</span>
-                </div>
                 <div className="info-row">
                   <span className="info-label">Responsável:</span>
                   <span className="info-value">{getUserName(selectedTicket.assigned_to)}</span>
                 </div>
               </div>
             </div>
-          </div>
+          </aside>
         ) : (
-          <div className="ticket-panel empty">
+          <aside className="ticket-panel empty card">
             <div className="empty-panel">
-              <span className="empty-icon-large">👆</span>
-              <p>Selecione um chamado da fila</p>
-              <small>Clique em um card para ver detalhes e atender</small>
+              <span className="empty-icon-large">📊</span>
+              <h3>Resumo Operacional</h3>
+              <p>Selecione um chamado da fila para ver o preview detalhado.</p>
+              <div className="empty-panel-metrics">
+                <div className="empty-metric-card">
+                  <span className="empty-metric-value">{sortedTickets.length}</span>
+                  <span className="empty-metric-label">Na fila</span>
+                </div>
+                <div className="empty-metric-card">
+                  <span className="empty-metric-value">{myTicketsCount}</span>
+                  <span className="empty-metric-label">Meus atendimentos</span>
+                </div>
+                <div className="empty-metric-card">
+                  <span className="empty-metric-value">{stats.waitingUser}</span>
+                  <span className="empty-metric-label">Aguardando usuário</span>
+                </div>
+                <div className="empty-metric-card">
+                  <span className="empty-metric-value">{stats.resolvedToday}</span>
+                  <span className="empty-metric-label">Resolvidos hoje</span>
+                </div>
+              </div>
             </div>
-          </div>
+          </aside>
         )}
       </div>
     </div>

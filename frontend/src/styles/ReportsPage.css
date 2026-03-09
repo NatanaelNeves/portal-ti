@@ -152,7 +152,7 @@
   margin-bottom: 2rem;
 }
 
-.stat-card {
+.reports-page .stat-card {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   padding: 1.5rem;
@@ -161,23 +161,23 @@
   transition: transform 0.3s ease;
 }
 
-.stat-card:nth-child(2) {
+.reports-page .stat-card:nth-child(2) {
   background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
 }
 
-.stat-card:nth-child(3) {
+.reports-page .stat-card:nth-child(3) {
   background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
 }
 
-.stat-card:nth-child(4) {
+.reports-page .stat-card:nth-child(4) {
   background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
 }
 
-.stat-card:hover {
+.reports-page .stat-card:hover {
   transform: translateY(-5px);
 }
 
-.stat-card h3 {
+.reports-page .stat-card h3 {
   font-size: 0.9rem;
   margin: 0 0 1rem 0;
   opacity: 0.9;
@@ -331,7 +331,7 @@
   margin-bottom: 2rem;
 }
 
-.sla-overview .stat-card {
+.reports-page .sla-overview .stat-card {
   min-width: 300px;
 }
 

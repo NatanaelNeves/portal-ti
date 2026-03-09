@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { showToast } from '../utils/toast';
 import StatusTimeline from '../components/StatusTimeline';
 import TicketAttachments from '../components/TicketAttachments';
+import QuickActionsCard from '../components/QuickActionsCard';
 import '../styles/AdminTicketDetailPage.css';
 import { BACKEND_URL } from '../services/api';
 
@@ -278,6 +279,60 @@ export default function AdminTicketDetailPage() {
     await handleUpdateTicket(updates);
   };
 
+  // Handler para atribuir responsável (auto-atribuição)
+  const handleAssignToMe = async () => {
+    const userData = localStorage.getItem('internal_user');
+    if (userData) {
+      const user = JSON.parse(userData);
+      console.log('Auto-atribuindo ao usuário logado:', user.name);
+      try {
+        // Atribuir E mudar status para em progresso
+        await handleUpdateTicket({ 
+          assigned_to: user.id,
+          status: 'in_progress'
+        });
+        showToast.success('Chamado atribuído para você e iniciado!');
+      } catch (error) {
+        console.error('Erro ao auto-atribuir:', error);
+      }
+    } else {
+      showToast.error('Usuário não identificado');
+    }
+  };
+
+  // Handler para desatribuir responsável
+  const handleUnassign = async () => {
+    try {
+      await handleUpdateTicket({ 
+        assigned_to: undefined,
+        status: 'open'
+      });
+      showToast.success('Chamado desatribuído e reaberto');
+    } catch (error) {
+      console.error('Erro ao desatribuir:', error);
+    }
+  };
+
+  // Pegar nome do usuário logado
+  const getLoggedUserName = () => {
+    const userData = localStorage.getItem('internal_user');
+    if (userData) {
+      const user = JSON.parse(userData);
+      return user.name;
+    }
+    return null;
+  };
+
+  // Verificar se o chamado está atribuído ao usuário logado
+  const isAssignedToMe = () => {
+    const userData = localStorage.getItem('internal_user');
+    if (userData && ticket?.assigned_to) {
+      const user = JSON.parse(userData);
+      return user.id === ticket.assigned_to;
+    }
+    return false;
+  };
+
   return (
     <div className="admin-ticket-detail">
       {/* Header com navegação */}
@@ -299,51 +354,15 @@ export default function AdminTicketDetailPage() {
       {error && <div className="alert alert-error">{error}</div>}
 
       <div className="ticket-content">
-        {/* Ações Rápidas - Destacadas no topo */}
-        <div className="quick-actions-card">
-          <h2>⚡ Ações Rápidas</h2>
-          <div className="quick-actions-grid">
-            <button 
-              className="action-btn action-assume"
-              onClick={() => handleQuickAction('assume')}
-              disabled={submitting || ticket.status !== 'open'}
-            >
-              <span className="action-icon">🎯</span>
-              <span className="action-label">Assumir</span>
-              <span className="action-description">Iniciar atendimento</span>
-            </button>
-            
-            <button 
-              className="action-btn action-waiting"
-              onClick={() => handleQuickAction('waiting')}
-              disabled={submitting || ticket.status === 'closed'}
-            >
-              <span className="action-icon">⏳</span>
-              <span className="action-label">Aguardar Usuário</span>
-              <span className="action-description">Pendente de resposta</span>
-            </button>
-            
-            <button 
-              className="action-btn action-resolve"
-              onClick={() => handleQuickAction('resolve')}
-              disabled={submitting || ticket.status === 'closed'}
-            >
-              <span className="action-icon">✅</span>
-              <span className="action-label">Resolver</span>
-              <span className="action-description">Marcar como resolvido</span>
-            </button>
-            
-            <button 
-              className="action-btn action-close"
-              onClick={() => handleQuickAction('close')}
-              disabled={submitting || ticket.status === 'closed'}
-            >
-              <span className="action-icon">🔒</span>
-              <span className="action-label">Fechar</span>
-              <span className="action-description">Encerrar definitivamente</span>
-            </button>
-          </div>
-        </div>
+        {/* Ações Rápidas */}
+        <QuickActionsCard
+          status={ticket.status as 'open' | 'in_progress' | 'waiting_user' | 'resolved' | 'closed'}
+          isSubmitting={submitting}
+          onAssume={() => handleQuickAction('assume')}
+          onWaitingUser={() => handleQuickAction('waiting')}
+          onResolve={() => handleQuickAction('resolve')}
+          onClose={() => handleQuickAction('close')}
+        />
 
         {/* Timeline Visual */}
         <div className="timeline-card">
@@ -468,12 +487,38 @@ export default function AdminTicketDetailPage() {
                     </option>
                   ))}
                 </select>
+              ) : ticket.assigned_to ? (
+                <div className="assign-container">
+                  <div className="value" style={{ flex: 1 }}>
+                    {isAssignedToMe() 
+                      ? `${getLoggedUserName()} (Você)` 
+                      : users.find(u => u.id === ticket.assigned_to)?.name || 'Atribuído'
+                    }
+                  </div>
+                  {isAssignedToMe() && (
+                    <button
+                      onClick={handleUnassign}
+                      className="btn-unassign"
+                      disabled={submitting}
+                      title="Desatribuir este chamado"
+                    >
+                      ❌ Desatribuir
+                    </button>
+                  )}
+                </div>
               ) : (
-                <div className="value">
-                  {ticket.assigned_to 
-                    ? users.find(u => u.id === ticket.assigned_to)?.name || 'Atribuído'
-                    : 'Não atribuído'
-                  }
+                <div className="assign-container">
+                  <div className="value" style={{ flex: 1 }}>
+                    Não atribuído
+                  </div>
+                  <button
+                    onClick={handleAssignToMe}
+                    className="btn-assign-inline"
+                    disabled={submitting}
+                    title="Atribuir este chamado para mim e iniciar atendimento"
+                  >
+                    🎯 Atribuir para Mim
+                  </button>
                 </div>
               )}
             </div>
@@ -553,14 +598,6 @@ export default function AdminTicketDetailPage() {
           <form onSubmit={handleAddMessage} className="message-form">
             <div className="form-header">
               <label>📤 Nova Mensagem</label>
-              <label className="internal-checkbox">
-                <input 
-                  type="checkbox" 
-                  checked={isInternalNote}
-                  onChange={(e) => setIsInternalNote(e.target.checked)}
-                />
-                <span>🔒 Nota interna (visível apenas para TI)</span>
-              </label>
             </div>
             <textarea
               value={newMessage}
@@ -568,8 +605,26 @@ export default function AdminTicketDetailPage() {
               placeholder={isInternalNote ? "Digite uma nota interna para a equipe..." : "Digite sua resposta ao usuário..."}
               rows={4}
               disabled={submitting}
-              className="message-input"
+              className={`message-input ${isInternalNote ? 'internal-mode' : ''}`}
             />
+            <div className="internal-toggle-container">
+              <label className="internal-toggle">
+                <input 
+                  type="checkbox" 
+                  checked={isInternalNote}
+                  onChange={(e) => setIsInternalNote(e.target.checked)}
+                />
+                <span className="toggle-slider"></span>
+              </label>
+              <span className={`internal-toggle-label ${isInternalNote ? 'active' : ''}`}>
+                🔒 Nota Interna {isInternalNote && <span className="internal-badge-inline">ATIVO</span>}
+              </span>
+              {isInternalNote && (
+                <span style={{ fontSize: '0.85rem', color: '#78350f', marginLeft: 'auto' }}>
+                  Visível apenas para a equipe TI
+                </span>
+              )}
+            </div>
             <button
               type="submit"
               disabled={submitting || !newMessage.trim()}

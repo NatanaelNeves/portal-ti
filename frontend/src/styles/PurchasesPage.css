@@ -35,7 +35,7 @@
   gap: 1rem;
 }
 
-.stat-card {
+.purchases-page .stat-card {
   background: white;
   border-radius: 1rem;
   padding: 1.5rem;
@@ -48,7 +48,7 @@
   text-align: center;
 }
 
-.stat-card:hover {
+.purchases-page .stat-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
 }
@@ -75,79 +75,79 @@
 }
 
 /* Stat card variants */
-.stat-card.stat-total {
+.purchases-page .stat-card.stat-total {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border: none;
   color: white;
 }
 
-.stat-card.stat-total .stat-value,
-.stat-card.stat-total .stat-label {
+.purchases-page .stat-card.stat-total .stat-value,
+.purchases-page .stat-card.stat-total .stat-label {
   color: white;
 }
 
-.stat-card.stat-value {
+.purchases-page .stat-card.stat-value {
   background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
   border: none;
   color: white;
 }
 
-.stat-card.stat-value .stat-value,
-.stat-card.stat-value .stat-label {
+.purchases-page .stat-card.stat-value .stat-value,
+.purchases-page .stat-card.stat-value .stat-label {
   color: white;
 }
 
-.stat-card.stat-pending {
+.purchases-page .stat-card.stat-pending {
   border-color: #fbbf24;
   background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
 }
 
-.stat-card.stat-pending .stat-value {
+.purchases-page .stat-card.stat-pending .stat-value {
   color: #92400e;
 }
 
-.stat-card.stat-approved {
+.purchases-page .stat-card.stat-approved {
   border-color: #3b82f6;
   background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
 }
 
-.stat-card.stat-approved .stat-value {
+.purchases-page .stat-card.stat-approved .stat-value {
   color: #1e40af;
 }
 
-.stat-card.stat-purchased {
+.purchases-page .stat-card.stat-purchased {
   border-color: #a855f7;
   background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
 }
 
-.stat-card.stat-purchased .stat-value {
+.purchases-page .stat-card.stat-purchased .stat-value {
   color: #6b21a8;
 }
 
-.stat-card.stat-received {
+.purchases-page .stat-card.stat-received {
   border-color: #22c55e;
   background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
 }
 
-.stat-card.stat-received .stat-value {
+.purchases-page .stat-card.stat-received .stat-value {
   color: #065f46;
 }
 
-.stat-card.stat-completed {
+.purchases-page .stat-card.stat-completed {
   border-color: #10b981;
   background: linear-gradient(135deg, #d1fae5 0%, #6ee7b7 100%);
 }
 
-.stat-card.stat-completed .stat-value {
+.purchases-page .stat-card.stat-completed .stat-value {
   color: #047857;
 }
 
-.stat-card.stat-rejected {
+.purchases-page .stat-card.stat-rejected {
   border-color: #ef4444;
   background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
 }
 
-.stat-card.stat-rejected .stat-value {
+.purchases-page .stat-card.stat-rejected .stat-value {
   color: #991b1b;
 }
 

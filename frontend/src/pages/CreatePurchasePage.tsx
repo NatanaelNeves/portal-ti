@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import InventoryLayout from '../components/InventoryLayout';
 import '../styles/CreatePurchasePage.css';
 import { BACKEND_URL } from '../services/api';
+import { INSTITUTION_UNITS } from '../utils/institutionOptions';
 
 export default function CreatePurchasePage() {
   const [formData, setFormData] = useState({
@@ -60,7 +61,7 @@ export default function CreatePurchasePage() {
           requested_by_id: user.id,
           requester_name: user.name,
           requester_department: user.department || '',
-          requester_unit: user.unit || 'Unidade Central',
+          requester_unit: user.unit || INSTITUTION_UNITS[0],
           item_type: formData.item_type,
           item_description: formData.item_description,
           specifications: formData.specifications || null,

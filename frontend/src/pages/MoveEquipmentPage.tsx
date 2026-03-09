@@ -4,6 +4,7 @@ import api from '../services/api';
 import InventoryLayout from '../components/InventoryLayout';
 import { showToast } from '../utils/toast';
 import '../styles/MoveEquipmentPage.css';
+import { INSTITUTION_UNITS } from '../utils/institutionOptions';
 
 interface Equipment {
   id: string;
@@ -261,10 +262,9 @@ export default function MoveEquipmentPage() {
                   required
                 >
                   <option value="">Selecione a unidade</option>
-                  <option value="Maracanaú">Maracanaú</option>
-                  <option value="Fortaleza">Fortaleza</option>
-                  <option value="Caucaia">Caucaia</option>
-                  <option value="Sede Administrativa">Sede Administrativa</option>
+                  {INSTITUTION_UNITS.map((unit) => (
+                    <option key={unit} value={unit}>{unit}</option>
+                  ))}
                 </select>
               </div>
 

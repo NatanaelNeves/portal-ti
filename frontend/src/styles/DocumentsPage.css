@@ -69,7 +69,7 @@
   flex-wrap: wrap;
 }
 
-.stat-card {
+.documents-page .stat-card {
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -498,7 +498,7 @@
     gap: 0.75rem;
   }
 
-  .stat-card {
+  .documents-page .stat-card {
     min-width: 120px;
   }
 

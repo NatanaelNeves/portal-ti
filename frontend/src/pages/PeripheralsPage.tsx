@@ -4,6 +4,7 @@ import InventoryLayout from '../components/InventoryLayout';
 import '../styles/PeripheralsPage.css';
 import '../styles/InventoryButtons.css';
 import { BACKEND_URL } from '../services/api';
+import { INSTITUTION_UNITS } from '../utils/institutionOptions';
 
 interface Peripheral {
   id: string;
@@ -215,12 +216,9 @@ export default function PeripheralsPage() {
               onChange={(e) => setFilterUnit(e.target.value)}
             >
               <option value="all">Todas</option>
-              <option value="Agapito">Agapito</option>
-              <option value="Senador">Senador</option>
-              <option value="Caucaia">Caucaia</option>
-              <option value="Maracanaú">Maracanaú</option>
-              <option value="VP">VP</option>
-              <option value="Maranguape">Maranguape</option>
+              {INSTITUTION_UNITS.map((unit) => (
+                <option key={unit} value={unit}>{unit}</option>
+              ))}
             </select>
           </div>
         </div>

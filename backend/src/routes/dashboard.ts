@@ -3,73 +3,265 @@ import { database } from "../database/connection";
 
 const dashboardRouter = Router();
 
+const toInt = (value: unknown): number => {
+  const parsed = Number.parseInt(String(value ?? 0), 10);
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
+
+const toFloat = (value: unknown): number => {
+  const parsed = Number.parseFloat(String(value ?? 0));
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
+
+const calculateDeltaPercent = (current: number, previous: number): number => {
+  if (previous <= 0) {
+    return current > 0 ? 100 : 0;
+  }
+
+  return Math.round(((current - previous) / previous) * 100);
+};
+
 dashboardRouter.get("/admin", async (req: Request, res: Response) => {
   try {
-    // Total de chamados
-    const totalResult = await database.query("SELECT COUNT(*) as count FROM tickets");
-    const totalTickets = parseInt(totalResult.rows[0].count);
+    const [
+      totalResult,
+      statusResult,
+      resolvedTodayResult,
+      resolvedYesterdayResult,
+      openTodayResult,
+      inProgressTodayResult,
+      totalTicketsTodayResult,
+      priorityResult,
+      slaAllTimeResult,
+      slaTrendResult,
+      assetsSummaryResult,
+      pendingPurchasesResult,
+      assetsMovementTodayResult,
+      assetsMaintenanceTodayResult,
+      assetsCreatedThisMonthResult,
+      recentActivityResult,
+    ] = await Promise.all([
+      database.query("SELECT COUNT(*) as count FROM tickets"),
+      database.query(`
+        SELECT status, COUNT(*) as count 
+        FROM tickets 
+        GROUP BY status
+      `),
+      database.query(`
+        SELECT COUNT(*) as count 
+        FROM tickets 
+        WHERE status IN ('resolved', 'closed')
+          AND DATE(updated_at) = CURRENT_DATE
+      `),
+      database.query(`
+        SELECT COUNT(*) as count
+        FROM tickets
+        WHERE status IN ('resolved', 'closed')
+          AND DATE(updated_at) = CURRENT_DATE - INTERVAL '1 day'
+      `),
+      database.query(`
+        SELECT COUNT(*) as count
+        FROM tickets
+        WHERE status = 'open'
+          AND DATE(created_at) = CURRENT_DATE
+      `),
+      database.query(`
+        SELECT COUNT(*) as count
+        FROM tickets
+        WHERE status = 'in_progress'
+          AND DATE(updated_at) = CURRENT_DATE
+      `),
+      database.query(`
+        SELECT COUNT(*) as count
+        FROM tickets
+        WHERE DATE(created_at) = CURRENT_DATE
+      `),
+      database.query(`
+        SELECT priority, COUNT(*) as count 
+        FROM tickets 
+        GROUP BY priority
+      `),
+      database.query(`
+        SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (updated_at - created_at))/3600), 0) as avg_hours
+        FROM tickets
+        WHERE status IN ('resolved', 'closed')
+      `),
+      database.query(`
+        SELECT
+          COALESCE(
+            AVG(
+              CASE
+                WHEN updated_at >= CURRENT_DATE - INTERVAL '7 days'
+                THEN EXTRACT(EPOCH FROM (updated_at - created_at))/3600
+              END
+            ),
+            0
+          ) AS current_week_sla,
+          COALESCE(
+            AVG(
+              CASE
+                WHEN updated_at >= CURRENT_DATE - INTERVAL '14 days'
+                  AND updated_at < CURRENT_DATE - INTERVAL '7 days'
+                THEN EXTRACT(EPOCH FROM (updated_at - created_at))/3600
+              END
+            ),
+            0
+          ) AS previous_week_sla
+        FROM tickets
+        WHERE status IN ('resolved', 'closed')
+      `),
+      database.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE current_status IN ('available', 'in_stock')) AS assets_in_stock,
+          COUNT(*) FILTER (WHERE current_status = 'in_use') AS assets_assigned,
+          COUNT(*) FILTER (WHERE current_status = 'maintenance') AS assets_in_maintenance,
+          COUNT(*) AS total_assets
+        FROM inventory_equipment
+      `),
+      database.query(`
+        SELECT COUNT(*) as count
+        FROM purchase_requisitions
+        WHERE status = 'pending'
+      `),
+      database.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE movement_type IN ('delivery', 'transfer') AND DATE(movement_date) = CURRENT_DATE) AS assigned_today,
+          COUNT(*) FILTER (WHERE movement_type = 'return' AND DATE(movement_date) = CURRENT_DATE) AS returned_today
+        FROM equipment_movements
+      `),
+      database.query(`
+        SELECT COUNT(*) AS maintenance_today
+        FROM responsibility_terms
+        WHERE return_destination = 'maintenance'
+          AND DATE(updated_at) = CURRENT_DATE
+      `),
+      database.query(`
+        SELECT COUNT(*) as count
+        FROM inventory_equipment
+        WHERE DATE(created_at) >= DATE_TRUNC('month', CURRENT_DATE)
+      `),
+      database.query(`
+        SELECT *
+        FROM (
+          SELECT
+            CONCAT('ticket-created-', t.id::text) AS id,
+            'ticket_created' AS event_type,
+            COALESCE(t.title, 'Chamado sem título') AS title,
+            COALESCE(t.priority, 'medium') AS detail,
+            t.created_at AS event_time,
+            '/admin/chamados' AS route
+          FROM tickets t
 
-    // Debug: Ver todos os status dos chamados
-    const debugStatus = await database.query("SELECT status, COUNT(*) as count FROM tickets GROUP BY status");
-    console.log('Status dos chamados:', debugStatus.rows);
+          UNION ALL
 
-    // Chamados por status
-    const statusResult = await database.query(`
-      SELECT status, COUNT(*) as count 
-      FROM tickets 
-      GROUP BY status
-    `);
+          SELECT
+            CONCAT('ticket-resolved-', t.id::text) AS id,
+            'ticket_resolved' AS event_type,
+            COALESCE(t.title, 'Chamado sem título') AS title,
+            COALESCE(t.status, 'resolved') AS detail,
+            t.updated_at AS event_time,
+            '/admin/chamados?status=resolved' AS route
+          FROM tickets t
+          WHERE t.status IN ('resolved', 'closed')
+
+          UNION ALL
+
+          SELECT
+            CONCAT('asset-movement-', em.id::text) AS id,
+            CASE
+              WHEN em.movement_type IN ('delivery', 'transfer') THEN 'asset_assigned'
+              WHEN em.movement_type = 'return' THEN 'asset_returned'
+              ELSE 'asset_returned'
+            END AS event_type,
+            CONCAT(COALESCE(ie.internal_code, 'EQ'), ' • ', COALESCE(ie.type, 'Equipamento')) AS title,
+            COALESCE(em.to_user_name, em.from_user_name, em.to_location, em.from_location, 'Sem responsável') AS detail,
+            em.movement_date AS event_time,
+            '/admin/estoque' AS route
+          FROM equipment_movements em
+          JOIN inventory_equipment ie ON ie.id = em.equipment_id
+          WHERE em.movement_type IN ('delivery', 'transfer', 'return')
+
+          UNION ALL
+
+          SELECT
+            CONCAT('asset-maintenance-', rt.id::text) AS id,
+            'asset_maintenance' AS event_type,
+            CONCAT(COALESCE(ie.internal_code, 'EQ'), ' • ', COALESCE(ie.type, 'Equipamento')) AS title,
+            COALESCE(NULLIF(rt.return_problems, ''), 'Encaminhado para manutenção') AS detail,
+            rt.updated_at AS event_time,
+            '/admin/estoque?status=maintenance' AS route
+          FROM responsibility_terms rt
+          JOIN inventory_equipment ie ON ie.id = rt.equipment_id
+          WHERE rt.return_destination = 'maintenance'
+        ) AS events
+        ORDER BY event_time DESC
+        LIMIT 12
+      `),
+    ]);
+
+    const totalTickets = toInt(totalResult.rows[0]?.count);
 
     const ticketsByStatus: Record<string, number> = {};
     let openTickets = 0;
     let inProgressTickets = 0;
-    let resolvedTickets = 0;
 
-    statusResult.rows.forEach((row: any) => {
+    statusResult.rows.forEach((row: { status: string; count: string }) => {
       const status = row.status;
-      const count = parseInt(row.count);
+      const count = toInt(row.count);
       ticketsByStatus[status] = count;
 
-      console.log(`Status: ${status}, Count: ${count}`);
-
-      if (status === 'open') openTickets = count;
-      else if (status === 'in_progress') inProgressTickets = count;
-      // NÃO mais contar resolved/closed aqui - será contado abaixo apenas os de HOJE
+      if (status === 'open') {
+        openTickets = count;
+      } else if (status === 'in_progress') {
+        inProgressTickets = count;
+      }
     });
 
-    // Contar tickets resolvidos HOJE (não todos)
-    const resolvedTodayResult = await database.query(`
-      SELECT COUNT(*) as count 
-      FROM tickets 
-      WHERE (status = 'resolved' OR status = 'closed')
-        AND DATE(updated_at) = CURRENT_DATE
-    `);
-    resolvedTickets = parseInt(resolvedTodayResult.rows[0].count || 0);
-    
-    console.log(`Resolvidos HOJE: ${resolvedTickets}`);
-
-    // Chamados por prioridade
-    const priorityResult = await database.query(`
-      SELECT priority, COUNT(*) as count 
-      FROM tickets 
-      GROUP BY priority
-    `);
+    const resolvedTickets = toInt(resolvedTodayResult.rows[0]?.count);
+    const resolvedYesterday = toInt(resolvedYesterdayResult.rows[0]?.count);
+    const openToday = toInt(openTodayResult.rows[0]?.count);
+    const inProgressToday = toInt(inProgressTodayResult.rows[0]?.count);
+    const totalCreatedToday = toInt(totalTicketsTodayResult.rows[0]?.count);
+    const resolvedChangePercent = calculateDeltaPercent(resolvedTickets, resolvedYesterday);
 
     const ticketsByPriority: Record<string, number> = {};
-    priorityResult.rows.forEach((row: any) => {
-      ticketsByPriority[row.priority] = parseInt(row.count);
+    priorityResult.rows.forEach((row: { priority: string; count: string }) => {
+      ticketsByPriority[row.priority] = toInt(row.count);
     });
 
-    // Calcular SLA médio (tempo médio de resolução em horas)
-    const slaResult = await database.query(`
-      SELECT AVG(EXTRACT(EPOCH FROM (updated_at - created_at))/3600) as avg_hours
-      FROM tickets
-      WHERE status IN ('resolved', 'closed')
-    `);
+    const allTimeSla = toFloat(slaAllTimeResult.rows[0]?.avg_hours);
+    const currentWeekSla = toFloat(slaTrendResult.rows[0]?.current_week_sla);
+    const previousWeekSla = toFloat(slaTrendResult.rows[0]?.previous_week_sla);
 
-    const averageSLA = slaResult.rows[0].avg_hours 
-      ? Math.round(parseFloat(slaResult.rows[0].avg_hours))
-      : 0;
+    const averageSLA = Number((currentWeekSla > 0 ? currentWeekSla : allTimeSla).toFixed(1));
+    const previousAverageSLA = Number((previousWeekSla > 0 ? previousWeekSla : allTimeSla).toFixed(1));
+
+    const assetsInStock = toInt(assetsSummaryResult.rows[0]?.assets_in_stock);
+    const assetsAssigned = toInt(assetsSummaryResult.rows[0]?.assets_assigned);
+    const assetsInMaintenance = toInt(assetsSummaryResult.rows[0]?.assets_in_maintenance);
+    const totalAssets = toInt(assetsSummaryResult.rows[0]?.total_assets);
+    const pendingPurchases = toInt(pendingPurchasesResult.rows[0]?.count);
+
+    const assetsAssignedToday = toInt(assetsMovementTodayResult.rows[0]?.assigned_today);
+    const assetsReturnedToday = toInt(assetsMovementTodayResult.rows[0]?.returned_today);
+    const assetsMaintenanceToday = toInt(assetsMaintenanceTodayResult.rows[0]?.maintenance_today);
+    const assetsAddedThisMonth = toInt(assetsCreatedThisMonthResult.rows[0]?.count);
+
+    const recentActivity = recentActivityResult.rows.map((row: {
+      id: string;
+      event_type: string;
+      title: string;
+      detail: string;
+      event_time: string | Date;
+      route: string;
+    }) => ({
+      id: row.id,
+      type: row.event_type,
+      title: row.title,
+      detail: row.detail,
+      timestamp: new Date(row.event_time).toISOString(),
+      route: row.route,
+    }));
 
     res.json({
       totalTickets,
@@ -77,8 +269,27 @@ dashboardRouter.get("/admin", async (req: Request, res: Response) => {
       inProgressTickets,
       resolvedTickets,
       averageSLA,
+      previousAverageSLA,
       ticketsByStatus,
       ticketsByPriority,
+      ticketIndicators: {
+        openToday,
+        inProgressToday,
+        totalCreatedToday,
+        resolvedChangePercent,
+      },
+      assets: {
+        inStock: assetsInStock,
+        assigned: assetsAssigned,
+        inMaintenance: assetsInMaintenance,
+        total: totalAssets,
+        assignedToday: assetsAssignedToday,
+        returnedToday: assetsReturnedToday,
+        maintenanceToday: assetsMaintenanceToday,
+        addedThisMonth: assetsAddedThisMonth,
+      },
+      pendingPurchases,
+      recentActivity,
     });
   } catch (error) {
     console.error("Erro ao buscar dashboard admin:", error);

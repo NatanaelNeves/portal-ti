@@ -38,7 +38,7 @@
   margin-bottom: 2rem;
 }
 
-.stat-card {
+.responsibilities-page .stat-card {
   background: white;
   padding: 1.5rem;
   border-radius: 12px;
@@ -46,7 +46,7 @@
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
-.stat-card:hover {
+.responsibilities-page .stat-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
