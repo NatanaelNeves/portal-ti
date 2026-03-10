@@ -61,10 +61,26 @@ jobs:
           KUDU_USER: ${{ secrets.AZURE_KUDU_USER }}
           KUDU_PASS: ${{ secrets.AZURE_KUDU_PASS }}
         run: |
-          curl -X POST \
-            "https://portal-ti-backend.scm.azurewebsites.net/api/zipdeploy" \
-            --user "${KUDU_USER}:${KUDU_PASS}" \
-            --data-binary @backend-deploy.zip \
-            -H "Content-Type: application/zip" \
-            --fail-with-body \
-            -w "\nHTTP Status: %{http_code}\n"
+          for attempt in 1 2 3 4 5; do
+            echo "=== Deploy attempt $attempt ==="
+            HTTP_CODE=$(curl -s -o /tmp/deploy-response.txt -w "%{http_code}" \
+              -X POST \
+              "https://portal-ti-backend.scm.azurewebsites.net/api/zipdeploy" \
+              --user "${KUDU_USER}:${KUDU_PASS}" \
+              --data-binary @backend-deploy.zip \
+              -H "Content-Type: application/zip")
+            echo "HTTP Status: $HTTP_CODE"
+            cat /tmp/deploy-response.txt || true
+            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "202" ]; then
+              echo "Deploy succeeded!"
+              exit 0
+            elif [ "$HTTP_CODE" = "409" ]; then
+              echo "Another deployment in progress — waiting 30s before retry..."
+              sleep 30
+            else
+              echo "Unexpected status $HTTP_CODE — aborting."
+              exit 1
+            fi
+          done
+          echo "All attempts failed (409 persists)."
+          exit 1
