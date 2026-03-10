@@ -24,11 +24,11 @@ interface Notebook {
 }
 
 const STATUS_CFG: Record<string, { label: string; cls: string }> = {
-  available:      { label: 'DisponÃ­vel',  cls: 'nb-status-available' },
+  available:      { label: 'Disponível',  cls: 'nb-status-available' },
   in_stock:       { label: 'Em Estoque',  cls: 'nb-status-stock' },
   in_use:         { label: 'Em Uso',      cls: 'nb-status-inuse' },
-  maintenance:    { label: 'ManutenÃ§Ã£o',  cls: 'nb-status-maint' },
-  in_maintenance: { label: 'ManutenÃ§Ã£o',  cls: 'nb-status-maint' },
+  maintenance:    { label: 'Manutenção',  cls: 'nb-status-maint' },
+  in_maintenance: { label: 'Manutenção',  cls: 'nb-status-maint' },
   retired:        { label: 'Baixado',     cls: 'nb-status-retired' },
 };
 
@@ -84,7 +84,7 @@ function ModelGroup({ groupKey, notebooks, colorIdx, search, statusFilter, onNav
 
   // specs from first notebook
   const ref = notebooks[0];
-  const specs = [ref?.processor, ref?.memory_ram, ref?.storage, ref?.screen_size].filter(Boolean).join(' Â· ');
+  const specs = [ref?.processor, ref?.memory_ram, ref?.storage, ref?.screen_size].filter(Boolean).join(' · ');
 
   if (filtered.length === 0 && (search || statusFilter !== 'all')) return null;
 
@@ -96,7 +96,7 @@ function ModelGroup({ groupKey, notebooks, colorIdx, search, statusFilter, onNav
         onClick={() => setExpanded(e => !e)}
       >
         <div className="nb-group-left">
-          <div className="nb-group-icon" style={{ backgroundColor: color.accent }}>ðŸ’»</div>
+          <div className="nb-group-icon" style={{ backgroundColor: color.accent }}>NB</div>
           <div>
             <div className="nb-group-title">
               <span className="nb-group-name">{groupKey}</span>
@@ -107,12 +107,12 @@ function ModelGroup({ groupKey, notebooks, colorIdx, search, statusFilter, onNav
         </div>
         <div className="nb-group-right">
           <div className="nb-group-counts">
-            {counts.inuse > 0     && <span className="nb-cnt nb-cnt-inuse">âœ“ {counts.inuse} em uso</span>}
-            {counts.available > 0 && <span className="nb-cnt nb-cnt-avail">ðŸ“¦ {counts.available} disponÃ­vel</span>}
-            {counts.maint > 0     && <span className="nb-cnt nb-cnt-maint">ðŸ”§ {counts.maint} manutenÃ§Ã£o</span>}
-            {counts.retired > 0   && <span className="nb-cnt nb-cnt-ret">ðŸ—‘ {counts.retired} baixado</span>}
+            {counts.inuse > 0     && <span className="nb-cnt nb-cnt-inuse">{counts.inuse} em uso</span>}
+            {counts.available > 0 && <span className="nb-cnt nb-cnt-avail">{counts.available} disponível</span>}
+            {counts.maint > 0     && <span className="nb-cnt nb-cnt-maint">{counts.maint} manutenção</span>}
+            {counts.retired > 0   && <span className="nb-cnt nb-cnt-ret">{counts.retired} baixado</span>}
           </div>
-          <span className="nb-group-chevron">{expanded ? 'â–²' : 'â–¼'}</span>
+          <span className="nb-group-chevron">{expanded ? '▲' : '▼'}</span>
         </div>
       </div>
 
@@ -122,12 +122,12 @@ function ModelGroup({ groupKey, notebooks, colorIdx, search, statusFilter, onNav
             <thead>
               <tr>
                 <th>#</th>
-                <th>CÃ³digo</th>
-                <th>ResponsÃ¡vel</th>
+                <th>Código</th>
+                <th>Responsável</th>
                 <th>Unidade</th>
                 <th>Status</th>
-                <th>CondiÃ§Ã£o</th>
-                <th>AÃ§Ãµes</th>
+                <th>Condição</th>
+                <th>Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -162,29 +162,29 @@ function ModelGroup({ groupKey, notebooks, colorIdx, search, statusFilter, onNav
                           </div>
                         </div>
                       ) : (
-                        <span className="nb-empty">â€”</span>
+                        <span className="nb-empty">—</span>
                       )}
                     </td>
-                    <td className="nb-unit">{nb.current_unit || 'â€”'}</td>
+                    <td className="nb-unit">{nb.current_unit || '—'}</td>
                     <td><span className={`nb-status ${stCfg.cls}`}>{stCfg.label}</span></td>
-                    <td className="nb-condition">{nb.physical_condition || 'â€”'}</td>
+                    <td className="nb-condition">{nb.physical_condition || '—'}</td>
                     <td onClick={e => e.stopPropagation()}>
                       <div className="nb-actions">
                         <button className="nb-btn nb-btn-view" onClick={() => onNavigate(`/inventario/equipamento/${nb.id}`)}>
-                          ðŸ“‹ Ver
+                          Ver
                         </button>
                         {(['available','in_stock'].includes(nb.current_status)) && (
                           <button className="nb-btn nb-btn-deliver" onClick={() => onNavigate('/inventario/equipamentos/entregar')}>
-                            ðŸ“¤ Entregar
+                            Entregar
                           </button>
                         )}
                         {nb.current_status === 'in_use' && (
                           <>
                             <button className="nb-btn nb-btn-move" onClick={() => onNavigate(`/inventario/equipamento/${nb.id}/movimentar`)}>
-                              ðŸ”„ Mover
+                              Mover
                             </button>
                             <button className="nb-btn nb-btn-return" onClick={() => onNavigate(`/inventario/equipamentos/devolver?equipment=${nb.id}`)}>
-                              ðŸ“¥ Devolver
+                              Devolver
                             </button>
                           </>
                         )}
@@ -277,15 +277,15 @@ export default function NotebooksPage() {
         {/* HEADER */}
         <div className="nb-header">
           <div>
-            <h1 className="nb-title">ðŸ’» Notebooks</h1>
-            <p className="nb-subtitle">Agrupados por marca e modelo Â· {groups.length} modelos Â· {notebooks.length} unidades</p>
+            <h1 className="nb-title">Notebooks</h1>
+            <p className="nb-subtitle">Agrupados por marca e modelo · {groups.length} modelos · {notebooks.length} unidades</p>
           </div>
           <div className="nb-header-actions">
             <button className="nb-btn-outline" onClick={() => ExcelExportService.exportNotebooks(notebooks)} disabled={notebooks.length === 0}>
-              ðŸ“Š Exportar Excel
+              Exportar Excel
             </button>
             <button className="nb-btn-primary" onClick={() => navigate('/inventario/equipamentos/novo')}>
-              âž• Cadastrar
+              + Cadastrar
             </button>
           </div>
         </div>
@@ -295,14 +295,13 @@ export default function NotebooksPage() {
         {/* STATS */}
         <div className="nb-stats">
           {[
-            { label: 'Total',       value: totals.total,     icon: 'ðŸ“‹', cls: 'nb-stat-total'   },
-            { label: 'Em Uso',      value: totals.inuse,     icon: 'âœ…', cls: 'nb-stat-inuse'   },
-            { label: 'DisponÃ­vel',  value: totals.available, icon: 'ðŸ“¦', cls: 'nb-stat-avail'   },
-            { label: 'ManutenÃ§Ã£o',  value: totals.maint,     icon: 'ðŸ”§', cls: 'nb-stat-maint'   },
-            { label: 'Baixado',     value: totals.retired,   icon: 'ðŸ—‘', cls: 'nb-stat-retired' },
+            { label: 'Total',      value: totals.total,     cls: 'nb-stat-total'   },
+            { label: 'Em Uso',     value: totals.inuse,     cls: 'nb-stat-inuse'   },
+            { label: 'Disponível', value: totals.available, cls: 'nb-stat-avail'   },
+            { label: 'Manutenção', value: totals.maint,     cls: 'nb-stat-maint'   },
+            { label: 'Baixado',    value: totals.retired,   cls: 'nb-stat-retired' },
           ].map(s => (
             <div key={s.label} className={`nb-stat ${s.cls}`}>
-              <div className="nb-stat-icon">{s.icon}</div>
               <div className="nb-stat-value">{s.value}</div>
               <div className="nb-stat-label">{s.label}</div>
             </div>
@@ -312,21 +311,21 @@ export default function NotebooksPage() {
         {/* FILTERS */}
         <div className="nb-filters">
           <div className="nb-search-wrap">
-            <span className="nb-search-icon">ðŸ”</span>
+            <span className="nb-search-icon">🔍</span>
             <input
               className="nb-search"
-              placeholder="Buscar por responsÃ¡vel, cÃ³digo, unidade..."
+              placeholder="Buscar por responsável, código, unidade..."
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
-            {search && <button className="nb-search-clear" onClick={() => setSearch('')}>âœ•</button>}
+            {search && <button className="nb-search-clear" onClick={() => setSearch('')}>✕</button>}
           </div>
           <select className="nb-select" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
             <option value="all">Todos os status</option>
             <option value="in_use">Em Uso</option>
-            <option value="available">DisponÃ­vel</option>
+            <option value="available">Disponível</option>
             <option value="in_stock">Em Estoque</option>
-            <option value="maintenance">ManutenÃ§Ã£o</option>
+            <option value="maintenance">Manutenção</option>
             <option value="retired">Baixado</option>
           </select>
           <div className="nb-brand-chips">
@@ -349,11 +348,11 @@ export default function NotebooksPage() {
         {/* MODEL GROUPS */}
         {filteredGroups.length === 0 ? (
           <div className="nb-empty">
-            <div className="nb-empty-icon">ðŸ“­</div>
+            <div className="nb-empty-icon">📭</div>
             <h3>Nenhum notebook encontrado</h3>
             <p>Cadastre notebooks ou ajuste os filtros</p>
             <button className="nb-btn-primary" onClick={() => navigate('/inventario/equipamentos/novo')}>
-              âž• Cadastrar Notebook
+              + Cadastrar Notebook
             </button>
           </div>
         ) : (
