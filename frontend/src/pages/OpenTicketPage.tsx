@@ -76,12 +76,14 @@ export default function OpenTicketPage() {
   const validateTitle = (title: string): string | undefined => {
     if (!title) return 'Resumo é obrigatório';
     if (title.length < 5) return 'Resumo deve ter no mínimo 5 caracteres';
+    if (title.length > 200) return 'Resumo deve ter no máximo 200 caracteres';
     return undefined;
   };
 
   const validateDescription = (description: string): string | undefined => {
     if (!description) return 'Descrição é obrigatória';
     if (description.length < 10) return 'Descrição deve ter no mínimo 10 caracteres';
+    if (description.length > 2000) return 'Descrição deve ter no máximo 2000 caracteres';
     return undefined;
   };
 
@@ -156,8 +158,15 @@ export default function OpenTicketPage() {
 
     // Validação client-side
     if (formData.title.length < 5) {
-      setError('Título deve ter no mínimo 5 caracteres');
-      showToast.error('Título deve ter no mínimo 5 caracteres');
+      setError('Resumo deve ter no mínimo 5 caracteres');
+      showToast.error('Resumo deve ter no mínimo 5 caracteres');
+      setLoading(false);
+      return;
+    }
+
+    if (formData.title.length > 200) {
+      setError('Resumo deve ter no máximo 200 caracteres');
+      showToast.error('Resumo deve ter no máximo 200 caracteres');
       setLoading(false);
       return;
     }
@@ -165,6 +174,13 @@ export default function OpenTicketPage() {
     if (formData.description.length < 10) {
       setError('Descrição deve ter no mínimo 10 caracteres');
       showToast.error('Descrição deve ter no mínimo 10 caracteres');
+      setLoading(false);
+      return;
+    }
+
+    if (formData.description.length > 2000) {
+      setError('Descrição deve ter no máximo 2000 caracteres');
+      showToast.error('Descrição deve ter no máximo 2000 caracteres');
       setLoading(false);
       return;
     }
@@ -219,9 +235,12 @@ export default function OpenTicketPage() {
       if (!ticketResponse.ok) {
         const errorData = await ticketResponse.json().catch(() => ({}));
         console.error('Erro ao criar chamado:', errorData);
-        const errorMessage = errorData.details 
-          ? `${errorData.error}: ${errorData.details}` 
-          : errorData.error || 'Erro ao criar chamado';
+        let errorMessage = errorData.error || 'Erro ao criar chamado';
+        if (Array.isArray(errorData.details) && errorData.details.length > 0) {
+          errorMessage = errorData.details.map((d: any) => d.message).join('; ');
+        } else if (typeof errorData.details === 'string') {
+          errorMessage = errorData.details;
+        }
         throw new Error(errorMessage);
       }
 
@@ -407,6 +426,7 @@ export default function OpenTicketPage() {
                         onBlur={() => handleBlur('title')}
                         required
                         placeholder="Ex: Impressora do setor não imprime"
+                        maxLength={200}
                         className={fieldErrors.title ? 'input-error' : ''}
                         aria-describedby="title-hint title-error"
                       />
@@ -433,6 +453,7 @@ export default function OpenTicketPage() {
                         required
                         placeholder="Descreva em detalhes o que está acontecendo e como isso impacta seu trabalho..."
                         rows={6}
+                        maxLength={2000}
                         className={fieldErrors.description ? 'input-error' : ''}
                         aria-describedby="description-hint description-error"
                       />
