@@ -259,18 +259,20 @@ export default function TicketDetailPage() {
             </div>
           ) : (
             <div className="conversation">
-              {messages.map((msg) => (
+              {messages.map((msg) => {
+                const isStaff = msg.author_type !== 'public';
+                return (
                 <div 
                   key={msg.id} 
-                  className={`message ${msg.author_type === 'it_staff' ? 'message-ti' : 'message-user'}`}
+                  className={`message ${isStaff ? 'message-ti' : 'message-user'}`}
                 >
                   <div className="message-avatar">
-                    {msg.author_type === 'it_staff' ? '🔧' : '👤'}
+                    {isStaff ? '🔧' : '👤'}
                   </div>
                   <div className="message-content">
                     <div className="message-header">
                       <span className="message-author">
-                        {msg.author_type === 'it_staff'
+                        {isStaff
                           ? msg.author_name || 'Equipe TI'
                           : 'Você'}
                       </span>
@@ -286,7 +288,8 @@ export default function TicketDetailPage() {
                     <p className="message-text">{msg.message}</p>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
