@@ -1,4 +1,4 @@
-name: Deploy Backend to Azure Web App
+name: Deploy Backend to Azure Web App  # triggered after secrets configured
 
 on:
   push:
