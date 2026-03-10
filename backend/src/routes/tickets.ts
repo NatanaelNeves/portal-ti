@@ -3,7 +3,7 @@ import { database } from '../database/connection';
 import { authenticate, authorize } from '../middleware/authorization';
 import { UserRole } from '../types/enums';
 import { EmailService } from '../services/emailService';
-// v2026.03.10e - auto-update status to in_progress on any public reply (not just waiting_user)
+// v2026.03.10f - silentRefresh(true) confirms DB status after public reply
 import { uploadTicketAttachment, deleteFile } from '../services/uploadService';
 import { validate, createTicketSchema, updateTicketSchema, addMessageSchema } from '../middleware/validation';
 import path from 'path';

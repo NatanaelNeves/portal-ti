@@ -152,15 +152,18 @@ export default function TicketDetailPage() {
       const responseData = await response.json();
       setNewMessage('');
 
-      // Se o backend retornou o status atualizado do chamado, aplica imediatamente
+      // Aplica imediatamente o status retornado pelo backend (garantia visual rápida)
       if (responseData.ticket_status) {
         setTicket(prev => prev ? { ...prev, status: responseData.ticket_status } : prev);
       } else if (!isInternalUser && ticket?.status === 'waiting_user') {
-        // Fallback otimista caso backend antigo não retorne ticket_status
+        // Fallback otimista: usuário público respondeu ticket em aguardando
         setTicket(prev => prev ? { ...prev, status: 'in_progress' } : prev);
       }
 
-      await silentRefresh(id, false); // Só atualiza mensagens — não sobrescreve o status já setado do POST
+      // Confirma status do banco e atualiza mensagens.
+      // O backend só envia a resposta APÓS gravar o UPDATE no DB,
+      // então ao chegar aqui o status correto já está persistido.
+      await silentRefresh(id, true);
     } catch (err: any) {
       setError(err.message || 'Erro ao adicionar mensagem');
     } finally {
