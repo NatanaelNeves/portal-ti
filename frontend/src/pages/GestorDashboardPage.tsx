@@ -274,7 +274,7 @@ export default function GestorDashboardPage() {
             <div className="gd-table-card">
               <div className="gd-table-header">
                 <h3>🔄 Últimas Movimentações</h3>
-                <button className="gd-btn-link" onClick={() => navigate('/inventario/responsabilidades')}>Ver todas →</button>
+                <button className="gd-btn-link" onClick={() => navigate('/gestor/solicitacoes?tab=equipment')}>Ver todas →</button>
               </div>
               {movements.length > 0 ? (
                 <table className="gd-table">
@@ -301,7 +301,7 @@ export default function GestorDashboardPage() {
             <div className="gd-table-card">
               <div className="gd-table-header">
                 <h3>🛒 Últimas Requisições de Compra</h3>
-                <button className="gd-btn-link" onClick={() => navigate('/inventario/compras')}>Ver todas →</button>
+                <button className="gd-btn-link" onClick={() => navigate('/gestor/solicitacoes?tab=purchases')}>Ver todas →</button>
               </div>
               {purchases.length > 0 ? (
                 <table className="gd-table">

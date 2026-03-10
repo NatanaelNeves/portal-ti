@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import '../styles/GestorTicketsPage.css';
 import { BACKEND_URL } from '../services/api';
 
@@ -68,7 +68,9 @@ interface Purchase {
 
 export default function GestorTicketsPage() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<Tab>('tickets');
+  const [searchParams] = useSearchParams();
+  const initialTab = (searchParams.get('tab') as Tab) || 'tickets';
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab);
 
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [users, setUsers] = useState<InternalUser[]>([]);
@@ -144,7 +146,7 @@ export default function GestorTicketsPage() {
       const r = await fetch(`${BACKEND_URL}/api/inventory/equipment`, { headers: { Authorization: `Bearer ${token}` } });
       if (!r.ok) throw new Error('Erro ao carregar equipamentos');
       const raw = await r.json();
-      setEquipment(Array.isArray(raw) ? raw : (raw.data || []));
+      setEquipment(Array.isArray(raw) ? raw : (raw.equipment || raw.data || []));
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -158,7 +160,7 @@ export default function GestorTicketsPage() {
       const r = await fetch(`${BACKEND_URL}/api/inventory/notebooks`, { headers: { Authorization: `Bearer ${token}` } });
       if (!r.ok) throw new Error('Erro ao carregar notebooks');
       const raw = await r.json();
-      setNotebooks(Array.isArray(raw) ? raw : (raw.data || []));
+      setNotebooks(Array.isArray(raw) ? raw : (raw.notebooks || raw.data || []));
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -172,7 +174,7 @@ export default function GestorTicketsPage() {
       const r = await fetch(`${BACKEND_URL}/api/inventory/requisitions`, { headers: { Authorization: `Bearer ${token}` } });
       if (!r.ok) throw new Error('Erro ao carregar compras');
       const raw = await r.json();
-      setPurchases(Array.isArray(raw) ? raw : (raw.data || []));
+      setPurchases(Array.isArray(raw) ? raw : (raw.requisitions || raw.data || []));
     } catch (err: any) {
       setError(err.message);
     } finally {
