@@ -7,6 +7,7 @@ import { database } from './database/connection';
 import { initializeDatabase } from './database/schema';
 import { generalLimiter, authLimiter, createLimiter } from './middleware/rateLimiter';
 import { initializeWebSocket } from './services/websocketService';
+import { initializeScheduler } from './services/schedulerService';
 
 console.log('🚀 Starting Portal TI Backend...');
 console.log('📝 Loading configuration...');
@@ -98,6 +99,9 @@ async function startServer(): Promise<void> {
         console.log('🔌 Initializing WebSocket...');
         initializeWebSocket(httpServer);
         console.log('✓ WebSocket initialized');
+
+        console.log('⏰ Initializing Scheduler...');
+        initializeScheduler();
         return;
       } catch (error) {
         console.error(`❌ DB connection attempt ${i} failed:`, error);
