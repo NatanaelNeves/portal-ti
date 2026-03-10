@@ -3,7 +3,7 @@ import { database } from '../database/connection';
 import { authenticate, authorize } from '../middleware/authorization';
 import { UserRole } from '../types/enums';
 import { EmailService } from '../services/emailService';
-// v2026.03.10 - auto-status: waiting_user → in_progress on public reply
+// v2026.03.10b - auto-status: waiting_user → in_progress on public reply (force redeploy)
 import { uploadTicketAttachment, deleteFile } from '../services/uploadService';
 import { validate, createTicketSchema, updateTicketSchema, addMessageSchema } from '../middleware/validation';
 import path from 'path';

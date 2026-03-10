@@ -150,7 +150,14 @@ export default function TicketDetailPage() {
       }
 
       setNewMessage('');
-      await silentRefresh(id); // Refresh ticket status + messages silently
+
+      // Atualização otimista: se usuário público responde e chamado estava aguardando,
+      // atualiza o status imediatamente na tela sem esperar o servidor
+      if (!isInternalUser && ticket?.status === 'waiting_user') {
+        setTicket(prev => prev ? { ...prev, status: 'in_progress' } : prev);
+      }
+
+      await silentRefresh(id); // Confirm from server (status + new messages)
     } catch (err: any) {
       setError(err.message || 'Erro ao adicionar mensagem');
     } finally {
