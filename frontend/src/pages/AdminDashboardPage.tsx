@@ -153,7 +153,6 @@ export default function AdminDashboardPage() {
       low: { label: 'Baixa', icon: '🟢' },
       medium: { label: 'Média', icon: '🟡' },
       high: { label: 'Alta', icon: '🟠' },
-      critical: { label: 'Crítica', icon: '🔴' },
     };
     const item = labels[priority] || { label: priority, icon: '📌' };
     return `${item.icon} ${item.label}`;

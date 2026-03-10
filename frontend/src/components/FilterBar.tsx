@@ -39,8 +39,7 @@ const defaultStatusOptions: FilterOption[] = [
 const defaultPriorityOptions: FilterOption[] = [
   { value: 'low', label: 'Baixa' },
   { value: 'medium', label: 'Média' },
-  { value: 'high', label: 'Alta' },
-  { value: 'critical', label: 'Crítica' }
+  { value: 'high', label: 'Alta' }
 ];
 
 const FilterBar: React.FC<FilterBarProps> = ({

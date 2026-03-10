@@ -15,7 +15,6 @@ const PRIORITY_LABELS: Record<string, string> = {
   low: 'Baixa',
   medium: 'Média',
   high: 'Alta',
-  critical: 'Crítica',
 };
 
 export default function TicketsPage() {
@@ -114,7 +113,6 @@ export default function TicketsPage() {
                 <option value="low">Baixa</option>
                 <option value="medium">Média</option>
                 <option value="high">Alta</option>
-                <option value="critical">Crítica</option>
               </select>
             </div>
           </div>
