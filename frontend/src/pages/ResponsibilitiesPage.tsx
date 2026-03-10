@@ -234,7 +234,7 @@ export default function ResponsibilitiesPage() {
                           onClick={() => navigate(`/inventario/equipamento/${eq.id}`)}
                           title="Ver detalhes"
                         >
-                          <span className="btn-icon">�</span> Detalhes
+                          <span className="btn-icon">📋</span> Detalhes
                         </button>
                         <button
                           className="btn btn-sm btn-move"
