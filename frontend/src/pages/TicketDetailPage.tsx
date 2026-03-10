@@ -151,13 +151,21 @@ export default function TicketDetailPage() {
 
       setNewMessage('');
 
-      // Atualização otimista: se usuário público responde e chamado estava aguardando,
-      // atualiza o status imediatamente na tela sem esperar o servidor
-      if (!isInternalUser && ticket?.status === 'waiting_user') {
+      // Flag: usuário público respondeu a um chamado que estava aguardando
+      const shouldForceInProgress = !isInternalUser && ticket?.status === 'waiting_user';
+
+      // Atualização otimista imediata
+      if (shouldForceInProgress) {
         setTicket(prev => prev ? { ...prev, status: 'in_progress' } : prev);
       }
 
-      await silentRefresh(id); // Confirm from server (status + new messages)
+      await silentRefresh(id); // Busca mensagens e status do servidor
+
+      // Re-aplica o status caso o servidor ainda retorne waiting_user
+      // (pode acontecer se o backend ainda não foi atualizado)
+      if (shouldForceInProgress) {
+        setTicket(prev => prev && prev.status === 'waiting_user' ? { ...prev, status: 'in_progress' } : prev);
+      }
     } catch (err: any) {
       setError(err.message || 'Erro ao adicionar mensagem');
     } finally {

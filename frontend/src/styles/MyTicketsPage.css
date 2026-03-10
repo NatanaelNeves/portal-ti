@@ -256,6 +256,11 @@
   color: var(--laranja-acolhedor);
 }
 
+.status-waiting {
+  background: #FFF8E1;
+  color: #F57F17;
+}
+
 .status-resolved {
   background: #E8F5E9;
   color: var(--verde-nazareno);

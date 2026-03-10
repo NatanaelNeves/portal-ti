@@ -237,6 +237,8 @@ export default function MyTicketsPage() {
         return 'status-open';
       case 'in_progress':
         return 'status-progress';
+      case 'waiting_user':
+        return 'status-waiting';
       case 'resolved':
         return 'status-resolved';
       case 'closed':
@@ -251,9 +253,11 @@ export default function MyTicketsPage() {
       case 'open':
         return '📋 Recebido';
       case 'in_progress':
-        return '⏱️ Em Análise';
+        return '⏱️ Em Atendimento';
+      case 'waiting_user':
+        return '⏳ Aguardando Você';
       case 'resolved':
-        return '✅ Resolvendo';
+        return '✅ Resolvido';
       case 'closed':
         return '✔️ Concluído';
       default:
