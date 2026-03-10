@@ -8,6 +8,10 @@ on:
       - '.github/workflows/deploy-backend.yml'
   workflow_dispatch:
 
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: true
+
 env:
   NODE_VERSION: '20.x'
 
@@ -61,7 +65,7 @@ jobs:
           KUDU_USER: ${{ secrets.AZURE_KUDU_USER }}
           KUDU_PASS: ${{ secrets.AZURE_KUDU_PASS }}
         run: |
-          for attempt in 1 2 3 4 5; do
+          for attempt in 1 2 3 4 5 6 7 8; do
             echo "=== Deploy attempt $attempt ==="
             HTTP_CODE=$(curl -s -o /tmp/deploy-response.txt -w "%{http_code}" \
               -X POST \
@@ -75,8 +79,8 @@ jobs:
               echo "Deploy succeeded!"
               exit 0
             elif [ "$HTTP_CODE" = "409" ]; then
-              echo "Another deployment in progress — waiting 30s before retry..."
-              sleep 30
+              echo "Another deployment in progress — waiting 60s before retry..."
+              sleep 60
             else
               echo "Unexpected status $HTTP_CODE — aborting."
               exit 1
