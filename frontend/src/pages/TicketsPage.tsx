@@ -3,6 +3,21 @@ import { ticketService } from '../services/ticketService';
 import { Ticket } from '../types';
 import '../styles/TicketsPage.css';
 
+const STATUS_LABELS: Record<string, string> = {
+  open: 'Aberto',
+  in_progress: 'Em Atendimento',
+  waiting_user: 'Aguardando Você',
+  resolved: 'Resolvido',
+  closed: 'Fechado',
+};
+
+const PRIORITY_LABELS: Record<string, string> = {
+  low: 'Baixa',
+  medium: 'Média',
+  high: 'Alta',
+  critical: 'Crítica',
+};
+
 export default function TicketsPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
@@ -122,8 +137,8 @@ export default function TicketsPage() {
               <h3>{ticket.title}</h3>
               <p className="description">{ticket.description}</p>
               <div className="ticket-meta">
-                <span className={`status status-${ticket.status}`}>{ticket.status}</span>
-                <span className={`priority priority-${ticket.priority}`}>{ticket.priority}</span>
+                <span className={`status status-${ticket.status}`}>{STATUS_LABELS[ticket.status] || ticket.status}</span>
+                <span className={`priority priority-${ticket.priority}`}>{PRIORITY_LABELS[ticket.priority] || ticket.priority}</span>
               </div>
               <small>Criado em {new Date(ticket.createdAt).toLocaleDateString()}</small>
             </div>

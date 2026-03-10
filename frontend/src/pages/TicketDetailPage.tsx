@@ -184,6 +184,8 @@ export default function TicketDetailPage() {
         return 'status-open';
       case 'in_progress':
         return 'status-progress';
+      case 'waiting_user':
+        return 'status-waiting';
       case 'resolved':
         return 'status-resolved';
       case 'closed':
@@ -198,7 +200,9 @@ export default function TicketDetailPage() {
       case 'open':
         return 'Aberto';
       case 'in_progress':
-        return 'Em Progresso';
+        return 'Em Atendimento';
+      case 'waiting_user':
+        return 'Aguardando Você';
       case 'resolved':
         return 'Resolvido';
       case 'closed':

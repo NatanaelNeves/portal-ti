@@ -41,14 +41,14 @@ export const createTicketSchema = z.object({
     message: 'Tipo inválido'
   }),
   
-  priority: z.enum(['low', 'medium', 'high'], {
+  priority: z.enum(['low', 'medium', 'high', 'critical'], {
     message: 'Prioridade inválida'
   }),
 });
 
 export const updateTicketSchema = z.object({
   status: z.enum(['open', 'in_progress', 'waiting_user', 'resolved', 'closed']).optional(),
-  priority: z.enum(['low', 'medium', 'high']).optional(),
+  priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
   assigned_to_id: z.string().uuid().nullable().optional(),
 }).refine((data) => Object.keys(data).length > 0, {
   message: 'Pelo menos um campo deve ser fornecido',
