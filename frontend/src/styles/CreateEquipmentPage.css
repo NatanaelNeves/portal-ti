@@ -294,3 +294,105 @@
     width: 100%;
   }
 }
+
+/* ===== GROUP PICKER (Step 1 - Notebook) ===== */
+.group-picker {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 1.5rem 0;
+}
+.group-picker-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 0.4rem;
+}
+.group-picker-subtitle {
+  font-size: 0.9rem;
+  color: #64748b;
+  margin-bottom: 1.25rem;
+}
+.group-picker-loading {
+  color: #64748b;
+  font-size: 0.95rem;
+  padding: 1rem 0;
+}
+.group-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.group-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1.1rem;
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+  text-align: left;
+}
+.group-picker-item:hover {
+  border-color: #667eea;
+  background: #f5f3ff;
+  box-shadow: 0 2px 8px rgba(102,126,234,0.12);
+}
+.group-picker-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+.group-picker-name {
+  flex: 1;
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 0.95rem;
+}
+.group-picker-count {
+  font-size: 0.8rem;
+  color: #64748b;
+  white-space: nowrap;
+}
+.group-picker-arrow {
+  color: #94a3b8;
+  font-size: 1rem;
+}
+.group-picker-new {
+  border-style: dashed;
+  border-color: #667eea;
+  background: #fafafe;
+}
+.group-picker-new .group-picker-name {
+  color: #667eea;
+}
+/* Back bar at top of form in step 2 */
+.group-back-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  padding: 0.6rem 1rem;
+  background: #f8f9ff;
+  border-radius: 8px;
+  border: 1px solid #e0e7ff;
+}
+.group-back-btn {
+  font-size: 0.82rem;
+  color: #667eea;
+  background: none;
+  border: 1px solid #667eea;
+  border-radius: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.group-back-btn:hover {
+  background: #667eea;
+  color: #fff;
+}
+.group-back-label {
+  font-size: 0.85rem;
+  color: #475569;
+}

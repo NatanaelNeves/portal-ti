@@ -448,3 +448,22 @@
 @media (max-width: 480px) {
   .nb-stats { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* Add-to-group button in model group header */
+.nb-btn-add-group {
+  padding: 4px 10px;
+  background: #fff;
+  border: 1.5px solid #667eea;
+  color: #667eea;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1.4;
+  transition: background 0.15s, color 0.15s;
+}
+.nb-btn-add-group:hover {
+  background: #667eea;
+  color: #fff;
+}

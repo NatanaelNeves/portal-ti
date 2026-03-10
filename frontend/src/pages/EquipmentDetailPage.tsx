@@ -7,6 +7,20 @@ import DocumentUploader from '../components/DocumentUploader';
 import '../styles/EquipmentDetailPage.css';
 import '../styles/InventoryButtons.css';
 
+// Mapeamento de condição física para português
+const CONDITION_LABELS: Record<string, string> = {
+  new:            'Novo',
+  Novo:           'Novo',
+  good:           'Bom',
+  Bom:            'Bom',
+  regular:        'Regular',
+  Regular:        'Regular',
+  bad:            'Com Defeito',
+  damaged:        'Com Defeito',
+  'Com Defeito':  'Com Defeito',
+  'Para Descarte':'Para Descarte',
+};
+
 // Função para traduzir tipos de movimentação
 const translateMovementType = (type: string): string => {
   const translations: { [key: string]: string } = {
@@ -209,7 +223,7 @@ export default function EquipmentDetailPage() {
                     <dt>Marca</dt><dd>{equipment.brand}</dd>
                     <dt>Modelo</dt><dd>{equipment.model}</dd>
                     <dt>Série</dt><dd>{equipment.serial_number || '-'}</dd>
-                    <dt>Condição</dt><dd>{equipment.physical_condition || '-'}</dd>
+                    <dt>Condição</dt><dd>{CONDITION_LABELS[equipment.physical_condition] || equipment.physical_condition || '-'}</dd>
                   </dl>
                 </div>
                 <div className="card">

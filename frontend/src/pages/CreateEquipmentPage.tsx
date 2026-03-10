@@ -1,19 +1,41 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import InventoryLayout from '../components/InventoryLayout';
 import '../styles/CreateEquipmentPage.css';
 import { INSTITUTION_UNITS } from '../utils/institutionOptions';
+import { BACKEND_URL } from '../services/api';
 
 type EquipmentCategory = 'NOTEBOOK' | 'PERIPHERAL';
 
+interface NotebookGroup {
+  brand: string;
+  model: string;
+  count: number;
+}
+
+const CONDITION_OPTIONS = [
+  { value: 'Novo',          label: 'Novo' },
+  { value: 'Bom',           label: 'Bom' },
+  { value: 'Regular',       label: 'Regular' },
+  { value: 'Com Defeito',   label: 'Com Defeito' },
+  { value: 'Para Descarte', label: 'Para Descarte' },
+];
+
 export default function CreateEquipmentPage() {
+  const [searchParams] = useSearchParams();
   const [category, setCategory] = useState<EquipmentCategory>('NOTEBOOK');
+  // step 1 = choose group (notebook only), step 2 = fill form
+  const [step, setStep] = useState<1 | 2>(() => {
+    return searchParams.get('brand') ? 2 : 1;
+  });
+  const [groups, setGroups] = useState<NotebookGroup[]>([]);
+  const [groupsLoading, setGroupsLoading] = useState(false);
   const [formData, setFormData] = useState({
     // Básico
     type: '',
     custom_type: '',
-    brand: '',
-    model: '',
+    brand: searchParams.get('brand') || '',
+    model: searchParams.get('model') || '',
     serial_number: '',
     
     // Notebook específico
@@ -26,7 +48,7 @@ export default function CreateEquipmentPage() {
     // Localização e status
     current_unit: INSTITUTION_UNITS[0],
     current_status: 'available',
-    physical_condition: 'new',
+    physical_condition: 'Novo',
     
     // Aquisição
     acquisition_date: '',
@@ -40,6 +62,43 @@ export default function CreateEquipmentPage() {
   const navigate = useNavigate();
 
   const units = INSTITUTION_UNITS;
+
+  // Fetch notebook groups for step 1
+  useEffect(() => {
+    if (category === 'NOTEBOOK' && step === 1) {
+      fetchGroups();
+    }
+  }, [category, step]);
+
+  const fetchGroups = async () => {
+    try {
+      setGroupsLoading(true);
+      const token = localStorage.getItem('internal_token');
+      const response = await fetch(`${BACKEND_URL}/api/inventory/notebooks`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      const notebooks: { brand: string; model: string }[] = data.notebooks || [];
+      // Build groups with normalized keys
+      const normalize = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
+      const map = new Map<string, NotebookGroup>();
+      for (const nb of notebooks) {
+        const raw = `${nb.brand} ${nb.model}`.trim().replace(/\s+/g, ' ');
+        const key = normalize(raw);
+        if (!map.has(key)) map.set(key, { brand: nb.brand.trim(), model: nb.model.trim(), count: 0 });
+        map.get(key)!.count++;
+      }
+      setGroups(Array.from(map.values()).sort((a, b) => b.count - a.count));
+    } catch { /* ignore */ } finally {
+      setGroupsLoading(false);
+    }
+  };
+
+  const selectGroup = (g: NotebookGroup) => {
+    setFormData(prev => ({ ...prev, brand: g.brand, model: g.model }));
+    setStep(2);
+  };
 
   const peripheralTypes = [
     'Mouse',
@@ -67,9 +126,12 @@ export default function CreateEquipmentPage() {
 
   const handleCategoryChange = (newCategory: EquipmentCategory) => {
     setCategory(newCategory);
+    setStep(1);
     // Reset campos não usados
     setFormData(prev => ({
       ...prev,
+      brand: '',
+      model: '',
       type: newCategory === 'NOTEBOOK' ? 'Notebook' : '',
       processor: '',
       ram: '',
@@ -204,8 +266,60 @@ export default function CreateEquipmentPage() {
           </div>
 
           <div className="form-container">
+
+            {/* STEP 1 — ESCOLHER MODELO (apenas Notebook) */}
+            {category === 'NOTEBOOK' && step === 1 && (
+              <div className="group-picker">
+                <div className="group-picker-title">Qual o modelo do notebook?</div>
+                <p className="group-picker-subtitle">Escolha um modelo existente ou crie um novo.</p>
+
+                {groupsLoading ? (
+                  <div className="group-picker-loading">Carregando modelos...</div>
+                ) : (
+                  <div className="group-picker-list">
+                    {groups.map(g => (
+                      <button
+                        key={`${g.brand}-${g.model}`}
+                        type="button"
+                        className="group-picker-item"
+                        onClick={() => selectGroup(g)}
+                      >
+                        <span className="group-picker-icon">💻</span>
+                        <span className="group-picker-name">{g.brand} {g.model}</span>
+                        <span className="group-picker-count">{g.count} unidade{g.count !== 1 ? 's' : ''}</span>
+                        <span className="group-picker-arrow">→</span>
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      className="group-picker-item group-picker-new"
+                      onClick={() => { setFormData(prev => ({ ...prev, brand: '', model: '' })); setStep(2); }}
+                    >
+                      <span className="group-picker-icon">＋</span>
+                      <span className="group-picker-name">Criar novo modelo</span>
+                      <span className="group-picker-count">Preencher marca e modelo manualmente</span>
+                      <span className="group-picker-arrow">→</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* STEP 2 — FORMULÁRIO */}
+            {(category === 'PERIPHERAL' || step === 2) && (
             <form onSubmit={handleSubmit} className="create-form">
-              
+              {/* Breadcrumb de volta para grupos (notebook) */}
+              {category === 'NOTEBOOK' && (
+                <div className="group-back-bar">
+                  <button type="button" className="group-back-btn" onClick={() => setStep(1)}>
+                    ← Trocar modelo
+                  </button>
+                  <span className="group-back-label">
+                    Adicionando a: <strong>{formData.brand || '—'} {formData.model || '—'}</strong>
+                  </span>
+                </div>
+              )}
+
               {/* TIPO (só para periféricos) */}
               {category === 'PERIPHERAL' && (
                 <>
@@ -390,10 +504,9 @@ export default function CreateEquipmentPage() {
                     value={formData.physical_condition}
                     onChange={handleInputChange}
                   >
-                    <option value="new">⭐ Novo</option>
-                    <option value="good">✓ Bom</option>
-                    <option value="regular">~ Regular</option>
-                    <option value="bad">✗ Ruim</option>
+                    {CONDITION_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -457,6 +570,7 @@ export default function CreateEquipmentPage() {
                 </button>
               </div>
             </form>
+            )}
           </div>
         </div>
       </div>

@@ -41,6 +41,19 @@ const BRAND_COLORS = [
   { accent: '#8b5cf6', light: '#f5f3ff', badge: '#a78bfa' },
 ];
 
+const CONDITION_LABELS: Record<string, string> = {
+  new:            'Novo',
+  Novo:           'Novo',
+  good:           'Bom',
+  Bom:            'Bom',
+  regular:        'Regular',
+  Regular:        'Regular',
+  bad:            'Com Defeito',
+  damaged:        'Com Defeito',
+  'Com Defeito':  'Com Defeito',
+  'Para Descarte':'Para Descarte',
+};
+
 function getInitials(name: string) {
   return name.split(' ').filter(Boolean).slice(0, 2).map(n => n[0]).join('').toUpperCase();
 }
@@ -112,6 +125,13 @@ function ModelGroup({ groupKey, notebooks, colorIdx, search, statusFilter, onNav
             {counts.maint > 0     && <span className="nb-cnt nb-cnt-maint">{counts.maint} manutenção</span>}
             {counts.retired > 0   && <span className="nb-cnt nb-cnt-ret">{counts.retired} baixado</span>}
           </div>
+          <button
+            className="nb-btn-add-group"
+            onClick={e => { e.stopPropagation(); onNavigate(`/inventario/equipamentos/novo?brand=${encodeURIComponent(notebooks[0]?.brand || '')}&model=${encodeURIComponent(notebooks[0]?.model || '')}`); }}
+            title="Adicionar notebook a este modelo"
+          >
+            + Adicionar
+          </button>
           <span className="nb-group-chevron">{expanded ? '▲' : '▼'}</span>
         </div>
       </div>
@@ -167,7 +187,7 @@ function ModelGroup({ groupKey, notebooks, colorIdx, search, statusFilter, onNav
                     </td>
                     <td className="nb-unit">{nb.current_unit || '—'}</td>
                     <td><span className={`nb-status ${stCfg.cls}`}>{stCfg.label}</span></td>
-                    <td className="nb-condition">{nb.physical_condition || '—'}</td>
+                    <td className="nb-condition">{CONDITION_LABELS[nb.physical_condition] || nb.physical_condition || '—'}</td>
                     <td onClick={e => e.stopPropagation()}>
                       <div className="nb-actions">
                         <button className="nb-btn nb-btn-view" onClick={() => onNavigate(`/inventario/equipamento/${nb.id}`)}>
