@@ -90,7 +90,7 @@ export default function TicketDetailPage() {
     if (!newMessage.trim() || !id) return;
     
     // Usuário interno pode enviar sem token público
-    if (!isInternalUser && !token) return;
+    if (!isInternalUser && !token && !userToken) return;
 
     try {
       setSubmitting(true);
@@ -98,11 +98,13 @@ export default function TicketDetailPage() {
         'Content-Type': 'application/json',
       };
 
-      // Usuário interno usa JWT, usuário público usa token
+      // Usuário interno usa JWT, usuário público usa token (URL param ou localStorage)
       if (isInternalUser && internalToken) {
         headers['Authorization'] = `Bearer ${internalToken}`;
       } else if (token) {
         headers['X-User-Token'] = token;
+      } else if (userToken) {
+        headers['X-User-Token'] = userToken;
       }
 
       const response = await fetch(`${BACKEND_URL}/api/tickets/${id}/messages`, {
