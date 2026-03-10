@@ -81,7 +81,7 @@ export default function CreateEquipmentPage() {
       const data = await response.json();
       const notebooks: { brand: string; model: string }[] = data.notebooks || [];
       // Build groups with normalized keys
-      const normalize = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
+      const normalize = (s: string) => s.trim().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').toLowerCase();
       const map = new Map<string, NotebookGroup>();
       for (const nb of notebooks) {
         const raw = `${nb.brand} ${nb.model}`.trim().replace(/\s+/g, ' ');
