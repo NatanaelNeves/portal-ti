@@ -236,6 +236,13 @@ export default function CreateEquipmentPage() {
       <div className="create-equipment-page">
         <div className="container">
           <header className="page-header">
+            <button
+              type="button"
+              className="btn-back"
+              onClick={() => navigate(-1)}
+            >
+              ← Voltar
+            </button>
             <h1>➕ Novo Equipamento</h1>
             <p>Adicione um novo equipamento ao inventário</p>
           </header>

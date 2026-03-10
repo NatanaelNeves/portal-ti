@@ -30,6 +30,27 @@
   font-weight: 400;
 }
 
+.btn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+  padding: 6px 14px;
+  background: none;
+  border: 1.5px solid #cbd5e0;
+  border-radius: 8px;
+  color: #4a5568;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.btn-back:hover {
+  background: #edf2f7;
+  border-color: #a0aec0;
+  color: #1a202c;
+}
+
 .error-message {
   background: #fff5f5;
   color: #c53030;
