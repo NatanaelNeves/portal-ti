@@ -211,7 +211,8 @@ export default function OpenTicketPage() {
           title: formData.title,
           description: formData.description,
           type: formData.type,
-          priority: formData.priority,
+          // 'critical' não é aceito pelo backend atual — mapeia para 'high'
+          priority: formData.priority === 'critical' ? 'high' : formData.priority,
         }),
       });
 
