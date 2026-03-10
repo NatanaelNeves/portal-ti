@@ -3,7 +3,7 @@ import { database } from '../database/connection';
 import { authenticate, authorize } from '../middleware/authorization';
 import { UserRole } from '../types/enums';
 import { EmailService } from '../services/emailService';
-// v2026.03.10d - return updated ticket status in POST /messages response
+// v2026.03.10e - auto-update status to in_progress on any public reply (not just waiting_user)
 import { uploadTicketAttachment, deleteFile } from '../services/uploadService';
 import { validate, createTicketSchema, updateTicketSchema, addMessageSchema } from '../middleware/validation';
 import path from 'path';
@@ -561,15 +561,21 @@ ticketsRouter.post('/:id/messages', validate(addMessageSchema), async (req: Requ
       [id, authorType, authorId, message, is_internal || false]
     );
 
-    // Auto-update ticket status: quando usuário público responde e chamado estava aguardando,
+    // Auto-update ticket status: quando usuário público responde e chamado estava aguardando/aberto,
     // volta automaticamente para 'em atendimento'
     if (authorType === 'public') {
-      await database.query(
-        `UPDATE tickets SET status = 'in_progress', updated_at = NOW()
-         WHERE id = $1 AND status = 'waiting_user'`,
-        [id]
-      );
-      console.log(`[AUTO-STATUS] Ticket ${id}: updated waiting_user -> in_progress (if applicable)`);
+      const beforeStatus = await database.query('SELECT status FROM tickets WHERE id = $1', [id]);
+      const statusBefore = beforeStatus.rows[0]?.status;
+      console.log(`[AUTO-STATUS] Ticket ${id}: status antes = ${statusBefore}`);
+
+      if (statusBefore && !['resolved', 'closed'].includes(statusBefore)) {
+        await database.query(
+          `UPDATE tickets SET status = 'in_progress', updated_at = NOW()
+           WHERE id = $1`,
+          [id]
+        );
+        console.log(`[AUTO-STATUS] Ticket ${id}: status atualizado ${statusBefore} -> in_progress`);
+      }
     }
 
     // Buscar o status atual do chamado para retornar na resposta
@@ -578,6 +584,7 @@ ticketsRouter.post('/:id/messages', validate(addMessageSchema), async (req: Requ
       [id]
     );
     const currentTicketStatus = ticketStatus.rows[0]?.status;
+    console.log(`[AUTO-STATUS] Ticket ${id}: ticket_status retornado = ${currentTicketStatus}`);
 
     // 📧 NOTIFICAÇÃO: Nova mensagem (não enviar se for mensagem interna)
     if (!is_internal) {
