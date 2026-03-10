@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import StatusTimeline from '../components/StatusTimeline';
 import NextAction from '../components/NextAction';
+import TicketAttachments from '../components/TicketAttachments';
 import '../styles/TicketDetailPage.css';
 import { BACKEND_URL } from '../services/api';
 
@@ -281,6 +282,13 @@ export default function TicketDetailPage() {
             </form>
           )}
         </div>
+
+        {/* Anexos */}
+        <TicketAttachments
+          ticketId={id!}
+          userToken={token || userToken || undefined}
+          authToken={isInternalUser && internalToken ? internalToken : undefined}
+        />
 
         {/* Informações técnicas (colapsável) */}
         <details className="ticket-details-section">

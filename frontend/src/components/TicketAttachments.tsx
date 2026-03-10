@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import ConfirmDialog from './ConfirmDialog';
+import { BACKEND_URL } from '../services/api';
 import '../styles/TicketAttachments.css';
 
 interface Attachment {
@@ -42,7 +43,7 @@ export default function TicketAttachments({ ticketId, userToken, authToken }: Pr
 
   const fetchAttachments = async () => {
     try {
-      const response = await fetch(`/api/tickets/${ticketId}/attachments`, {
+      const response = await fetch(`${BACKEND_URL}/api/tickets/${ticketId}/attachments`, {
         headers: getHeaders(),
       });
 
@@ -86,7 +87,7 @@ export default function TicketAttachments({ ticketId, userToken, authToken }: Pr
       const formData = new FormData();
       formData.append('attachment', file);
 
-      const response = await fetch(`/api/tickets/${ticketId}/attachments`, {
+      const response = await fetch(`${BACKEND_URL}/api/tickets/${ticketId}/attachments`, {
         method: 'POST',
         headers: getHeaders(),
         body: formData,
@@ -119,7 +120,7 @@ export default function TicketAttachments({ ticketId, userToken, authToken }: Pr
     if (!deleteConfirm.attachmentId) return;
 
     try {
-      const response = await fetch(`/api/tickets/${ticketId}/attachments/${deleteConfirm.attachmentId}`, {
+      const response = await fetch(`${BACKEND_URL}/api/tickets/${ticketId}/attachments/${deleteConfirm.attachmentId}`, {
         method: 'DELETE',
         headers: getHeaders(),
       });
@@ -164,7 +165,8 @@ export default function TicketAttachments({ ticketId, userToken, authToken }: Pr
   const handleDownload = async (attachment: Attachment) => {
     try {
       // Fazer fetch do arquivo com autenticação
-      const response = await fetch(attachment.url, {
+      const fullUrl = attachment.url.startsWith('http') ? attachment.url : `${BACKEND_URL}${attachment.url}`;
+      const response = await fetch(fullUrl, {
         headers: getHeaders(),
       });
 
