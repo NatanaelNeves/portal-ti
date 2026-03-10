@@ -21,6 +21,7 @@ interface Message {
   id: string;
   message: string;
   author_type: string;
+  author_name?: string;
   created_at: string;
   is_internal: boolean;
 }
@@ -233,15 +234,17 @@ export default function TicketDetailPage() {
               {messages.map((msg) => (
                 <div 
                   key={msg.id} 
-                  className={`message ${msg.author_type === 'internal' ? 'message-ti' : 'message-user'}`}
+                  className={`message ${msg.author_type === 'it_staff' ? 'message-ti' : 'message-user'}`}
                 >
                   <div className="message-avatar">
-                    {msg.author_type === 'internal' ? '🔧' : '👤'}
+                    {msg.author_type === 'it_staff' ? '🔧' : '👤'}
                   </div>
                   <div className="message-content">
                     <div className="message-header">
                       <span className="message-author">
-                        {msg.author_type === 'internal' ? 'Equipe TI' : 'Você'}
+                        {msg.author_type === 'it_staff'
+                          ? msg.author_name || 'Equipe TI'
+                          : 'Você'}
                       </span>
                       <span className="message-time">
                         {new Date(msg.created_at).toLocaleString('pt-BR', {

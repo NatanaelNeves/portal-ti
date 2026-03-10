@@ -298,9 +298,17 @@ ticketsRouter.get('/:id', async (req: Request, res: Response) => {
 
       // Retornar chamado com mensagens
       const messages = await database.query(
-        `SELECT * FROM ticket_messages 
-         WHERE ticket_id = $1 
-         ORDER BY created_at ASC`,
+        `SELECT tm.*,
+           CASE
+             WHEN tm.author_type = 'it_staff' THEN iu.name
+             WHEN tm.author_type = 'public' THEN pu.name
+             ELSE NULL
+           END as author_name
+         FROM ticket_messages tm
+         LEFT JOIN internal_users iu ON tm.author_type = 'it_staff' AND iu.id::text = tm.author_id::text
+         LEFT JOIN public_users pu ON tm.author_type = 'public' AND pu.id::text = tm.author_id::text
+         WHERE tm.ticket_id = $1
+         ORDER BY tm.created_at ASC`,
         [id]
       );
 
@@ -327,9 +335,17 @@ ticketsRouter.get('/:id', async (req: Request, res: Response) => {
 
         // Retornar chamado com mensagens
         const messages = await database.query(
-          `SELECT * FROM ticket_messages 
-           WHERE ticket_id = $1 
-           ORDER BY created_at ASC`,
+          `SELECT tm.*,
+             CASE
+               WHEN tm.author_type = 'it_staff' THEN iu.name
+               WHEN tm.author_type = 'public' THEN pu.name
+               ELSE NULL
+             END as author_name
+           FROM ticket_messages tm
+           LEFT JOIN internal_users iu ON tm.author_type = 'it_staff' AND iu.id::text = tm.author_id::text
+           LEFT JOIN public_users pu ON tm.author_type = 'public' AND pu.id::text = tm.author_id::text
+           WHERE tm.ticket_id = $1
+           ORDER BY tm.created_at ASC`,
           [id]
         );
 
@@ -471,9 +487,17 @@ ticketsRouter.get('/:id/messages', async (req: Request, res: Response) => {
 
     // Get messages
     const messages = await database.query(
-      `SELECT * FROM ticket_messages 
-       WHERE ticket_id = $1 
-       ORDER BY created_at ASC`,
+      `SELECT tm.*,
+         CASE
+           WHEN tm.author_type = 'it_staff' THEN iu.name
+           WHEN tm.author_type = 'public' THEN pu.name
+           ELSE NULL
+         END as author_name
+       FROM ticket_messages tm
+       LEFT JOIN internal_users iu ON tm.author_type = 'it_staff' AND iu.id::text = tm.author_id::text
+       LEFT JOIN public_users pu ON tm.author_type = 'public' AND pu.id::text = tm.author_id::text
+       WHERE tm.ticket_id = $1
+       ORDER BY tm.created_at ASC`,
       [id]
     );
 
@@ -535,6 +559,16 @@ ticketsRouter.post('/:id/messages', validate(addMessageSchema), async (req: Requ
       RETURNING *`,
       [id, authorType, authorId, message, is_internal || false]
     );
+
+    // Auto-update ticket status: quando usuário público responde e chamado estava aguardando,
+    // volta automaticamente para 'em atendimento'
+    if (authorType === 'public') {
+      await database.query(
+        `UPDATE tickets SET status = 'in_progress', updated_at = NOW()
+         WHERE id = $1 AND status = 'waiting_user'`,
+        [id]
+      );
+    }
 
     // 📧 NOTIFICAÇÃO: Nova mensagem (não enviar se for mensagem interna)
     if (!is_internal) {

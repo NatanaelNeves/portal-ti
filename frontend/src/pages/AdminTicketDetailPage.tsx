@@ -29,6 +29,7 @@ interface Message {
   id: string;
   message: string;
   author_type: string;
+  author_name?: string;
   created_at: string;
   is_internal: boolean;
 }
@@ -257,12 +258,13 @@ export default function AdminTicketDetailPage() {
   const priorityBadge = getPriorityBadge(ticket.priority);
 
   // Ações rápidas de status
-  const handleQuickAction = async (action: 'assume' | 'waiting' | 'resolve' | 'close') => {
+  const handleQuickAction = async (action: 'assume' | 'waiting' | 'resolve' | 'close' | 'resume') => {
     const statusMap = {
       assume: 'in_progress',
       waiting: 'waiting_user',
       resolve: 'resolved',
-      close: 'closed'
+      close: 'closed',
+      resume: 'in_progress'
     };
     
     const updates: any = { status: statusMap[action] };
@@ -362,6 +364,7 @@ export default function AdminTicketDetailPage() {
           onWaitingUser={() => handleQuickAction('waiting')}
           onResolve={() => handleQuickAction('resolve')}
           onClose={() => handleQuickAction('close')}
+          onResume={() => handleQuickAction('resume')}
         />
 
         {/* Timeline Visual */}
@@ -576,7 +579,9 @@ export default function AdminTicketDetailPage() {
                 >
                   <div className="message-header">
                     <span className="message-author">
-                      {msg.author_type === 'it_staff' ? '👨‍💼 Equipe TI' : '👤 Usuário'}
+                      {msg.author_type === 'it_staff'
+                        ? `👨‍💼 ${msg.author_name || 'Equipe TI'}`
+                        : `👤 ${msg.author_name || ticket?.requester_name || 'Usuário'}`}
                     </span>
                     {msg.is_internal && <span className="internal-badge">🔒 Interno</span>}
                     <span className="message-date">

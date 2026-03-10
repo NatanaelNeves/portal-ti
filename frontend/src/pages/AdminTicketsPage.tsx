@@ -215,7 +215,7 @@ export default function AdminTicketsPage() {
         inProgress: ticketList.filter((t: Ticket) => t.status === 'in_progress').length,
         newToday: ticketList.filter((t: Ticket) => new Date(t.created_at).toDateString() === today).length,
         resolvedToday: ticketList.filter((t: Ticket) => 
-          t.status === 'resolved' && 
+          (t.status === 'resolved' || t.status === 'closed') && 
           new Date(t.updated_at).toDateString() === today
         ).length
       });

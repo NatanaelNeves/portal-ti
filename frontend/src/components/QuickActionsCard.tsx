@@ -7,6 +7,7 @@ interface QuickActionsCardProps {
   onWaitingUser: () => void;
   onResolve: () => void;
   onClose: () => void;
+  onResume: () => void;
 }
 
 export default function QuickActionsCard({
@@ -16,9 +17,11 @@ export default function QuickActionsCard({
   onWaitingUser,
   onResolve,
   onClose,
+  onResume,
 }: QuickActionsCardProps) {
   // Determinar se o chamado foi assumido
   const isAssumed = status !== 'open';
+  const canResume = status === 'waiting_user' || status === 'resolved';
 
   return (
     <div className="quick-actions-card">
@@ -57,6 +60,21 @@ export default function QuickActionsCard({
             !isAssumed
               ? 'Assuma o chamado primeiro para realizar esta ação'
               : 'Marcar como aguardando resposta do usuário'
+          }
+        />
+
+        {/* Botão Retomar Atendimento - Azul */}
+        <ActionButton
+          icon="🔄"
+          title="Retomar"
+          description="Voltar ao atendimento"
+          onClick={onResume}
+          disabled={isSubmitting || !canResume}
+          variant="primary"
+          title_attr={
+            canResume
+              ? 'Retomar o atendimento deste chamado'
+              : 'Disponível quando aguardando usuário ou resolvido'
           }
         />
 
