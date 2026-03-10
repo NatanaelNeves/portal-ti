@@ -234,24 +234,38 @@ export default function NotebooksPage() {
 
   // Agrupar por marca + modelo
   const groups = useMemo(() => {
+    const normalize = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
+    const labelMap = new Map<string, string>();
     const map = new Map<string, Notebook[]>();
     notebooks.forEach(nb => {
-      const key = `${nb.brand} ${nb.model}`.trim() || 'Sem modelo';
-      if (!map.has(key)) map.set(key, []);
+      const raw = `${nb.brand} ${nb.model}`.trim().replace(/\s+/g, ' ') || 'Sem modelo';
+      const key = normalize(raw);
+      if (!map.has(key)) {
+        map.set(key, []);
+        labelMap.set(key, raw);
+      }
       map.get(key)!.push(nb);
     });
-    // ordenar por qtd decrescente
-    return Array.from(map.entries()).sort((a, b) => b[1].length - a[1].length);
+    return Array.from(map.entries())
+      .sort((a, b) => b[1].length - a[1].length)
+      .map(([key, nbs]) => [labelMap.get(key) ?? key, nbs] as [string, Notebook[]]);
   }, [notebooks]);
 
   const brands = useMemo(() => {
-    const set = new Set(notebooks.map(n => n.brand).filter(Boolean));
-    return Array.from(set).sort();
+    const seen = new Set<string>();
+    const result: string[] = [];
+    notebooks.forEach(n => {
+      if (n.brand) {
+        const norm = n.brand.trim().toLowerCase();
+        if (!seen.has(norm)) { seen.add(norm); result.push(n.brand.trim()); }
+      }
+    });
+    return result.sort();
   }, [notebooks]);
 
   const filteredGroups = useMemo(() => {
     if (brandFilter === 'all') return groups;
-    return groups.filter(([key]) => key.toLowerCase().startsWith(brandFilter.toLowerCase()));
+    return groups.filter(([key]) => key.toLowerCase().startsWith(brandFilter.trim().toLowerCase()));
   }, [groups, brandFilter]);
 
   const totals = useMemo(() => ({
