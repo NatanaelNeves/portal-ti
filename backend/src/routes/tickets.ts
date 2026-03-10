@@ -3,7 +3,7 @@ import { database } from '../database/connection';
 import { authenticate, authorize } from '../middleware/authorization';
 import { UserRole } from '../types/enums';
 import { EmailService } from '../services/emailService';
-// v2026.03.10f - silentRefresh(true) confirms DB status after public reply
+// v2026.03.10g - strengthened UPDATE with RETURNING to confirm row was modified
 import { uploadTicketAttachment, deleteFile } from '../services/uploadService';
 import { validate, createTicketSchema, updateTicketSchema, addMessageSchema } from '../middleware/validation';
 import path from 'path';
@@ -561,21 +561,30 @@ ticketsRouter.post('/:id/messages', validate(addMessageSchema), async (req: Requ
       [id, authorType, authorId, message, is_internal || false]
     );
 
-    // Auto-update ticket status: quando usuário público responde e chamado estava aguardando/aberto,
-    // volta automaticamente para 'em atendimento'
+    // Auto-update: público respondeu → volta para 'em atendimento'
     if (authorType === 'public') {
       const beforeStatus = await database.query('SELECT status FROM tickets WHERE id = $1', [id]);
       const statusBefore = beforeStatus.rows[0]?.status;
       console.log(`[AUTO-STATUS] Ticket ${id}: status antes = ${statusBefore}`);
 
       if (statusBefore && !['resolved', 'closed'].includes(statusBefore)) {
-        await database.query(
+        const updateResult = await database.query(
           `UPDATE tickets SET status = 'in_progress', updated_at = NOW()
-           WHERE id = $1`,
+           WHERE id = $1
+           RETURNING id, status`,
           [id]
         );
-        console.log(`[AUTO-STATUS] Ticket ${id}: status atualizado ${statusBefore} -> in_progress`);
+        const updatedRow = updateResult.rows[0];
+        if (updatedRow) {
+          console.log(`[AUTO-STATUS] Ticket ${id}: DB confirmado status=${updatedRow.status}`);
+        } else {
+          console.error(`[AUTO-STATUS] Ticket ${id}: UPDATE não afetou nenhuma linha!`);
+        }
+      } else {
+        console.log(`[AUTO-STATUS] Ticket ${id}: status ${statusBefore} não modificado (resolved/closed)`);
       }
+    } else {
+      console.log(`[AUTO-STATUS] Ticket ${id}: autor é ${authorType}, sem alteração de status`);
     }
 
     // Buscar o status atual do chamado para retornar na resposta
