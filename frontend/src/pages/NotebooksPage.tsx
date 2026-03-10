@@ -254,7 +254,7 @@ export default function NotebooksPage() {
 
   // Agrupar por marca + modelo
   const groups = useMemo(() => {
-    const normalize = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
+    const normalize = (s: string) => s.trim().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').toLowerCase();
     const labelMap = new Map<string, string>();
     const map = new Map<string, Notebook[]>();
     notebooks.forEach(nb => {
