@@ -87,7 +87,7 @@ export default function TicketDetailPage() {
     }
   };
 
-  const silentRefresh = async (ticketId: string) => {
+  const silentRefresh = async (ticketId: string, updateStatus = true) => {
     try {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (isInternalUser && internalToken) {
@@ -101,7 +101,7 @@ export default function TicketDetailPage() {
         fetch(`${BACKEND_URL}/api/tickets/${ticketId}`, { headers }),
         fetch(`${BACKEND_URL}/api/tickets/${ticketId}/messages`, { headers }),
       ]);
-      if (ticketRes.ok) {
+      if (ticketRes.ok && updateStatus) {
         const ticketData = await ticketRes.json();
         setTicket(ticketData);
       }
@@ -149,23 +149,18 @@ export default function TicketDetailPage() {
         throw new Error('Erro ao adicionar mensagem');
       }
 
+      const responseData = await response.json();
       setNewMessage('');
 
-      // Flag: usuário público respondeu a um chamado que estava aguardando
-      const shouldForceInProgress = !isInternalUser && ticket?.status === 'waiting_user';
-
-      // Atualização otimista imediata
-      if (shouldForceInProgress) {
+      // Se o backend retornou o status atualizado do chamado, aplica imediatamente
+      if (responseData.ticket_status) {
+        setTicket(prev => prev ? { ...prev, status: responseData.ticket_status } : prev);
+      } else if (!isInternalUser && ticket?.status === 'waiting_user') {
+        // Fallback otimista caso backend antigo não retorne ticket_status
         setTicket(prev => prev ? { ...prev, status: 'in_progress' } : prev);
       }
 
-      await silentRefresh(id); // Busca mensagens e status do servidor
-
-      // Re-aplica o status caso o servidor ainda retorne waiting_user
-      // (pode acontecer se o backend ainda não foi atualizado)
-      if (shouldForceInProgress) {
-        setTicket(prev => prev && prev.status === 'waiting_user' ? { ...prev, status: 'in_progress' } : prev);
-      }
+      await silentRefresh(id, false); // Só atualiza mensagens — não sobrescreve o status já setado do POST
     } catch (err: any) {
       setError(err.message || 'Erro ao adicionar mensagem');
     } finally {

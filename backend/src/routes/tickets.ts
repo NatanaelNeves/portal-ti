@@ -3,7 +3,7 @@ import { database } from '../database/connection';
 import { authenticate, authorize } from '../middleware/authorization';
 import { UserRole } from '../types/enums';
 import { EmailService } from '../services/emailService';
-// v2026.03.10c - auto-status: waiting_user → in_progress on public reply (force redeploy)
+// v2026.03.10d - return updated ticket status in POST /messages response
 import { uploadTicketAttachment, deleteFile } from '../services/uploadService';
 import { validate, createTicketSchema, updateTicketSchema, addMessageSchema } from '../middleware/validation';
 import path from 'path';
@@ -569,7 +569,15 @@ ticketsRouter.post('/:id/messages', validate(addMessageSchema), async (req: Requ
          WHERE id = $1 AND status = 'waiting_user'`,
         [id]
       );
+      console.log(`[AUTO-STATUS] Ticket ${id}: updated waiting_user -> in_progress (if applicable)`);
     }
+
+    // Buscar o status atual do chamado para retornar na resposta
+    const ticketStatus = await database.query(
+      'SELECT status FROM tickets WHERE id = $1',
+      [id]
+    );
+    const currentTicketStatus = ticketStatus.rows[0]?.status;
 
     // 📧 NOTIFICAÇÃO: Nova mensagem (não enviar se for mensagem interna)
     if (!is_internal) {
@@ -634,7 +642,7 @@ ticketsRouter.post('/:id/messages', validate(addMessageSchema), async (req: Requ
       }
     }
 
-    res.status(201).json(result.rows[0]);
+    res.status(201).json({ ...result.rows[0], ticket_status: currentTicketStatus });
   } catch (error) {
     console.error('Error adding message:', error);
     res.status(500).json({ error: 'Failed to add message' });
