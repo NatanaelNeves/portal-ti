@@ -1,11 +1,14 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import InventoryLayout from '../components/InventoryLayout';
 import '../styles/CreatePurchasePage.css';
 import { BACKEND_URL } from '../services/api';
 import { INSTITUTION_UNITS } from '../utils/institutionOptions';
 
 export default function CreatePurchasePage() {
+  const { id } = useParams<{ id: string }>();
+  const isEditing = Boolean(id);
+
   const [formData, setFormData] = useState({
     item_type: '',
     item_description: '',
@@ -20,9 +23,46 @@ export default function CreatePurchasePage() {
     notes: ''
   });
   const [loading, setLoading] = useState(false);
+  const [fetchLoading, setFetchLoading] = useState(isEditing);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
+
+  // Load existing requisition when editing
+  useEffect(() => {
+    if (!isEditing) return;
+    const fetchRequisition = async () => {
+      try {
+        setFetchLoading(true);
+        const token = localStorage.getItem('internal_token');
+        const response = await fetch(`${BACKEND_URL}/api/inventory/requisitions`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!response.ok) throw new Error('Erro ao carregar solicitação');
+        const data = await response.json();
+        const req = (data.requisitions || []).find((r: any) => r.id === id);
+        if (!req) throw new Error('Solicitação não encontrada');
+        setFormData({
+          item_type: req.item_type || '',
+          item_description: req.item_description || '',
+          specifications: req.specifications || '',
+          quantity: req.quantity || 1,
+          priority: req.priority || 'normal',
+          reason: req.reason || '',
+          needed_by_date: req.needed_by_date ? req.needed_by_date.split('T')[0] : '',
+          estimated_value: req.estimated_value ? String(req.estimated_value) : '',
+          supplier: req.supplier || '',
+          expected_delivery_date: req.expected_delivery_date ? req.expected_delivery_date.split('T')[0] : '',
+          notes: req.notes || '',
+        });
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setFetchLoading(false);
+      }
+    };
+    fetchRequisition();
+  }, [id, isEditing]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -51,8 +91,13 @@ export default function CreatePurchasePage() {
       
       const user = JSON.parse(userData);
 
-      const response = await fetch(`${BACKEND_URL}/api/inventory/requisitions`, {
-        method: 'POST',
+      const url = isEditing
+        ? `${BACKEND_URL}/api/inventory/requisitions/${id}`
+        : `${BACKEND_URL}/api/inventory/requisitions`;
+      const method = isEditing ? 'PATCH' : 'POST';
+
+      const response = await fetch(url, {
+        method,
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -82,19 +127,21 @@ export default function CreatePurchasePage() {
       }
 
       setSuccess(true);
-      setFormData({
-        item_type: '',
-        item_description: '',
-        specifications: '',
-        quantity: 1,
-        priority: 'normal',
-        reason: '',
-        needed_by_date: '',
-        estimated_value: '',
-        supplier: '',
-        expected_delivery_date: '',
-        notes: ''
-      });
+      if (!isEditing) {
+        setFormData({
+          item_type: '',
+          item_description: '',
+          specifications: '',
+          quantity: 1,
+          priority: 'normal',
+          reason: '',
+          needed_by_date: '',
+          estimated_value: '',
+          supplier: '',
+          expected_delivery_date: '',
+          notes: ''
+        });
+      }
 
       setTimeout(() => {
         navigate('/inventario/compras');
@@ -111,9 +158,12 @@ export default function CreatePurchasePage() {
       <div className="create-purchase-page">
         <div className="container">
           <header className="page-header">
-            <h1>🛒 Nova Solicitação de Compra</h1>
-            <p>Registre uma nova solicitação de aquisição de equipamento</p>
+            <button type="button" className="btn-back" onClick={() => navigate('/inventario/compras')}>← Voltar</button>
+            <h1>{isEditing ? '✏️ Editar Solicitação de Compra' : '🛒 Nova Solicitação de Compra'}</h1>
+            <p>{isEditing ? 'Altere os dados da solicitação enquanto ainda está pendente.' : 'Registre uma nova solicitação de aquisição de equipamento'}</p>
           </header>
+
+          {fetchLoading && <div className="loading-state">⏳ Carregando dados da solicitação...</div>}
 
           {error && <div className="error-message">{error}</div>}
           {success && <div className="success-message">✅ Solicitação criada com sucesso!</div>}
@@ -282,7 +332,7 @@ export default function CreatePurchasePage() {
                   disabled={loading}
                   className="btn-submit"
                 >
-                  {loading ? '⏳ Criando...' : '✅ Criar Solicitação'}
+                  {loading ? '⏳ Salvando...' : isEditing ? '💾 Salvar Alterações' : '✅ Criar Solicitação'}
                 </button>
                 <button
                   type="button"

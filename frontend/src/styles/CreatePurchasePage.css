@@ -28,6 +28,34 @@
   font-size: 0.95rem;
 }
 
+.create-purchase-page .btn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  padding: 5px 14px;
+  background: none;
+  border: 1.5px solid #cbd5e0;
+  border-radius: 8px;
+  color: #4a5568;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.create-purchase-page .btn-back:hover {
+  background: #edf2f7;
+  border-color: #a0aec0;
+  color: #1a202c;
+}
+
+.create-purchase-page .loading-state {
+  color: #64748b;
+  font-size: 0.95rem;
+  padding: 1rem 0;
+  margin-bottom: 1rem;
+}
+
 .create-purchase-page .error-message {
   background: #fee;
   color: #c33;

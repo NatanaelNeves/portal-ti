@@ -98,6 +98,7 @@ function App() {
             <Route path="/inventario/recebimento" element={<InternalProtectedRoute requireITStaff={true}><ReceiveEquipmentPage /></InternalProtectedRoute>} />
             <Route path="/inventario/compras" element={<InternalProtectedRoute requireITStaff={true}><PurchasesPage /></InternalProtectedRoute>} />
             <Route path="/inventario/compras/nova" element={<InternalProtectedRoute requireITStaff={true}><CreatePurchasePage /></InternalProtectedRoute>} />
+            <Route path="/inventario/compras/:id/editar" element={<InternalProtectedRoute requireITStaff={true}><CreatePurchasePage /></InternalProtectedRoute>} />
             <Route path="/inventario/equipamento/:equipmentId" element={<InternalProtectedRoute requireITStaff={true}><EquipmentDetailPage /></InternalProtectedRoute>} />
             <Route path="/inventario/equipamento/:equipmentId/movimentar" element={<InternalProtectedRoute requireITStaff={true}><MoveEquipmentPage /></InternalProtectedRoute>} />
             <Route path="/inventario/equipamento/:equipmentId/assinar-termo" element={<InternalProtectedRoute requireITStaff={true}><SignTermPage /></InternalProtectedRoute>} />

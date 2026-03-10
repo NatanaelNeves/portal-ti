@@ -1241,6 +1241,56 @@ inventoryRouter.post('/requisitions', async (req: Request, res: Response) => {
   }
 });
 
+// PATCH - Editar requisição (apenas quando status = pending)
+inventoryRouter.patch('/requisitions/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const {
+      item_type, item_description, specifications, quantity, priority,
+      reason, needed_by_date, estimated_value, supplier, expected_delivery_date, notes
+    } = req.body;
+
+    // Verificar se a requisição existe e está pendente
+    const check = await database.query(
+      'SELECT id, status FROM purchase_requisitions WHERE id = $1',
+      [id]
+    );
+    if (check.rows.length === 0) {
+      return res.status(404).json({ error: 'Requisição não encontrada' });
+    }
+    if (check.rows[0].status !== 'pending') {
+      return res.status(400).json({ error: 'Apenas requisições pendentes podem ser editadas' });
+    }
+
+    const result = await database.query(`
+      UPDATE purchase_requisitions SET
+        item_type = COALESCE($1, item_type),
+        item_description = COALESCE($2, item_description),
+        specifications = $3,
+        quantity = COALESCE($4, quantity),
+        priority = COALESCE($5, priority),
+        reason = COALESCE($6, reason),
+        needed_by_date = $7,
+        estimated_value = $8,
+        supplier = $9,
+        expected_delivery_date = $10,
+        notes = $11,
+        updated_at = NOW()
+      WHERE id = $12
+      RETURNING *
+    `, [
+      item_type, item_description, specifications || null, quantity, priority,
+      reason, needed_by_date || null, estimated_value || null,
+      supplier || null, expected_delivery_date || null, notes || null, id
+    ]);
+
+    res.json({ requisition: result.rows[0] });
+  } catch (error: any) {
+    console.error('❌ Erro ao editar requisição:', error);
+    res.status(500).json({ error: 'Failed to update requisition', details: error.message });
+  }
+});
+
 // PATCH - Aprovar requisição
 inventoryRouter.patch('/requisitions/:id/approve', async (req: Request, res: Response) => {
   try {

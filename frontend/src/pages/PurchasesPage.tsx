@@ -516,6 +516,15 @@ export default function PurchasesPage() {
                     >
                       ❌ Rejeitar
                     </button>
+                    <button 
+                      className="btn btn-secondary"
+                      onClick={() => {
+                        setSelectedPurchase(null);
+                        navigate(`/inventario/compras/${selectedPurchase.id}/editar`);
+                      }}
+                    >
+                      ✏️ Editar
+                    </button>
                   </>
                 )}
                 {selectedPurchase.status === 'approved' && (
