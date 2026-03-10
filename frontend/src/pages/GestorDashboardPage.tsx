@@ -83,7 +83,7 @@ export default function GestorDashboardPage() {
       }
       if (purchasesRes.status === 'fulfilled' && purchasesRes.value.ok) {
         const raw = await purchasesRes.value.json();
-        const list: Purchase[] = Array.isArray(raw) ? raw : (raw.data || []);
+        const list: Purchase[] = Array.isArray(raw) ? raw : (raw.requisitions || raw.data || []);
         setPurchases(list.slice(0, 6));
       }
       setLastUpdate(new Date());
@@ -120,6 +120,21 @@ export default function GestorDashboardPage() {
       rejected: 'Rejeitado', cancelled: 'Cancelado',
     };
     return map[status] || status;
+  };
+
+  const translateIssueTitle = (title: string) => {
+    const map: Record<string, string> = {
+      incident: 'Incidente',
+      request: 'Solicitação',
+      problem: 'Problema',
+      change: 'Mudança',
+      hardware: 'Hardware',
+      software: 'Software',
+      network: 'Rede',
+      access: 'Acesso',
+      other: 'Outro',
+    };
+    return map[title?.toLowerCase()] || title;
   };
 
   const getPurchaseStatusClass = (status: string) => {
@@ -258,7 +273,7 @@ export default function GestorDashboardPage() {
                   {data.topIssues.slice(0, 6).map((issue, idx) => (
                     <div key={idx} className="gd-issue-item">
                       <span className="gd-issue-rank">#{idx + 1}</span>
-                      <span className="gd-issue-title">{issue.title}</span>
+                      <span className="gd-issue-title">{translateIssueTitle(issue.title)}</span>
                       <span className="gd-issue-count">{issue.count}</span>
                     </div>
                   ))}
