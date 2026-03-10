@@ -273,8 +273,6 @@ export default function MyTicketsPage() {
         return '🟡 Médio';
       case 'high':
         return '🟠 Alto';
-      case 'critical':
-        return '🔴 Crítico';
       default:
         return priority;
     }

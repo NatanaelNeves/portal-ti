@@ -253,7 +253,6 @@ const ReportsPage: React.FC = () => {
       low: 'Baixa',
       medium: 'Média',
       high: 'Alta',
-      critical: 'Crítica'
     };
     return labels[priority] || priority;
   };

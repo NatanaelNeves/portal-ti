@@ -29,7 +29,6 @@ interface InternalUser {
 }
 
 interface TicketStats {
-  critical: number;
   waitingUser: number;
   inProgress: number;
   newToday: number;
@@ -44,11 +43,10 @@ export default function AdminTicketsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [filterPriority, setFilterPriority] = useState<'critical' | 'high' | 'medium' | 'low' | null>(null);
+  const [filterPriority, setFilterPriority] = useState<'high' | 'medium' | 'low' | null>(null);
   const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'mine' | 'unassigned'>('all');
   const [currentUserId, setCurrentUserId] = useState<string>('');
   const [stats, setStats] = useState<TicketStats>({
-    critical: 0,
     waitingUser: 0,
     inProgress: 0,
     newToday: 0,
@@ -208,9 +206,7 @@ export default function AdminTicketsPage() {
       
       // Calculate stats (do total, não apenas da página)
       const today = new Date().toDateString();
-      const activeStatuses = ['open', 'in_progress', 'waiting', 'waiting_user'];
       setStats({
-        critical: ticketList.filter((t: Ticket) => (t.priority === 'critical' || t.priority === 'urgent') && activeStatuses.includes(t.status)).length,
         waitingUser: ticketList.filter((t: Ticket) => t.status === 'waiting_user').length,
         inProgress: ticketList.filter((t: Ticket) => t.status === 'in_progress').length,
         newToday: ticketList.filter((t: Ticket) => new Date(t.created_at).toDateString() === today).length,
@@ -248,9 +244,7 @@ export default function AdminTicketsPage() {
 
   const getPriorityLabel = (priority: string) => {
     switch (priority) {
-      case 'critical':
       case 'urgent':
-        return 'Crítica';
       case 'high':
         return 'Alta';
       case 'medium':
@@ -281,9 +275,7 @@ export default function AdminTicketsPage() {
 
   const getPriorityBadgeClass = (priority: string) => {
     switch (priority) {
-      case 'critical':
       case 'urgent':
-        return 'badge-priority-critical';
       case 'high':
         return 'badge-priority-high';
       case 'medium':
@@ -301,15 +293,14 @@ export default function AdminTicketsPage() {
     return user ? user.name : 'Atribuído';
   };
 
-  const isPriorityMatch = (ticket: Ticket, priority: 'critical' | 'high' | 'medium' | 'low') => {
-    if (priority === 'critical') {
-      return ticket.priority === 'critical' || ticket.priority === 'urgent';
+  const isPriorityMatch = (ticket: Ticket, priority: 'high' | 'medium' | 'low') => {
+    if (priority === 'high') {
+      return ticket.priority === 'high' || ticket.priority === 'urgent';
     }
-
     return ticket.priority === priority;
   };
 
-  const getPriorityCount = (priority: 'critical' | 'high' | 'medium' | 'low') => {
+  const getPriorityCount = (priority: 'high' | 'medium' | 'low') => {
     return tickets.filter(ticket => {
       // Só conta chamados ativos (open, in_progress ou waiting)
       const activeStatuses = ['open', 'in_progress', 'waiting', 'waiting_user'];
@@ -438,29 +429,6 @@ export default function AdminTicketsPage() {
         <div className="stats-section">
           <h3 className="stats-section-title">Filtrar por Prioridade</h3>
           <div className="stats-grid stats-grid-filters stats-grid-priority">
-            <button
-              type="button"
-              className={`stat-card stat-priority-critical ${hasAdvancedFilters ? 'is-disabled' : ''} ${filterPriority === 'critical' ? 'is-active' : ''}`}
-              onClick={() => {
-                if (!hasAdvancedFilters) {
-                  setFilterPriority(filterPriority === 'critical' ? null : 'critical');
-                }
-              }}
-              disabled={hasAdvancedFilters}
-              aria-pressed={filterPriority === 'critical'}
-            >
-              <span className="stat-icon-wrap" aria-hidden="true">
-                <span className="stat-icon">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10"/>
-                    <line x1="12" y1="8" x2="12" y2="12"/>
-                    <line x1="12" y1="16" x2="12.01" y2="16"/>
-                  </svg>
-                </span>
-              </span>
-              <span className="stat-number">{getPriorityCount('critical')}</span>
-              <span className="stat-label">Crítica</span>
-            </button>
 
             <button
               type="button"
@@ -569,7 +537,7 @@ export default function AdminTicketsPage() {
         <div className="active-filter-banner">
           <div className="active-filter-info">
             <span className="active-filter-icon" aria-hidden="true">
-              {filterPriority === 'critical' ? '🔴' : filterPriority === 'high' ? '🟠' : filterPriority === 'medium' ? '🟡' : '🟢'}
+              {filterPriority === 'high' ? '🟠' : filterPriority === 'medium' ? '🟡' : '🟢'}
             </span>
             <span>
               Filtro ativo: Prioridade {getPriorityLabel(filterPriority)}
@@ -711,7 +679,6 @@ export default function AdminTicketsPage() {
               <label className="filter-label">🚨 Prioridade:</label>
               <div className="advanced-checkbox-list">
                 {[
-                  { value: 'critical', label: '🔴 Crítica' },
                   { value: 'high', label: '🟠 Alta' },
                   { value: 'medium', label: '🟡 Média' },
                   { value: 'low', label: '🟢 Baixa' }

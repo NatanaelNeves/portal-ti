@@ -51,7 +51,6 @@ export default function OpenTicketPage() {
   // SLA mapping based on priority
   const getSlaHours = (priority: string): number => {
     const slaMap: Record<string, number> = {
-      'critical': 2,
       'high': 8,
       'medium': 24,
       'low': 72,
@@ -227,8 +226,7 @@ export default function OpenTicketPage() {
           title: formData.title,
           description: formData.description,
           type: formData.type,
-          // 'critical' não é aceito pelo backend atual — mapeia para 'high'
-          priority: formData.priority === 'critical' ? 'high' : formData.priority,
+          priority: formData.priority,
         }),
       });
 
@@ -555,17 +553,7 @@ export default function OpenTicketPage() {
                           <div className="priority-label">Alto</div>
                           <div className="priority-desc">Dificulta muito o trabalho</div>
                         </button>
-                        <button
-                          type="button"
-                          className={`priority-option priority-critical ${formData.priority === 'critical' ? 'active' : ''}`}
-                          onClick={() => setFormData(prev => ({ ...prev, priority: 'critical' }))}
-                          role="radio"
-                          aria-checked={formData.priority === 'critical'}
-                        >
-                          <div className="priority-indicator"></div>
-                          <div className="priority-label">Crítico</div>
-                          <div className="priority-desc">Impossibilita o atendimento</div>
-                        </button>
+
                       </div>
                       <span className="field-hint">
                         Selecione o nível que melhor representa o impacto no seu trabalho
@@ -650,7 +638,6 @@ export default function OpenTicketPage() {
                             {formData.priority === 'low' && 'Baixo'}
                             {formData.priority === 'medium' && 'Médio'}
                             {formData.priority === 'high' && 'Alto'}
-                            {formData.priority === 'critical' && 'Crítico'}
                           </span>
                         </div>
                       </div>

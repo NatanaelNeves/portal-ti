@@ -183,9 +183,9 @@ export default function GestorTicketsPage() {
   };
 
   const getStatusLabel = (s: string) => (({ open: 'Aberto', in_progress: 'Em Atendimento', waiting_user: 'Aguardando', resolved: 'Resolvido', closed: 'Fechado' } as Record<string,string>)[s] || s);
-  const getPriorityLabel = (p: string) => (({ critical: 'Critica', urgent: 'Critica', high: 'Alta', medium: 'Media', low: 'Baixa' } as Record<string,string>)[p] || p);
+  const getPriorityLabel = (p: string) => (({ urgent: 'Alta', high: 'Alta', medium: 'Media', low: 'Baixa' } as Record<string,string>)[p] || p);
   const getStatusClass = (s: string) => (({ open: 'badge-open', in_progress: 'badge-progress', waiting_user: 'badge-warning', resolved: 'badge-success', closed: 'badge-neutral' } as Record<string,string>)[s] || 'badge-neutral');
-  const getPriorityClass = (p: string) => (['critical','urgent'].includes(p) ? 'badge-critical' : (({ high: 'badge-high', medium: 'badge-medium', low: 'badge-low' } as Record<string,string>)[p] || 'badge-neutral'));
+  const getPriorityClass = (p: string) => (p === 'urgent' ? 'badge-high' : (({ high: 'badge-high', medium: 'badge-medium', low: 'badge-low' } as Record<string,string>)[p] || 'badge-neutral'));
   const getEquipStatusLabel = (s: string) => (({ in_use: 'Em Uso', available: 'Disponivel', maintenance: 'Manutencao', inactive: 'Inativo', lost: 'Extraviado' } as Record<string,string>)[s] || s);
   const getEquipStatusClass = (s: string) => (({ in_use: 'badge-success', available: 'badge-info', maintenance: 'badge-warning', inactive: 'badge-neutral', lost: 'badge-danger' } as Record<string,string>)[s] || 'badge-neutral');
   const getPurchaseStatusLabel = (s: string) => (({ pending: 'Pendente', approved: 'Aprovado', purchased: 'Comprado', rejected: 'Rejeitado', cancelled: 'Cancelado' } as Record<string,string>)[s] || s);
@@ -200,10 +200,7 @@ export default function GestorTicketsPage() {
 
   const filteredTickets = tickets.filter(t => {
     if (filterStatus !== 'all' && t.status !== filterStatus) return false;
-    if (filterPriority !== 'all') {
-      if (filterPriority === 'critical' && !['critical','urgent'].includes(t.priority)) return false;
-      if (filterPriority !== 'critical' && t.priority !== filterPriority) return false;
-    }
+    if (filterPriority !== 'all' && t.priority !== filterPriority) return false;
     if (searchText.trim()) {
       const q = searchText.toLowerCase();
       return (
@@ -235,7 +232,7 @@ export default function GestorTicketsPage() {
     open: tickets.filter(t => t.status === 'open').length,
     inProgress: tickets.filter(t => t.status === 'in_progress').length,
     resolved: tickets.filter(t => t.status === 'resolved').length,
-    critical: tickets.filter(t => ['critical','urgent'].includes(t.priority) && !['resolved','closed'].includes(t.status)).length,
+    critical: tickets.filter(t => t.priority === 'high' && !['resolved','closed'].includes(t.status)).length,
   };
 
   const TABS: Array<{ id: Tab; label: string; count?: number }> = [
@@ -278,7 +275,7 @@ export default function GestorTicketsPage() {
             <div className="gt-stat-box open"><span className="gt-stat-val">{ticketStats.open}</span><span className="gt-stat-lbl">Abertos</span></div>
             <div className="gt-stat-box progress"><span className="gt-stat-val">{ticketStats.inProgress}</span><span className="gt-stat-lbl">Em Atendimento</span></div>
             <div className="gt-stat-box resolved"><span className="gt-stat-val">{ticketStats.resolved}</span><span className="gt-stat-lbl">Resolvidos</span></div>
-            <div className="gt-stat-box critical"><span className="gt-stat-val">{ticketStats.critical}</span><span className="gt-stat-lbl">Criticos Ativos</span></div>
+            <div className="gt-stat-box critical"><span className="gt-stat-val">{ticketStats.critical}</span><span className="gt-stat-lbl">Alta Prioridade</span></div>
           </div>
 
           <div className="gt-filters">
@@ -299,7 +296,6 @@ export default function GestorTicketsPage() {
             </select>
             <select className="gt-select" value={filterPriority} onChange={e => setFilterPriority(e.target.value)}>
               <option value="all">Todas as prioridades</option>
-              <option value="critical">Critica</option>
               <option value="high">Alta</option>
               <option value="medium">Media</option>
               <option value="low">Baixa</option>
