@@ -87,6 +87,33 @@ export default function TicketDetailPage() {
     }
   };
 
+  const silentRefresh = async (ticketId: string) => {
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (isInternalUser && internalToken) {
+        headers['Authorization'] = `Bearer ${internalToken}`;
+      } else if (token) {
+        headers['X-User-Token'] = token;
+      } else if (userToken) {
+        headers['X-User-Token'] = userToken;
+      }
+      const [ticketRes, messagesRes] = await Promise.all([
+        fetch(`${BACKEND_URL}/api/tickets/${ticketId}`, { headers }),
+        fetch(`${BACKEND_URL}/api/tickets/${ticketId}/messages`, { headers }),
+      ]);
+      if (ticketRes.ok) {
+        const ticketData = await ticketRes.json();
+        setTicket(ticketData);
+      }
+      if (messagesRes.ok) {
+        const messagesData = await messagesRes.json();
+        setMessages(messagesData.messages || []);
+      }
+    } catch (err) {
+      console.error('Silent refresh error:', err);
+    }
+  };
+
   const handleAddMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !id) return;
@@ -123,7 +150,7 @@ export default function TicketDetailPage() {
       }
 
       setNewMessage('');
-      fetchTicket(id); // Refresh messages
+      await silentRefresh(id); // Refresh ticket status + messages silently
     } catch (err: any) {
       setError(err.message || 'Erro ao adicionar mensagem');
     } finally {
