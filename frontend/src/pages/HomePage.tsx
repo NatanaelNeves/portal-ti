@@ -78,7 +78,7 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="home-footer">
-        <p>&copy; 2024 O Pequeno Nazareno - Dignidade e Justiça para a Infância</p>
+        <p>&copy; 2026 O Pequeno Nazareno - Dignidade e Justiça para a Infância</p>
       </footer>
     </div>
   );
