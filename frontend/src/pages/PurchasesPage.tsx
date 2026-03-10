@@ -234,7 +234,12 @@ export default function PurchasesPage() {
     completed: purchases.filter(p => p.status === 'completed').length
   };
 
-  const totalValue = purchases.reduce((sum, p) => sum + (parseFloat(String(p.estimated_value)) || 0) * p.quantity, 0);
+  const totalValue = purchases.reduce((sum, p) => {
+    if (p.actual_value !== null && p.actual_value !== undefined && parseFloat(String(p.actual_value)) > 0) {
+      return sum + (parseFloat(String(p.actual_value)) || 0);
+    }
+    return sum + (parseFloat(String(p.estimated_value)) || 0) * p.quantity;
+  }, 0);
   
   const formatCurrency = (value: number) => {
     if (value === 0) return 'R$ 0,00';
@@ -314,7 +319,7 @@ export default function PurchasesPage() {
           <div className="stat-card stat-value">
             <div className="stat-icon">💰</div>
             <div className="stat-value">{formatCurrency(totalValue)}</div>
-            <div className="stat-label">Valor Total Estimado</div>
+            <div className="stat-label">Valor Total</div>
           </div>
         </div>
 
@@ -389,7 +394,8 @@ export default function PurchasesPage() {
               {purchases.map((purchase, index) => {
                 const status = getStatusBadge(purchase.status);
                 const estimatedValue = parseFloat(String(purchase.estimated_value)) || 0;
-                const totalItemValue = estimatedValue * purchase.quantity;
+                const actualValue = purchase.actual_value !== null && purchase.actual_value !== undefined ? parseFloat(String(purchase.actual_value)) : null;
+                const totalItemValue = actualValue !== null && actualValue > 0 ? actualValue : estimatedValue * purchase.quantity;
                 
                 return (
                   <tr key={`${purchase.id}-${index}`}>
@@ -404,6 +410,7 @@ export default function PurchasesPage() {
                     </td>
                     <td>
                       <strong>R$ {totalItemValue.toFixed(2)}</strong>
+                      {actualValue !== null && actualValue > 0 && <small className="text-muted"> (real)</small>}
                     </td>
                     <td>
                       {purchase.supplier || <span className="text-muted">-</span>}
@@ -576,7 +583,7 @@ export default function PurchasesPage() {
                     <dd>{selectedPurchase.item_description}</dd>
                     <dt>Quantidade:</dt>
                     <dd>{selectedPurchase.quantity} unidade(s)</dd>
-                    <dt>Valor Total:</dt>
+                    <dt>Valor Estimado Total:</dt>
                     <dd><strong>R$ {(parseFloat(String(selectedPurchase.estimated_value)) * selectedPurchase.quantity).toFixed(2)}</strong></dd>
                   </dl>
                 </div>

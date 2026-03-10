@@ -192,6 +192,13 @@ export default function CreatePurchasePage() {
                   <option value="Roteador">Roteador</option>
                   <option value="Nobreak">Nobreak</option>
                   <option value="Outro">Outro</option>
+                  <optgroup label="Serviços">
+                    <option value="Serviço de Reparo">Reparo / Manutenção</option>
+                    <option value="Serviço de TI">Serviço de TI</option>
+                    <option value="Licença de Software">Licença de Software</option>
+                    <option value="Serviço de Instalação">Instalação / Configuração</option>
+                    <option value="Outro Serviço">Outro Serviço</option>
+                  </optgroup>
                 </select>
               </div>
 
