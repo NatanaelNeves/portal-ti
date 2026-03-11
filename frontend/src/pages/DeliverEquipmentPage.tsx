@@ -139,22 +139,22 @@ const DeliverEquipmentPage: React.FC = () => {
 
     try {
       const token = localStorage.getItem('internal_token');
-      const userStr = localStorage.getItem('internalUser');
+      const userStr = localStorage.getItem('internal_user');
       const user = userStr ? JSON.parse(userStr) : null;
 
       // Enviar dados no formato que o backend espera (snake_case)
       const payload = {
         equipment_id: formData.equipmentId,
         responsible_name: formData.responsibleName,
-        responsible_cpf: formData.responsibleCpf,
-        responsible_email: formData.responsibleEmail,
-        responsible_phone: formData.responsiblePhone,
+        responsible_cpf: formData.responsibleCpf || null,
+        responsible_email: formData.responsibleEmail || null,
+        responsible_phone: formData.responsiblePhone || null,
         responsible_department: formData.responsibleDepartment,
         responsible_unit: formData.responsibleUnit,
         delivery_reason: formData.deliveryReason,
         delivery_notes: formData.deliveryNotes,
         issued_by_id: user?.id || null,
-        issued_by_name: user?.full_name || 'Sistema'
+        issued_by_name: user?.full_name || user?.name || 'Sistema'
       };
 
       console.log('📤 Enviando requisição:', payload);
@@ -271,7 +271,7 @@ const DeliverEquipmentPage: React.FC = () => {
               />
             </div>
             <div className="form-group">
-              <label htmlFor="responsibleCpf">CPF *</label>
+              <label htmlFor="responsibleCpf">CPF</label>
               <input
                 type="text"
                 id="responsibleCpf"
@@ -280,25 +280,23 @@ const DeliverEquipmentPage: React.FC = () => {
                 onChange={handleCpfChange}
                 placeholder="000.000.000-00"
                 maxLength={14}
-                required
               />
             </div>
           </div>
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="responsibleEmail">E-mail *</label>
+              <label htmlFor="responsibleEmail">E-mail</label>
               <input
                 type="email"
                 id="responsibleEmail"
                 name="responsibleEmail"
                 value={formData.responsibleEmail}
                 onChange={handleInputChange}
-                required
               />
             </div>
             <div className="form-group">
-              <label htmlFor="responsiblePhone">Telefone *</label>
+              <label htmlFor="responsiblePhone">Telefone</label>
               <input
                 type="text"
                 id="responsiblePhone"
@@ -307,21 +305,19 @@ const DeliverEquipmentPage: React.FC = () => {
                 onChange={handlePhoneChange}
                 placeholder="(00) 00000-0000"
                 maxLength={15}
-                required
               />
             </div>
           </div>
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="responsiblePosition">Cargo *</label>
+              <label htmlFor="responsiblePosition">Cargo</label>
               <input
                 type="text"
                 id="responsiblePosition"
                 name="responsiblePosition"
                 value={formData.responsiblePosition}
                 onChange={handleInputChange}
-                required
               />
             </div>
             <div className="form-group">

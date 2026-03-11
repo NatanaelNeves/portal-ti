@@ -139,8 +139,8 @@ const ReturnEquipmentPage: React.FC = () => {
         return_checklist: formData.checklist,
         return_problems: formData.returnProblems || 'Nenhum problema relatado',
         return_destination: formData.returnDestination,
-        received_by_id: currentUser.id,
-        received_by_name: currentUser.name
+        received_by_id: currentUser.id || null,
+        received_by_name: currentUser.name || currentUser.full_name || 'Sistema'
       };
 
       const response = await api.post(

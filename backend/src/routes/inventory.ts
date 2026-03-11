@@ -545,12 +545,29 @@ inventoryRouter.post('/movements/deliver', async (req: Request, res: Response) =
     // Aceitar equipamentos disponíveis ou em estoque
     if (!['available', 'in_stock'].includes(equipment.rows[0].current_status)) {
       return res.status(400).json({ 
-        error: 'Equipment is not available', 
+        error: `Equipamento não está disponível (status atual: ${equipment.rows[0].current_status})`, 
         current_status: equipment.rows[0].current_status 
       });
     }
 
     const movement_number = await generateMovementNumber();
+
+    // Garantir que issued_by_id não seja null (buscar admin como fallback)
+    let finalIssuedById = issued_by_id;
+    let finalIssuedByName = issued_by_name || 'Sistema';
+    if (!finalIssuedById) {
+      const adminUser = await database.query(`
+        SELECT id, full_name FROM internal_users WHERE role IN ('admin', 'ti_staff') ORDER BY created_at LIMIT 1
+      `);
+      if (adminUser.rows.length > 0) {
+        finalIssuedById = adminUser.rows[0].id;
+        finalIssuedByName = finalIssuedByName === 'Sistema' ? adminUser.rows[0].full_name : finalIssuedByName;
+      }
+    }
+
+    if (!finalIssuedById) {
+      return res.status(400).json({ error: 'Usuário não identificado. Faça login novamente.' });
+    }
 
     // Criar termo de responsabilidade (responsible_id é opcional - pode ser funcionário externo)
     const term = await database.query(`
@@ -563,7 +580,7 @@ inventoryRouter.post('/movements/deliver', async (req: Request, res: Response) =
     `, [
       equipment_id, responsible_name, responsible_department,
       responsible_unit, responsible_email, responsible_phone, responsible_cpf,
-      delivery_reason, delivery_notes, issued_by_id, issued_by_name
+      delivery_reason, delivery_notes, finalIssuedById, finalIssuedByName
     ]);
 
     // Criar movimentação
@@ -576,7 +593,7 @@ inventoryRouter.post('/movements/deliver', async (req: Request, res: Response) =
     `, [
       movement_number, equipment_id, term.rows[0].id,
       responsible_name, responsible_unit, responsible_department,
-      delivery_reason, issued_by_id, issued_by_name
+      delivery_reason, finalIssuedById, finalIssuedByName
     ]);
 
     // Atualizar status do equipamento
