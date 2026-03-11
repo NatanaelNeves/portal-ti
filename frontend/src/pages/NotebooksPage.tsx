@@ -81,9 +81,9 @@ function ModelGroup({ groupKey, notebooks, colorIdx, search, statusFilter, onNav
     const q = search.toLowerCase();
     const matchSearch = !q ||
       (n.responsible_name || '').toLowerCase().includes(q) ||
-      n.current_unit.toLowerCase().includes(q) ||
-      n.internal_code.toLowerCase().includes(q) ||
-      n.serial_number.toLowerCase().includes(q);
+      (n.current_unit || '').toLowerCase().includes(q) ||
+      (n.internal_code || '').toLowerCase().includes(q) ||
+      (n.serial_number || '').toLowerCase().includes(q);
     const matchStatus = statusFilter === 'all' || n.current_status === statusFilter;
     return matchSearch && matchStatus;
   }), [notebooks, search, statusFilter]);
@@ -258,7 +258,7 @@ export default function NotebooksPage() {
     const labelMap = new Map<string, string>();
     const map = new Map<string, Notebook[]>();
     notebooks.forEach(nb => {
-      const raw = `${nb.brand} ${nb.model}`.trim().replace(/\s+/g, ' ') || 'Sem modelo';
+      const raw = `${nb.brand || ''} ${nb.model || ''}`.trim().replace(/\s+/g, ' ') || 'Sem modelo';
       const key = normalize(raw);
       if (!map.has(key)) {
         map.set(key, []);
@@ -276,7 +276,7 @@ export default function NotebooksPage() {
     const result: string[] = [];
     notebooks.forEach(n => {
       if (n.brand) {
-        const norm = n.brand.trim().toLowerCase();
+        const norm = (n.brand || '').trim().toLowerCase();
         if (!seen.has(norm)) { seen.add(norm); result.push(n.brand.trim()); }
       }
     });

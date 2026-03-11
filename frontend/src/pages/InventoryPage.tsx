@@ -89,10 +89,10 @@ export default function InventoryPage() {
   // Filtrar notebooks
   const filteredNotebooks = notebooks.filter(nb => {
     const matchesSearch = searchQuery === '' || 
-      nb.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      nb.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      nb.internal_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (nb.serial_number && nb.serial_number.toLowerCase().includes(searchQuery.toLowerCase()));
+      (nb.brand || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (nb.model || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (nb.internal_code || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (nb.serial_number || '').toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || nb.current_status === statusFilter;
     const matchesUnit = unitFilter === 'all' || nb.current_unit === unitFilter;
@@ -103,10 +103,10 @@ export default function InventoryPage() {
   // Filtrar periféricos
   const filteredPeripherals = peripherals.filter(per => {
     const matchesSearch = searchQuery === '' || 
-      per.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      per.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      per.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      per.internal_code.toLowerCase().includes(searchQuery.toLowerCase());
+      (per.type || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (per.brand || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (per.model || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (per.internal_code || '').toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || per.current_status === statusFilter;
     const matchesUnit = unitFilter === 'all' || per.current_unit === unitFilter;
