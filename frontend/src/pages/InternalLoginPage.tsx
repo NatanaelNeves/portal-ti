@@ -44,6 +44,8 @@ export default function InternalLoginPage() {
       // Redirect based on role
       if (user.role === 'it_staff') {
         window.location.href = '/admin/chamados';
+      } else if (user.role === 'admin_staff') {
+        window.location.href = '/admin/auxiliar/dashboard';
       } else if (user.role === 'manager' || user.role === 'gestor') {
         window.location.href = '/gestor/dashboard';
       } else {

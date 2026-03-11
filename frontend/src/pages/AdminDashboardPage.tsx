@@ -118,6 +118,24 @@ export default function AdminDashboardPage() {
       return;
     }
 
+    const userRaw = localStorage.getItem('internal_user');
+    if (userRaw) {
+      try {
+        const user = JSON.parse(userRaw) as { role?: string };
+        if (user.role === 'admin_staff') {
+          navigate('/admin/auxiliar/dashboard');
+          return;
+        }
+        if (user.role === 'manager' || user.role === 'gestor') {
+          navigate('/gestor/dashboard');
+          return;
+        }
+      } catch {
+        navigate('/admin/login');
+        return;
+      }
+    }
+
     void fetchDashboardData();
   }, [navigate]);
 

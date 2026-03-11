@@ -169,6 +169,10 @@ ticketsRouter.get('/', async (req: Request, res: Response) => {
         } else if (decoded.role === UserRole.ADMIN_STAFF) {
           // Administrativo só vê chamados do administrativo por padrão
           conditions.push(`COALESCE(t.department, 'ti') = 'administrativo'`);
+          // Auxiliar administrativo vê apenas chamados atribuídos a ele
+          conditions.push(`t.assigned_to_id = $${paramCount}`);
+          params.push(decoded.id);
+          paramCount++;
         }
         // ADMIN e MANAGER veem todos se não filtrarem
 
@@ -184,7 +188,7 @@ ticketsRouter.get('/', async (req: Request, res: Response) => {
           paramCount++;
         }
 
-        if (assigned_to) {
+        if (assigned_to && decoded.role !== UserRole.ADMIN_STAFF) {
           if (assigned_to === 'unassigned') {
             conditions.push('t.assigned_to_id IS NULL');
           } else {
@@ -349,6 +353,13 @@ ticketsRouter.get('/:id', async (req: Request, res: Response) => {
           return res.status(403).json({ error: 'Acesso negado' });
         }
 
+        if (decoded.role === UserRole.ADMIN_STAFF && ticket.rows[0].assigned_to_id !== decoded.id) {
+          return res.status(403).json({
+            error: 'Acesso negado',
+            message: 'Auxiliar administrativo pode visualizar apenas chamados atribuídos a si.'
+          });
+        }
+
         // Retornar chamado com mensagens
         const messages = await database.query(
           `SELECT tm.*,
@@ -504,6 +515,13 @@ ticketsRouter.get('/:id/messages', async (req: Request, res: Response) => {
         const allowedRoles = [UserRole.IT_STAFF, UserRole.ADMIN_STAFF, UserRole.MANAGER, UserRole.ADMIN];
         if (!allowedRoles.includes(decoded.role)) {
           return res.status(403).json({ error: 'Acesso negado' });
+        }
+
+        if (decoded.role === UserRole.ADMIN_STAFF && ticket.rows[0].assigned_to_id !== decoded.id) {
+          return res.status(403).json({
+            error: 'Acesso negado',
+            message: 'Auxiliar administrativo pode visualizar mensagens apenas dos chamados atribuídos a si.'
+          });
         }
       } catch (err) {
         return res.status(401).json({ error: 'Token inválido' });
@@ -720,6 +738,7 @@ ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (r
     const { config } = require('../config/environment');
     
     let userId: string;
+    let userRole: UserRole;
     
     try {
       const decoded = jwt.verify(token, config.jwt.secret) as any;
@@ -733,9 +752,28 @@ ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (r
       }
       
       userId = decoded.id;
+      userRole = decoded.role;
       console.log('Usuário autenticado:', decoded.name, '(', decoded.role, ')');
     } catch (err) {
       return res.status(401).json({ error: 'Token inválido' });
+    }
+
+    if (userRole === UserRole.ADMIN_STAFF) {
+      const assignedCheck = await database.query(
+        'SELECT assigned_to_id FROM tickets WHERE id = $1',
+        [id]
+      );
+
+      if (!assignedCheck.rows.length) {
+        return res.status(404).json({ error: 'Chamado não encontrado' });
+      }
+
+      if (assignedCheck.rows[0].assigned_to_id !== userId) {
+        return res.status(403).json({
+          error: 'Acesso negado',
+          message: 'Auxiliar administrativo só pode atualizar chamados atribuídos a si.'
+        });
+      }
     }
 
     // Construir query de update

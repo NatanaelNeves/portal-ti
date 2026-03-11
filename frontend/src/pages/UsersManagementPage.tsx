@@ -37,6 +37,7 @@ export default function UsersManagementPage() {
   const [newPassword, setNewPassword] = useState('');
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
+  const [creatingUser, setCreatingUser] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('internal_token');
@@ -82,8 +83,14 @@ export default function UsersManagementPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (creatingUser) {
+      return;
+    }
+
     setFormError('');
     setFormSuccess('');
+    setCreatingUser(true);
 
     try {
       const token = localStorage.getItem('internal_token');
@@ -93,11 +100,18 @@ export default function UsersManagementPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          email: formData.email.trim().toLowerCase(),
+          name: formData.name.trim(),
+        }),
       });
 
       if (!response.ok) {
         const data = await response.json();
+        if (response.status === 409) {
+          throw new Error(data.error || 'Já existe um usuário com este e-mail.');
+        }
         throw new Error(data.error || 'Erro ao criar usuário');
       }
 
@@ -109,6 +123,8 @@ export default function UsersManagementPage() {
       if (token) fetchUsers(token);
     } catch (err: any) {
       setFormError(err.message || 'Erro ao criar usuário');
+    } finally {
+      setCreatingUser(false);
     }
   };
 
@@ -330,8 +346,8 @@ export default function UsersManagementPage() {
                 )}
               </div>
 
-              <button type="submit" className="btn btn-primary">
-                Criar Usuário
+              <button type="submit" className="btn btn-primary" disabled={creatingUser}>
+                {creatingUser ? 'Criando...' : 'Criar Usuário'}
               </button>
             </form>
           </div>

@@ -1,7 +1,18 @@
 import { Router, Request, Response } from "express";
+import jwt from 'jsonwebtoken';
 import { database } from "../database/connection";
+import { config } from '../config/environment';
+import { UserRole } from '../types/enums';
 
 const dashboardRouter = Router();
+
+interface InternalUserClaims {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  type?: string;
+}
 
 const toInt = (value: unknown): number => {
   const parsed = Number.parseInt(String(value ?? 0), 10);
@@ -21,8 +32,40 @@ const calculateDeltaPercent = (current: number, previous: number): number => {
   return Math.round(((current - previous) / previous) * 100);
 };
 
+const getInternalUserFromToken = (req: Request, res: Response): InternalUserClaims | null => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+
+  if (!token) {
+    res.status(401).json({ error: 'Autenticação necessária' });
+    return null;
+  }
+
+  try {
+    const decoded = jwt.verify(token, config.jwt.secret as string) as InternalUserClaims;
+    if (decoded.type && decoded.type !== 'internal') {
+      res.status(401).json({ error: 'Token inválido' });
+      return null;
+    }
+    return decoded;
+  } catch {
+    res.status(401).json({ error: 'Token inválido ou expirado' });
+    return null;
+  }
+};
+
 dashboardRouter.get("/admin", async (req: Request, res: Response) => {
   try {
+    const user = getInternalUserFromToken(req, res);
+    if (!user) {
+      return;
+    }
+
+    if (![UserRole.ADMIN, UserRole.IT_STAFF].includes(user.role)) {
+      res.status(403).json({ error: 'Acesso negado' });
+      return;
+    }
+
     const [
       totalResult,
       statusResult,
@@ -297,8 +340,86 @@ dashboardRouter.get("/admin", async (req: Request, res: Response) => {
   }
 });
 
+dashboardRouter.get('/admin-staff', async (req: Request, res: Response) => {
+  try {
+    const user = getInternalUserFromToken(req, res);
+    if (!user) {
+      return;
+    }
+
+    if (user.role !== UserRole.ADMIN_STAFF) {
+      res.status(403).json({ error: 'Acesso negado' });
+      return;
+    }
+
+    const [myTicketsResult, myStatusResult, pendingDeptResult, recentTicketsResult] = await Promise.all([
+      database.query(
+        `SELECT COUNT(*) AS count
+         FROM tickets
+         WHERE assigned_to_id = $1`,
+        [user.id]
+      ),
+      database.query(
+        `SELECT status, COUNT(*) AS count
+         FROM tickets
+         WHERE assigned_to_id = $1
+         GROUP BY status`,
+        [user.id]
+      ),
+      database.query(
+        `SELECT COUNT(*) AS count
+         FROM tickets
+         WHERE COALESCE(department, 'ti') = 'administrativo'
+           AND status IN ('open', 'in_progress', 'waiting_user')`,
+      ),
+      database.query(
+        `SELECT id, title, status, priority, created_at, updated_at
+         FROM tickets
+         WHERE assigned_to_id = $1
+         ORDER BY updated_at DESC
+         LIMIT 8`,
+        [user.id]
+      ),
+    ]);
+
+    const myTicketsByStatus: Record<string, number> = {};
+    myStatusResult.rows.forEach((row: { status: string; count: string }) => {
+      myTicketsByStatus[row.status] = toInt(row.count);
+    });
+
+    const myTicketsTotal = toInt(myTicketsResult.rows[0]?.count);
+    const myOpenTickets = myTicketsByStatus.open ?? 0;
+    const myInProgressTickets = myTicketsByStatus.in_progress ?? 0;
+    const myWaitingTickets = myTicketsByStatus.waiting_user ?? 0;
+    const myResolvedTickets = (myTicketsByStatus.resolved ?? 0) + (myTicketsByStatus.closed ?? 0);
+
+    res.json({
+      myTicketsTotal,
+      myOpenTickets,
+      myInProgressTickets,
+      myWaitingTickets,
+      myResolvedTickets,
+      administrativePendingTotal: toInt(pendingDeptResult.rows[0]?.count),
+      recentTickets: recentTicketsResult.rows,
+    });
+  } catch (error) {
+    console.error('Erro ao buscar dashboard do auxiliar administrativo:', error);
+    res.status(500).json({ error: 'Failed to load admin staff dashboard data' });
+  }
+});
+
 dashboardRouter.get("/gestor", async (req: Request, res: Response) => {
   try {
+    const user = getInternalUserFromToken(req, res);
+    if (!user) {
+      return;
+    }
+
+    if (![UserRole.MANAGER, UserRole.ADMIN].includes(user.role)) {
+      res.status(403).json({ error: 'Acesso negado' });
+      return;
+    }
+
     // Total de chamados
     const totalResult = await database.query("SELECT COUNT(*) as count FROM tickets");
     const totalTickets = parseInt(totalResult.rows[0].count);

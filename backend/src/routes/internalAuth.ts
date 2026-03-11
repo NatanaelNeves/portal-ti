@@ -18,8 +18,9 @@ interface InternalUser {
 router.post('/internal-login', validate(loginSchema), async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
 
-    if (!email || !password) {
+    if (!normalizedEmail || !password) {
       res.status(400).json({ error: 'Email and password are required' });
       return;
     }
@@ -27,8 +28,8 @@ router.post('/internal-login', validate(loginSchema), async (req: Request, res: 
     // Find user in internal_users
     const result = await database.query(
       `SELECT id, email, name, password_hash, role FROM internal_users 
-       WHERE email = $1 AND is_active = true`,
-      [email]
+       WHERE LOWER(email) = LOWER($1) AND is_active = true`,
+      [normalizedEmail]
     );
 
     if (result.rows.length === 0) {
@@ -78,6 +79,8 @@ router.post('/internal-register', validate(registerSchema), async (req: Request,
   try {
     const { email, name, password, role = 'it_staff' } = req.body;
     const token = req.headers.authorization?.split(' ')[1];
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const normalizedName = String(name || '').trim();
 
     if (!token) {
       res.status(401).json({ error: 'Authentication required' });
@@ -101,19 +104,24 @@ router.post('/internal-register', validate(registerSchema), async (req: Request,
       return;
     }
 
-    if (!email || !name || !password) {
+    if (!normalizedEmail || !normalizedName || !password) {
       res.status(400).json({ error: 'Email, name, and password are required' });
       return;
     }
 
     // Check if user already exists
     const existingUser = await database.query(
-      'SELECT id FROM internal_users WHERE email = $1',
-      [email]
+      'SELECT id, is_active FROM internal_users WHERE LOWER(email) = LOWER($1)',
+      [normalizedEmail]
     );
 
     if (existingUser.rows.length > 0) {
-      res.status(409).json({ error: 'User already exists' });
+      const existing = existingUser.rows[0];
+      if (existing.is_active === false) {
+        res.status(409).json({ error: 'Já existe um usuário inativo com este e-mail. Reative o usuário existente.' });
+        return;
+      }
+      res.status(409).json({ error: 'Já existe um usuário com este e-mail.' });
       return;
     }
 
@@ -125,7 +133,7 @@ router.post('/internal-register', validate(registerSchema), async (req: Request,
       `INSERT INTO internal_users (email, name, password_hash, role)
        VALUES ($1, $2, $3, $4)
        RETURNING id, email, name, role`,
-      [email, name, passwordHash, role]
+      [normalizedEmail, normalizedName, passwordHash, role]
     );
 
     res.status(201).json({
@@ -134,6 +142,13 @@ router.post('/internal-register', validate(registerSchema), async (req: Request,
     });
   } catch (error) {
     console.error('Error creating internal user:', error);
+
+    const dbError = error as { code?: string };
+    if (dbError.code === '23505') {
+      res.status(409).json({ error: 'Já existe um usuário com este e-mail.' });
+      return;
+    }
+
     res.status(500).json({ error: 'Internal server error' });
   }
 });

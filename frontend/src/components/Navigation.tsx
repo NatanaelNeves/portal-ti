@@ -58,6 +58,7 @@ export default function Navigation() {
   const getDashboardRoute = () => {
     if (!userData) return '/admin/dashboard';
     if (userData.role === 'manager') return '/gestor/dashboard';
+    if (userData.role === 'admin_staff') return '/admin/auxiliar/dashboard';
     return '/admin/dashboard';
   };
 

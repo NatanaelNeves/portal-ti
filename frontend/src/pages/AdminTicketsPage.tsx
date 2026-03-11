@@ -83,6 +83,7 @@ export default function AdminTicketsPage() {
       // Auto-set department filter based on role
       if (user.role === 'admin_staff') {
         setDepartmentFilter('administrativo');
+        setAssignmentFilter('mine');
       } else if (user.role === 'it_staff') {
         setDepartmentFilter('ti');
       }
@@ -91,7 +92,7 @@ export default function AdminTicketsPage() {
 
     fetchTickets();
     fetchUsers();
-  }, [filterStatus, assignmentFilter, selectedStatuses, selectedPriorities, searchText, currentPage, departmentFilter, navigate]);
+  }, [filterStatus, assignmentFilter, selectedStatuses, selectedPriorities, searchText, currentPage, departmentFilter, currentUserId, navigate]);
 
   const fetchUsers = async () => {
     try {
@@ -596,15 +597,17 @@ export default function AdminTicketsPage() {
 
       {/* Filtros de Atribuição */}
       <div className="assignment-filters">
-        <button 
-          className={`filter-btn ${assignmentFilter === 'all' && filterStatus === 'all' ? 'active' : ''}`}
-          onClick={() => {
-            setAssignmentFilter('all');
-            setFilterStatus('all');
-          }}
-        >
-          📋 Fila Ativa
-        </button>
+        {userRole !== 'admin_staff' && (
+          <button 
+            className={`filter-btn ${assignmentFilter === 'all' && filterStatus === 'all' ? 'active' : ''}`}
+            onClick={() => {
+              setAssignmentFilter('all');
+              setFilterStatus('all');
+            }}
+          >
+            📋 Fila Ativa
+          </button>
+        )}
         <button 
           className={`filter-btn filter-mine ${assignmentFilter === 'mine' ? 'active' : ''}`}
           onClick={() => {
@@ -614,15 +617,17 @@ export default function AdminTicketsPage() {
         >
           👤 Meus Atendimentos ({myTicketsCount})
         </button>
-        <button 
-          className={`filter-btn ${assignmentFilter === 'unassigned' ? 'active' : ''}`}
-          onClick={() => {
-            setAssignmentFilter('unassigned');
-            setFilterStatus('all');
-          }}
-        >
-          ⚠️ Não Atribuídos
-        </button>
+        {userRole !== 'admin_staff' && (
+          <button 
+            className={`filter-btn ${assignmentFilter === 'unassigned' ? 'active' : ''}`}
+            onClick={() => {
+              setAssignmentFilter('unassigned');
+              setFilterStatus('all');
+            }}
+          >
+            ⚠️ Não Atribuídos
+          </button>
+        )}
         <button 
           className={`filter-btn filter-btn-toggle ${showFilters ? 'active' : ''}`}
           onClick={() => {

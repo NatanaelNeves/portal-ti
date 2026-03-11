@@ -14,6 +14,7 @@ import InformationCenterPage from './pages/InformationCenterPage';
 // Internal Pages
 import InternalLoginPage from './pages/InternalLoginPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
+import AdminStaffDashboardPage from './pages/AdminStaffDashboardPage';
 import AdminTicketsPage from './pages/AdminTicketsPage';
 import AdminTicketDetailPage from './pages/AdminTicketDetailPage';
 import InventoryPage from './pages/InventoryPage';
@@ -78,6 +79,7 @@ function App() {
 
             {/* IT Staff Routes */}
             <Route path="/admin/dashboard" element={<InternalProtectedRoute><AdminDashboardPage /></InternalProtectedRoute>} />
+            <Route path="/admin/auxiliar/dashboard" element={<InternalProtectedRoute><AdminStaffDashboardPage /></InternalProtectedRoute>} />
             <Route path="/admin/chamados" element={<InternalProtectedRoute><AdminTicketsPage /></InternalProtectedRoute>} />
             <Route path="/admin/chamados/:id" element={<InternalProtectedRoute><AdminTicketDetailPage /></InternalProtectedRoute>} />
             <Route path="/admin/conhecimento" element={<InternalProtectedRoute><KnowledgeManagementPage /></InternalProtectedRoute>} />

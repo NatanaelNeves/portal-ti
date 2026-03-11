@@ -1,5 +1,5 @@
 import express, { Express, Response } from 'express';
-import cors from 'cors';
+import cors, { CorsOptions } from 'cors';
 import path from 'path';
 import http from 'http';
 import { config } from './config/environment';
@@ -22,19 +22,49 @@ if (config.nodeEnv === 'production') {
   app.set('trust proxy', 1);
 }
 
-// Middleware
-app.use(cors({
-  origin: config.cors.origin,
+const configuredOrigins = Array.isArray(config.cors.origin) ? config.cors.origin : [config.cors.origin];
+const normalizedConfiguredOrigins = configuredOrigins
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const isAllowedCorsOrigin = (origin: string): boolean => {
+  if (normalizedConfiguredOrigins.includes(origin)) {
+    return true;
+  }
+
+  try {
+    const hostname = new URL(origin).hostname.toLowerCase();
+    return hostname.endsWith('.azurestaticapps.net');
+  } catch {
+    return false;
+  }
+};
+
+const corsOptions: CorsOptions = {
+  origin: (origin, callback) => {
+    if (!origin || isAllowedCorsOrigin(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-user-token'],
-}));
+  optionsSuccessStatus: 204,
+};
+
+// Middleware
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Garantir UTF-8 em todas as respostas
 app.use((req, res, next) => {
-  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  if (req.method !== 'OPTIONS') {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  }
   next();
 });
 
