@@ -93,6 +93,8 @@ export async function initializeDatabase(): Promise<void> {
         type VARCHAR(50) NOT NULL,
         priority VARCHAR(50) NOT NULL DEFAULT 'medium',
         status VARCHAR(50) NOT NULL DEFAULT 'open',
+        department VARCHAR(50) NOT NULL DEFAULT 'ti',
+        category VARCHAR(100),
         requester_type VARCHAR(20) NOT NULL DEFAULT 'public',
         requester_id UUID NOT NULL,
         assigned_to_id UUID REFERENCES internal_users(id),
@@ -101,6 +103,20 @@ export async function initializeDatabase(): Promise<void> {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
+    `);
+
+    // Migração: adicionar coluna department se não existir
+    await database.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'tickets' AND column_name = 'department') THEN
+          ALTER TABLE tickets ADD COLUMN department VARCHAR(50) NOT NULL DEFAULT 'ti';
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'tickets' AND column_name = 'category') THEN
+          ALTER TABLE tickets ADD COLUMN category VARCHAR(100);
+        END IF;
+      END
+      $$;
     `);
 
     // Tabela de mensagens/histórico de chamados

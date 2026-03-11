@@ -9,6 +9,8 @@ interface Ticket {
   title: string;
   status: string;
   priority: string;
+  department?: string;
+  category?: string;
   created_at: string;
   updated_at: string;
 }

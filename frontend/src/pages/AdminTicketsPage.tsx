@@ -10,6 +10,8 @@ interface Ticket {
   status: string;
   priority: string;
   type: string;
+  department?: string;
+  category?: string;
   created_at: string;
   updated_at: string;
   requester_id: string;
@@ -62,6 +64,8 @@ export default function AdminTicketsPage() {
   const [totalTickets, setTotalTickets] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [departmentFilter, setDepartmentFilter] = useState<string>('');
+  const [userRole, setUserRole] = useState<string>('');
 
   useEffect(() => {
     const token = localStorage.getItem('internal_token');
@@ -75,11 +79,19 @@ export default function AdminTicketsPage() {
     if (userData) {
       const user = JSON.parse(userData);
       setCurrentUserId(user.id);
+      setUserRole(user.role);
+      // Auto-set department filter based on role
+      if (user.role === 'admin_staff') {
+        setDepartmentFilter('administrativo');
+      } else if (user.role === 'it_staff') {
+        setDepartmentFilter('ti');
+      }
+      // admin and manager see all by default (empty filter)
     }
 
     fetchTickets();
     fetchUsers();
-  }, [filterStatus, assignmentFilter, selectedStatuses, selectedPriorities, searchText, currentPage, navigate]);
+  }, [filterStatus, assignmentFilter, selectedStatuses, selectedPriorities, searchText, currentPage, departmentFilter, navigate]);
 
   const fetchUsers = async () => {
     try {
@@ -176,6 +188,11 @@ export default function AdminTicketsPage() {
         params.append('assigned_to', currentUserId);
       } else if (assignmentFilter === 'unassigned') {
         params.append('assigned_to', 'unassigned');
+      }
+      
+      // Filtro por departamento
+      if (departmentFilter) {
+        params.append('department', departmentFilter);
       }
       
       // Paginação
@@ -399,7 +416,7 @@ export default function AdminTicketsPage() {
     <div className="admin-tickets-dashboard">
       <header className="dashboard-header card">
         <div className="dashboard-header-main">
-          <h1>🧑‍💻 Central Operacional TI</h1>
+          <h1>{departmentFilter === 'administrativo' ? '🏢 Central Operacional Administrativa' : '🧑‍💻 Central Operacional TI'}</h1>
           <p>Painel de atendimento em tempo real</p>
         </div>
         <div className="dashboard-header-status">
@@ -415,6 +432,30 @@ export default function AdminTicketsPage() {
           </span>
         </div>
       </header>
+
+      {/* Department Tabs - visible for admin and manager */}
+      {(userRole === 'admin' || userRole === 'manager') && (
+        <div className="department-tabs">
+          <button
+            className={`dept-tab ${departmentFilter === '' ? 'active' : ''}`}
+            onClick={() => { setDepartmentFilter(''); setCurrentPage(1); }}
+          >
+            📊 Todos
+          </button>
+          <button
+            className={`dept-tab ${departmentFilter === 'ti' ? 'active' : ''}`}
+            onClick={() => { setDepartmentFilter('ti'); setCurrentPage(1); }}
+          >
+            🖥️ TI
+          </button>
+          <button
+            className={`dept-tab ${departmentFilter === 'administrativo' ? 'active' : ''}`}
+            onClick={() => { setDepartmentFilter('administrativo'); setCurrentPage(1); }}
+          >
+            🏢 Administrativo
+          </button>
+        </div>
+      )}
 
       {error && <div className="alert alert-error">{error}</div>}
 
@@ -782,6 +823,15 @@ export default function AdminTicketsPage() {
                   </div>
 
                   <div className="ticket-card-badges">
+                    {ticket.department && ticket.department !== 'ti' && (
+                      <span className="badge badge-dept-admin">🏢 Administrativo</span>
+                    )}
+                    {(!ticket.department || ticket.department === 'ti') && departmentFilter === '' && (
+                      <span className="badge badge-dept-ti">🖥️ TI</span>
+                    )}
+                    {ticket.category && (
+                      <span className="badge badge-category">{ticket.category}</span>
+                    )}
                     <span className="badge badge-type">{ticket.type}</span>
                     <span className={`badge ${getPriorityBadgeClass(ticket.priority)}`}>
                       {getPriorityLabel(ticket.priority)}
@@ -928,6 +978,20 @@ export default function AdminTicketsPage() {
                         {selectedTicket.requester_department || '—'}
                         {selectedTicket.requester_department && selectedTicket.requester_unit && ' • '}
                         {selectedTicket.requester_unit || ''}
+                      </span>
+                    </div>
+                  )}
+                  <div className="info-row">
+                    <span className="info-label">Departamento:</span>
+                    <span className="info-value">
+                      {selectedTicket.department === 'administrativo' ? '🏢 Administrativo' : '🖥️ TI'}
+                    </span>
+                  </div>
+                  {selectedTicket.category && (
+                    <div className="info-row">
+                      <span className="info-label">Categoria:</span>
+                      <span className="info-value" style={{ textTransform: 'capitalize' }}>
+                        {selectedTicket.category.replace(/_/g, ' ')}
                       </span>
                     </div>
                   )}

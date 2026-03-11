@@ -14,6 +14,8 @@ interface TicketDetail {
   status: string;
   priority: string;
   type: string;
+  department?: string;
+  category?: string;
   created_at: string;
   updated_at: string;
   resolved_at?: string;
@@ -525,6 +527,22 @@ export default function AdminTicketDetailPage() {
                 </div>
               )}
             </div>
+
+            <div className="info-item">
+              <label>🏢 Departamento:</label>
+              <div className="value">
+                {ticket.department === 'administrativo' ? '🏢 Administrativo' : '🖥️ TI'}
+              </div>
+            </div>
+
+            {ticket.category && (
+            <div className="info-item">
+              <label>📂 Categoria:</label>
+              <div className="value" style={{ textTransform: 'capitalize' }}>
+                {ticket.category.replace(/_/g, ' ')}
+              </div>
+            </div>
+            )}
 
             <div className="info-item">
               <label>📅 Criado em:</label>

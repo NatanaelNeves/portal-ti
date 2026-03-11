@@ -94,6 +94,62 @@
   font-size: 0.86rem;
 }
 
+/* Department Tabs */
+.department-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 4px;
+  background: #f1f5f9;
+  border-radius: 12px;
+  width: fit-content;
+}
+
+.dept-tab {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #64748b;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.dept-tab:hover {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.dept-tab.active {
+  background: #fff;
+  color: #1A3C5E;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Department Badges */
+.badge-dept-ti {
+  background: #EFF6FF;
+  color: #1D4ED8;
+  border: 1px solid #BFDBFE;
+}
+
+.badge-dept-admin {
+  background: #FEF3C7;
+  color: #92400E;
+  border: 1px solid #FDE68A;
+}
+
+.badge-category {
+  background: #F0FDF4;
+  color: #166534;
+  border: 1px solid #BBF7D0;
+  font-size: 0.72rem;
+  text-transform: capitalize;
+}
+
 /* Estatísticas - Container */
 .stats-container {
   display: grid;

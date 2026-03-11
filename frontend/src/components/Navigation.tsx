@@ -52,7 +52,7 @@ export default function Navigation() {
   
   const showAssetsLink = userData && (userData.role === 'admin' || userData.role === 'it_staff');
   const showUsersLink = userData && (userData.role === 'admin' || userData.role === 'it_staff');
-  const showKnowledgeLink = userData && ['it_staff', 'admin'].includes(userData.role);
+  const showKnowledgeLink = userData && ['it_staff', 'admin', 'admin_staff'].includes(userData.role);
 
   // Definir rota do dashboard baseado no papel
   const getDashboardRoute = () => {
@@ -68,7 +68,9 @@ export default function Navigation() {
     { label: 'Painel', action: () => navigate(dashboardRoute) },
     {
       label: 'Solicitações',
-      action: () => navigate(userData?.role === 'manager' ? '/gestor/solicitacoes' : '/admin/chamados'),
+      action: () => navigate(
+        userData?.role === 'manager' ? '/gestor/solicitacoes' : '/admin/chamados'
+      ),
     },
   ];
 

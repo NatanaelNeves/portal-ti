@@ -248,6 +248,65 @@
   gap: 4px;
 }
 
+/* ===== DEPARTMENT SELECTION ===== */
+.department-selection {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  margin-top: 16px;
+}
+
+.department-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 32px 24px;
+  border: 3px solid #E5E7EB;
+  border-radius: 16px;
+  background: var(--branco, #fff);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: inherit;
+  text-align: center;
+}
+
+.department-card:hover {
+  border-color: #1A3C5E;
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.department-card.active {
+  border-color: #1A3C5E;
+  background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
+  box-shadow: 0 8px 24px rgba(26, 60, 94, 0.2);
+}
+
+.department-icon {
+  font-size: 3rem;
+}
+
+.department-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1F2937;
+}
+
+.department-card.active .department-name {
+  color: #1A3C5E;
+}
+
+.department-desc {
+  font-size: 0.875rem;
+  color: #6B7280;
+  line-height: 1.4;
+}
+
+.department-card.active .department-desc {
+  color: #374151;
+}
+
 /* ===== TYPE CHIPS ===== */
 .type-chips {
   display: grid;

@@ -44,6 +44,12 @@ export const createTicketSchema = z.object({
   priority: z.enum(['low', 'medium', 'high'], {
     message: 'Prioridade inválida'
   }),
+
+  department: z.enum(['ti', 'administrativo'], {
+    message: 'Departamento inválido'
+  }).default('ti'),
+
+  category: z.string().max(100, 'Categoria muito longa').optional(),
 });
 
 export const updateTicketSchema = z.object({
@@ -89,7 +95,7 @@ export const registerSchema = z.object({
     .min(6, 'Senha deve ter no mínimo 6 caracteres')
     .max(100, 'Senha muito longa'),
   
-  role: z.enum(['admin', 'it_staff', 'manager', 'user']).optional(),
+  role: z.enum(['admin', 'it_staff', 'admin_staff', 'manager', 'user']).optional(),
 });
 
 export const publicAccessSchema = z.object({
@@ -180,13 +186,13 @@ export const createUserSchema = z.object({
     .min(6, 'Senha deve ter no mínimo 6 caracteres')
     .max(100, 'Senha muito longa'),
   
-  role: z.enum(['admin', 'it_staff', 'manager', 'user']),
+  role: z.enum(['admin', 'it_staff', 'admin_staff', 'manager', 'user']),
 });
 
 export const updateUserSchema = z.object({
   email: z.string().email('Email inválido').max(255).optional(),
   name: z.string().min(2).max(255).optional(),
-  role: z.enum(['admin', 'it_staff', 'manager', 'user']).optional(),
+  role: z.enum(['admin', 'it_staff', 'admin_staff', 'manager', 'user']).optional(),
   password: z.string().min(6).max(100).optional(),
 }).refine((data) => Object.keys(data).length > 0, {
   message: 'Pelo menos um campo deve ser fornecido',

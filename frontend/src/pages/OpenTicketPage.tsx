@@ -14,6 +14,8 @@ interface FormData {
   description: string;
   type: string;
   priority: string;
+  ticketDepartment: string; // 'ti' | 'administrativo'
+  category: string;
 }
 
 interface FieldError {
@@ -42,6 +44,8 @@ export default function OpenTicketPage() {
     description: '',
     type: 'incident',
     priority: 'medium',
+    ticketDepartment: '', // Empty - user must choose
+    category: '',
   });
   const [fieldErrors, setFieldErrors] = useState<FieldError>({});
   const [loading, setLoading] = useState(false);
@@ -123,14 +127,36 @@ export default function OpenTicketPage() {
     }
   };
 
+  // TI categories
+  const TI_CATEGORIES = [
+    { value: 'computador', label: 'Computador', icon: '💻' },
+    { value: 'internet', label: 'Internet', icon: '🌐' },
+    { value: 'impressora', label: 'Impressora', icon: '🖨️' },
+    { value: 'sistema', label: 'Sistema', icon: '⚙️' },
+    { value: 'outro', label: 'Outro', icon: '📋' },
+  ];
+
+  // Administrative categories
+  const ADMIN_CATEGORIES = [
+    { value: 'copia_chave', label: 'Cópia de chave', icon: '🔑' },
+    { value: 'apoio_evento', label: 'Apoio em evento', icon: '🎪' },
+    { value: 'buscar_doacao', label: 'Buscar doação', icon: '📦' },
+    { value: 'solicitar_documento', label: 'Solicitar documento', icon: '📄' },
+    { value: 'outro', label: 'Outro', icon: '📋' },
+  ];
+
   // Check if current step is valid
   const isStepValid = (step: number): boolean => {
     switch (step) {
       case 1:
-        return !!(formData.email && formData.name && !fieldErrors.email && !fieldErrors.name);
+        if (!formData.ticketDepartment) return false;
+        if (!formData.category) return false;
+        return true;
       case 2:
-        return !!(formData.title && formData.description && !fieldErrors.title && !fieldErrors.description);
+        return !!(formData.email && formData.name && !fieldErrors.email && !fieldErrors.name);
       case 3:
+        return !!(formData.title && formData.description && !fieldErrors.title && !fieldErrors.description);
+      case 4:
         return true;
       default:
         return false;
@@ -140,7 +166,7 @@ export default function OpenTicketPage() {
   // Navigate between steps
   const handleNextStep = () => {
     if (isStepValid(currentStep)) {
-      setCurrentStep((prev) => Math.min(prev + 1, 3));
+      setCurrentStep((prev) => Math.min(prev + 1, 4));
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -227,6 +253,8 @@ export default function OpenTicketPage() {
           description: formData.description,
           type: formData.type,
           priority: formData.priority,
+          department: formData.ticketDepartment,
+          category: formData.category || undefined,
         }),
       });
 
@@ -280,33 +308,148 @@ export default function OpenTicketPage() {
                 <div className="step-circle">
                   {currentStep > 1 ? '✓' : '1'}
                 </div>
-                <div className="step-label">Suas Informações</div>
+                <div className="step-label">Departamento</div>
               </div>
               <div className="step-line"></div>
               <div className={`step ${currentStep >= 2 ? 'active' : ''} ${currentStep > 2 ? 'completed' : ''}`}>
                 <div className="step-circle">
                   {currentStep > 2 ? '✓' : '2'}
                 </div>
+                <div className="step-label">Suas Informações</div>
+              </div>
+              <div className="step-line"></div>
+              <div className={`step ${currentStep >= 3 ? 'active' : ''} ${currentStep > 3 ? 'completed' : ''}`}>
+                <div className="step-circle">
+                  {currentStep > 3 ? '✓' : '3'}
+                </div>
                 <div className="step-label">Detalhes</div>
               </div>
               <div className="step-line"></div>
-              <div className={`step ${currentStep >= 3 ? 'active' : ''}`}>
-                <div className="step-circle">3</div>
+              <div className={`step ${currentStep >= 4 ? 'active' : ''}`}>
+                <div className="step-circle">4</div>
                 <div className="step-label">Confirmação</div>
               </div>
             </div>
 
             <div className="form-header">
-              <h1>Nova Solicitação de Apoio</h1>
-              <p>Preencha os dados para que possamos apoiar seu trabalho</p>
+              <h1>Central de Solicitações</h1>
+              <p>Abra uma solicitação para TI ou para o setor Administrativo</p>
             </div>
 
             {error && <div className="alert alert-error">{error}</div>}
 
             <form onSubmit={handleSubmit} className="ticket-form">
-              {/* Step 1: Personal Info */}
+              {/* Step 1: Choose Department */}
               {currentStep === 1 && (
                 <div className="form-step" data-step="1">
+                  <div className="step-card">
+                    <h2 className="section-title">Tipo de Solicitação</h2>
+                    <p className="section-subtitle">Selecione para qual departamento é sua solicitação</p>
+                    
+                    <div className="department-selection" role="radiogroup" aria-label="Tipo de Solicitação">
+                      <button
+                        type="button"
+                        className={`department-card ${formData.ticketDepartment === 'ti' ? 'active' : ''}`}
+                        onClick={() => {
+                          setFormData(prev => ({ 
+                            ...prev, 
+                            ticketDepartment: 'ti', 
+                            type: 'incident',
+                            category: '' 
+                          }));
+                        }}
+                        role="radio"
+                        aria-checked={formData.ticketDepartment === 'ti'}
+                      >
+                        <span className="department-icon">🖥️</span>
+                        <span className="department-name">Suporte de TI</span>
+                        <span className="department-desc">Problemas técnicos, acessos, instalação de software, equipamentos</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`department-card ${formData.ticketDepartment === 'administrativo' ? 'active' : ''}`}
+                        onClick={() => {
+                          setFormData(prev => ({ 
+                            ...prev, 
+                            ticketDepartment: 'administrativo', 
+                            type: 'request',
+                            category: '' 
+                          }));
+                        }}
+                        role="radio"
+                        aria-checked={formData.ticketDepartment === 'administrativo'}
+                      >
+                        <span className="department-icon">🏢</span>
+                        <span className="department-name">Solicitação Administrativa</span>
+                        <span className="department-desc">Cópia de chave, apoio em evento, buscar doação, documentos</span>
+                      </button>
+                    </div>
+
+                    {/* TI categories */}
+                    {formData.ticketDepartment === 'ti' && (
+                      <div className="form-group" style={{ marginTop: '1.5rem' }}>
+                        <label>
+                          Categoria <span className="required">*</span>
+                        </label>
+                        <div className="type-chips" role="radiogroup" aria-label="Categoria de TI">
+                          {TI_CATEGORIES.map((cat) => (
+                            <button
+                              key={cat.value}
+                              type="button"
+                              className={`chip ${formData.category === cat.value ? 'active' : ''}`}
+                              onClick={() => setFormData(prev => ({ ...prev, category: cat.value }))}
+                              role="radio"
+                              aria-checked={formData.category === cat.value}
+                            >
+                              <span className="chip-icon">{cat.icon}</span>
+                              <span className="chip-text">{cat.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Admin categories */}
+                    {formData.ticketDepartment === 'administrativo' && (
+                      <div className="form-group" style={{ marginTop: '1.5rem' }}>
+                        <label>
+                          Categoria <span className="required">*</span>
+                        </label>
+                        <div className="type-chips" role="radiogroup" aria-label="Categoria Administrativa">
+                          {ADMIN_CATEGORIES.map((cat) => (
+                            <button
+                              key={cat.value}
+                              type="button"
+                              className={`chip ${formData.category === cat.value ? 'active' : ''}`}
+                              onClick={() => setFormData(prev => ({ ...prev, category: cat.value }))}
+                              role="radio"
+                              aria-checked={formData.category === cat.value}
+                            >
+                              <span className="chip-icon">{cat.icon}</span>
+                              <span className="chip-text">{cat.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="step-actions">
+                    <button
+                      type="button"
+                      onClick={handleNextStep}
+                      className="btn btn-primary"
+                      disabled={!formData.ticketDepartment || !formData.category}
+                    >
+                      Continuar →
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2: Personal Info */}
+              {currentStep === 2 && (
+                <div className="form-step" data-step="2">
                   <div className="step-card">
                     <h2 className="section-title">Suas Informações</h2>
                     <p className="section-subtitle">Precisamos saber quem você é e onde trabalha</p>
@@ -394,9 +537,16 @@ export default function OpenTicketPage() {
                   <div className="step-actions">
                     <button
                       type="button"
+                      onClick={handlePrevStep}
+                      className="btn btn-secondary"
+                    >
+                      ← Voltar
+                    </button>
+                    <button
+                      type="button"
                       onClick={handleNextStep}
                       className="btn btn-primary"
-                      disabled={!isStepValid(1)}
+                      disabled={!isStepValid(2)}
                     >
                       Continuar →
                     </button>
@@ -404,9 +554,9 @@ export default function OpenTicketPage() {
                 </div>
               )}
 
-              {/* Step 2: Ticket Details */}
-              {currentStep === 2 && (
-                <div className="form-step" data-step="2">
+              {/* Step 3: Ticket Details */}
+              {currentStep === 3 && (
+                <div className="form-step" data-step="3">
                   <div className="step-card">
                     <h2 className="section-title">Detalhes da Solicitação</h2>
                     <p className="section-subtitle">Descreva o que você precisa</p>
@@ -465,54 +615,7 @@ export default function OpenTicketPage() {
                       )}
                     </div>
 
-                    {/* Type as Chips */}
-                    <div className="form-group">
-                      <label>
-                        Tipo de Solicitação <span className="required">*</span>
-                      </label>
-                      <div className="type-chips" role="radiogroup" aria-label="Tipo de Solicitação">
-                        <button
-                          type="button"
-                          className={`chip ${formData.type === 'incident' ? 'active' : ''}`}
-                          onClick={() => setFormData(prev => ({ ...prev, type: 'incident' }))}
-                          role="radio"
-                          aria-checked={formData.type === 'incident'}
-                        >
-                          <span className="chip-icon">🔧</span>
-                          <span className="chip-text">Problema Técnico</span>
-                        </button>
-                        <button
-                          type="button"
-                          className={`chip ${formData.type === 'request' ? 'active' : ''}`}
-                          onClick={() => setFormData(prev => ({ ...prev, type: 'request' }))}
-                          role="radio"
-                          aria-checked={formData.type === 'request'}
-                        >
-                          <span className="chip-icon">🔑</span>
-                          <span className="chip-text">Solicitação de Acesso</span>
-                        </button>
-                        <button
-                          type="button"
-                          className={`chip ${formData.type === 'change' ? 'active' : ''}`}
-                          onClick={() => setFormData(prev => ({ ...prev, type: 'change' }))}
-                          role="radio"
-                          aria-checked={formData.type === 'change'}
-                        >
-                          <span className="chip-icon">❓</span>
-                          <span className="chip-text">Dúvida</span>
-                        </button>
-                        <button
-                          type="button"
-                          className={`chip ${formData.type === 'problem' ? 'active' : ''}`}
-                          onClick={() => setFormData(prev => ({ ...prev, type: 'problem' }))}
-                          role="radio"
-                          aria-checked={formData.type === 'problem'}
-                        >
-                          <span className="chip-icon">💾</span>
-                          <span className="chip-text">Instalação de Software</span>
-                        </button>
-                      </div>
-                    </div>
+                    {/* Type is auto-set based on department; categories are selected in Step 1 */}
 
                     {/* Priority as Visual Scale */}
                     <div className="form-group">
@@ -573,7 +676,7 @@ export default function OpenTicketPage() {
                       type="button"
                       onClick={handleNextStep}
                       className="btn btn-primary"
-                      disabled={!isStepValid(2)}
+                      disabled={!isStepValid(3)}
                     >
                       Continuar →
                     </button>
@@ -581,14 +684,33 @@ export default function OpenTicketPage() {
                 </div>
               )}
 
-              {/* Step 3: Confirmation */}
-              {currentStep === 3 && (
-                <div className="form-step" data-step="3">
+              {/* Step 4: Confirmation */}
+              {currentStep === 4 && (
+                <div className="form-step" data-step="4">
                   <div className="step-card">
                     <h2 className="section-title">Confirmação</h2>
                     <p className="section-subtitle">Revise suas informações antes de enviar</p>
                     
                     <div className="confirmation-summary">
+                      <div className="summary-section">
+                        <h3>Departamento</h3>
+                        <div className="summary-item">
+                          <span className="summary-label">Tipo de Solicitação:</span>
+                          <span className="summary-value">
+                            {formData.ticketDepartment === 'ti' ? '🖥️ Suporte de TI' : '🏢 Solicitação Administrativa'}
+                          </span>
+                        </div>
+                        {formData.category && (
+                          <div className="summary-item">
+                            <span className="summary-label">Categoria:</span>
+                            <span className="summary-value">
+                              {[...TI_CATEGORIES, ...ADMIN_CATEGORIES].find(c => c.value === formData.category)?.icon}{' '}
+                              {[...TI_CATEGORIES, ...ADMIN_CATEGORIES].find(c => c.value === formData.category)?.label}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
                       <div className="summary-section">
                         <h3>Seus Dados</h3>
                         <div className="summary-item">
@@ -622,15 +744,6 @@ export default function OpenTicketPage() {
                         <div className="summary-item">
                           <span className="summary-label">Descrição:</span>
                           <span className="summary-value">{formData.description}</span>
-                        </div>
-                        <div className="summary-item">
-                          <span className="summary-label">Tipo:</span>
-                          <span className="summary-value">
-                            {formData.type === 'incident' && '🔧 Problema Técnico'}
-                            {formData.type === 'request' && '🔑 Solicitação de Acesso'}
-                            {formData.type === 'change' && '❓ Dúvida'}
-                            {formData.type === 'problem' && '💾 Instalação de Software'}
-                          </span>
                         </div>
                         <div className="summary-item">
                           <span className="summary-label">Impacto:</span>

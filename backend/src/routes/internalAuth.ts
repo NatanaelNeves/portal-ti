@@ -11,7 +11,7 @@ interface InternalUser {
   id: string;
   email: string;
   name: string;
-  role: 'it_staff' | 'manager' | 'admin';
+  role: 'it_staff' | 'admin_staff' | 'manager' | 'admin';
 }
 
 // Login for internal staff
@@ -95,9 +95,9 @@ router.post('/internal-register', validate(registerSchema), async (req: Request,
       return;
     }
 
-    // TI só pode criar outros TI, não pode criar admin ou gestor
-    if (decoded.role === 'it_staff' && role !== 'it_staff') {
-      res.status(403).json({ error: 'TI staff can only create other IT staff members' });
+    // TI só pode criar outros TI ou admin_staff, não pode criar admin ou gestor
+    if (decoded.role === 'it_staff' && role !== 'it_staff' && role !== 'admin_staff') {
+      res.status(403).json({ error: 'TI staff can only create IT staff or administrative staff members' });
       return;
     }
 
@@ -184,8 +184,8 @@ router.get('/users', async (req: Request, res: Response) => {
         role: string;
       };
 
-      // Admins, IT staff, and managers can list users
-      if (decoded.role !== 'admin' && decoded.role !== 'it_staff' && decoded.role !== 'manager') {
+      // Admins, IT staff, admin_staff, and managers can list users
+      if (decoded.role !== 'admin' && decoded.role !== 'it_staff' && decoded.role !== 'admin_staff' && decoded.role !== 'manager') {
         res.status(403).json({ error: 'Access denied' });
         return;
       }

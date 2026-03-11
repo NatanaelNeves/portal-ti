@@ -41,6 +41,7 @@ ticketsRouter.get('/', async (req: Request, res: Response) => {
     const search = req.query.search as string;
     const date_from = req.query.date_from as string;
     const date_to = req.query.date_to as string;
+    const departmentFilter = req.query.department as string; // 'ti' | 'administrativo'
     
     // Parâmetros de paginação
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
@@ -144,7 +145,7 @@ ticketsRouter.get('/', async (req: Request, res: Response) => {
         const decoded = jwt.verify(token, config.jwt.secret) as any;
         
         // Validar permissão para ver todos os chamados
-        const allowedRoles = [UserRole.IT_STAFF, UserRole.MANAGER, UserRole.ADMIN];
+        const allowedRoles = [UserRole.IT_STAFF, UserRole.ADMIN_STAFF, UserRole.MANAGER, UserRole.ADMIN];
         if (!allowedRoles.includes(decoded.role)) {
           return res.status(403).json({ 
             error: 'Acesso negado',
@@ -156,6 +157,20 @@ ticketsRouter.get('/', async (req: Request, res: Response) => {
         const conditions: string[] = [];
         const params: any[] = [];
         let paramCount = 1;
+
+        // Filtro por departamento do chamado
+        if (departmentFilter) {
+          conditions.push(`COALESCE(t.department, 'ti') = $${paramCount}`);
+          params.push(departmentFilter);
+          paramCount++;
+        } else if (decoded.role === UserRole.IT_STAFF) {
+          // TI só vê chamados de TI por padrão
+          conditions.push(`COALESCE(t.department, 'ti') = 'ti'`);
+        } else if (decoded.role === UserRole.ADMIN_STAFF) {
+          // Administrativo só vê chamados do administrativo por padrão
+          conditions.push(`COALESCE(t.department, 'ti') = 'administrativo'`);
+        }
+        // ADMIN e MANAGER veem todos se não filtrarem
 
         if (status && status.length > 0) {
           conditions.push(`t.status = ANY($${paramCount})`);
@@ -328,8 +343,8 @@ ticketsRouter.get('/:id', async (req: Request, res: Response) => {
       try {
         const decoded = jwt.verify(token, config.jwt.secret) as any;
         
-        // TI, Coordenador e Admin podem ver qualquer chamado
-        const allowedRoles = [UserRole.IT_STAFF, UserRole.MANAGER, UserRole.ADMIN];
+        // TI, Administrativo, Coordenador e Admin podem ver qualquer chamado
+        const allowedRoles = [UserRole.IT_STAFF, UserRole.ADMIN_STAFF, UserRole.MANAGER, UserRole.ADMIN];
         if (!allowedRoles.includes(decoded.role)) {
           return res.status(403).json({ error: 'Acesso negado' });
         }
@@ -370,10 +385,10 @@ ticketsRouter.get('/:id', async (req: Request, res: Response) => {
 ticketsRouter.post('/', validate(createTicketSchema), async (req: Request, res: Response) => {
   try {
     const userToken = req.headers['x-user-token'] as string;
-    const { title, description, type, priority } = req.body;
+    const { title, description, type, priority, department, category } = req.body;
 
     console.log('POST /tickets - Token:', userToken ? 'present' : 'missing');
-    console.log('POST /tickets - Body:', { title, description, type, priority });
+    console.log('POST /tickets - Body:', { title, description, type, priority, department, category });
 
     if (!userToken) {
       return res.status(401).json({ error: 'Token required' });
@@ -396,30 +411,43 @@ ticketsRouter.post('/', validate(createTicketSchema), async (req: Request, res: 
     const ticket = await database.query(
       `INSERT INTO tickets (
         requester_type, requester_id, title, description, 
-        type, priority, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        type, priority, status, department, category
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *`,
-      ['public', publicUser.rows[0].id, title, description, type || 'support', priority || 'medium', 'open']
+      ['public', publicUser.rows[0].id, title, description, type || 'support', priority || 'medium', 'open', department || 'ti', category || null]
     );
 
     console.log('POST /tickets - Ticket created:', ticket.rows[0].id);
 
-    // 📧 NOTIFICAÇÃO: Novo chamado para equipe de TI
+    // 📧 NOTIFICAÇÃO: Novo chamado para equipe responsável
     try {
-      const itUsers = await database.query(
+      // Direcionar notificação conforme departamento do chamado
+      const ticketDept = department || 'ti';
+      let targetRoles: string[];
+      
+      if (ticketDept === 'administrativo') {
+        // Notificar equipe administrativa
+        targetRoles = ['admin_staff', 'admin'];
+      } else {
+        // Notificar equipe de TI
+        targetRoles = ['it_staff', 'admin'];
+      }
+      
+      const staffUsers = await database.query(
         `SELECT email FROM internal_users 
-         WHERE role IN ('it_staff', 'admin') AND is_active = true`
+         WHERE role = ANY($1) AND is_active = true`,
+        [targetRoles]
       );
       
-      const itEmails = itUsers.rows.map((u: any) => u.email);
+      const staffEmails = staffUsers.rows.map((u: any) => u.email);
       
-      if (itEmails.length > 0) {
+      if (staffEmails.length > 0) {
         await EmailService.notifyNewTicket(
           ticket.rows[0].id,
           title,
           publicUser.rows[0].name,
           priority || 'medium',
-          itEmails
+          staffEmails
         );
       }
     } catch (emailError) {
@@ -472,8 +500,8 @@ ticketsRouter.get('/:id/messages', async (req: Request, res: Response) => {
       try {
         const decoded = jwt.verify(token, config.jwt.secret) as any;
         
-        // TI, Coordenador e Admin podem ver mensagens de qualquer chamado
-        const allowedRoles = [UserRole.IT_STAFF, UserRole.MANAGER, UserRole.ADMIN];
+        // TI, Administrativo, Coordenador e Admin podem ver mensagens de qualquer chamado
+        const allowedRoles = [UserRole.IT_STAFF, UserRole.ADMIN_STAFF, UserRole.MANAGER, UserRole.ADMIN];
         if (!allowedRoles.includes(decoded.role)) {
           return res.status(403).json({ error: 'Acesso negado' });
         }
@@ -696,11 +724,11 @@ ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (r
     try {
       const decoded = jwt.verify(token, config.jwt.secret) as any;
       
-      // AUTORIZAÇÃO: Apenas TI e Admin podem atualizar
-      if (![UserRole.IT_STAFF, UserRole.ADMIN].includes(decoded.role)) {
+      // AUTORIZAÇÃO: TI, Admin e Administrativo podem atualizar
+      if (![UserRole.IT_STAFF, UserRole.ADMIN_STAFF, UserRole.ADMIN].includes(decoded.role)) {
         return res.status(403).json({ 
           error: 'Acesso negado',
-          message: 'Apenas TI e Administradores podem atualizar chamados'
+          message: 'Apenas TI, Administrativo e Administradores podem atualizar chamados'
         });
       }
       

@@ -13,6 +13,8 @@ interface TicketDetail {
   status: string;
   priority: string;
   type: string;
+  department?: string;
+  category?: string;
   created_at: string;
   updated_at: string;
   resolved_at?: string;

@@ -234,6 +234,8 @@ export default function UsersManagementPage() {
         return 'Administrador';
       case 'it_staff':
         return 'Equipe de TI';
+      case 'admin_staff':
+        return 'Auxiliar Administrativo';
       case 'manager':
         return 'Gestor';
       default:
@@ -317,12 +319,13 @@ export default function UsersManagementPage() {
                   required
                 >
                   <option value="it_staff">Equipe de TI</option>
+                  <option value="admin_staff">Auxiliar Administrativo</option>
                   {isAdmin && <option value="manager">Gestor</option>}
                   {isAdmin && <option value="admin">Administrador</option>}
                 </select>
                 {!isAdmin && (
                   <small style={{ color: '#666', marginTop: '5px', display: 'block' }}>
-                    💡 Você pode adicionar apenas membros da equipe de TI
+                    💡 Você pode adicionar membros da equipe de TI ou Auxiliar Administrativo
                   </small>
                 )}
               </div>
@@ -443,6 +446,7 @@ export default function UsersManagementPage() {
                     required
                   >
                     <option value="it_staff">Equipe de TI</option>
+                    <option value="admin_staff">Auxiliar Administrativo</option>
                     <option value="manager">Gestor</option>
                     <option value="admin">Administrador</option>
                   </select>

@@ -1,6 +1,7 @@
 export enum UserRole {
   FINAL_USER = 'final_user',
   IT_STAFF = 'it_staff',
+  ADMIN_STAFF = 'admin_staff',
   MANAGER = 'manager',
   ADMIN = 'admin',
 }
@@ -12,6 +13,11 @@ export enum TicketStatus {
   RESOLVED = 'resolved',
   CLOSED = 'closed',
   CANCELLED = 'cancelled',
+}
+
+export enum TicketDepartment {
+  TI = 'ti',
+  ADMINISTRATIVO = 'administrativo',
 }
 
 export enum TicketType {
@@ -49,6 +55,8 @@ export interface Ticket {
   type: TicketType;
   priority: TicketPriority;
   status: TicketStatus;
+  department: TicketDepartment;
+  category?: string;
   requesterId: string;
   assignedToId?: string;
   departmentId?: string;

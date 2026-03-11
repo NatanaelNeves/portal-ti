@@ -2,6 +2,7 @@
 export enum UserRole {
   FINAL_USER = 'final_user',      // Usuário final
   IT_STAFF = 'it_staff',          // Equipe de TI
+  ADMIN_STAFF = 'admin_staff',    // Auxiliar Administrativo
   MANAGER = 'manager',            // Coordenação/Gestão
   ADMIN = 'admin',                // Administrador do sistema
 }
@@ -14,6 +15,12 @@ export enum TicketStatus {
   RESOLVED = 'resolved',          // Resolvido
   CLOSED = 'closed',              // Fechado
   CANCELLED = 'cancelled',        // Cancelado
+}
+
+// Departamento do chamado
+export enum TicketDepartment {
+  TI = 'ti',                      // Suporte de TI
+  ADMINISTRATIVO = 'administrativo', // Setor Administrativo
 }
 
 // Tipos de chamados

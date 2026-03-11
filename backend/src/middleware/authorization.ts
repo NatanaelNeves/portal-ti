@@ -18,10 +18,10 @@ declare global {
  */
 export const PERMISSIONS = {
   // Chamados
-  'tickets:view:all': [UserRole.IT_STAFF, UserRole.MANAGER, UserRole.ADMIN],
-  'tickets:update': [UserRole.IT_STAFF, UserRole.ADMIN],
+  'tickets:view:all': [UserRole.IT_STAFF, UserRole.ADMIN_STAFF, UserRole.MANAGER, UserRole.ADMIN],
+  'tickets:update': [UserRole.IT_STAFF, UserRole.ADMIN_STAFF, UserRole.ADMIN],
   'tickets:delete': [UserRole.ADMIN],
-  'tickets:assign': [UserRole.IT_STAFF, UserRole.ADMIN],
+  'tickets:assign': [UserRole.IT_STAFF, UserRole.ADMIN_STAFF, UserRole.ADMIN],
   
   // Estoque
   'inventory:view': [UserRole.IT_STAFF, UserRole.ADMIN],
@@ -46,6 +46,7 @@ export const PERMISSIONS = {
   // Dashboard
   'dashboard:admin': [UserRole.ADMIN],
   'dashboard:ti': [UserRole.IT_STAFF, UserRole.ADMIN],
+  'dashboard:administrativo': [UserRole.ADMIN_STAFF, UserRole.ADMIN],
   'dashboard:coordenador': [UserRole.MANAGER, UserRole.ADMIN],
 } as Record<string, UserRole[]>;
 
