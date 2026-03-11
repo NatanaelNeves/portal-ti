@@ -259,7 +259,11 @@ inventoryRouter.get('/equipment', async (req: Request, res: Response) => {
       SELECT DISTINCT ON (ie.id)
         ie.*,
         COALESCE(iu.name, rt.responsible_name) as responsible_name,
-        rt.issued_date as in_use_since
+        rt.issued_date as in_use_since,
+        rt.id as active_term_id,
+        rt.responsible_name as term_responsible_name,
+        rt.responsible_unit as term_responsible_unit,
+        rt.issued_date as term_issued_date
       FROM inventory_equipment ie
       LEFT JOIN internal_users iu ON ie.current_responsible_id = iu.id
       LEFT JOIN responsibility_terms rt ON ie.id = rt.equipment_id AND rt.status = 'active'
@@ -287,7 +291,26 @@ inventoryRouter.get('/equipment', async (req: Request, res: Response) => {
 
     const result = await database.query(query, params);
     
-    res.json({ equipment: result.rows, total: result.rows.length });
+    // Map active_term as nested object for frontend compatibility
+    const equipment = result.rows.map((row: any) => {
+      const { active_term_id, term_responsible_name, term_responsible_unit, term_issued_date, ...rest } = row;
+      return {
+        ...rest,
+        active_term: active_term_id ? {
+          id: active_term_id,
+          responsible_name: term_responsible_name,
+          responsible_unit: term_responsible_unit,
+          issued_date: term_issued_date
+        } : (rest.current_status === 'in_use' ? {
+          id: null,
+          responsible_name: rest.current_responsible_name || 'Sem termo',
+          responsible_unit: rest.current_unit || '',
+          issued_date: null
+        } : null)
+      };
+    });
+
+    res.json({ equipment, total: equipment.length });
   } catch (error: any) {
     console.error('Error fetching equipment:', error);
     res.status(500).json({ error: 'Failed to fetch equipment' });
@@ -686,7 +709,7 @@ inventoryRouter.post('/movements/return', async (req: Request, res: Response) =>
       return_condition,
       return_checklist,
       return_problems,
-      return_destination, // 'available', 'maintenance', 'retired'
+      return_destination, // 'available', 'maintenance', 'storage', 'disposal'
       received_by_id,
       received_by_name
     } = req.body;
@@ -704,7 +727,7 @@ inventoryRouter.post('/movements/return', async (req: Request, res: Response) =>
       return res.status(400).json({ error: 'Equipment is not in use' });
     }
 
-    // Buscar termo ativo
+    // Buscar termo ativo (pode não existir para equipamentos importados)
     const activeTerm = await database.query(`
       SELECT * FROM responsibility_terms 
       WHERE equipment_id = $1 AND status = 'active'
@@ -712,32 +735,36 @@ inventoryRouter.post('/movements/return', async (req: Request, res: Response) =>
       LIMIT 1
     `, [equipment_id]);
 
-    if (activeTerm.rows.length === 0) {
-      return res.status(400).json({ error: 'No active responsibility term found' });
-    }
-
-    const term = activeTerm.rows[0];
+    const term = activeTerm.rows.length > 0 ? activeTerm.rows[0] : null;
     const movement_number = await generateMovementNumber();
 
-    // Atualizar termo de responsabilidade
-    await database.query(`
-      UPDATE responsibility_terms
-      SET returned_date = CURRENT_DATE,
-          return_condition = $1,
-          return_checklist = $2,
-          return_problems = $3,
-          return_destination = $4,
-          received_by_id = $5,
-          received_by = $6,
-          status = 'returned',
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = $7
-    `, [
-      return_condition, JSON.stringify(return_checklist), return_problems,
-      return_destination, received_by_id, received_by_name, term.id
-    ]);
+    // Mapear destino para status válido do equipamento
+    let newStatus = return_destination || 'available';
+    if (newStatus === 'storage') newStatus = 'available';
+    if (newStatus === 'disposal') newStatus = 'retired';
+
+    // Se existe termo ativo, atualizar
+    if (term) {
+      await database.query(`
+        UPDATE responsibility_terms
+        SET returned_date = CURRENT_DATE,
+            return_condition = $1,
+            return_checklist = $2,
+            return_problems = $3,
+            return_destination = $4,
+            received_by_id = $5,
+            received_by = $6,
+            status = 'returned',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $7
+      `, [
+        return_condition, JSON.stringify(return_checklist || {}), return_problems,
+        return_destination, received_by_id, received_by_name, term.id
+      ]);
+    }
 
     // Criar movimentação de devolução
+    const eq = equipment.rows[0];
     await database.query(`
       INSERT INTO equipment_movements (
         movement_number, equipment_id, term_id, movement_type, movement_date,
@@ -745,8 +772,11 @@ inventoryRouter.post('/movements/return', async (req: Request, res: Response) =>
         condition_after, reason, registered_by_id, registered_by_name
       ) VALUES ($1, $2, $3, 'return', CURRENT_TIMESTAMP, $4, $5, $6, $7, $8, $9, $10, $11)
     `, [
-      movement_number, equipment_id, term.id,
-      term.responsible_id, term.responsible_name, term.responsible_unit, term.responsible_department,
+      movement_number, equipment_id, term ? term.id : null,
+      term ? term.responsible_id : eq.current_responsible_id,
+      term ? term.responsible_name : (eq.current_responsible_name || 'Desconhecido'),
+      term ? term.responsible_unit : eq.current_unit,
+      term ? term.responsible_department : null,
       return_condition, return_problems || 'Devolução', received_by_id, received_by_name
     ]);
 
@@ -761,8 +791,8 @@ inventoryRouter.post('/movements/return', async (req: Request, res: Response) =>
           updated_at = CURRENT_TIMESTAMP
       WHERE id = $4
     `, [
-      return_destination,
-      `Estoque TI - ${equipment.rows[0].current_unit}`,
+      newStatus,
+      `Estoque TI - ${eq.current_unit}`,
       return_condition,
       equipment_id
     ]);
@@ -770,7 +800,7 @@ inventoryRouter.post('/movements/return', async (req: Request, res: Response) =>
     res.status(200).json({ 
       message: 'Equipment returned successfully',
       movement_number,
-      term_id: term.id
+      term_id: term ? term.id : null
     });
   } catch (error: any) {
     console.error('Error returning equipment:', error);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api, { BACKEND_URL } from '../services/api';
 import '../styles/ReturnEquipmentPage.css';
 
@@ -37,6 +37,8 @@ interface ReturnForm {
 
 const ReturnEquipmentPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const preselectedId = searchParams.get('equipment') || '';
   const [inUseEquipment, setInUseEquipment] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -74,6 +76,16 @@ const ReturnEquipmentPage: React.FC = () => {
   useEffect(() => {
     fetchInUseEquipment();
   }, []);
+
+  // Auto-select equipment from query param
+  useEffect(() => {
+    if (preselectedId && inUseEquipment.length > 0) {
+      const found = inUseEquipment.find(eq => eq.id === preselectedId);
+      if (found) {
+        setFormData(prev => ({ ...prev, equipmentId: preselectedId }));
+      }
+    }
+  }, [preselectedId, inUseEquipment]);
 
   const fetchInUseEquipment = async () => {
     try {
@@ -136,11 +148,13 @@ const ReturnEquipmentPage: React.FC = () => {
         payload
       );
 
-      setSuccess('Equipamento devolvido com sucesso! Termo de devolução gerado.');
+      setSuccess('Equipamento devolvido com sucesso!');
       
-      // Abrir PDF do termo em nova aba
+      // Abrir PDF do termo em nova aba (somente se houver termo)
       const termId = response.data.term_id;
-      window.open(`${BACKEND_URL}/api/inventory/terms/${termId}/return-pdf`, '_blank');
+      if (termId) {
+        window.open(`${BACKEND_URL}/api/inventory/terms/${termId}/return-pdf`, '_blank');
+      }
 
       // Redirecionar após 2 segundos
       setTimeout(() => {
@@ -148,7 +162,7 @@ const ReturnEquipmentPage: React.FC = () => {
       }, 2000);
     } catch (err: any) {
       console.error('Erro ao devolver equipamento:', err);
-      setError(err.response?.data?.message || 'Erro ao devolver equipamento');
+      setError(err.response?.data?.error || err.response?.data?.message || 'Erro ao devolver equipamento');
     } finally {
       setLoading(false);
     }
@@ -185,7 +199,8 @@ const ReturnEquipmentPage: React.FC = () => {
               {inUseEquipment.map(eq => (
                 <option key={eq.id} value={eq.id}>
                   {eq.internal_code} - {eq.type} {eq.brand} {eq.model}
-                  {eq.active_term && ` (Em uso por: ${eq.active_term.responsible_name})`}
+                  {eq.active_term ? ` (Em uso por: ${eq.active_term.responsible_name})` : 
+                   eq.current_responsible_name ? ` (Em uso por: ${eq.current_responsible_name})` : ''}
                 </option>
               ))}
             </select>

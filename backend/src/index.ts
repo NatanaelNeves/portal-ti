@@ -53,10 +53,11 @@ app.get('/api/health', (_, res: Response) => {
 });
 
 // Self-restart endpoint — used by deploy workflow to force container restart
-app.post('/api/internal/restart', (req: Request, res: Response) => {
-  const token = req.headers['x-restart-token'];
+app.post('/api/internal/restart', (req, res) => {
+  const token = req.get('x-restart-token');
   if (!token || token !== (process.env.RESTART_TOKEN || 'deploy-restart-2026')) {
-    return res.status(403).json({ error: 'Forbidden' });
+    res.status(403).json({ error: 'Forbidden' });
+    return;
   }
   console.log('[RESTART] Restart requested via deploy workflow');
   res.json({ message: 'Restarting in 2 seconds...', version: BUILD_VERSION });
