@@ -52,6 +52,20 @@ app.get('/api/health', (_, res: Response) => {
   res.json({ status: 'ok', db: dbReady, version: BUILD_VERSION, build: BUILD_TIMESTAMP, timestamp: new Date().toISOString() });
 });
 
+// Self-restart endpoint — used by deploy workflow to force container restart
+app.post('/api/internal/restart', (req: Request, res: Response) => {
+  const token = req.headers['x-restart-token'];
+  if (!token || token !== (process.env.RESTART_TOKEN || 'deploy-restart-2026')) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  console.log('[RESTART] Restart requested via deploy workflow');
+  res.json({ message: 'Restarting in 2 seconds...', version: BUILD_VERSION });
+  setTimeout(() => {
+    console.log('[RESTART] Exiting process — Azure will auto-restart container');
+    process.exit(0);
+  }, 2000);
+});
+
 // Rotas da API (authLimiter desabilitado em desenvolvimento)
 app.use('/api/auth', require('./routes/auth').default);
 app.use('/api/public-auth', require('./routes/publicAuth').default);

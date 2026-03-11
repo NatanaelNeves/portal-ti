@@ -155,18 +155,51 @@ jobs:
           fi
           
           echo ""
-          echo "=== Step 2: Wait for app to restart and verify ==="
+          echo "=== Step 2: Wait for app to come up ==="
           sleep 30
+          APP_UP=false
           for i in 1 2 3 4 5 6 7 8; do
-            HTTP=$(curl -s -o /tmp/health-resp.txt -w "%{http_code}" \
-              "${APP}/api/health" --max-time 15)
+            HEALTH=$(curl -s "${APP}/api/health" --max-time 15 2>/dev/null || echo "")
+            HTTP=$(curl -s -o /dev/null -w "%{http_code}" "${APP}/api/health" --max-time 15)
             echo "Health check $i: HTTP $HTTP"
             if [ "$HTTP" = "200" ]; then
+              APP_UP=true
               echo "App is running!"
-              cat /tmp/health-resp.txt 2>/dev/null || true
-              exit 0
+              echo "$HEALTH"
+              
+              # Check if running the new version
+              RUNNING_VERSION=$(echo "$HEALTH" | grep -o '"version":"[^"]*"' | cut -d'"' -f4)
+              echo "Running version: $RUNNING_VERSION"
+              break
             fi
             sleep 15
           done
-          echo "App may still be starting — check ${APP}"
-          echo "Deploy completed. Container restart may take a few more minutes."
+          
+          if [ "$APP_UP" = "true" ]; then
+            echo ""
+            echo "=== Step 3: Trigger self-restart to ensure new code is loaded ==="
+            RESTART_RESP=$(curl -s -o /tmp/restart-resp.txt -w "%{http_code}" \
+              -X POST "${APP}/api/internal/restart" \
+              -H "X-Restart-Token: deploy-restart-2026" \
+              -H "Content-Type: application/json" \
+              --max-time 10)
+            echo "Restart endpoint HTTP: $RESTART_RESP"
+            cat /tmp/restart-resp.txt 2>/dev/null || true
+            echo ""
+            
+            echo "Waiting for app to restart with new code..."
+            sleep 30
+            for i in 1 2 3 4 5 6; do
+              HTTP=$(curl -s -o /tmp/health2.txt -w "%{http_code}" \
+                "${APP}/api/health" --max-time 15)
+              echo "Post-restart check $i: HTTP $HTTP"
+              if [ "$HTTP" = "200" ]; then
+                echo "App restarted successfully!"
+                cat /tmp/health2.txt 2>/dev/null || true
+                exit 0
+              fi
+              sleep 15
+            done
+          fi
+          
+          echo "Deploy completed. App may need a few more minutes to fully restart."
