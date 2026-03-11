@@ -57,13 +57,7 @@ interface ReturnTermData {
   };
   inspection: {
     condition: string;
-    checklist: {
-      screen?: boolean;
-      keyboard?: boolean;
-      touchpad?: boolean;
-      charger?: boolean;
-      battery?: boolean;
-    };
+    checklist: Record<string, boolean>;
     notes?: string;
   };
   returnReason: string;
@@ -230,9 +224,9 @@ export class PDFService {
     doc.fontSize(12).font('Helvetica-Bold').text('RESPONSÁVEL:', { underline: true });
     doc.moveDown(0.5);
     doc.font('Helvetica').fontSize(10);
-    doc.text(`Nome: ${data.responsible.name.toUpperCase()}`);
-    doc.text(`Setor: ${data.responsible.department}`);
-    doc.text(`Unidade: ${data.responsible.unit}`);
+    doc.text(`Nome: ${(data.responsible.name || 'N/A').toUpperCase()}`);
+    doc.text(`Setor: ${data.responsible.department || 'N/A'}`);
+    doc.text(`Unidade: ${data.responsible.unit || 'N/A'}`);
     doc.moveDown();
 
     // Linha divisória
@@ -243,8 +237,12 @@ export class PDFService {
     doc.fontSize(12).font('Helvetica-Bold').text('HISTÓRICO:', { underline: true });
     doc.moveDown(0.5);
     doc.font('Helvetica').fontSize(10);
-    doc.text(`Entrega: ${data.history.deliveryDate.toLocaleDateString('pt-BR')}`);
-    doc.text(`Devolução: ${data.history.returnDate.toLocaleDateString('pt-BR')}`);
+    const fmtDelivery = data.history.deliveryDate instanceof Date && !isNaN(data.history.deliveryDate.getTime())
+      ? data.history.deliveryDate.toLocaleDateString('pt-BR') : 'N/A';
+    const fmtReturn = data.history.returnDate instanceof Date && !isNaN(data.history.returnDate.getTime())
+      ? data.history.returnDate.toLocaleDateString('pt-BR') : 'N/A';
+    doc.text(`Entrega: ${fmtDelivery}`);
+    doc.text(`Devolução: ${fmtReturn}`);
     doc.text(`Tempo de uso: ${data.history.daysInUse} dias`);
     if (data.history.deliveryTermFile) {
       doc.text(`Termo entrega: ${data.history.deliveryTermFile}`);
@@ -260,29 +258,42 @@ export class PDFService {
     doc.moveDown(0.5);
     doc.font('Helvetica').fontSize(10);
     
-    const conditionEmoji = 
-      data.inspection.condition === 'perfect' ? '🟢' :
-      data.inspection.condition === 'good' ? '🟡' :
-      data.inspection.condition === 'regular' ? '🟠' : '🔴';
+    const conditionLabel = 
+      data.inspection.condition === 'perfect' ? '[EXCELENTE]' :
+      data.inspection.condition === 'excellent' ? '[EXCELENTE]' :
+      data.inspection.condition === 'good' ? '[BOM]' :
+      data.inspection.condition === 'fair' ? '[REGULAR]' :
+      data.inspection.condition === 'regular' ? '[REGULAR]' :
+      data.inspection.condition === 'poor' ? '[RUIM]' :
+      data.inspection.condition === 'damaged' ? '[DANIFICADO]' : '[N/A]';
     
-    doc.text(`Estado Geral: ${conditionEmoji} ${data.inspection.condition.toUpperCase()}`);
+    doc.text(`Estado Geral: ${conditionLabel} ${(data.inspection.condition || 'N/A').toUpperCase()}`);
     doc.moveDown(0.5);
     
+    // Render checklist - handle both old keys (screen/keyboard) and new keys (physicalIntegrity/accessories)
+    const cl = data.inspection.checklist || {};
     doc.text('Checklist:');
-    if (data.inspection.checklist.screen !== undefined) {
-      doc.text(`[${data.inspection.checklist.screen ? '✓' : ' '}] Tela sem trincas`);
+    const checkItems: Array<{key: string, label: string}> = [
+      { key: 'physicalIntegrity', label: 'Integridade fisica' },
+      { key: 'accessories', label: 'Acessorios incluidos' },
+      { key: 'powerCable', label: 'Cabo de energia/carregador' },
+      { key: 'functionalTest', label: 'Teste funcional' },
+      { key: 'cleaningDone', label: 'Limpeza realizada' },
+      { key: 'screen', label: 'Tela sem trincas' },
+      { key: 'keyboard', label: 'Teclado funcionando' },
+      { key: 'touchpad', label: 'Touchpad funcionando' },
+      { key: 'charger', label: 'Carregador incluido' },
+      { key: 'battery', label: 'Bateria com carga' },
+    ];
+    let hasCheckItems = false;
+    for (const item of checkItems) {
+      if ((cl as any)[item.key] !== undefined) {
+        doc.text(`[${(cl as any)[item.key] ? 'X' : ' '}] ${item.label}`);
+        hasCheckItems = true;
+      }
     }
-    if (data.inspection.checklist.keyboard !== undefined) {
-      doc.text(`[${data.inspection.checklist.keyboard ? '✓' : ' '}] Teclado funcionando`);
-    }
-    if (data.inspection.checklist.touchpad !== undefined) {
-      doc.text(`[${data.inspection.checklist.touchpad ? '✓' : ' '}] Touchpad funcionando`);
-    }
-    if (data.inspection.checklist.charger !== undefined) {
-      doc.text(`[${data.inspection.checklist.charger ? '✓' : ' '}] Carregador incluído`);
-    }
-    if (data.inspection.checklist.battery !== undefined) {
-      doc.text(`[${data.inspection.checklist.battery ? '✓' : ' '}] Bateria com carga`);
+    if (!hasCheckItems) {
+      doc.text('  Nenhum item verificado');
     }
     doc.moveDown(0.5);
     
@@ -304,7 +315,7 @@ export class PDFService {
     doc.moveDown(0.5);
     doc.font('Helvetica').fontSize(10);
     doc.text(
-      `Eu, ${data.responsible.name.toUpperCase()}, declaro que devolvi o equipamento acima em perfeitas condições, conforme vistoria, e não possuo mais responsabilidade sobre o mesmo.`,
+      `Eu, ${(data.responsible.name || 'N/A').toUpperCase()}, declaro que devolvi o equipamento acima em perfeitas condições, conforme vistoria, e não possuo mais responsabilidade sobre o mesmo.`,
       { width: 495, align: 'justify' }
     );
     doc.moveDown();
@@ -322,16 +333,18 @@ export class PDFService {
     
     // Assinatura responsável
     doc.text('_'.repeat(40), 50, signatureY);
-    doc.text(data.responsible.name.toUpperCase(), 50, signatureY + 15, { width: 200 });
+    doc.text((data.responsible.name || 'N/A').toUpperCase(), 50, signatureY + 15, { width: 200 });
     doc.text('Responsável que Devolveu', 50, signatureY + 30, { width: 200 });
 
     // Assinatura recebedor
     doc.text('_'.repeat(40), 320, signatureY);
-    doc.text(data.receivedBy.name.toUpperCase(), 320, signatureY + 15, { width: 200 });
+    doc.text((data.receivedBy.name || 'N/A').toUpperCase(), 320, signatureY + 15, { width: 200 });
     doc.text('Responsável que Recebeu', 320, signatureY + 30, { width: 200 });
 
     doc.moveDown(4);
-    doc.text(`${data.location}, ${data.history.returnDate.toLocaleDateString('pt-BR')}`, { align: 'center' });
+    const fmtReturnDate = data.history.returnDate instanceof Date && !isNaN(data.history.returnDate.getTime())
+      ? data.history.returnDate.toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
+    doc.text(`${data.location}, ${fmtReturnDate}`, { align: 'center' });
     doc.moveDown(2);
 
     // Linha divisória

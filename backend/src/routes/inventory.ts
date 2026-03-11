@@ -972,20 +972,32 @@ inventoryRouter.get('/terms/:termId/return-pdf', async (req: Request, res: Respo
     const returnDate = new Date(term.returned_date);
     const daysInUse = Math.floor((returnDate.getTime() - deliveryDate.getTime()) / (1000 * 60 * 60 * 24));
 
+    // Parse checklist safely (could be JSON string, object, or null)
+    let checklist = {};
+    try {
+      if (term.return_checklist) {
+        checklist = typeof term.return_checklist === 'string'
+          ? JSON.parse(term.return_checklist)
+          : term.return_checklist;
+      }
+    } catch (e) {
+      console.warn('Failed to parse return_checklist:', e);
+    }
+
     const pdfData = {
       movementNumber: term.movement_number || 'N/A',
       equipment: {
-        category: term.category,
-        type: term.type,
-        brand: term.brand,
-        model: term.model,
-        internalCode: term.internal_code,
-        serialNumber: term.serial_number
+        category: term.category || 'N/A',
+        type: term.type || 'N/A',
+        brand: term.brand || 'N/A',
+        model: term.model || 'N/A',
+        internalCode: term.internal_code || 'N/A',
+        serialNumber: term.serial_number || 'N/A'
       },
       responsible: {
-        name: term.responsible_name,
-        department: term.responsible_department,
-        unit: term.responsible_unit
+        name: term.responsible_name || 'N/A',
+        department: term.responsible_department || 'N/A',
+        unit: term.responsible_unit || 'N/A'
       },
       history: {
         deliveryDate,
@@ -994,14 +1006,14 @@ inventoryRouter.get('/terms/:termId/return-pdf', async (req: Request, res: Respo
         deliveryTermFile: term.delivery_term_pdf
       },
       inspection: {
-        condition: term.return_condition,
-        checklist: term.return_checklist ? JSON.parse(term.return_checklist) : {},
-        notes: term.return_problems
+        condition: term.return_condition || 'N/A',
+        checklist,
+        notes: term.return_problems || ''
       },
       returnReason: 'Devolução regular',
-      returnDestination: term.return_destination,
+      returnDestination: term.return_destination || 'available',
       receivedBy: {
-        name: term.received_by
+        name: term.received_by || 'N/A'
       },
       location: `Maracanaú/CE`
     };
