@@ -77,66 +77,77 @@ jobs:
             }' \
             -w "\nHTTP Status: %{http_code}\n"
 
-      - name: Clear stuck deployment lock
+      - name: Force-clear stuck deployment lock
         env:
           KUDU_USER: ${{ secrets.AZURE_KUDU_USER }}
           KUDU_PASS: ${{ secrets.AZURE_KUDU_PASS }}
         run: |
-          echo "=== Checking for stuck deployments ==="
-          curl -s \
-            "https://portal-ti-backend.scm.azurewebsites.net/api/deployments" \
-            --user "${KUDU_USER}:${KUDU_PASS}" \
-            | head -c 500 || true
-          echo ""
-          echo "=== Clearing deployment lock ==="
+          echo "=== Killing Kudu SCM process to release all locks ==="
           curl -s -X DELETE \
-            "https://portal-ti-backend.scm.azurewebsites.net/api/vfs/site/deployments/active" \
+            "https://portal-ti-backend.scm.azurewebsites.net/api/processes/0" \
             --user "${KUDU_USER}:${KUDU_PASS}" \
-            -w "\nHTTP Status: %{http_code}\n" || true
-          echo "=== Waiting 5s for lock release ==="
-          sleep 5
+            -w "\nKill SCM HTTP Status: %{http_code}\n" || true
+          
+          echo "=== Waiting 15s for SCM restart ==="
+          sleep 15
+          
+          echo "=== Deleting deployment lock files via command API ==="
+          curl -s -X POST \
+            "https://portal-ti-backend.scm.azurewebsites.net/api/command" \
+            --user "${KUDU_USER}:${KUDU_PASS}" \
+            -H "Content-Type: application/json" \
+            -d '{"command":"rm -rf /home/site/locks/deployment && echo LOCKS_CLEARED","dir":"/home"}' \
+            -w "\nCommand HTTP Status: %{http_code}\n" || true
+          
+          echo "=== Verifying SCM is responding ==="
+          for i in 1 2 3 4 5; do
+            HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
+              "https://portal-ti-backend.scm.azurewebsites.net/api/deployments" \
+              --user "${KUDU_USER}:${KUDU_PASS}")
+            echo "Check $i: HTTP $HTTP"
+            if [ "$HTTP" = "200" ]; then
+              echo "SCM is back online!"
+              break
+            fi
+            sleep 5
+          done
 
-      - name: Deploy to Azure Web App (Kudu ZIP deploy - async)
+      - name: Deploy to Azure Web App (OneDeploy API)
         env:
           KUDU_USER: ${{ secrets.AZURE_KUDU_USER }}
           KUDU_PASS: ${{ secrets.AZURE_KUDU_PASS }}
         run: |
-          echo "=== Starting async ZIP deploy ==="
+          echo "=== Starting deploy via OneDeploy API ==="
           HTTP_CODE=$(curl -s -o /tmp/deploy-response.txt -w "%{http_code}" \
             -X POST \
-            "https://portal-ti-backend.scm.azurewebsites.net/api/zipdeploy?isAsync=true" \
+            "https://portal-ti-backend.scm.azurewebsites.net/api/publish?type=zip&async=true&restart=true&clean=true" \
             --user "${KUDU_USER}:${KUDU_PASS}" \
             --data-binary @backend-deploy.zip \
             -H "Content-Type: application/zip")
           
           echo "HTTP Status: $HTTP_CODE"
-          cat /tmp/deploy-response.txt || true
+          cat /tmp/deploy-response.txt 2>/dev/null || true
+          echo ""
           
           if [ "$HTTP_CODE" = "202" ] || [ "$HTTP_CODE" = "200" ]; then
             echo "Deploy request accepted!"
           elif [ "$HTTP_CODE" = "409" ]; then
-            echo "409 Conflict — retrying after restart..."
-            # Force restart to clear stuck deployment
-            curl -s -X POST \
-              "https://portal-ti-backend.scm.azurewebsites.net/api/diagnostics/runtime/restart" \
-              --user "${KUDU_USER}:${KUDU_PASS}" \
-              -w "\nRestart HTTP Status: %{http_code}\n" || true
-            sleep 30
-            
+            echo "409 still happening — trying zipdeploy as fallback..."
             HTTP_CODE=$(curl -s -o /tmp/deploy-response.txt -w "%{http_code}" \
               -X POST \
               "https://portal-ti-backend.scm.azurewebsites.net/api/zipdeploy?isAsync=true" \
               --user "${KUDU_USER}:${KUDU_PASS}" \
               --data-binary @backend-deploy.zip \
               -H "Content-Type: application/zip")
-            echo "Retry HTTP Status: $HTTP_CODE"
+            echo "Fallback HTTP Status: $HTTP_CODE"
             if [ "$HTTP_CODE" != "202" ] && [ "$HTTP_CODE" != "200" ]; then
-              cat /tmp/deploy-response.txt || true
-              echo "Deploy failed after retry"
+              cat /tmp/deploy-response.txt 2>/dev/null || true
+              echo "All deploy methods failed. You may need to restart the App Service from Azure Portal."
               exit 1
             fi
           else
-            echo "Unexpected status $HTTP_CODE — aborting."
+            cat /tmp/deploy-response.txt 2>/dev/null || true
+            echo "Unexpected status $HTTP_CODE"
             exit 1
           fi
           
@@ -153,14 +164,14 @@ jobs:
             
             if [ "$COMPLETE" = "true" ]; then
               if [ "$STATUS" = "4" ]; then
-                echo "✅ Deploy succeeded!"
+                echo "Deploy succeeded!"
                 exit 0
               else
-                echo "❌ Deploy completed with error status: $STATUS"
+                echo "Deploy completed with error status: $STATUS"
                 echo "$DEPLOY_INFO" | head -c 1000
                 exit 1
               fi
             fi
           done
-          echo "⚠️ Deploy polling timed out (5 min) — check Azure portal"
+          echo "Deploy polling timed out (5 min) — check Azure portal"
           exit 1
