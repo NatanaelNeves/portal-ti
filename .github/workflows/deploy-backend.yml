@@ -43,23 +43,14 @@ jobs:
           ls -la dist/
           ls dist/index.js && echo "dist/index.js OK" || (echo "dist/index.js MISSING" && exit 1)
 
-      - name: Install production dependencies only
-        working-directory: ./backend
-        run: |
-          rm -rf node_modules
-          npm ci --omit=dev
-
-      - name: Package deployment artifact
+      - name: Prepare deployment artifact
         run: |
           mkdir -p backend-deploy
           cp -r backend/dist         backend-deploy/
-          cp -r backend/node_modules backend-deploy/
           cp backend/package*.json   backend-deploy/
-          [ -f backend/web.config ] && cp backend/web.config backend-deploy/
-          cd backend-deploy
-          zip -r ../backend-deploy.zip .
-          echo "=== Artifact size ==="
-          ls -lh ../backend-deploy.zip
+          echo "=== Artifact contents ==="
+          find backend-deploy/dist -name "*.js" | wc -l
+          echo " JS files ready for deploy"
 
       - name: Configure Azure App Settings via Kudu
         env:
@@ -78,55 +69,66 @@ jobs:
             }' \
             -w "\nHTTP Status: %{http_code}\n"
 
-      - name: Deploy to Azure App Service
+      - name: Deploy files via Kudu VFS API
         env:
           KUDU_USER: ${{ secrets.AZURE_KUDU_USER }}
           KUDU_PASS: ${{ secrets.AZURE_KUDU_PASS }}
         run: |
           SCM="https://portal-ti-backend.scm.azurewebsites.net"
           APP="https://portal-ti-backend.azurewebsites.net"
+          WWWROOT="${SCM}/api/vfs/site/wwwroot"
           
-          echo "=== Step 1: Upload zip via VFS ==="
-          for attempt in 1 2 3; do
-            HTTP_CODE=$(curl -s -o /tmp/upload-resp.txt -w "%{http_code}" \
-              -X PUT \
-              "${SCM}/api/vfs/tmp/backend-deploy.zip" \
+          echo "=== Step 1: Upload dist/ files via VFS ==="
+          upload_file() {
+            local SRC="$1" DEST="$2"
+            # Ensure parent directory exists (VFS needs trailing / for dirs)
+            local DIR=$(dirname "$DEST")
+            if [ "$DIR" != "." ]; then
+              curl -s -o /dev/null -X PUT "${WWWROOT}/${DIR}/" \
+                --user "${KUDU_USER}:${KUDU_PASS}" \
+                -H "If-Match: *" \
+                --max-time 15 || true
+            fi
+            HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
+              -X PUT "${WWWROOT}/${DEST}" \
               --user "${KUDU_USER}:${KUDU_PASS}" \
               -H "If-Match: *" \
-              --data-binary @backend-deploy.zip \
-              --max-time 120)
-            echo "Upload attempt $attempt: HTTP $HTTP_CODE"
-            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "204" ]; then
-              echo "Upload OK"
-              break
+              -H "Content-Type: application/octet-stream" \
+              --data-binary "@${SRC}" \
+              --max-time 60)
+            echo "  ${DEST}: HTTP ${HTTP}"
+            if [ "$HTTP" != "200" ] && [ "$HTTP" != "201" ] && [ "$HTTP" != "204" ]; then
+              echo "  WARNING: Upload failed for ${DEST}"
+              return 1
             fi
-            echo "Retrying in 15s..."
-            sleep 15
+            return 0
+          }
+          
+          # Upload all compiled JS files from dist/
+          cd backend-deploy
+          find dist -name "*.js" -type f | while read FILE; do
+            upload_file "$FILE" "$FILE"
           done
           
-          echo "=== Step 2: Unzip to wwwroot ==="
-          HTTP_CODE=$(curl -s -o /tmp/cmd-resp.txt -w "%{http_code}" \
-            -X POST \
-            "${SCM}/api/command" \
+          # Upload package.json
+          upload_file "package.json" "package.json"
+          
+          echo "=== Step 2: Verify new files on server ==="
+          curl -s -X POST "${SCM}/api/command" \
             --user "${KUDU_USER}:${KUDU_PASS}" \
             -H "Content-Type: application/json" \
-            -d '{"command":"rm -rf /home/site/wwwroot/* && unzip -o /tmp/backend-deploy.zip -d /home/site/wwwroot/ && echo DEPLOY_OK","dir":"/tmp"}' \
-            --max-time 120)
-          echo "Unzip HTTP: $HTTP_CODE"
-          cat /tmp/cmd-resp.txt 2>/dev/null | head -20 || true
+            -d '{"command":"grep BUILD_VERSION /home/site/wwwroot/dist/index.js | head -1","dir":"/"}' \
+            --max-time 15 | jq -r '.Output // "Could not verify"'
           
-          echo "=== Step 3: Kill node process to force container restart ==="
-          # Kill all node processes so Azure restarts the container with new code
-          curl -s -o /tmp/kill-resp.txt -w "Kill HTTP: %{http_code}\n" \
-            -X POST \
-            "${SCM}/api/command" \
-            --user "${KUDU_USER}:${KUDU_PASS}" \
-            -H "Content-Type: application/json" \
-            -d '{"command":"pkill -f \"node /home/site/wwwroot\" || pkill node || echo NO_NODE_PROCESS","dir":"/tmp"}' \
-            --max-time 30 || true
-          cat /tmp/kill-resp.txt 2>/dev/null || true
+          echo "=== Step 3: Restart app via self-restart endpoint ==="
+          HTTP=$(curl -s -o /tmp/restart-resp.txt -w "%{http_code}" \
+            -X POST "${APP}/api/internal/restart" \
+            -H "X-Restart-Token: deploy-restart-2026" \
+            --max-time 15)
+          echo "Restart HTTP: $HTTP"
+          cat /tmp/restart-resp.txt 2>/dev/null || true
           
-          echo "=== Step 4: Wait for app to restart ==="
+          echo "=== Step 4: Wait for app to come back ==="
           sleep 30
           for i in 1 2 3 4 5 6 7 8 9 10; do
             HTTP=$(curl -s -o /tmp/health.txt -w "%{http_code}" \
