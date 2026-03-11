@@ -45,7 +45,7 @@ app.use('/api/', generalLimiter);
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Health check — always responds, independent of DB status
-const BUILD_VERSION = 'v2026.06.14a';
+const BUILD_VERSION = 'v2026.06.14b';
 const BUILD_TIMESTAMP = new Date().toISOString();
 let dbReady = false;
 app.get('/api/health', (_, res: Response) => {
@@ -82,8 +82,8 @@ app.use('/api/reports', require('./routes/reports').default);
 
 // Error handling
 app.use((err: any, req: any, res: Response, next: any) => {
-  console.error('Error:', err);
-  res.status(500).json({ error: 'Internal server error' });
+  console.error('Error:', err?.message || err, err?.stack);
+  res.status(500).json({ error: 'Internal server error', details: err?.message || String(err) });
 });
 
 // Start server — listen FIRST, connect DB after
