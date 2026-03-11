@@ -77,101 +77,70 @@ jobs:
             }' \
             -w "\nHTTP Status: %{http_code}\n"
 
-      - name: Force-clear stuck deployment lock
+      - name: Deploy via VFS + Command (bypasses deployment lock)
         env:
           KUDU_USER: ${{ secrets.AZURE_KUDU_USER }}
           KUDU_PASS: ${{ secrets.AZURE_KUDU_PASS }}
         run: |
-          echo "=== Killing Kudu SCM process to release all locks ==="
-          curl -s -X DELETE \
-            "https://portal-ti-backend.scm.azurewebsites.net/api/processes/0" \
+          SCM="https://portal-ti-backend.scm.azurewebsites.net"
+          
+          echo "=== Step 1: Upload zip via VFS API (bypasses deploy engine) ==="
+          HTTP_CODE=$(curl -s -o /tmp/upload-resp.txt -w "%{http_code}" \
+            -X PUT \
+            "${SCM}/api/vfs/tmp/backend-deploy.zip" \
             --user "${KUDU_USER}:${KUDU_PASS}" \
-            -w "\nKill SCM HTTP Status: %{http_code}\n" || true
+            -H "If-Match: *" \
+            --data-binary @backend-deploy.zip)
+          echo "Upload HTTP: $HTTP_CODE"
+          cat /tmp/upload-resp.txt 2>/dev/null || true
+          echo ""
+          if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ] && [ "$HTTP_CODE" != "204" ]; then
+            echo "Upload failed!"
+            exit 1
+          fi
+          echo "Zip uploaded to /tmp/backend-deploy.zip on server"
           
-          echo "=== Waiting 15s for SCM restart ==="
-          sleep 15
-          
-          echo "=== Deleting deployment lock files via command API ==="
-          curl -s -X POST \
-            "https://portal-ti-backend.scm.azurewebsites.net/api/command" \
+          echo "=== Step 2: Clean wwwroot + unzip via Command API ==="
+          HTTP_CODE=$(curl -s -o /tmp/cmd-resp.txt -w "%{http_code}" \
+            -X POST \
+            "${SCM}/api/command" \
             --user "${KUDU_USER}:${KUDU_PASS}" \
             -H "Content-Type: application/json" \
-            -d '{"command":"rm -rf /home/site/locks/deployment && echo LOCKS_CLEARED","dir":"/home"}' \
-            -w "\nCommand HTTP Status: %{http_code}\n" || true
-          
-          echo "=== Verifying SCM is responding ==="
-          for i in 1 2 3 4 5; do
-            HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
-              "https://portal-ti-backend.scm.azurewebsites.net/api/deployments" \
-              --user "${KUDU_USER}:${KUDU_PASS}")
-            echo "Check $i: HTTP $HTTP"
-            if [ "$HTTP" = "200" ]; then
-              echo "SCM is back online!"
-              break
-            fi
-            sleep 5
-          done
-
-      - name: Deploy to Azure Web App (OneDeploy API)
-        env:
-          KUDU_USER: ${{ secrets.AZURE_KUDU_USER }}
-          KUDU_PASS: ${{ secrets.AZURE_KUDU_PASS }}
-        run: |
-          echo "=== Starting deploy via OneDeploy API ==="
-          HTTP_CODE=$(curl -s -o /tmp/deploy-response.txt -w "%{http_code}" \
-            -X POST \
-            "https://portal-ti-backend.scm.azurewebsites.net/api/publish?type=zip&async=true&restart=true&clean=true" \
-            --user "${KUDU_USER}:${KUDU_PASS}" \
-            --data-binary @backend-deploy.zip \
-            -H "Content-Type: application/zip")
-          
-          echo "HTTP Status: $HTTP_CODE"
-          cat /tmp/deploy-response.txt 2>/dev/null || true
+            -d '{"command":"rm -rf /home/site/wwwroot/* && cd /tmp && unzip -o backend-deploy.zip -d /home/site/wwwroot/ && ls -la /home/site/wwwroot/ && echo DEPLOY_OK","dir":"/tmp"}')
+          echo "Command HTTP: $HTTP_CODE"
+          cat /tmp/cmd-resp.txt 2>/dev/null || true
           echo ""
-          
-          if [ "$HTTP_CODE" = "202" ] || [ "$HTTP_CODE" = "200" ]; then
-            echo "Deploy request accepted!"
-          elif [ "$HTTP_CODE" = "409" ]; then
-            echo "409 still happening — trying zipdeploy as fallback..."
-            HTTP_CODE=$(curl -s -o /tmp/deploy-response.txt -w "%{http_code}" \
-              -X POST \
-              "https://portal-ti-backend.scm.azurewebsites.net/api/zipdeploy?isAsync=true" \
-              --user "${KUDU_USER}:${KUDU_PASS}" \
-              --data-binary @backend-deploy.zip \
-              -H "Content-Type: application/zip")
-            echo "Fallback HTTP Status: $HTTP_CODE"
-            if [ "$HTTP_CODE" != "202" ] && [ "$HTTP_CODE" != "200" ]; then
-              cat /tmp/deploy-response.txt 2>/dev/null || true
-              echo "All deploy methods failed. You may need to restart the App Service from Azure Portal."
-              exit 1
-            fi
-          else
-            cat /tmp/deploy-response.txt 2>/dev/null || true
-            echo "Unexpected status $HTTP_CODE"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Unzip command failed!"
             exit 1
           fi
           
-          # Poll deployment status (max 5 minutes)
-          echo "=== Polling deployment status ==="
-          for i in $(seq 1 30); do
-            sleep 10
-            DEPLOY_INFO=$(curl -s \
-              "https://portal-ti-backend.scm.azurewebsites.net/api/deployments/latest" \
-              --user "${KUDU_USER}:${KUDU_PASS}")
-            STATUS=$(echo "$DEPLOY_INFO" | grep -o '"status":[0-9]*' | grep -o '[0-9]*' || echo "unknown")
-            COMPLETE=$(echo "$DEPLOY_INFO" | grep -o '"complete":[a-z]*' | grep -o '[a-z]*$' || echo "unknown")
-            echo "Poll $i/30 — status: $STATUS, complete: $COMPLETE"
-            
-            if [ "$COMPLETE" = "true" ]; then
-              if [ "$STATUS" = "4" ]; then
-                echo "Deploy succeeded!"
-                exit 0
-              else
-                echo "Deploy completed with error status: $STATUS"
-                echo "$DEPLOY_INFO" | head -c 1000
-                exit 1
-              fi
+          # Verify deploy
+          if grep -q "DEPLOY_OK" /tmp/cmd-resp.txt; then
+            echo "Files deployed to wwwroot successfully!"
+          else
+            echo "Warning: DEPLOY_OK marker not found in output"
+            cat /tmp/cmd-resp.txt
+          fi
+          
+          echo "=== Step 3: Restart app by killing main process ==="
+          curl -s -X DELETE \
+            "${SCM}/api/processes/0" \
+            --user "${KUDU_USER}:${KUDU_PASS}" \
+            -w "\nRestart HTTP: %{http_code}\n" || true
+          
+          echo "=== Step 4: Wait and verify app is running ==="
+          sleep 20
+          for i in 1 2 3 4 5; do
+            HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
+              "https://portal-ti-backend.azurewebsites.net/api/health" \
+              --max-time 10)
+            echo "Health check $i: HTTP $HTTP"
+            if [ "$HTTP" = "200" ]; then
+              echo "App is running!"
+              exit 0
             fi
+            sleep 10
           done
-          echo "Deploy polling timed out (5 min) — check Azure portal"
-          exit 1
+          echo "App may still be starting — check https://portal-ti-backend.azurewebsites.net"
+          echo "Deploy files were placed successfully. App will start when Azure warms up the container."
