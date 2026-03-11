@@ -60,6 +60,18 @@ jobs:
           echo "=== Artifact size ==="
           ls -lh ../backend-deploy.zip
 
+      - name: Set CORS_ORIGIN app setting via Kudu
+        env:
+          KUDU_USER: ${{ secrets.AZURE_KUDU_USER }}
+          KUDU_PASS: ${{ secrets.AZURE_KUDU_PASS }}
+        run: |
+          curl -s -X POST \
+            "https://portal-ti-backend.scm.azurewebsites.net/api/settings" \
+            --user "${KUDU_USER}:${KUDU_PASS}" \
+            -H "Content-Type: application/json" \
+            -d '{"CORS_ORIGIN":"https://green-ocean-096bd050f.2.azurestaticapps.net"}' \
+            -w "\nHTTP Status: %{http_code}\n"
+
       - name: Deploy to Azure Web App (Kudu ZIP deploy)
         env:
           KUDU_USER: ${{ secrets.AZURE_KUDU_USER }}

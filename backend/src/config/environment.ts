@@ -33,7 +33,10 @@ export const config = {
     expiration: process.env.JWT_EXPIRATION || '7d',
   },
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    // Suporta múltiplas origens separadas por vírgula, ex: "https://app.com,http://localhost:3000"
+    origin: process.env.CORS_ORIGIN
+      ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+      : ['http://localhost:3000', 'http://localhost:5173'],
   },
   email: {
     enabled: process.env.EMAIL_ENABLED === 'true',
