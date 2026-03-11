@@ -60,43 +60,107 @@ jobs:
           echo "=== Artifact size ==="
           ls -lh ../backend-deploy.zip
 
-      - name: Set CORS_ORIGIN app setting via Kudu
+      - name: Configure Azure App Settings via Kudu
         env:
           KUDU_USER: ${{ secrets.AZURE_KUDU_USER }}
           KUDU_PASS: ${{ secrets.AZURE_KUDU_PASS }}
         run: |
+          echo "=== Setting app config ==="
           curl -s -X POST \
             "https://portal-ti-backend.scm.azurewebsites.net/api/settings" \
             --user "${KUDU_USER}:${KUDU_PASS}" \
             -H "Content-Type: application/json" \
-            -d '{"CORS_ORIGIN":"https://green-ocean-096bd050f.2.azurestaticapps.net"}' \
+            -d '{
+              "CORS_ORIGIN":"https://green-ocean-096bd050f.2.azurestaticapps.net",
+              "SCM_DO_BUILD_DURING_DEPLOYMENT":"false",
+              "WEBSITE_RUN_FROM_PACKAGE":"0"
+            }' \
             -w "\nHTTP Status: %{http_code}\n"
 
-      - name: Deploy to Azure Web App (Kudu ZIP deploy)
+      - name: Clear stuck deployment lock
         env:
           KUDU_USER: ${{ secrets.AZURE_KUDU_USER }}
           KUDU_PASS: ${{ secrets.AZURE_KUDU_PASS }}
         run: |
-          for attempt in 1 2 3 4 5 6 7 8; do
-            echo "=== Deploy attempt $attempt ==="
+          echo "=== Checking for stuck deployments ==="
+          curl -s \
+            "https://portal-ti-backend.scm.azurewebsites.net/api/deployments" \
+            --user "${KUDU_USER}:${KUDU_PASS}" \
+            | head -c 500 || true
+          echo ""
+          echo "=== Clearing deployment lock ==="
+          curl -s -X DELETE \
+            "https://portal-ti-backend.scm.azurewebsites.net/api/vfs/site/deployments/active" \
+            --user "${KUDU_USER}:${KUDU_PASS}" \
+            -w "\nHTTP Status: %{http_code}\n" || true
+          echo "=== Waiting 5s for lock release ==="
+          sleep 5
+
+      - name: Deploy to Azure Web App (Kudu ZIP deploy - async)
+        env:
+          KUDU_USER: ${{ secrets.AZURE_KUDU_USER }}
+          KUDU_PASS: ${{ secrets.AZURE_KUDU_PASS }}
+        run: |
+          echo "=== Starting async ZIP deploy ==="
+          HTTP_CODE=$(curl -s -o /tmp/deploy-response.txt -w "%{http_code}" \
+            -X POST \
+            "https://portal-ti-backend.scm.azurewebsites.net/api/zipdeploy?isAsync=true" \
+            --user "${KUDU_USER}:${KUDU_PASS}" \
+            --data-binary @backend-deploy.zip \
+            -H "Content-Type: application/zip")
+          
+          echo "HTTP Status: $HTTP_CODE"
+          cat /tmp/deploy-response.txt || true
+          
+          if [ "$HTTP_CODE" = "202" ] || [ "$HTTP_CODE" = "200" ]; then
+            echo "Deploy request accepted!"
+          elif [ "$HTTP_CODE" = "409" ]; then
+            echo "409 Conflict — retrying after restart..."
+            # Force restart to clear stuck deployment
+            curl -s -X POST \
+              "https://portal-ti-backend.scm.azurewebsites.net/api/diagnostics/runtime/restart" \
+              --user "${KUDU_USER}:${KUDU_PASS}" \
+              -w "\nRestart HTTP Status: %{http_code}\n" || true
+            sleep 30
+            
             HTTP_CODE=$(curl -s -o /tmp/deploy-response.txt -w "%{http_code}" \
               -X POST \
-              "https://portal-ti-backend.scm.azurewebsites.net/api/zipdeploy" \
+              "https://portal-ti-backend.scm.azurewebsites.net/api/zipdeploy?isAsync=true" \
               --user "${KUDU_USER}:${KUDU_PASS}" \
               --data-binary @backend-deploy.zip \
               -H "Content-Type: application/zip")
-            echo "HTTP Status: $HTTP_CODE"
-            cat /tmp/deploy-response.txt || true
-            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "202" ]; then
-              echo "Deploy succeeded!"
-              exit 0
-            elif [ "$HTTP_CODE" = "409" ]; then
-              echo "Another deployment in progress — waiting 60s before retry..."
-              sleep 60
-            else
-              echo "Unexpected status $HTTP_CODE — aborting."
+            echo "Retry HTTP Status: $HTTP_CODE"
+            if [ "$HTTP_CODE" != "202" ] && [ "$HTTP_CODE" != "200" ]; then
+              cat /tmp/deploy-response.txt || true
+              echo "Deploy failed after retry"
               exit 1
             fi
+          else
+            echo "Unexpected status $HTTP_CODE — aborting."
+            exit 1
+          fi
+          
+          # Poll deployment status (max 5 minutes)
+          echo "=== Polling deployment status ==="
+          for i in $(seq 1 30); do
+            sleep 10
+            DEPLOY_INFO=$(curl -s \
+              "https://portal-ti-backend.scm.azurewebsites.net/api/deployments/latest" \
+              --user "${KUDU_USER}:${KUDU_PASS}")
+            STATUS=$(echo "$DEPLOY_INFO" | grep -o '"status":[0-9]*' | grep -o '[0-9]*' || echo "unknown")
+            COMPLETE=$(echo "$DEPLOY_INFO" | grep -o '"complete":[a-z]*' | grep -o '[a-z]*$' || echo "unknown")
+            echo "Poll $i/30 — status: $STATUS, complete: $COMPLETE"
+            
+            if [ "$COMPLETE" = "true" ]; then
+              if [ "$STATUS" = "4" ]; then
+                echo "✅ Deploy succeeded!"
+                exit 0
+              else
+                echo "❌ Deploy completed with error status: $STATUS"
+                echo "$DEPLOY_INFO" | head -c 1000
+                exit 1
+              fi
+            fi
           done
-          echo "All attempts failed (409 persists)."
+          echo "⚠️ Deploy polling timed out (5 min) — check Azure portal"
           exit 1
