@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BACKEND_URL } from '../services/api';
 import InventoryLayout from '../components/InventoryLayout';
+import { EditEquipmentDialog, DeleteEquipmentDialog, EquipmentData } from '../components/EquipmentDialogs';
 import '../styles/InventoryPage.css';
 import { INSTITUTION_UNITS } from '../utils/institutionOptions';
 
@@ -50,11 +51,37 @@ export default function InventoryPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [unitFilter, setUnitFilter] = useState('all');
 
+  // Edit/Delete state
+  const [editEquipment, setEditEquipment] = useState<EquipmentData | null>(null);
+  const [deleteEquipment, setDeleteEquipment] = useState<{id: string; internal_code: string; brand?: string; model?: string; current_status?: string} | null>(null);
+  const [showEdit, setShowEdit] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+
   const units = INSTITUTION_UNITS;
 
   useEffect(() => {
     fetchData();
   }, [activeTab]);
+
+  const handleEdit = async (id: string) => {
+    try {
+      const token = localStorage.getItem('internal_token');
+      const response = await fetch(`${BACKEND_URL}/api/inventory/equipment/${id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error('Erro ao carregar');
+      const data = await response.json();
+      setEditEquipment(data.equipment);
+      setShowEdit(true);
+    } catch (err) {
+      alert('Erro ao carregar dados do equipamento');
+    }
+  };
+
+  const handleDelete = (item: { id: string; internal_code: string; brand?: string; model?: string; current_status?: string }) => {
+    setDeleteEquipment(item);
+    setShowDelete(true);
+  };
 
   const fetchData = async () => {
     try {
@@ -310,16 +337,27 @@ export default function InventoryPage() {
                             <span className="no-responsible">—</span>
                           )}
                         </td>
-                        <td>
-                          <button 
-                            className="btn-table-action"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/inventario/equipamento/${notebook.id}`);
-                            }}
-                          >
-                            📄 Ver
-                          </button>
+                        <td onClick={e => e.stopPropagation()}>
+                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                            <button 
+                              className="btn-table-action"
+                              onClick={() => navigate(`/inventario/equipamento/${notebook.id}`)}
+                            >
+                              📄 Ver
+                            </button>
+                            <button 
+                              className="btn-table-edit"
+                              onClick={() => handleEdit(notebook.id)}
+                            >
+                              ✏️ Editar
+                            </button>
+                            <button 
+                              className="btn-table-delete"
+                              onClick={() => handleDelete(notebook)}
+                            >
+                              🗑️
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -378,16 +416,28 @@ export default function InventoryPage() {
                       </div>
                     </div>
 
-                    <div className="card-footer-peripheral">
-                      <button 
-                        className="btn-card-action"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/inventario/equipamento/${peripheral.id}`);
-                        }}
-                      >
-                        📄 Ver Detalhes
-                      </button>
+                    <div className="card-footer-peripheral" onClick={e => e.stopPropagation()}>
+                      <div style={{ display: 'flex', gap: '6px', width: '100%' }}>
+                        <button 
+                          className="btn-card-action"
+                          style={{ flex: 1 }}
+                          onClick={() => navigate(`/inventario/equipamento/${peripheral.id}`)}
+                        >
+                          📄 Ver
+                        </button>
+                        <button 
+                          className="btn-card-edit"
+                          onClick={() => handleEdit(peripheral.id)}
+                        >
+                          ✏️ Editar
+                        </button>
+                        <button 
+                          className="btn-card-delete"
+                          onClick={() => handleDelete(peripheral)}
+                        >
+                          🗑️
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -397,6 +447,26 @@ export default function InventoryPage() {
         )}
 
       </div>
+
+      {/* Edit Dialog */}
+      {editEquipment && (
+        <EditEquipmentDialog
+          equipment={editEquipment}
+          open={showEdit}
+          onClose={() => { setShowEdit(false); setEditEquipment(null); }}
+          onSaved={fetchData}
+        />
+      )}
+
+      {/* Delete Dialog */}
+      {deleteEquipment && (
+        <DeleteEquipmentDialog
+          equipment={deleteEquipment}
+          open={showDelete}
+          onClose={() => { setShowDelete(false); setDeleteEquipment(null); }}
+          onDeleted={fetchData}
+        />
+      )}
     </InventoryLayout>
   );
 }

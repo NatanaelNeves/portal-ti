@@ -383,6 +383,111 @@ inventoryRouter.get('/equipment/:id', async (req: Request, res: Response) => {
   }
 });
 
+// PUT - Atualizar equipamento
+inventoryRouter.put('/equipment/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const {
+      brand, model, serial_number, description,
+      processor, memory_ram, storage, screen_size, operating_system,
+      physical_condition, current_status, current_location, current_unit,
+      acquisition_date, purchase_value, warranty_expiration, notes, type
+    } = req.body;
+
+    // Verificar se existe
+    const existing = await database.query('SELECT id, category FROM inventory_equipment WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Equipamento não encontrado' });
+    }
+
+    const fields: string[] = [];
+    const values: any[] = [];
+    let idx = 1;
+
+    const addField = (name: string, value: any) => {
+      if (value !== undefined) {
+        fields.push(`${name} = $${idx++}`);
+        values.push(value);
+      }
+    };
+
+    addField('brand', brand);
+    addField('model', model);
+    addField('serial_number', serial_number);
+    addField('description', description);
+    addField('processor', processor);
+    addField('memory_ram', memory_ram);
+    addField('storage', storage);
+    addField('screen_size', screen_size);
+    addField('operating_system', operating_system);
+    addField('physical_condition', physical_condition);
+    addField('current_status', current_status);
+    addField('current_location', current_location);
+    addField('current_unit', current_unit);
+    addField('acquisition_date', acquisition_date || null);
+    addField('purchase_value', purchase_value || null);
+    addField('warranty_expiration', warranty_expiration || null);
+    addField('notes', notes);
+    addField('type', type);
+
+    if (fields.length === 0) {
+      return res.status(400).json({ error: 'Nenhum campo para atualizar' });
+    }
+
+    fields.push(`updated_at = NOW()`);
+    values.push(id);
+
+    const result = await database.query(
+      `UPDATE inventory_equipment SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`,
+      values
+    );
+
+    console.log(`✏️ Equipment updated: ${id}`);
+    res.json({ equipment: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error updating equipment:', error);
+    res.status(500).json({ error: 'Erro ao atualizar equipamento' });
+  }
+});
+
+// DELETE - Excluir equipamento
+inventoryRouter.delete('/equipment/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Verificar se existe
+    const existing = await database.query('SELECT id, internal_code, current_status FROM inventory_equipment WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Equipamento não encontrado' });
+    }
+
+    // Verificar se está em uso (não permitir deletar se em uso)
+    if (existing.rows[0].current_status === 'in_use') {
+      return res.status(400).json({ error: 'Não é possível excluir equipamento que está em uso. Faça a devolução primeiro.' });
+    }
+
+    // Verificar se tem termos ativos
+    const activeTerms = await database.query(
+      'SELECT id FROM responsibility_terms WHERE equipment_id = $1 AND status = \'active\'',
+      [id]
+    );
+    if (activeTerms.rows.length > 0) {
+      return res.status(400).json({ error: 'Não é possível excluir equipamento com termos de responsabilidade ativos.' });
+    }
+
+    // Deletar registros relacionados na ordem correta
+    await database.query('DELETE FROM equipment_movements WHERE equipment_id = $1', [id]);
+    await database.query('DELETE FROM responsibility_terms WHERE equipment_id = $1', [id]);
+    await database.query('DELETE FROM inventory_equipment WHERE id = $1', [id]);
+
+    console.log(`🗑️ Equipment deleted: ${existing.rows[0].internal_code} (${id})`);
+    res.json({ message: 'Equipamento excluído com sucesso' });
+  } catch (error: any) {
+    console.error('Error deleting equipment:', error);
+    res.status(500).json({ error: 'Erro ao excluir equipamento' });
+  }
+});
+
 // ===== MOVIMENTAÇÕES - ENTREGA =====
 
 // POST - Entregar equipamento

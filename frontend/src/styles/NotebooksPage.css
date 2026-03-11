@@ -413,6 +413,10 @@
 .nb-btn-move:hover { background: #bfdbfe; }
 .nb-btn-return { background: #fef9c3; color: #a16207; }
 .nb-btn-return:hover { background: #fef08a; }
+.nb-btn-edit { background: #eef2ff; color: #6366f1; }
+.nb-btn-edit:hover { background: #6366f1; color: #fff; }
+.nb-btn-del { background: #fef2f2; color: #dc2626; font-size: 11px; }
+.nb-btn-del:hover { background: #dc2626; color: #fff; }
 
 /* EMPTY STATE */
 .nb-empty-page, .nb-empty {

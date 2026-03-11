@@ -2,6 +2,7 @@
 import { useNavigate } from 'react-router-dom';
 import InventoryLayout from '../components/InventoryLayout';
 import { ExcelExportService } from '../services/excelExportService';
+import { EditEquipmentDialog, DeleteEquipmentDialog, EquipmentData } from '../components/EquipmentDialogs';
 import '../styles/NotebooksPage.css';
 import { BACKEND_URL } from '../services/api';
 
@@ -71,9 +72,11 @@ interface ModelGroupProps {
   search: string;
   statusFilter: string;
   onNavigate: (path: string) => void;
+  onEdit: (id: string) => void;
+  onDelete: (nb: Notebook) => void;
 }
 
-function ModelGroup({ groupKey, notebooks, colorIdx, search, statusFilter, onNavigate }: ModelGroupProps) {
+function ModelGroup({ groupKey, notebooks, colorIdx, search, statusFilter, onNavigate, onEdit, onDelete }: ModelGroupProps) {
   const [expanded, setExpanded] = useState(true);
   const color = BRAND_COLORS[colorIdx % BRAND_COLORS.length];
 
@@ -193,6 +196,9 @@ function ModelGroup({ groupKey, notebooks, colorIdx, search, statusFilter, onNav
                         <button className="nb-btn nb-btn-view" onClick={() => onNavigate(`/inventario/equipamento/${nb.id}`)}>
                           Ver
                         </button>
+                        <button className="nb-btn nb-btn-edit" onClick={() => onEdit(nb.id)}>
+                          Editar
+                        </button>
                         {(['available','in_stock'].includes(nb.current_status)) && (
                           <button className="nb-btn nb-btn-deliver" onClick={() => onNavigate('/inventario/equipamentos/entregar')}>
                             Entregar
@@ -208,6 +214,9 @@ function ModelGroup({ groupKey, notebooks, colorIdx, search, statusFilter, onNav
                             </button>
                           </>
                         )}
+                        <button className="nb-btn nb-btn-del" onClick={() => onDelete(nb)}>
+                          🗑️
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -233,7 +242,33 @@ export default function NotebooksPage() {
   const [brandFilter, setBrandFilter] = useState('all');
   const navigate = useNavigate();
 
+  // Edit/Delete state
+  const [editEquipment, setEditEquipment] = useState<EquipmentData | null>(null);
+  const [deleteEquipment, setDeleteEquipment] = useState<{id: string; internal_code: string; brand?: string; model?: string; current_status?: string} | null>(null);
+  const [showEdit, setShowEdit] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+
   useEffect(() => { fetchNotebooks(); }, []);
+
+  const handleEdit = async (id: string) => {
+    try {
+      const token = localStorage.getItem('internal_token');
+      const response = await fetch(`${BACKEND_URL}/api/inventory/equipment/${id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error('Erro ao carregar');
+      const data = await response.json();
+      setEditEquipment(data.equipment);
+      setShowEdit(true);
+    } catch (err) {
+      alert('Erro ao carregar dados do equipamento');
+    }
+  };
+
+  const handleDelete = (nb: {id: string; internal_code: string; brand?: string; model?: string; current_status?: string}) => {
+    setDeleteEquipment(nb);
+    setShowDelete(true);
+  };
 
   const fetchNotebooks = async () => {
     try {
@@ -399,10 +434,32 @@ export default function NotebooksPage() {
               search={search}
               statusFilter={statusFilter}
               onNavigate={navigate}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
             />
           ))
         )}
       </div>
+
+      {/* Edit Dialog */}
+      {editEquipment && (
+        <EditEquipmentDialog
+          equipment={editEquipment}
+          open={showEdit}
+          onClose={() => { setShowEdit(false); setEditEquipment(null); }}
+          onSaved={fetchNotebooks}
+        />
+      )}
+
+      {/* Delete Dialog */}
+      {deleteEquipment && (
+        <DeleteEquipmentDialog
+          equipment={deleteEquipment}
+          open={showDelete}
+          onClose={() => { setShowDelete(false); setDeleteEquipment(null); }}
+          onDeleted={fetchNotebooks}
+        />
+      )}
     </InventoryLayout>
   );
 }

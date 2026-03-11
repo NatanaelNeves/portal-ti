@@ -1,0 +1,366 @@
+/* ============================================================
+   Equipment Edit/Delete Dialogs
+   ============================================================ */
+
+.eq-dialog-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: eqFadeIn 0.2s ease;
+}
+
+@keyframes eqFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.eq-dialog {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  width: 95%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  animation: eqSlideUp 0.25s ease;
+}
+
+.eq-dialog-edit {
+  max-width: 700px;
+}
+
+.eq-dialog-delete {
+  max-width: 480px;
+}
+
+@keyframes eqSlideUp {
+  from { transform: translateY(30px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Header */
+.eq-dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.eq-dialog-header h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+  color: #1f2937;
+}
+
+.eq-dialog-code {
+  background: #f3f4f6;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: monospace;
+  color: #6b7280;
+}
+
+.eq-dialog-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: #9ca3af;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+.eq-dialog-close:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.eq-dialog-header-danger {
+  border-bottom-color: #fecaca;
+  background: #fef2f2;
+}
+.eq-dialog-header-danger h2 {
+  color: #dc2626;
+}
+
+/* Body */
+.eq-dialog-body {
+  overflow-y: auto;
+  padding: 20px;
+  flex: 1;
+}
+
+.eq-dialog-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin: 12px 20px 0;
+}
+
+/* Sections */
+.eq-dialog-section {
+  margin-bottom: 16px;
+}
+.eq-dialog-section h3 {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+/* Grid */
+.eq-dialog-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 600px) {
+  .eq-dialog-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Fields */
+.eq-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.eq-field label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #4b5563;
+}
+.eq-field input,
+.eq-field select {
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #1f2937;
+  background: #fff;
+  transition: border-color 0.15s;
+}
+.eq-field input:focus,
+.eq-field select:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.eq-textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #1f2937;
+  resize: vertical;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.eq-textarea:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+/* Footer */
+.eq-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.eq-btn-cancel {
+  padding: 8px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  color: #4b5563;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.eq-btn-cancel:hover {
+  background: #f9fafb;
+}
+
+.eq-btn-save {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 6px;
+  background: #6366f1;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.eq-btn-save:hover {
+  background: #4f46e5;
+}
+.eq-btn-save:disabled {
+  background: #a5b4fc;
+  cursor: not-allowed;
+}
+
+.eq-btn-delete {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 6px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.eq-btn-delete:hover {
+  background: #b91c1c;
+}
+.eq-btn-delete:disabled {
+  background: #fca5a5;
+  cursor: not-allowed;
+}
+
+/* Delete dialog specifics */
+.eq-delete-warning {
+  text-align: center;
+  padding: 10px 0;
+}
+.eq-delete-icon {
+  font-size: 40px;
+  margin-bottom: 8px;
+}
+.eq-delete-warning p {
+  font-size: 14px;
+  color: #4b5563;
+  margin: 6px 0;
+}
+.eq-delete-info {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 10px;
+  margin: 10px 0;
+  font-size: 14px;
+  color: #1f2937;
+}
+.eq-delete-note {
+  color: #dc2626 !important;
+  font-weight: 500;
+  font-size: 13px !important;
+}
+
+.eq-confirm-field {
+  margin-top: 12px;
+}
+.eq-confirm-field label {
+  display: block;
+  font-size: 13px;
+  color: #4b5563;
+  margin-bottom: 6px;
+}
+.eq-confirm-field input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  text-align: center;
+  font-family: monospace;
+  box-sizing: border-box;
+}
+.eq-confirm-field input:focus {
+  outline: none;
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+/* Action buttons in tables */
+.btn-table-edit,
+.btn-table-delete {
+  padding: 4px 10px;
+  border: 1px solid;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.btn-table-edit {
+  color: #6366f1;
+  border-color: #c7d2fe;
+  background: #eef2ff;
+}
+.btn-table-edit:hover {
+  background: #6366f1;
+  color: #fff;
+}
+
+.btn-table-delete {
+  color: #dc2626;
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+.btn-table-delete:hover {
+  background: #dc2626;
+  color: #fff;
+}
+
+/* Card action buttons (peripherals) */
+.btn-card-edit,
+.btn-card-delete {
+  padding: 6px 12px;
+  border: 1px solid;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.15s;
+  flex: 1;
+}
+
+.btn-card-edit {
+  color: #6366f1;
+  border-color: #c7d2fe;
+  background: #eef2ff;
+}
+.btn-card-edit:hover {
+  background: #6366f1;
+  color: #fff;
+}
+
+.btn-card-delete {
+  color: #dc2626;
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+.btn-card-delete:hover {
+  background: #dc2626;
+  color: #fff;
+}
