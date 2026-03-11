@@ -55,6 +55,7 @@ jobs:
           cp -r backend/dist         backend-deploy/
           cp -r backend/node_modules backend-deploy/
           cp backend/package*.json   backend-deploy/
+          [ -f backend/web.config ] && cp backend/web.config backend-deploy/
           cd backend-deploy
           zip -r ../backend-deploy.zip .
           echo "=== Artifact size ==="
