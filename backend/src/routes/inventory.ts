@@ -765,20 +765,35 @@ inventoryRouter.post('/movements/return', async (req: Request, res: Response) =>
 
     // Criar movimentação de devolução
     const eq = equipment.rows[0];
-    await database.query(`
-      INSERT INTO equipment_movements (
-        movement_number, equipment_id, term_id, movement_type, movement_date,
-        from_user_id, from_user_name, from_unit, from_department,
-        condition_after, reason, registered_by_id, registered_by_name
-      ) VALUES ($1, $2, $3, 'return', CURRENT_TIMESTAMP, $4, $5, $6, $7, $8, $9, $10, $11)
-    `, [
-      movement_number, equipment_id, term ? term.id : null,
-      term ? term.responsible_id : eq.current_responsible_id,
-      term ? term.responsible_name : (eq.current_responsible_name || 'Desconhecido'),
-      term ? term.responsible_unit : eq.current_unit,
-      term ? term.responsible_department : null,
-      return_condition, return_problems || 'Devolução', received_by_id, received_by_name
-    ]);
+    
+    // registered_by_id é NOT NULL — usar received_by_id ou buscar um admin
+    let registeredById = received_by_id;
+    if (!registeredById) {
+      // Buscar primeiro admin/TI user como fallback
+      const adminUser = await database.query(`
+        SELECT id FROM internal_users WHERE role IN ('admin', 'ti_staff') LIMIT 1
+      `);
+      registeredById = adminUser.rows.length > 0 ? adminUser.rows[0].id : null;
+    }
+
+    if (registeredById) {
+      await database.query(`
+        INSERT INTO equipment_movements (
+          movement_number, equipment_id, term_id, movement_type, movement_date,
+          from_user_id, from_user_name, from_unit, from_department,
+          condition_after, reason, registered_by_id, registered_by_name
+        ) VALUES ($1, $2, $3, 'return', CURRENT_TIMESTAMP, $4, $5, $6, $7, $8, $9, $10, $11)
+      `, [
+        movement_number, equipment_id, term ? term.id : null,
+        term ? term.responsible_id : eq.current_responsible_id,
+        term ? term.responsible_name : (eq.current_responsible_name || 'Desconhecido'),
+        term ? term.responsible_unit : eq.current_unit,
+        term ? term.responsible_department : null,
+        return_condition, return_problems || 'Devolução', registeredById, received_by_name || 'Sistema'
+      ]);
+    } else {
+      console.warn('⚠️ No registered_by_id available for movement, skipping movement record');
+    }
 
     // Atualizar status do equipamento
     await database.query(`
@@ -803,8 +818,8 @@ inventoryRouter.post('/movements/return', async (req: Request, res: Response) =>
       term_id: term ? term.id : null
     });
   } catch (error: any) {
-    console.error('Error returning equipment:', error);
-    res.status(500).json({ error: 'Failed to return equipment' });
+    console.error('Error returning equipment:', error?.message || error);
+    res.status(500).json({ error: 'Failed to return equipment', details: error?.message || String(error) });
   }
 });
 
