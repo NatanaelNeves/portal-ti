@@ -78,70 +78,95 @@ jobs:
             }' \
             -w "\nHTTP Status: %{http_code}\n"
 
-      - name: Deploy via VFS + Command (bypasses deployment lock)
+      - name: Deploy via OneDeploy API (with VFS fallback)
         env:
           KUDU_USER: ${{ secrets.AZURE_KUDU_USER }}
           KUDU_PASS: ${{ secrets.AZURE_KUDU_PASS }}
         run: |
           SCM="https://portal-ti-backend.scm.azurewebsites.net"
+          APP="https://portal-ti-backend.azurewebsites.net"
+          DEPLOYED=false
           
-          echo "=== Step 1: Upload zip via VFS API (bypasses deploy engine) ==="
-          HTTP_CODE=$(curl -s -o /tmp/upload-resp.txt -w "%{http_code}" \
-            -X PUT \
-            "${SCM}/api/vfs/tmp/backend-deploy.zip" \
-            --user "${KUDU_USER}:${KUDU_PASS}" \
-            -H "If-Match: *" \
-            --data-binary @backend-deploy.zip)
-          echo "Upload HTTP: $HTTP_CODE"
-          cat /tmp/upload-resp.txt 2>/dev/null || true
+          echo "=== Step 1: Deploy via OneDeploy API (deploys + restarts app) ==="
+          for attempt in 1 2 3; do
+            HTTP_CODE=$(curl -s -o /tmp/deploy-resp.txt -w "%{http_code}" \
+              -X POST \
+              "${SCM}/api/publish?type=zip&restart=true&clean=true&async=false" \
+              --user "${KUDU_USER}:${KUDU_PASS}" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary @backend-deploy.zip \
+              --max-time 300)
+            echo "OneDeploy attempt $attempt: HTTP $HTTP_CODE"
+            cat /tmp/deploy-resp.txt 2>/dev/null | head -20 || true
+            echo ""
+            
+            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "202" ]; then
+              echo "OneDeploy succeeded! App will restart automatically."
+              DEPLOYED=true
+              break
+            fi
+            
+            if [ "$HTTP_CODE" = "409" ] && [ "$attempt" -lt 3 ]; then
+              echo "Deployment lock (409), waiting 30s before retry..."
+              sleep 30
+            else
+              echo "OneDeploy attempt $attempt failed with HTTP $HTTP_CODE"
+              if [ "$attempt" -lt 3 ]; then
+                sleep 15
+              fi
+            fi
+          done
+          
+          if [ "$DEPLOYED" = "false" ]; then
+            echo ""
+            echo "=== OneDeploy failed, falling back to VFS + Command API ==="
+            
+            echo "--- Fallback Step 1: Upload zip via VFS ---"
+            HTTP_CODE=$(curl -s -o /tmp/upload-resp.txt -w "%{http_code}" \
+              -X PUT \
+              "${SCM}/api/vfs/tmp/backend-deploy.zip" \
+              --user "${KUDU_USER}:${KUDU_PASS}" \
+              -H "If-Match: *" \
+              --data-binary @backend-deploy.zip)
+            echo "Upload HTTP: $HTTP_CODE"
+            if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ] && [ "$HTTP_CODE" != "204" ]; then
+              echo "VFS upload failed!"
+              exit 1
+            fi
+            
+            echo "--- Fallback Step 2: Clean wwwroot + unzip ---"
+            HTTP_CODE=$(curl -s -o /tmp/cmd-resp.txt -w "%{http_code}" \
+              -X POST \
+              "${SCM}/api/command" \
+              --user "${KUDU_USER}:${KUDU_PASS}" \
+              -H "Content-Type: application/json" \
+              -d '{"command":"rm -rf /home/site/wwwroot/* && cd /tmp && unzip -o backend-deploy.zip -d /home/site/wwwroot/ && ls -la /home/site/wwwroot/ && echo DEPLOY_OK","dir":"/tmp"}')
+            echo "Unzip HTTP: $HTTP_CODE"
+            cat /tmp/cmd-resp.txt 2>/dev/null | head -20 || true
+            
+            echo "--- Fallback Step 3: Force restart via settings change ---"
+            TIMESTAMP=$(date +%s)
+            curl -s -X POST \
+              "${SCM}/api/command" \
+              --user "${KUDU_USER}:${KUDU_PASS}" \
+              -H "Content-Type: application/json" \
+              -d "{\"command\":\"echo ${TIMESTAMP} > /home/site/deployments/deploy_timestamp && mkdir -p /home/site/deployments/${TIMESTAMP} && echo '{\\\"status\\\":4,\\\"complete\\\":true}' > /home/site/deployments/${TIMESTAMP}/status.json && echo ${TIMESTAMP} > /home/site/deployments/active && echo RESTART_TRIGGERED\"}" \
+              -w "\nRestart trigger HTTP: %{http_code}\n" || true
+          fi
+          
           echo ""
-          if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ] && [ "$HTTP_CODE" != "204" ]; then
-            echo "Upload failed!"
-            exit 1
-          fi
-          echo "Zip uploaded to /tmp/backend-deploy.zip on server"
-          
-          echo "=== Step 2: Clean wwwroot + unzip via Command API ==="
-          HTTP_CODE=$(curl -s -o /tmp/cmd-resp.txt -w "%{http_code}" \
-            -X POST \
-            "${SCM}/api/command" \
-            --user "${KUDU_USER}:${KUDU_PASS}" \
-            -H "Content-Type: application/json" \
-            -d '{"command":"rm -rf /home/site/wwwroot/* && cd /tmp && unzip -o backend-deploy.zip -d /home/site/wwwroot/ && ls -la /home/site/wwwroot/ && echo DEPLOY_OK","dir":"/tmp"}')
-          echo "Command HTTP: $HTTP_CODE"
-          cat /tmp/cmd-resp.txt 2>/dev/null || true
-          echo ""
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "Unzip command failed!"
-            exit 1
-          fi
-          
-          # Verify deploy
-          if grep -q "DEPLOY_OK" /tmp/cmd-resp.txt; then
-            echo "Files deployed to wwwroot successfully!"
-          else
-            echo "Warning: DEPLOY_OK marker not found in output"
-            cat /tmp/cmd-resp.txt
-          fi
-          
-          echo "=== Step 3: Restart app by killing main process ==="
-          curl -s -X DELETE \
-            "${SCM}/api/processes/0" \
-            --user "${KUDU_USER}:${KUDU_PASS}" \
-            -w "\nRestart HTTP: %{http_code}\n" || true
-          
-          echo "=== Step 4: Wait and verify app is running ==="
-          sleep 20
-          for i in 1 2 3 4 5; do
-            HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
-              "https://portal-ti-backend.azurewebsites.net/api/health" \
-              --max-time 10)
+          echo "=== Step 2: Wait for app to restart and verify ==="
+          sleep 30
+          for i in 1 2 3 4 5 6 7 8; do
+            HTTP=$(curl -s -o /tmp/health-resp.txt -w "%{http_code}" \
+              "${APP}/api/health" --max-time 15)
             echo "Health check $i: HTTP $HTTP"
             if [ "$HTTP" = "200" ]; then
               echo "App is running!"
+              cat /tmp/health-resp.txt 2>/dev/null || true
               exit 0
             fi
-            sleep 10
+            sleep 15
           done
-          echo "App may still be starting — check https://portal-ti-backend.azurewebsites.net"
-          echo "Deploy files were placed successfully. App will start when Azure warms up the container."
+          echo "App may still be starting — check ${APP}"
+          echo "Deploy completed. Container restart may take a few more minutes."

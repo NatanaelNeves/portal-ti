@@ -45,10 +45,11 @@ app.use('/api/', generalLimiter);
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Health check — always responds, independent of DB status
-const BUILD_VERSION = 'v2026.03.10g';
+const BUILD_VERSION = 'v2026.06.14a';
+const BUILD_TIMESTAMP = new Date().toISOString();
 let dbReady = false;
 app.get('/api/health', (_, res: Response) => {
-  res.json({ status: 'ok', db: dbReady, version: BUILD_VERSION, timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', db: dbReady, version: BUILD_VERSION, build: BUILD_TIMESTAMP, timestamp: new Date().toISOString() });
 });
 
 // Rotas da API (authLimiter desabilitado em desenvolvimento)
