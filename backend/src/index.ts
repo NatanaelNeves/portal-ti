@@ -75,7 +75,7 @@ app.use('/api/', generalLimiter);
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Health check — always responds, independent of DB status
-const BUILD_VERSION = 'v2026.06.14c';
+const BUILD_VERSION = 'v2026.06.14d';
 const BUILD_TIMESTAMP = new Date().toISOString();
 let dbReady = false;
 app.get('/api/health', (_, res: Response) => {

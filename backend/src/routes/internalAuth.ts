@@ -118,7 +118,25 @@ router.post('/internal-register', validate(registerSchema), async (req: Request,
     if (existingUser.rows.length > 0) {
       const existing = existingUser.rows[0];
       if (existing.is_active === false) {
-        res.status(409).json({ error: 'Já existe um usuário inativo com este e-mail. Reative o usuário existente.' });
+        const passwordHash = await bcrypt.hash(password, 10);
+
+        const reactivatedUser = await database.query(
+          `UPDATE internal_users
+           SET email = $1,
+               name = $2,
+               password_hash = $3,
+               role = $4,
+               is_active = true
+           WHERE id = $5
+           RETURNING id, email, name, role`,
+          [normalizedEmail, normalizedName, passwordHash, role, existing.id]
+        );
+
+        res.status(200).json({
+          user: reactivatedUser.rows[0],
+          message: 'Usuário existente reativado com sucesso',
+          reactivated: true,
+        });
         return;
       }
       res.status(409).json({ error: 'Já existe um usuário com este e-mail.' });

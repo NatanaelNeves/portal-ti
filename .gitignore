@@ -11,6 +11,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Deploy and runtime artifacts
+backend/backend-deploy.zip
+webapp-logs/*.zip
+
 # IDEs
 .vscode/
 .idea/

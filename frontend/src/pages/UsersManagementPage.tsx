@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ConfirmDialog from '../components/ConfirmDialog';
 import '../styles/UsersManagementPage.css';
@@ -38,6 +38,7 @@ export default function UsersManagementPage() {
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
   const [creatingUser, setCreatingUser] = useState(false);
+  const createUserInFlightRef = useRef(false);
 
   useEffect(() => {
     const token = localStorage.getItem('internal_token');
@@ -84,12 +85,13 @@ export default function UsersManagementPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (creatingUser) {
+    if (creatingUser || createUserInFlightRef.current) {
       return;
     }
 
     setFormError('');
     setFormSuccess('');
+    createUserInFlightRef.current = true;
     setCreatingUser(true);
 
     try {
@@ -107,15 +109,23 @@ export default function UsersManagementPage() {
         }),
       });
 
+      const contentType = response.headers.get('content-type') || '';
+      let data: any = {};
+      if (contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        data = { error: text || 'Erro ao criar usuário' };
+      }
+
       if (!response.ok) {
-        const data = await response.json();
         if (response.status === 409) {
           throw new Error(data.error || 'Já existe um usuário com este e-mail.');
         }
         throw new Error(data.error || 'Erro ao criar usuário');
       }
 
-      setFormSuccess('Usuário criado com sucesso!');
+      setFormSuccess(data.message || 'Usuário criado com sucesso!');
       setFormData({ email: '', name: '', password: '', role: 'it_staff' });
       setShowForm(false);
       
@@ -124,6 +134,7 @@ export default function UsersManagementPage() {
     } catch (err: any) {
       setFormError(err.message || 'Erro ao criar usuário');
     } finally {
+      createUserInFlightRef.current = false;
       setCreatingUser(false);
     }
   };

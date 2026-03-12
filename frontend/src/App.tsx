@@ -78,15 +78,15 @@ function App() {
             <Route path="/admin/login" element={<InternalLoginPage />} />
 
             {/* IT Staff Routes */}
-            <Route path="/admin/dashboard" element={<InternalProtectedRoute><AdminDashboardPage /></InternalProtectedRoute>} />
-            <Route path="/admin/auxiliar/dashboard" element={<InternalProtectedRoute><AdminStaffDashboardPage /></InternalProtectedRoute>} />
-            <Route path="/admin/chamados" element={<InternalProtectedRoute><AdminTicketsPage /></InternalProtectedRoute>} />
-            <Route path="/admin/chamados/:id" element={<InternalProtectedRoute><AdminTicketDetailPage /></InternalProtectedRoute>} />
-            <Route path="/admin/conhecimento" element={<InternalProtectedRoute><KnowledgeManagementPage /></InternalProtectedRoute>} />
-            <Route path="/admin/usuarios" element={<InternalProtectedRoute><UsersManagementPage /></InternalProtectedRoute>} />
-            <Route path="/admin/estoque" element={<InternalProtectedRoute><InventoryPage /></InternalProtectedRoute>} />
-            <Route path="/admin/documentos" element={<InternalProtectedRoute><DocumentsPage /></InternalProtectedRoute>} />
-            <Route path="/admin/relatorios" element={<InternalProtectedRoute><ReportsPage /></InternalProtectedRoute>} />
+            <Route path="/admin/dashboard" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff']}><AdminDashboardPage /></InternalProtectedRoute>} />
+            <Route path="/admin/auxiliar/dashboard" element={<InternalProtectedRoute allowedRoles={['admin_staff']}><AdminStaffDashboardPage /></InternalProtectedRoute>} />
+            <Route path="/admin/chamados" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff', 'admin_staff']}><AdminTicketsPage /></InternalProtectedRoute>} />
+            <Route path="/admin/chamados/:id" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff', 'admin_staff']}><AdminTicketDetailPage /></InternalProtectedRoute>} />
+            <Route path="/admin/conhecimento" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff', 'admin_staff']}><KnowledgeManagementPage /></InternalProtectedRoute>} />
+            <Route path="/admin/usuarios" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff']}><UsersManagementPage /></InternalProtectedRoute>} />
+            <Route path="/admin/estoque" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff']}><InventoryPage /></InternalProtectedRoute>} />
+            <Route path="/admin/documentos" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff', 'admin_staff']}><DocumentsPage /></InternalProtectedRoute>} />
+            <Route path="/admin/relatorios" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff', 'admin_staff']}><ReportsPage /></InternalProtectedRoute>} />
 
             {/* Inventory Module Routes - IT Staff Only */}
             <Route path="/inventario" element={<InternalProtectedRoute requireITStaff={true}><InventoryDashboardPage /></InternalProtectedRoute>} />
@@ -107,8 +107,8 @@ function App() {
             <Route path="/inventario/termo/:termId/devolucao" element={<InternalProtectedRoute requireITStaff={true}><ReturnTermPage /></InternalProtectedRoute>} />
 
             {/* Gestor/Manager Routes */}
-            <Route path="/gestor/dashboard" element={<InternalProtectedRoute><GestorDashboardPage /></InternalProtectedRoute>} />
-            <Route path="/gestor/solicitacoes" element={<InternalProtectedRoute><GestorTicketsPage /></InternalProtectedRoute>} />
+            <Route path="/gestor/dashboard" element={<InternalProtectedRoute allowedRoles={['manager', 'admin']}><GestorDashboardPage /></InternalProtectedRoute>} />
+            <Route path="/gestor/solicitacoes" element={<InternalProtectedRoute allowedRoles={['manager', 'admin']}><GestorTicketsPage /></InternalProtectedRoute>} />
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />
