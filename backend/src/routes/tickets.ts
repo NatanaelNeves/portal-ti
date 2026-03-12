@@ -28,6 +28,57 @@ const canAdminStaffAccessAdministrativeTicket = (ticket: TicketAccessRow, userId
 };
 
 /**
+ * GET /new-since - Polling endpoint: returns tickets created after ?since=<ISO timestamp>
+ * Only accessible to internal staff (admin, it_staff, admin_staff, manager).
+ * Returns minimal payload: id, title, department, created_at.
+ */
+ticketsRouter.get('/new-since', authenticate, async (req: Request, res: Response) => {
+  try {
+    const decoded = (req as any).user;
+    if (!canViewTicketsAsInternalRole(decoded.role)) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+
+    const since = req.query.since as string;
+    if (!since) {
+      return res.status(400).json({ error: 'Parâmetro "since" obrigatório' });
+    }
+
+    let conditions = [`t.created_at > $1`];
+    const params: any[] = [since];
+    let paramCount = 2;
+
+    // admin_staff só vê chamados administrativos (atribuídos a si ou sem responsável)
+    if (decoded.role === UserRole.ADMIN_STAFF) {
+      conditions.push(
+        `(COALESCE(t.department, 'ti') = 'administrativo' AND (t.assigned_to_id = $${paramCount} OR t.assigned_to_id IS NULL))`
+      );
+      params.push(decoded.id);
+      paramCount++;
+    }
+
+    // manager vê apenas o próprio departamento (ajustado conforme implementação existente)
+    if (isManagerRole(decoded.role)) {
+      conditions.push(`COALESCE(t.department, 'ti') = 'administrativo'`);
+    }
+
+    const result = await database.query(
+      `SELECT t.id, t.title, t.department, t.created_at
+       FROM tickets t
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY t.created_at ASC
+       LIMIT 20`,
+      params
+    );
+
+    res.json({ tickets: result.rows });
+  } catch (error: any) {
+    console.error('Error polling new tickets:', error);
+    res.status(500).json({ error: 'Failed to poll tickets' });
+  }
+});
+
+/**
  * GET / - Listar chamados com filtros e paginação
  * 
  * Query params:

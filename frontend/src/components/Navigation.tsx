@@ -1,11 +1,13 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import GlobalSearch from './GlobalSearch';
+import { useNotifications } from '../contexts/NotificationContext';
 import '../styles/Navigation.css';
 
 export default function Navigation() {
   const navigate = useNavigate();
   const { logout } = useAuthStore();
+  const { unseenCount, clearUnseen } = useNotifications();
   const isInternalUser = !!localStorage.getItem('internal_token');
 
   const handleLogout = () => {
@@ -68,13 +70,17 @@ export default function Navigation() {
   const dashboardRoute = getDashboardRoute();
 
   // Todos os links em uma única lista (sem dropdown)
-  const navLinks: Array<{ label: string; action: () => void }> = [
+  const navLinks: Array<{ label: string; action: () => void; badge?: number }> = [
     { label: 'Painel', action: () => navigate(dashboardRoute) },
     {
       label: 'Solicitações',
-      action: () => navigate(
-        userRole === 'manager' || userRole === 'gestor' ? '/gestor/solicitacoes' : '/admin/chamados'
-      ),
+      badge: unseenCount > 0 ? unseenCount : undefined,
+      action: () => {
+        clearUnseen();
+        navigate(
+          userRole === 'manager' || userRole === 'gestor' ? '/gestor/solicitacoes' : '/admin/chamados'
+        );
+      },
     },
   ];
 
@@ -113,6 +119,9 @@ export default function Navigation() {
             className="nav-link"
           >
             {link.label}
+            {link.badge !== undefined && (
+              <span className="nav-badge">{link.badge > 99 ? '99+' : link.badge}</span>
+            )}
           </button>
         ))}
       </div>

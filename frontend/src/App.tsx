@@ -46,6 +46,7 @@ import MoveEquipmentPage from './pages/MoveEquipmentPage';
 import Navigation from './components/Navigation';
 import InternalProtectedRoute from './components/InternalProtectedRoute';
 import ToastContainer from './components/ToastContainer';
+import { NotificationProvider } from './contexts/NotificationContext';
 
 function App() {
   const { loadStoredUser } = useAuthStore();
@@ -61,13 +62,14 @@ function App() {
   }
 
   return (
-    <Router>
-      <div className="app">
-        <Toaster />
-        <ToastContainer />
-        <Navigation />
-        <main className="main-content">
-          <Routes>
+    <NotificationProvider>
+      <Router>
+        <div className="app">
+          <Toaster />
+          <ToastContainer />
+          <Navigation />
+          <main className="main-content">
+            <Routes>
             {/* Public Routes */}
             <Route path="/" element={<HomePage />} />
             <Route path="/abrir-chamado" element={<OpenTicketPage />} />
@@ -116,6 +118,7 @@ function App() {
         </main>
       </div>
     </Router>
+  </NotificationProvider>
   );
 }
 

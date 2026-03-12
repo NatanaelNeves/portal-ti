@@ -110,6 +110,35 @@
   outline-offset: 2px;
 }
 
+/* ── Notification badge on nav links ─────────────────────────────────── */
+.nav-link {
+  position: relative;
+}
+
+.nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  margin-left: 6px;
+  background: #f56565;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 9px;
+  line-height: 1;
+  vertical-align: middle;
+  animation: badge-pop 0.25s ease-out;
+}
+
+@keyframes badge-pop {
+  0%   { transform: scale(0.5); opacity: 0; }
+  70%  { transform: scale(1.15); }
+  100% { transform: scale(1);   opacity: 1; }
+}
+
 /* Seção Direita (Busca + Perfil) */
 .navbar-right {
   display: flex;
