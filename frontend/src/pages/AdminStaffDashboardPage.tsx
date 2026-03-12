@@ -181,28 +181,36 @@ export default function AdminStaffDashboardPage() {
   const pendingMine = data.myOpenTickets + data.myInProgressTickets + data.myWaitingTickets;
   const topKpis = [
     {
-      key: 'myTicketsTotal',
-      title: 'Meus chamados',
-      value: data.myTicketsTotal,
-      subtitle: 'Total sob minha responsabilidade',
-    },
-    {
       key: 'pendingMine',
-      title: 'Pendentes',
+      title: 'Chamados Pendentes',
       value: pendingMine,
-      subtitle: 'Abertos, em atendimento e aguardando',
+      subtitle: 'Abertos, em atendimento e aguardando usuário',
+      icon: '📦',
+      tone: 'pending',
     },
     {
       key: 'myResolvedToday',
-      title: 'Resolvidos hoje',
+      title: 'Chamados Resolvidos Hoje',
       value: data.myResolvedToday,
-      subtitle: 'Finalizados hoje',
+      subtitle: 'Chamados finalizados no dia atual',
+      icon: '🎯',
+      tone: 'resolved',
+    },
+    {
+      key: 'myTicketsTotal',
+      title: 'Chamados Atribuídos a Mim',
+      value: data.myTicketsTotal,
+      subtitle: 'Total sob minha responsabilidade',
+      icon: '🧑‍💼',
+      tone: 'assigned',
     },
     {
       key: 'unassignedAdministrativeTickets',
-      title: 'Sem responsável',
+      title: 'Chamados Sem Responsável',
       value: data.unassignedAdministrativeTickets,
-      subtitle: 'Fila sem atribuição',
+      subtitle: 'Fila administrativa sem atribuição',
+      icon: '🚨',
+      tone: 'unassigned',
     },
   ];
 
@@ -212,24 +220,24 @@ export default function AdminStaffDashboardPage() {
       title: 'Abertos',
       value: data.myOpenTickets,
       subtitle: 'Aguardando primeiro atendimento',
+      icon: '📬',
+      tone: 'open',
     },
     {
       key: 'myInProgressTickets',
       title: 'Em atendimento',
       value: data.myInProgressTickets,
       subtitle: 'Já em tratativa',
+      icon: '🔵',
+      tone: 'in-progress',
     },
     {
       key: 'myWaitingTickets',
       title: 'Aguardando usuário',
       value: data.myWaitingTickets,
       subtitle: 'Dependem de retorno do solicitante',
-    },
-    {
-      key: 'myHighPriorityOpen',
-      title: 'Alta prioridade',
-      value: data.myHighPriorityOpen,
-      subtitle: 'Urgente, crítica e alta',
+      icon: '⏳',
+      tone: 'waiting',
     },
     {
       key: 'myAverageResolutionHours',
@@ -237,6 +245,8 @@ export default function AdminStaffDashboardPage() {
       value: data.myAverageResolutionHours,
       subtitle: 'Tempo médio para concluir',
       suffix: 'h',
+      icon: '📈',
+      tone: 'sla',
     },
   ];
 
@@ -255,6 +265,7 @@ export default function AdminStaffDashboardPage() {
       label: 'Ver fila',
       description: 'Visualizar chamados e priorizar atendimentos',
       action: () => navigate('/admin/chamados'),
+      tone: 'queue',
     },
     {
       key: 'pending',
@@ -262,6 +273,7 @@ export default function AdminStaffDashboardPage() {
       label: 'Atender pendentes',
       description: 'Assumir e tratar os chamados em aberto',
       action: () => navigate('/admin/chamados'),
+      tone: 'pending',
     },
     {
       key: 'refresh',
@@ -269,154 +281,169 @@ export default function AdminStaffDashboardPage() {
       label: 'Atualizar painel',
       description: 'Recarregar indicadores e últimos chamados',
       action: () => void fetchDashboard(),
+      tone: 'refresh',
     },
   ];
 
   const maxPriorityValue = Math.max(1, ...priorityData.map((item) => item.value));
-
-  const getKpiCardClass = (value: number, compact = false) => {
-    const baseClass = compact ? 'asd-kpi-card asd-kpi-card-compact' : 'asd-kpi-card';
-    return `${baseClass} ${value > 0 ? 'asd-kpi-card-positive' : 'asd-kpi-card-zero'}`;
-  };
+  const totalPriorityTickets = priorityData.reduce((sum, item) => sum + item.value, 0);
 
   const formatCardValue = (value: number, suffix?: string) => `${value}${suffix || ''}`;
 
   return (
     <div className="admin-staff-dashboard-page">
-      <header className="asd-header">
-        <div className="asd-header-left">
-          <h1>Dashboard Auxiliar Administrativo</h1>
-          <p>Olá, {currentUserName}. Aqui está a visão dos seus chamados e do administrativo.</p>
-        </div>
-        <div className="asd-header-actions">
-          <button className="asd-btn-refresh" onClick={() => void fetchDashboard()}>
-            Atualizar
-          </button>
-          <button className="asd-btn-chamados" onClick={() => navigate('/admin/chamados')}>
-            Ir para chamados
-          </button>
-        </div>
-      </header>
+      <div className="asd-shell">
+        <header className="asd-header">
+          <div className="asd-header-left">
+            <h1>Painel Operacional — Auxiliar Administrativo</h1>
+            <p>Olá, {currentUserName}. Acompanhe prioridades, desempenho e próximos atendimentos em tempo real.</p>
+          </div>
+          <div className="asd-header-actions">
+            <button className="asd-btn-refresh" onClick={() => void fetchDashboard()}>
+              🔄 Atualizar
+            </button>
+            <button className="asd-btn-chamados" onClick={() => navigate('/admin/chamados')}>
+              📋 Ver chamados
+            </button>
+          </div>
+        </header>
 
-      {error && <div className="alert alert-error">{error}</div>}
+        {error && <div className="alert alert-error">{error}</div>}
 
-      {loading ? (
-        <div className="asd-loading">Carregando dados...</div>
-      ) : (
-        <>
-          <section className="asd-kpis-top-row">
-            {topKpis.map((item) => (
-              <div key={item.key} className={getKpiCardClass(item.value)}>
-                <span className="asd-kpi-title">{item.title}</span>
-                <strong>{formatCardValue(item.value)}</strong>
-                <small>{item.subtitle}</small>
-              </div>
-            ))}
-          </section>
-
-          <section className="asd-kpis-secondary-row">
-            {secondaryKpis.map((item) => (
-              <div key={item.key} className={getKpiCardClass(item.value, true)}>
-                <span className="asd-kpi-title">{item.title}</span>
-                <strong>{formatCardValue(item.value, item.suffix)}</strong>
-                <small>{item.subtitle}</small>
-              </div>
-            ))}
-          </section>
-
-          <section className="asd-panels-grid">
-            <article className="asd-panel">
-              <div className="asd-panel-header">
-                <h2>Distribuição por prioridade (meus chamados)</h2>
-              </div>
-              <div className="asd-priority-list">
-                {priorityData.map((item) => (
-                  <div key={item.key} className="asd-priority-item">
-                    <div className="asd-priority-label-row">
-                      <span>{item.label}</span>
-                      <strong>{item.value}</strong>
-                    </div>
-                    <div className="asd-priority-bar">
-                      <div
-                        className={`asd-priority-fill ${item.colorClass}`}
-                        style={{ width: `${(item.value / maxPriorityValue) * 100}%` }}
-                      />
-                    </div>
+        {loading ? (
+          <div className="asd-loading">Carregando dados...</div>
+        ) : (
+          <>
+            <section className="asd-kpis-main-grid">
+              {topKpis.map((item) => (
+                <article key={item.key} className={`asd-kpi-main-card asd-kpi-main-${item.tone}`}>
+                  <div className="asd-kpi-main-top">
+                    <span className="asd-kpi-main-icon" aria-hidden="true">{item.icon}</span>
+                    <span className="asd-kpi-main-title">{item.title}</span>
                   </div>
-                ))}
-              </div>
-            </article>
+                  <strong className="asd-kpi-main-value">{formatCardValue(item.value)}</strong>
+                  <small className="asd-kpi-main-desc">{item.subtitle}</small>
+                </article>
+              ))}
+            </section>
 
-            <article className="asd-panel">
-              <div className="asd-panel-header">
-                <h2>Ações rápidas</h2>
-              </div>
-              <div className="asd-actions-grid">
-                {quickActions.map((action) => (
-                  <button key={action.key} className="asd-action-btn" onClick={action.action}>
-                    <span className="asd-action-icon" aria-hidden="true">{action.icon}</span>
-                    <span className="asd-action-content">
-                      <strong>{action.label}</strong>
-                      <small>{action.description}</small>
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <div className="asd-status-summary">
-                <div className="asd-status-summary-card asd-status-open">
-                  <span>Abertos</span>
-                  <strong>{data.myOpenTickets}</strong>
-                </div>
-                <div className="asd-status-summary-card asd-status-progress">
-                  <span>Em atendimento</span>
-                  <strong>{data.myInProgressTickets}</strong>
-                </div>
-                <div className="asd-status-summary-card asd-status-waiting">
-                  <span>Aguardando usuário</span>
-                  <strong>{data.myWaitingTickets}</strong>
-                </div>
-              </div>
-            </article>
-          </section>
+            <section className="asd-kpis-secondary-grid">
+              {secondaryKpis.map((item) => (
+                <article key={item.key} className={`asd-kpi-secondary-card asd-kpi-secondary-${item.tone}`}>
+                  <div className="asd-kpi-secondary-head">
+                    <span className="asd-kpi-secondary-icon" aria-hidden="true">{item.icon}</span>
+                    <span className="asd-kpi-secondary-title">{item.title}</span>
+                  </div>
+                  <strong className="asd-kpi-secondary-value">{formatCardValue(item.value, item.suffix)}</strong>
+                  <small className="asd-kpi-secondary-desc">{item.subtitle}</small>
+                </article>
+              ))}
+            </section>
 
-          <section className="asd-recent">
-            <div className="asd-recent-header">
-              <h2>Últimos chamados atribuídos a você</h2>
-            </div>
+            <section className="asd-operational-grid">
+              <article className="asd-panel asd-panel-priority">
+                <div className="asd-panel-header">
+                  <h2>Distribuição por prioridade</h2>
+                  <span>{totalPriorityTickets} chamados</span>
+                </div>
+                <div className="asd-priority-list">
+                  {priorityData.map((item) => {
+                    const percent = totalPriorityTickets > 0
+                      ? Math.round((item.value / totalPriorityTickets) * 100)
+                      : 0;
+                    const width = item.value > 0
+                      ? Math.max(8, (item.value / maxPriorityValue) * 100)
+                      : 0;
 
-            {data.recentTickets.length === 0 ? (
-              <p className="asd-empty">Nenhum chamado atribuído no momento.</p>
-            ) : (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Título</th>
-                    <th>Solicitante</th>
-                    <th>Status</th>
-                    <th>Prioridade</th>
-                    <th>Atualizado há</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.recentTickets.map((ticket) => (
-                    <tr key={ticket.id} onClick={() => navigate(`/admin/chamados/${ticket.id}`)}>
-                      <td>{ticket.title}</td>
-                      <td>{ticket.requester_name || 'Solicitante'}</td>
-                      <td>
-                        <span className={getStatusClass(ticket.status)}>{getStatusLabel(ticket.status)}</span>
-                      </td>
-                      <td>
-                        <span className={getPriorityClass(ticket.priority)}>{getPriorityLabel(ticket.priority)}</span>
-                      </td>
-                      <td>{formatElapsedTime(ticket.updated_at)}</td>
-                    </tr>
+                    return (
+                      <div key={item.key} className="asd-priority-item">
+                        <div className="asd-priority-label-row">
+                          <div className="asd-priority-label-left">
+                            <span className={`asd-priority-dot ${item.colorClass}`} />
+                            <span>{item.label}</span>
+                          </div>
+                          <div className="asd-priority-values">
+                            <strong>{item.value}</strong>
+                            <small>{percent}%</small>
+                          </div>
+                        </div>
+                        <div className="asd-priority-bar">
+                          <div
+                            className={`asd-priority-fill ${item.colorClass}`}
+                            style={{ width: `${width}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </article>
+
+              <article className="asd-panel asd-panel-actions">
+                <div className="asd-panel-header">
+                  <h2>Ações rápidas</h2>
+                  <span>Execução imediata</span>
+                </div>
+                <div className="asd-actions-stack">
+                  {quickActions.map((action) => (
+                    <button
+                      key={action.key}
+                      className={`asd-action-cta asd-action-${action.tone}`}
+                      onClick={action.action}
+                    >
+                      <span className="asd-action-icon" aria-hidden="true">{action.icon}</span>
+                      <span className="asd-action-content">
+                        <strong>{action.label}</strong>
+                        <small>{action.description}</small>
+                      </span>
+                    </button>
                   ))}
-                </tbody>
-              </table>
-            )}
-          </section>
-        </>
-      )}
+                </div>
+              </article>
+            </section>
+
+            <section className="asd-recent-panel">
+              <div className="asd-recent-header">
+                <h2>Últimos chamados atribuídos</h2>
+                <span>{data.recentTickets.length} itens</span>
+              </div>
+
+              {data.recentTickets.length === 0 ? (
+                <p className="asd-empty">Nenhum chamado atribuído no momento.</p>
+              ) : (
+                <div className="asd-recent-table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Título</th>
+                        <th>Solicitante</th>
+                        <th>Status</th>
+                        <th>Prioridade</th>
+                        <th>Atualizado há</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.recentTickets.map((ticket) => (
+                        <tr key={ticket.id} onClick={() => navigate(`/admin/chamados/${ticket.id}`)}>
+                          <td>{ticket.title}</td>
+                          <td>{ticket.requester_name || 'Solicitante'}</td>
+                          <td>
+                            <span className={getStatusClass(ticket.status)}>{getStatusLabel(ticket.status)}</span>
+                          </td>
+                          <td>
+                            <span className={getPriorityClass(ticket.priority)}>{getPriorityLabel(ticket.priority)}</span>
+                          </td>
+                          <td>{formatElapsedTime(ticket.updated_at)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          </>
+        )}
+      </div>
     </div>
   );
 }

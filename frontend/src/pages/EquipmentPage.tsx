@@ -29,6 +29,8 @@ export default function EquipmentPage() {
   const [filterUnit, setFilterUnit] = useState('all');
   const navigate = useNavigate();
 
+  const isAvailableStatus = (status: string) => status === 'available' || status === 'in_stock';
+
   useEffect(() => {
     fetchEquipments();
   }, [filterStatus, filterUnit]);
@@ -49,7 +51,13 @@ export default function EquipmentPage() {
       
       // Aplicar filtros
       if (filterStatus !== 'all') {
-        allEquipments = allEquipments.filter((eq: Equipment) => eq.current_status === filterStatus);
+        if (filterStatus === 'available') {
+          allEquipments = allEquipments.filter((eq: Equipment) => isAvailableStatus(eq.current_status));
+        } else if (filterStatus === 'in_maintenance') {
+          allEquipments = allEquipments.filter((eq: Equipment) => eq.current_status === 'in_maintenance' || eq.current_status === 'maintenance');
+        } else {
+          allEquipments = allEquipments.filter((eq: Equipment) => eq.current_status === filterStatus);
+        }
       }
       if (filterUnit !== 'all') {
         allEquipments = allEquipments.filter((eq: Equipment) => eq.current_unit === filterUnit);
@@ -76,7 +84,7 @@ export default function EquipmentPage() {
 
   const stats = {
     total: equipments.length,
-    available: equipments.filter(eq => eq.current_status === 'available').length,
+    available: equipments.filter(eq => isAvailableStatus(eq.current_status)).length,
     in_use: equipments.filter(eq => eq.current_status === 'in_use').length,
     maintenance: equipments.filter(eq => eq.current_status === 'in_maintenance' || eq.current_status === 'maintenance').length
   };
@@ -260,7 +268,7 @@ export default function EquipmentPage() {
                         >
                           <span className="btn-icon">📋</span> Detalhes
                         </button>
-                        {equipment.current_status === 'in_stock' && (
+                        {isAvailableStatus(equipment.current_status) && (
                           <button
                             className="btn btn-sm btn-deliver"
                             onClick={() => navigate('/inventario/equipamentos/entregar')}
