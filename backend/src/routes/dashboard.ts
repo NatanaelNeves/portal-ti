@@ -66,6 +66,14 @@ dashboardRouter.get("/admin", async (req: Request, res: Response) => {
       return;
     }
 
+    const isITStaffDashboard = user.role === UserRole.IT_STAFF;
+    const ticketScopeCondition = isITStaffDashboard
+      ? "COALESCE(department, 'ti') = 'ti'"
+      : '1=1';
+    const ticketScopeConditionWithAlias = isITStaffDashboard
+      ? "COALESCE(t.department, 'ti') = 'ti'"
+      : '1=1';
+
     const [
       totalResult,
       statusResult,
@@ -84,50 +92,58 @@ dashboardRouter.get("/admin", async (req: Request, res: Response) => {
       assetsCreatedThisMonthResult,
       recentActivityResult,
     ] = await Promise.all([
-      database.query("SELECT COUNT(*) as count FROM tickets"),
+      database.query(`SELECT COUNT(*) as count FROM tickets WHERE ${ticketScopeCondition}`),
       database.query(`
         SELECT status, COUNT(*) as count 
         FROM tickets 
+        WHERE ${ticketScopeCondition}
         GROUP BY status
       `),
       database.query(`
         SELECT COUNT(*) as count 
         FROM tickets 
         WHERE status IN ('resolved', 'closed')
+          AND ${ticketScopeCondition}
           AND DATE(updated_at) = CURRENT_DATE
       `),
       database.query(`
         SELECT COUNT(*) as count
         FROM tickets
         WHERE status IN ('resolved', 'closed')
+          AND ${ticketScopeCondition}
           AND DATE(updated_at) = CURRENT_DATE - INTERVAL '1 day'
       `),
       database.query(`
         SELECT COUNT(*) as count
         FROM tickets
         WHERE status = 'open'
+          AND ${ticketScopeCondition}
           AND DATE(created_at) = CURRENT_DATE
       `),
       database.query(`
         SELECT COUNT(*) as count
         FROM tickets
         WHERE status = 'in_progress'
+          AND ${ticketScopeCondition}
           AND DATE(updated_at) = CURRENT_DATE
       `),
       database.query(`
         SELECT COUNT(*) as count
         FROM tickets
-        WHERE DATE(created_at) = CURRENT_DATE
+        WHERE ${ticketScopeCondition}
+          AND DATE(created_at) = CURRENT_DATE
       `),
       database.query(`
         SELECT priority, COUNT(*) as count 
         FROM tickets 
+        WHERE ${ticketScopeCondition}
         GROUP BY priority
       `),
       database.query(`
         SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (updated_at - created_at))/3600), 0) as avg_hours
         FROM tickets
         WHERE status IN ('resolved', 'closed')
+          AND ${ticketScopeCondition}
       `),
       database.query(`
         SELECT
@@ -152,6 +168,7 @@ dashboardRouter.get("/admin", async (req: Request, res: Response) => {
           ) AS previous_week_sla
         FROM tickets
         WHERE status IN ('resolved', 'closed')
+          AND ${ticketScopeCondition}
       `),
       database.query(`
         SELECT
@@ -194,6 +211,7 @@ dashboardRouter.get("/admin", async (req: Request, res: Response) => {
             t.created_at AS event_time,
             '/admin/chamados' AS route
           FROM tickets t
+          WHERE ${ticketScopeConditionWithAlias}
 
           UNION ALL
 
@@ -206,6 +224,7 @@ dashboardRouter.get("/admin", async (req: Request, res: Response) => {
             '/admin/chamados?status=resolved' AS route
           FROM tickets t
           WHERE t.status IN ('resolved', 'closed')
+            AND ${ticketScopeConditionWithAlias}
 
           UNION ALL
 
