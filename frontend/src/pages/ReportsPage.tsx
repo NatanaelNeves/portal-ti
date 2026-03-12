@@ -277,7 +277,7 @@ const ReportsPage: React.FC = () => {
     const labels: Record<string, string> = {
       admin: 'Administrador',
       it_staff: 'TI',
-      admin_staff: 'Auxiliar Administrativo',
+      admin_staff: 'Assistente Administrativo',
     };
 
     return labels[role] || role;
@@ -463,7 +463,7 @@ const ReportsPage: React.FC = () => {
                   <div className="team-staff-grid">
                     {orderedTeams.map((teamKey) => {
                       const members = groupedTeamStats[teamKey];
-                      const teamLabel = members[0]?.teamLabel || (teamKey === 'administrativo' ? 'Auxiliar Administrativo' : 'TI');
+                      const teamLabel = members[0]?.teamLabel || (teamKey === 'administrativo' ? 'Assistente Administrativo' : 'TI');
 
                       return (
                         <div key={teamKey} className="team-staff-card">

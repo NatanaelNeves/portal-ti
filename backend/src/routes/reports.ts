@@ -62,7 +62,7 @@ const ensureReportsAccess = (req: Request, res: Response): InternalUserClaims | 
 };
 
 const formatTeamLabel = (team: string): string =>
-  team === 'administrativo' ? 'Auxiliar Administrativo' : 'TI';
+  team === 'administrativo' ? 'Assistente Administrativo' : 'TI';
 
 reportsRouter.use((req: Request, res: Response, next) => {
   const user = ensureReportsAccess(req, res);

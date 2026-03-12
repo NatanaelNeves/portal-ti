@@ -54,7 +54,7 @@ export default function AdminStaffDashboardPage() {
   const [data, setData] = useState<AdminStaffDashboardData>(EMPTY_DATA);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [currentUserName, setCurrentUserName] = useState('Auxiliar Administrativo');
+  const [currentUserName, setCurrentUserName] = useState('Assistente Administrativo');
 
   useEffect(() => {
     const token = localStorage.getItem('internal_token');
@@ -71,7 +71,7 @@ export default function AdminStaffDashboardPage() {
         navigate('/admin/dashboard');
         return;
       }
-      setCurrentUserName(user.name || 'Auxiliar Administrativo');
+      setCurrentUserName(user.name || 'Assistente Administrativo');
     } catch {
       navigate('/admin/login');
       return;
@@ -295,7 +295,7 @@ export default function AdminStaffDashboardPage() {
       <div className="asd-shell">
         <header className="asd-header">
           <div className="asd-header-left">
-            <h1>Painel Operacional — Auxiliar Administrativo</h1>
+            <h1>Painel Operacional — Assistente Administrativo</h1>
             <p>Olá, {currentUserName}. Acompanhe prioridades, desempenho e próximos atendimentos em tempo real.</p>
           </div>
           <div className="asd-header-actions">

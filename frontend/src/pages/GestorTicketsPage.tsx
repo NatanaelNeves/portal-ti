@@ -315,7 +315,7 @@ export default function GestorTicketsPage() {
             <select className="gt-select" value={filterTeam} onChange={e => setFilterTeam(e.target.value)}>
               <option value="all">Todas as equipes</option>
               <option value="ti">TI</option>
-              <option value="administrativo">Auxiliar Administrativo</option>
+              <option value="administrativo">Assistente Administrativo</option>
             </select>
             <button className="btn btn-secondary btn-sm" onClick={fetchTickets}>Atualizar</button>
           </div>

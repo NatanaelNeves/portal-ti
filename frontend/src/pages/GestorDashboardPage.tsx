@@ -184,7 +184,7 @@ export default function GestorDashboardPage() {
     const map: Record<string, string> = {
       admin: 'Administrador',
       it_staff: 'TI',
-      admin_staff: 'Auxiliar Administrativo',
+      admin_staff: 'Assistente Administrativo',
     };
 
     return map[role] || role;
@@ -306,7 +306,7 @@ export default function GestorDashboardPage() {
               <div className="gd-staff-grid">
                 {['ti', 'administrativo'].filter((teamKey) => staffByTeam[teamKey]?.length > 0).map((teamKey) => {
                   const teamMembers = staffByTeam[teamKey];
-                  const teamLabel = teamMembers[0]?.teamLabel || (teamKey === 'administrativo' ? 'Auxiliar Administrativo' : 'TI');
+                  const teamLabel = teamMembers[0]?.teamLabel || (teamKey === 'administrativo' ? 'Assistente Administrativo' : 'TI');
 
                   return (
                     <div key={teamKey} className="gd-table-card">
@@ -425,7 +425,7 @@ export default function GestorDashboardPage() {
                 <div className="gd-issues-by-team">
                   {['ti', 'administrativo'].filter(k => data.topIssuesByTeam![k]?.length > 0).map(teamKey => (
                     <div key={teamKey} className="gd-issues-team-block">
-                      <div className="gd-issues-team-label">{teamKey === 'administrativo' ? 'Auxiliar Administrativo' : 'TI'}</div>
+                      <div className="gd-issues-team-label">{teamKey === 'administrativo' ? 'Assistente Administrativo' : 'TI'}</div>
                       <div className="gd-issues-list">
                         {data.topIssuesByTeam![teamKey].map((issue, idx) => (
                           <div key={idx} className="gd-issue-item">
