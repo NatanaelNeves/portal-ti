@@ -33,6 +33,7 @@ export default function PurchasesPage() {
   const [actionModal, setActionModal] = useState<'approve' | 'reject' | 'purchase' | 'receive' | null>(null);
   const [actionData, setActionData] = useState<any>({});
   const [actionLoading, setActionLoading] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -223,6 +224,30 @@ export default function PurchasesPage() {
     }
   };
 
+
+  const handleDelete = async () => {
+    if (!selectedPurchase) return;
+    try {
+      setActionLoading(true);
+      const token = localStorage.getItem('internal_token');
+      const response = await fetch(`${BACKEND_URL}/api/inventory/requisitions/${selectedPurchase.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Erro ao excluir solicitação');
+      }
+      showToast.success('Solicitação excluída com sucesso');
+      setDeleteConfirm(false);
+      setSelectedPurchase(null);
+      fetchPurchases();
+    } catch (err: any) {
+      showToast.error('Erro: ' + err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const stats = {
     total: purchases.length,
@@ -435,6 +460,15 @@ export default function PurchasesPage() {
                         >
                           <span className="btn-icon">📋</span> Detalhes
                         </button>
+                        {(purchase.status === 'pending' || purchase.status === 'rejected') && (
+                          <button
+                            className="btn btn-sm btn-danger"
+                            onClick={() => { setSelectedPurchase(purchase); setDeleteConfirm(true); }}
+                            title="Excluir solicitação"
+                          >
+                            🗑️
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -533,6 +567,15 @@ export default function PurchasesPage() {
                       ✏️ Editar
                     </button>
                   </>
+                )}
+                {(selectedPurchase.status === 'pending' || selectedPurchase.status === 'rejected') && (
+                  <button
+                    className="btn btn-danger"
+                    onClick={() => setDeleteConfirm(true)}
+                    title="Excluir esta solicitação"
+                  >
+                    🗑️ Excluir
+                  </button>
                 )}
                 {selectedPurchase.status === 'approved' && (
                   <button 
@@ -714,6 +757,52 @@ export default function PurchasesPage() {
                 <button 
                   className="btn btn-secondary" 
                   onClick={() => setActionModal(null)}
+                  disabled={actionLoading}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Confirmação de Exclusão */}
+        {deleteConfirm && selectedPurchase && (
+          <div className="modal-overlay" onClick={() => setDeleteConfirm(false)}>
+            <div className="modal-content" style={{ maxWidth: '480px' }} onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>🗑️ Excluir Solicitação</h2>
+                <button className="modal-close" onClick={() => setDeleteConfirm(false)}>✕</button>
+              </div>
+              <div className="modal-body">
+                <p>Tem certeza que deseja excluir permanentemente esta solicitação?</p>
+                <div className="detail-section">
+                  <dl>
+                    <dt>Item:</dt>
+                    <dd><strong>{selectedPurchase.item_description}</strong></dd>
+                    <dt>Quantidade:</dt>
+                    <dd>{selectedPurchase.quantity} unidade(s)</dd>
+                    <dt>Status:</dt>
+                    <dd>
+                      <span className={`status-badge ${getStatusBadge(selectedPurchase.status).class}`}>
+                        {getStatusBadge(selectedPurchase.status).icon} {getStatusBadge(selectedPurchase.status).text}
+                      </span>
+                    </dd>
+                  </dl>
+                </div>
+                <p className="text-muted" style={{ fontSize: '0.85rem', marginTop: '8px' }}>Esta ação não pode ser desfeita.</p>
+              </div>
+              <div className="modal-footer">
+                <button
+                  className="btn btn-danger"
+                  onClick={handleDelete}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? 'Excluindo...' : '🗑️ Confirmar Exclusão'}
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setDeleteConfirm(false)}
                   disabled={actionLoading}
                 >
                   Cancelar

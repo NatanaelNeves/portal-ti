@@ -1482,6 +1482,32 @@ inventoryRouter.patch('/requisitions/:id', async (req: Request, res: Response) =
   }
 });
 
+// DELETE - Excluir requisição (apenas pendentes ou rejeitadas)
+inventoryRouter.delete('/requisitions/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const check = await database.query(
+      'SELECT id, status FROM purchase_requisitions WHERE id = $1',
+      [id]
+    );
+    if (check.rows.length === 0) {
+      return res.status(404).json({ error: 'Requisição não encontrada' });
+    }
+
+    const { status } = check.rows[0];
+    if (!['pending', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: 'Apenas requisições pendentes ou rejeitadas podem ser excluídas' });
+    }
+
+    await database.query('DELETE FROM purchase_requisitions WHERE id = $1', [id]);
+    res.json({ message: 'Requisição excluída com sucesso' });
+  } catch (error: any) {
+    console.error('❌ Erro ao excluir requisição:', error);
+    res.status(500).json({ error: 'Failed to delete requisition', details: error.message });
+  }
+});
+
 // PATCH - Aprovar requisição
 inventoryRouter.patch('/requisitions/:id/approve', async (req: Request, res: Response) => {
   try {
