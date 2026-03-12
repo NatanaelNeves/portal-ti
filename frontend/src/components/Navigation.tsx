@@ -22,7 +22,7 @@ export default function Navigation() {
     return (
       <nav className="navbar">
         <div className="navbar-brand" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
-          <h1>Central de Apoio OPN</h1>
+          <h1>Portal de Serviços Internos</h1>
           <small style={{ fontSize: '0.75rem', opacity: 0.9 }}>Cuidando de quem transforma vidas</small>
         </div>
         <div className="navbar-menu">
@@ -107,7 +107,7 @@ export default function Navigation() {
   return (
     <nav className="navbar navbar-internal">
       <div className="navbar-brand" onClick={() => navigate(dashboardRoute)} style={{ cursor: 'pointer' }}>
-        <h1>Central de Apoio OPN</h1>
+        <h1>Portal de Serviços Internos</h1>
         <small style={{ fontSize: '0.75rem', opacity: 0.9 }}>Área Interna</small>
       </div>
 

@@ -123,7 +123,7 @@ async function startServer(): Promise<void> {
     httpServer.listen(config.port, () => {
       console.log(`
 ╔═══════════════════════════════════════╗
-║   Portal de Serviços de TI            ║
+    ║   Portal de Serviços Internos         ║
 ║   Server running on port ${config.port}       ║
 ║   Environment: ${config.nodeEnv.toUpperCase().padEnd(26)}║
 ╚═══════════════════════════════════════╝

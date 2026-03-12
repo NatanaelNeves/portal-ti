@@ -33,7 +33,7 @@ export default function LoginPage() {
   return (
     <div className="login-container">
       <div className="login-card">
-        <h1>Portal de Serviços de TI</h1>
+        <h1>Portal de Serviços Internos</h1>
         <form onSubmit={handleSubmit}>
           {!isLogin && (
             <div className="form-group">

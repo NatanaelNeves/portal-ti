@@ -63,7 +63,7 @@ export default function InternalLoginPage() {
       <div className="login-container">
         <div className="login-card">
           <div className="login-header">
-            <h1>Portal de TI</h1>
+            <h1>Portal de Serviços Internos</h1>
             <p>Acesso para Equipe Interna</p>
           </div>
 

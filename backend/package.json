@@ -1,7 +1,7 @@
 {
   "name": "portal-ti-backend",
   "version": "1.0.0",
-  "description": "Backend para o Portal de Serviços de TI",
+  "description": "Backend para o Portal de Serviços Internos",
   "main": "dist/index.js",
   "scripts": {
     "dev": "ts-node src/index.ts",

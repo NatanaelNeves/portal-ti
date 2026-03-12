@@ -1,7 +1,7 @@
 {
   "name": "portal-ti-frontend",
   "version": "1.0.0",
-  "description": "Frontend para o Portal de Serviços de TI",
+  "description": "Frontend para o Portal de Serviços Internos",
   "type": "module",
   "scripts": {
     "dev": "vite",

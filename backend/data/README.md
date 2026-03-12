@@ -1,6 +1,6 @@
 # 📥 Scripts de Importação de Dados
 
-Scripts para importar dados iniciais no Portal de Serviços de TI.
+Scripts para importar dados iniciais no Portal de Serviços Internos.
 
 ## 📋 Pré-requisitos
 
