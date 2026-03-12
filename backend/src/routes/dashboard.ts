@@ -523,6 +523,7 @@ dashboardRouter.get("/gestor", async (req: Request, res: Response) => {
       slaResult,
       monthlyTrendResult,
       topIssuesResult,
+      topIssuesByTeamResult,
       departmentStatsResult,
       teamSummaryResult,
       staffPerformanceResult,
@@ -560,6 +561,16 @@ dashboardRouter.get("/gestor", async (req: Request, res: Response) => {
         GROUP BY type
         ORDER BY count DESC
         LIMIT 5
+      `),
+      database.query(`
+        SELECT
+          COALESCE(department, 'ti') as team,
+          type as title,
+          COUNT(*) as count
+        FROM tickets
+        WHERE created_at >= NOW() - INTERVAL '3 months'
+        GROUP BY COALESCE(department, 'ti'), type
+        ORDER BY COALESCE(department, 'ti') ASC, count DESC
       `),
       database.query(`
         SELECT
@@ -663,6 +674,14 @@ dashboardRouter.get("/gestor", async (req: Request, res: Response) => {
       count: toInt(row.count),
     }));
 
+    const topIssuesByTeam: Record<string, Array<{ title: string; count: number }>> = {};
+    topIssuesByTeamResult.rows.forEach((row: { team: string; title: string; count: string }) => {
+      if (!topIssuesByTeam[row.team]) topIssuesByTeam[row.team] = [];
+      topIssuesByTeam[row.team].push({ title: row.title, count: toInt(row.count) });
+    });
+    // keep only top 5 per team
+    Object.keys(topIssuesByTeam).forEach(k => { topIssuesByTeam[k] = topIssuesByTeam[k].slice(0, 5); });
+
     const departmentStats = departmentStatsResult.rows.reduce((acc: Record<string, { tickets: number; resolved: number }>, row: { department: string; total_tickets: string; resolved_tickets: string }) => {
       const label = row.department === 'administrativo' ? 'Auxiliar Administrativo' : 'TI';
       acc[label] = {
@@ -715,6 +734,7 @@ dashboardRouter.get("/gestor", async (req: Request, res: Response) => {
       ticketsByPriority,
       monthlyTrend,
       topIssues,
+      topIssuesByTeam,
       departmentStats,
       teamSummaries,
       staffPerformance,

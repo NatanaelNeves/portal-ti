@@ -16,6 +16,7 @@ interface GestorData {
   userSatisfaction: number;
   monthlyTrend: Array<{ month: string; tickets: number }>;
   topIssues: Array<{ title: string; count: number }>;
+  topIssuesByTeam?: Record<string, Array<{ title: string; count: number }>>;
   departmentStats: Record<string, { tickets: number; resolved: number }>;
   teamSummaries: Array<{
     key: string;
@@ -420,7 +421,24 @@ export default function GestorDashboardPage() {
             </div>
             <div className="gd-chart-card">
               <h3>🔥 Principais Problemas</h3>
-              {data?.topIssues && data.topIssues.length > 0 ? (
+              {data?.topIssuesByTeam && Object.keys(data.topIssuesByTeam).length > 0 ? (
+                <div className="gd-issues-by-team">
+                  {['ti', 'administrativo'].filter(k => data.topIssuesByTeam![k]?.length > 0).map(teamKey => (
+                    <div key={teamKey} className="gd-issues-team-block">
+                      <div className="gd-issues-team-label">{teamKey === 'administrativo' ? 'Auxiliar Administrativo' : 'TI'}</div>
+                      <div className="gd-issues-list">
+                        {data.topIssuesByTeam![teamKey].map((issue, idx) => (
+                          <div key={idx} className="gd-issue-item">
+                            <span className="gd-issue-rank">#{idx + 1}</span>
+                            <span className="gd-issue-title">{translateIssueTitle(issue.title)}</span>
+                            <span className="gd-issue-count">{issue.count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : data?.topIssues && data.topIssues.length > 0 ? (
                 <div className="gd-issues-list">
                   {data.topIssues.slice(0, 6).map((issue, idx) => (
                     <div key={idx} className="gd-issue-item">

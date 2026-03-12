@@ -12,6 +12,7 @@ interface Ticket {
   status: string;
   priority: string;
   type: string;
+  department?: string;
   created_at: string;
   updated_at: string;
   assigned_to?: string;
@@ -78,6 +79,7 @@ export default function GestorTicketsPage() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchText, setSearchText] = useState('');
   const [filterPriority, setFilterPriority] = useState('all');
+  const [filterTeam, setFilterTeam] = useState('all');
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
   const [equipment, setEquipment] = useState<Equipment[]>([]);
@@ -201,6 +203,10 @@ export default function GestorTicketsPage() {
   const filteredTickets = tickets.filter(t => {
     if (filterStatus !== 'all' && t.status !== filterStatus) return false;
     if (filterPriority !== 'all' && t.priority !== filterPriority) return false;
+    if (filterTeam !== 'all') {
+      const ticketTeam = t.department || 'ti';
+      if (ticketTeam !== filterTeam) return false;
+    }
     if (searchText.trim()) {
       const q = searchText.toLowerCase();
       return (
@@ -228,15 +234,17 @@ export default function GestorTicketsPage() {
   const filteredPurchases = purchases.filter(p => purchaseStatusFilter === 'all' || p.status === purchaseStatusFilter);
 
   const ticketStats = {
-    total: tickets.length,
-    open: tickets.filter(t => t.status === 'open').length,
-    inProgress: tickets.filter(t => t.status === 'in_progress').length,
-    resolved: tickets.filter(t => t.status === 'resolved').length,
-    critical: tickets.filter(t => t.priority === 'high' && !['resolved','closed'].includes(t.status)).length,
+    total: filteredTickets.length,
+    open: filteredTickets.filter(t => t.status === 'open').length,
+    inProgress: filteredTickets.filter(t => t.status === 'in_progress').length,
+    resolved: filteredTickets.filter(t => t.status === 'resolved').length,
+    critical: filteredTickets.filter(t => t.priority === 'high' && !['resolved','closed'].includes(t.status)).length,
+    ti: tickets.filter(t => !t.department || t.department === 'ti').length,
+    administrativo: tickets.filter(t => t.department === 'administrativo').length,
   };
 
   const TABS: Array<{ id: Tab; label: string; count?: number }> = [
-    { id: 'tickets', label: '\u{1F3AB} Chamados de TI', count: ticketStats.total },
+    { id: 'tickets', label: '\u{1F3AB} Chamados', count: tickets.length },
     { id: 'equipment', label: '\u{1F5A5}\uFE0F Equipamentos', count: equipment.length || undefined },
     { id: 'notebooks', label: '\u{1F4BB} Notebooks', count: notebooks.length || undefined },
     { id: 'purchases', label: '\u{1F6D2} Compras', count: purchases.length || undefined },
@@ -271,11 +279,15 @@ export default function GestorTicketsPage() {
       {activeTab === 'tickets' && (
         <div className="gt-tab-content">
           <div className="gt-stats-row">
-            <div className="gt-stat-box"><span className="gt-stat-val">{ticketStats.total}</span><span className="gt-stat-lbl">Total</span></div>
+            <div className="gt-stat-box"><span className="gt-stat-val">{ticketStats.total}</span><span className="gt-stat-lbl">Total{filterTeam !== 'all' ? ' (filtrado)' : ''}</span></div>
             <div className="gt-stat-box open"><span className="gt-stat-val">{ticketStats.open}</span><span className="gt-stat-lbl">Abertos</span></div>
             <div className="gt-stat-box progress"><span className="gt-stat-val">{ticketStats.inProgress}</span><span className="gt-stat-lbl">Em Atendimento</span></div>
             <div className="gt-stat-box resolved"><span className="gt-stat-val">{ticketStats.resolved}</span><span className="gt-stat-lbl">Resolvidos</span></div>
             <div className="gt-stat-box critical"><span className="gt-stat-val">{ticketStats.critical}</span><span className="gt-stat-lbl">Alta Prioridade</span></div>
+            {filterTeam === 'all' && (<>
+              <div className="gt-stat-box" style={{ borderLeft: '3px solid #4A90E2' }}><span className="gt-stat-val">{ticketStats.ti}</span><span className="gt-stat-lbl">TI</span></div>
+              <div className="gt-stat-box" style={{ borderLeft: '3px solid #48bb78' }}><span className="gt-stat-val">{ticketStats.administrativo}</span><span className="gt-stat-lbl">Adm.</span></div>
+            </>)}
           </div>
 
           <div className="gt-filters">
@@ -299,6 +311,11 @@ export default function GestorTicketsPage() {
               <option value="high">Alta</option>
               <option value="medium">Media</option>
               <option value="low">Baixa</option>
+            </select>
+            <select className="gt-select" value={filterTeam} onChange={e => setFilterTeam(e.target.value)}>
+              <option value="all">Todas as equipes</option>
+              <option value="ti">TI</option>
+              <option value="administrativo">Auxiliar Administrativo</option>
             </select>
             <button className="btn btn-secondary btn-sm" onClick={fetchTickets}>Atualizar</button>
           </div>
@@ -327,6 +344,11 @@ export default function GestorTicketsPage() {
                     <span className={`gt-badge ${getStatusClass(ticket.status)}`}>{getStatusLabel(ticket.status)}</span>
                     <span className={`gt-badge ${getPriorityClass(ticket.priority)}`}>{getPriorityLabel(ticket.priority)}</span>
                     <span className="gt-badge badge-type">{ticket.type}</span>
+                    {filterTeam === 'all' && (
+                      <span className={`gt-badge ${ticket.department === 'administrativo' ? 'badge-team-adm' : 'badge-team-ti'}`}>
+                        {ticket.department === 'administrativo' ? 'Adm.' : 'TI'}
+                      </span>
+                    )}
                   </div>
                   <div className="gt-ticket-footer">{getUserName(ticket.assigned_to)}</div>
                 </div>
