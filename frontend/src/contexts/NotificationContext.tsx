@@ -24,22 +24,45 @@ const NotificationContext = createContext<NotificationContextValue>({
 export const useNotifications = () => useContext(NotificationContext);
 
 // ─── Web Audio beep ───────────────────────────────────────────────────────────
-function playNotificationSound() {
+// Reuse a single AudioContext — creating one per sound hit the autoplay policy.
+let _audioCtx: AudioContext | null = null;
+
+function getAudioCtx(): AudioContext | null {
   try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    if (!_audioCtx) {
+      _audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    return _audioCtx;
+  } catch {
+    return null;
+  }
+}
+
+// Call this on any user interaction so the context leaves "suspended" state.
+function unlockAudioCtx() {
+  const ctx = getAudioCtx();
+  if (ctx && ctx.state === 'suspended') ctx.resume();
+}
+
+async function playNotificationSound() {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    // Browsers suspend AudioContext until user interaction — resume before playing.
+    if (ctx.state === 'suspended') await ctx.resume();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain);
     gain.connect(ctx.destination);
     osc.type = 'sine';
     osc.frequency.setValueAtTime(880, ctx.currentTime);
-    osc.frequency.setValueAtTime(660, ctx.currentTime + 0.12);
-    gain.gain.setValueAtTime(0.35, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+    osc.frequency.setValueAtTime(660, ctx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.4, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
     osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.35);
+    osc.stop(ctx.currentTime + 0.4);
   } catch (_) {
-    // browser may block autoplay — silent fail
+    // silent fail
   }
 }
 
@@ -114,7 +137,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       saveSeenIds(seen);
 
       // ── sound ──
-      playNotificationSound();
+      await playNotificationSound();
 
       // ── toast(s) ──
       unseen.forEach((ticket) => {
@@ -165,6 +188,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       Notification.requestPermission();
     }
 
+    // Unlock AudioContext as soon as the user first interacts with the page.
+    document.addEventListener('click', unlockAudioCtx);
+    document.addEventListener('keydown', unlockAudioCtx);
+
     const schedule = () => {
       timerRef.current = setTimeout(async () => {
         await poll();
@@ -176,6 +203,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
+      document.removeEventListener('click', unlockAudioCtx);
+      document.removeEventListener('keydown', unlockAudioCtx);
     };
   }, [poll]);
 
