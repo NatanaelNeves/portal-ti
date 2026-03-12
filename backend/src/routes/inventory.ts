@@ -107,8 +107,12 @@ inventoryRouter.get('/notebooks', async (req: Request, res: Response) => {
     const params: any[] = [];
 
     if (status) {
-      params.push(status);
-      query += ` AND ie.current_status = $${params.length}`;
+      if (status === 'available') {
+        query += ` AND ie.current_status IN ('available', 'in_stock')`;
+      } else {
+        params.push(status);
+        query += ` AND ie.current_status = $${params.length}`;
+      }
     }
 
     if (unit) {
@@ -180,8 +184,12 @@ inventoryRouter.get('/peripherals', async (req: Request, res: Response) => {
     const params: any[] = [];
 
     if (status) {
-      params.push(status);
-      query += ` AND ie.current_status = $${params.length}`;
+      if (status === 'available') {
+        query += ` AND ie.current_status IN ('available', 'in_stock')`;
+      } else {
+        params.push(status);
+        query += ` AND ie.current_status = $${params.length}`;
+      }
     }
 
     if (type) {
@@ -205,7 +213,7 @@ inventoryRouter.get('/peripherals', async (req: Request, res: Response) => {
         byType[item.type] = { total: 0, available: 0, in_use: 0, maintenance: 0 };
       }
       byType[item.type].total++;
-      if (item.current_status === 'available') byType[item.type].available++;
+      if (['available', 'in_stock'].includes(item.current_status)) byType[item.type].available++;
       if (item.current_status === 'in_use') byType[item.type].in_use++;
       if (item.current_status === 'maintenance') byType[item.type].maintenance++;
     });
@@ -273,8 +281,12 @@ inventoryRouter.get('/equipment', async (req: Request, res: Response) => {
     const params: any[] = [];
 
     if (status) {
-      params.push(status);
-      query += ` AND ie.current_status = $${params.length}`;
+      if (status === 'available') {
+        query += ` AND ie.current_status IN ('available', 'in_stock')`;
+      } else {
+        params.push(status);
+        query += ` AND ie.current_status = $${params.length}`;
+      }
     }
 
     if (unit) {
@@ -1320,7 +1332,7 @@ inventoryRouter.get('/view/by-unit', async (req: Request, res: Response) => {
 
       if (row.category === 'NOTEBOOK') {
         units[row.unit].notebooks.total += parseInt(row.count);
-        if (row.status === 'available') units[row.unit].notebooks.available += parseInt(row.count);
+        if (['available', 'in_stock'].includes(row.status)) units[row.unit].notebooks.available += parseInt(row.count);
         if (row.status === 'in_use') units[row.unit].notebooks.in_use += parseInt(row.count);
         if (row.status === 'maintenance') units[row.unit].notebooks.maintenance += parseInt(row.count);
       } else {
@@ -1328,7 +1340,7 @@ inventoryRouter.get('/view/by-unit', async (req: Request, res: Response) => {
           units[row.unit].peripherals[row.type] = { total: 0, available: 0, in_use: 0, maintenance: 0 };
         }
         units[row.unit].peripherals[row.type].total += parseInt(row.count);
-        if (row.status === 'available') units[row.unit].peripherals[row.type].available += parseInt(row.count);
+        if (['available', 'in_stock'].includes(row.status)) units[row.unit].peripherals[row.type].available += parseInt(row.count);
         if (row.status === 'in_use') units[row.unit].peripherals[row.type].in_use += parseInt(row.count);
         if (row.status === 'maintenance') units[row.unit].peripherals[row.type].maintenance += parseInt(row.count);
       }
@@ -1590,7 +1602,7 @@ inventoryRouter.get('/dashboard/summary', async (req: Request, res: Response) =>
     const stats = await database.query(`
       SELECT 
         COUNT(*) FILTER (WHERE current_status = 'in_use') as equipment_in_use,
-        COUNT(*) FILTER (WHERE current_status = 'available') as equipment_in_stock,
+        COUNT(*) FILTER (WHERE current_status IN ('available', 'in_stock')) as equipment_in_stock,
         COUNT(*) FILTER (WHERE current_status = 'maintenance') as equipment_in_maintenance,
         COUNT(*) FILTER (WHERE category = 'NOTEBOOK') as total_notebooks,
         COUNT(*) FILTER (WHERE category = 'PERIPHERAL') as total_peripherals

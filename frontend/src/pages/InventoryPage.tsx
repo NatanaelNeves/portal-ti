@@ -121,7 +121,8 @@ export default function InventoryPage() {
       (nb.internal_code || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (nb.serial_number || '').toLowerCase().includes(searchQuery.toLowerCase());
     
-    const matchesStatus = statusFilter === 'all' || nb.current_status === statusFilter;
+    const matchesStatus = statusFilter === 'all' || nb.current_status === statusFilter
+      || (statusFilter === 'available' && nb.current_status === 'in_stock');
     const matchesUnit = unitFilter === 'all' || nb.current_unit === unitFilter;
     
     return matchesSearch && matchesStatus && matchesUnit;
@@ -135,7 +136,8 @@ export default function InventoryPage() {
       (per.model || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (per.internal_code || '').toLowerCase().includes(searchQuery.toLowerCase());
     
-    const matchesStatus = statusFilter === 'all' || per.current_status === statusFilter;
+    const matchesStatus = statusFilter === 'all' || per.current_status === statusFilter
+      || (statusFilter === 'available' && per.current_status === 'in_stock');
     const matchesUnit = unitFilter === 'all' || per.current_unit === unitFilter;
     
     return matchesSearch && matchesStatus && matchesUnit;
@@ -144,8 +146,10 @@ export default function InventoryPage() {
   const getStatusClass = (status: string) => {
     const classes: Record<string, string> = {
       'available': 'status-available',
+      'in_stock': 'status-available',
       'in_use': 'status-in-use',
       'in_maintenance': 'status-maintenance',
+      'maintenance': 'status-maintenance',
       'lowered': 'status-retired'
     };
     return classes[status] || 'status-unknown';
@@ -153,9 +157,11 @@ export default function InventoryPage() {
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
-      'available': '✓ Disponível',
+      'available': '\u2713 Disponível',
+      'in_stock': '📦 Em Estoque',
       'in_use': '👤 Em Uso',
       'in_maintenance': '🔧 Manutenção',
+      'maintenance': '🔧 Manutenção',
       'lowered': '🗑️ Baixado'
     };
     return labels[status] || status;

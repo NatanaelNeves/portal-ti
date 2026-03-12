@@ -87,7 +87,8 @@ function ModelGroup({ groupKey, notebooks, colorIdx, search, statusFilter, onNav
       (n.current_unit || '').toLowerCase().includes(q) ||
       (n.internal_code || '').toLowerCase().includes(q) ||
       (n.serial_number || '').toLowerCase().includes(q);
-    const matchStatus = statusFilter === 'all' || n.current_status === statusFilter;
+    const matchStatus = statusFilter === 'all' || n.current_status === statusFilter
+      || (statusFilter === 'available' && n.current_status === 'in_stock');
     return matchSearch && matchStatus;
   }), [notebooks, search, statusFilter]);
 

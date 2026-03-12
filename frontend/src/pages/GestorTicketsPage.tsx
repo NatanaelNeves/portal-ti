@@ -188,8 +188,8 @@ export default function GestorTicketsPage() {
   const getPriorityLabel = (p: string) => (({ urgent: 'Alta', high: 'Alta', medium: 'Media', low: 'Baixa' } as Record<string,string>)[p] || p);
   const getStatusClass = (s: string) => (({ open: 'badge-open', in_progress: 'badge-progress', waiting_user: 'badge-warning', resolved: 'badge-success', closed: 'badge-neutral' } as Record<string,string>)[s] || 'badge-neutral');
   const getPriorityClass = (p: string) => (p === 'urgent' ? 'badge-high' : (({ high: 'badge-high', medium: 'badge-medium', low: 'badge-low' } as Record<string,string>)[p] || 'badge-neutral'));
-  const getEquipStatusLabel = (s: string) => (({ in_use: 'Em Uso', available: 'Disponivel', maintenance: 'Manutencao', inactive: 'Inativo', lost: 'Extraviado' } as Record<string,string>)[s] || s);
-  const getEquipStatusClass = (s: string) => (({ in_use: 'badge-success', available: 'badge-info', maintenance: 'badge-warning', inactive: 'badge-neutral', lost: 'badge-danger' } as Record<string,string>)[s] || 'badge-neutral');
+  const getEquipStatusLabel = (s: string) => (({ in_use: 'Em Uso', available: 'Disponivel', in_stock: 'Em Estoque', maintenance: 'Manutencao', inactive: 'Inativo', lost: 'Extraviado' } as Record<string,string>)[s] || s);
+  const getEquipStatusClass = (s: string) => (({ in_use: 'badge-success', available: 'badge-info', in_stock: 'badge-info', maintenance: 'badge-warning', inactive: 'badge-neutral', lost: 'badge-danger' } as Record<string,string>)[s] || 'badge-neutral');
   const getPurchaseStatusLabel = (s: string) => (({ pending: 'Pendente', approved: 'Aprovado', purchased: 'Comprado', rejected: 'Rejeitado', cancelled: 'Cancelado' } as Record<string,string>)[s] || s);
   const getPurchaseStatusClass = (s: string) => (({ pending: 'badge-warning', approved: 'badge-info', purchased: 'badge-success', rejected: 'badge-danger', cancelled: 'badge-neutral' } as Record<string,string>)[s] || 'badge-neutral');
   const getUserName = (id?: string) => users.find(u => u.id === id)?.name || 'Nao atribuido';
