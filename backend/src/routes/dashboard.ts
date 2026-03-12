@@ -174,7 +174,7 @@ dashboardRouter.get("/admin", async (req: Request, res: Response) => {
         SELECT
           COUNT(*) FILTER (WHERE current_status IN ('available', 'in_stock')) AS assets_in_stock,
           COUNT(*) FILTER (WHERE current_status = 'in_use') AS assets_assigned,
-          COUNT(*) FILTER (WHERE current_status = 'maintenance') AS assets_in_maintenance,
+          COUNT(*) FILTER (WHERE current_status IN ('maintenance', 'in_maintenance')) AS assets_in_maintenance,
           COUNT(*) AS total_assets
         FROM inventory_equipment
       `),
