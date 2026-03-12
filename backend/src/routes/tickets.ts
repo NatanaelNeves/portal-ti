@@ -6,6 +6,7 @@ import { EmailService } from '../services/emailService';
 // v2026.03.10g - strengthened UPDATE with RETURNING to confirm row was modified
 import { uploadTicketAttachment, deleteFile } from '../services/uploadService';
 import { validate, createTicketSchema, updateTicketSchema, addMessageSchema } from '../middleware/validation';
+import { pollingLimiter } from '../middleware/rateLimiter';
 import path from 'path';
 
 const ticketsRouter = Router();
@@ -32,7 +33,7 @@ const canAdminStaffAccessAdministrativeTicket = (ticket: TicketAccessRow, userId
  * Only accessible to internal staff (admin, it_staff, admin_staff, manager).
  * Returns minimal payload: id, title, department, created_at.
  */
-ticketsRouter.get('/new-since', authenticate, async (req: Request, res: Response) => {
+ticketsRouter.get('/new-since', pollingLimiter, authenticate, async (req: Request, res: Response) => {
   try {
     const decoded = (req as any).user;
     if (!canViewTicketsAsInternalRole(decoded.role)) {

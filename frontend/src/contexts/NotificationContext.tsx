@@ -97,7 +97,8 @@ function saveSeenIds(ids: Set<string>) {
 }
 
 // ─── POLL_INTERVAL ────────────────────────────────────────────────────────────
-const POLL_MS = 10_000;
+// 30 s is enough for near-real-time notifications and stays well under rate limits.
+const POLL_MS = 30_000;
 
 // ─── Provider ────────────────────────────────────────────────────────────────
 export function NotificationProvider({ children }: { children: ReactNode }) {

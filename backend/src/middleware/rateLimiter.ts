@@ -63,3 +63,22 @@ export const uploadLimiter = rateLimit({
   keyGenerator,
   validate,
 });
+
+/**
+ * Rate limiter dedicado para endpoints de polling (ex: /tickets/new-since)
+ * Limita por IP+token para não compartilhar cota entre usuários no mesmo proxy.
+ * 300 requests por 15 minutos (suficiente para 1 req/30s por ~150 abas)
+ */
+export const pollingLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isDevelopment ? 0 : 300,
+  message: 'Muitas requisições de polling. Tente novamente em instantes.',
+  skip: () => isDevelopment,
+  // Key = IP + bearer token so each authenticated user gets their own bucket
+  keyGenerator: (req: any): string => {
+    const ip = (req.ip || '127.0.0.1').replace(/:\d+$/, '');
+    const auth = (req.headers?.authorization || '').slice(-16); // last 16 chars of token
+    return `${ip}:${auth}`;
+  },
+  validate,
+});

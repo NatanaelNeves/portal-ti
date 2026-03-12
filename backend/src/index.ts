@@ -68,8 +68,11 @@ app.use((req, res, next) => {
   next();
 });
 
-// Rate limiting geral
-app.use('/api/', generalLimiter);
+// Rate limiting geral (excluindo endpoints de polling que têm limiter próprio)
+app.use('/api/', (req, res, next) => {
+  if (req.path.includes('/tickets/new-since')) return next();
+  return generalLimiter(req, res, next);
+});
 
 // Servir arquivos estáticos (uploads)
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
