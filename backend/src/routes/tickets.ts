@@ -10,6 +10,23 @@ import path from 'path';
 
 const ticketsRouter = Router();
 
+type TicketAccessRow = {
+  department?: string | null;
+  assigned_to_id?: string | null;
+};
+
+const isManagerRole = (role: string) => role === UserRole.MANAGER || role === 'gestor';
+
+const canViewTicketsAsInternalRole = (role: string) => {
+  return [UserRole.IT_STAFF, UserRole.ADMIN_STAFF, UserRole.ADMIN].includes(role as UserRole) || isManagerRole(role);
+};
+
+const canAdminStaffAccessAdministrativeTicket = (ticket: TicketAccessRow, userId: string) => {
+  const ticketDepartment = ticket.department || 'ti';
+  if (ticketDepartment !== 'administrativo') return false;
+  return !ticket.assigned_to_id || ticket.assigned_to_id === userId;
+};
+
 /**
  * GET / - Listar chamados com filtros e paginação
  * 
@@ -145,8 +162,7 @@ ticketsRouter.get('/', async (req: Request, res: Response) => {
         const decoded = jwt.verify(token, config.jwt.secret) as any;
         
         // Validar permissão para ver todos os chamados
-        const allowedRoles = [UserRole.IT_STAFF, UserRole.ADMIN_STAFF, UserRole.MANAGER, UserRole.ADMIN];
-        if (!allowedRoles.includes(decoded.role)) {
+        if (!canViewTicketsAsInternalRole(decoded.role)) {
           return res.status(403).json({ 
             error: 'Acesso negado',
             message: 'Você não tem permissão para ver todos os chamados'
@@ -169,8 +185,8 @@ ticketsRouter.get('/', async (req: Request, res: Response) => {
         } else if (decoded.role === UserRole.ADMIN_STAFF) {
           // Administrativo só vê chamados do administrativo por padrão
           conditions.push(`COALESCE(t.department, 'ti') = 'administrativo'`);
-          // Auxiliar administrativo vê apenas chamados atribuídos a ele
-          conditions.push(`t.assigned_to_id = $${paramCount}`);
+          // Auxiliar administrativo vê chamados atribuídos a ele ou sem responsável
+          conditions.push(`(t.assigned_to_id = $${paramCount} OR t.assigned_to_id IS NULL)`);
           params.push(decoded.id);
           paramCount++;
         }
@@ -348,15 +364,14 @@ ticketsRouter.get('/:id', async (req: Request, res: Response) => {
         const decoded = jwt.verify(token, config.jwt.secret) as any;
         
         // TI, Administrativo, Coordenador e Admin podem ver qualquer chamado
-        const allowedRoles = [UserRole.IT_STAFF, UserRole.ADMIN_STAFF, UserRole.MANAGER, UserRole.ADMIN];
-        if (!allowedRoles.includes(decoded.role)) {
+        if (!canViewTicketsAsInternalRole(decoded.role)) {
           return res.status(403).json({ error: 'Acesso negado' });
         }
 
-        if (decoded.role === UserRole.ADMIN_STAFF && ticket.rows[0].assigned_to_id !== decoded.id) {
+        if (decoded.role === UserRole.ADMIN_STAFF && !canAdminStaffAccessAdministrativeTicket(ticket.rows[0], decoded.id)) {
           return res.status(403).json({
             error: 'Acesso negado',
-            message: 'Auxiliar administrativo pode visualizar apenas chamados atribuídos a si.'
+            message: 'Auxiliar administrativo pode visualizar chamados administrativos atribuídos a si ou sem responsável.'
           });
         }
 
@@ -512,15 +527,14 @@ ticketsRouter.get('/:id/messages', async (req: Request, res: Response) => {
         const decoded = jwt.verify(token, config.jwt.secret) as any;
         
         // TI, Administrativo, Coordenador e Admin podem ver mensagens de qualquer chamado
-        const allowedRoles = [UserRole.IT_STAFF, UserRole.ADMIN_STAFF, UserRole.MANAGER, UserRole.ADMIN];
-        if (!allowedRoles.includes(decoded.role)) {
+        if (!canViewTicketsAsInternalRole(decoded.role)) {
           return res.status(403).json({ error: 'Acesso negado' });
         }
 
-        if (decoded.role === UserRole.ADMIN_STAFF && ticket.rows[0].assigned_to_id !== decoded.id) {
+        if (decoded.role === UserRole.ADMIN_STAFF && !canAdminStaffAccessAdministrativeTicket(ticket.rows[0], decoded.id)) {
           return res.status(403).json({
             error: 'Acesso negado',
-            message: 'Auxiliar administrativo pode visualizar mensagens apenas dos chamados atribuídos a si.'
+            message: 'Auxiliar administrativo pode visualizar mensagens apenas de chamados administrativos atribuídos a si ou sem responsável.'
           });
         }
       } catch (err) {
@@ -760,7 +774,7 @@ ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (r
 
     if (userRole === UserRole.ADMIN_STAFF) {
       const assignedCheck = await database.query(
-        'SELECT assigned_to_id FROM tickets WHERE id = $1',
+        'SELECT assigned_to_id, department FROM tickets WHERE id = $1',
         [id]
       );
 
@@ -768,10 +782,20 @@ ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (r
         return res.status(404).json({ error: 'Chamado não encontrado' });
       }
 
-      if (assignedCheck.rows[0].assigned_to_id !== userId) {
+      const assignedTicket = assignedCheck.rows[0] as TicketAccessRow;
+      const canAccess = canAdminStaffAccessAdministrativeTicket(assignedTicket, userId);
+
+      if (!canAccess) {
         return res.status(403).json({
           error: 'Acesso negado',
-          message: 'Auxiliar administrativo só pode atualizar chamados atribuídos a si.'
+          message: 'Auxiliar administrativo só pode atualizar chamados administrativos atribuídos a si ou sem responsável.'
+        });
+      }
+
+      if (assigned_to_id !== undefined && assigned_to_id !== null && assigned_to_id !== '' && assigned_to_id !== userId) {
+        return res.status(403).json({
+          error: 'Acesso negado',
+          message: 'Auxiliar administrativo só pode atribuir chamado para si mesmo.'
         });
       }
     }
