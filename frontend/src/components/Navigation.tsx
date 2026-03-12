@@ -49,15 +49,18 @@ export default function Navigation() {
   // Navegação para usuários internos autenticados
   const internalUser = localStorage.getItem('internal_user');
   const userData = internalUser ? JSON.parse(internalUser) : null;
+  const userRole = userData?.role;
   
-  const showAssetsLink = userData && (userData.role === 'admin' || userData.role === 'it_staff');
-  const showUsersLink = userData && (userData.role === 'admin' || userData.role === 'it_staff');
-  const showKnowledgeLink = userData && ['it_staff', 'admin', 'admin_staff'].includes(userData.role);
+  const showAssetsLink = userRole === 'admin' || userRole === 'it_staff';
+  const showUsersLink = userRole === 'admin' || userRole === 'it_staff';
+  const showKnowledgeLink = userRole === 'admin' || userRole === 'it_staff';
+  const showDocumentsLink = userRole === 'admin' || userRole === 'it_staff';
+  const showReportsLink = userRole === 'admin' || userRole === 'it_staff' || userRole === 'manager' || userRole === 'gestor';
 
   // Definir rota do dashboard baseado no papel
   const getDashboardRoute = () => {
     if (!userData) return '/admin/dashboard';
-    if (userData.role === 'manager') return '/gestor/dashboard';
+    if (userData.role === 'manager' || userData.role === 'gestor') return '/gestor/dashboard';
     if (userData.role === 'admin_staff') return '/admin/auxiliar/dashboard';
     return '/admin/dashboard';
   };
@@ -70,7 +73,7 @@ export default function Navigation() {
     {
       label: 'Solicitações',
       action: () => navigate(
-        userData?.role === 'manager' ? '/gestor/solicitacoes' : '/admin/chamados'
+        userRole === 'manager' || userRole === 'gestor' ? '/gestor/solicitacoes' : '/admin/chamados'
       ),
     },
   ];
@@ -83,8 +86,11 @@ export default function Navigation() {
     navLinks.push({ label: 'Inventário', action: () => navigate('/inventario') });
   }
 
-  if (showKnowledgeLink) {
+  if (showDocumentsLink) {
     navLinks.push({ label: 'Documentos', action: () => navigate('/admin/documentos') });
+  }
+
+  if (showReportsLink) {
     navLinks.push({ label: 'Relatórios', action: () => navigate('/admin/relatorios') });
   }
 

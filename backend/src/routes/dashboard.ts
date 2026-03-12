@@ -516,109 +516,198 @@ dashboardRouter.get("/gestor", async (req: Request, res: Response) => {
       return;
     }
 
-    // Total de chamados
-    const totalResult = await database.query("SELECT COUNT(*) as count FROM tickets");
-    const totalTickets = parseInt(totalResult.rows[0].count);
+    const [
+      totalResult,
+      statusResult,
+      priorityResult,
+      slaResult,
+      monthlyTrendResult,
+      topIssuesResult,
+      departmentStatsResult,
+      teamSummaryResult,
+      staffPerformanceResult,
+    ] = await Promise.all([
+      database.query(`SELECT COUNT(*) as count FROM tickets`),
+      database.query(`
+        SELECT status, COUNT(*) as count 
+        FROM tickets 
+        GROUP BY status
+      `),
+      database.query(`
+        SELECT priority, COUNT(*) as count 
+        FROM tickets 
+        GROUP BY priority
+      `),
+      database.query(`
+        SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (COALESCE(resolved_at, updated_at) - created_at))/3600), 0) as avg_hours
+        FROM tickets
+        WHERE status IN ('resolved', 'closed')
+      `),
+      database.query(`
+        SELECT TO_CHAR(month_bucket, 'Mon') as month, tickets
+        FROM (
+          SELECT DATE_TRUNC('month', created_at) as month_bucket, COUNT(*) as tickets
+          FROM tickets
+          WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '5 months'
+          GROUP BY month_bucket
+          ORDER BY month_bucket ASC
+        ) trend
+      `),
+      database.query(`
+        SELECT type as title, COUNT(*) as count
+        FROM tickets
+        WHERE created_at >= NOW() - INTERVAL '3 months'
+        GROUP BY type
+        ORDER BY count DESC
+        LIMIT 5
+      `),
+      database.query(`
+        SELECT
+          COALESCE(department, 'ti') as department,
+          COUNT(*) as total_tickets,
+          COUNT(*) FILTER (WHERE status IN ('resolved', 'closed')) as resolved_tickets
+        FROM tickets
+        GROUP BY COALESCE(department, 'ti')
+        ORDER BY CASE COALESCE(department, 'ti')
+          WHEN 'ti' THEN 1
+          ELSE 2
+        END
+      `),
+      database.query(`
+        SELECT
+          CASE WHEN iu.role = 'admin_staff' THEN 'administrativo' ELSE 'ti' END as team,
+          COUNT(t.id) as total_tickets,
+          COUNT(*) FILTER (WHERE t.status IN ('resolved', 'closed')) as resolved_tickets,
+          COUNT(*) FILTER (WHERE t.status = 'open') as open_tickets,
+          COUNT(*) FILTER (WHERE t.status = 'in_progress') as in_progress_tickets,
+          COUNT(*) FILTER (WHERE t.status = 'waiting_user') as waiting_tickets,
+          COUNT(*) FILTER (WHERE DATE(t.updated_at) = CURRENT_DATE) as handled_today,
+          COUNT(DISTINCT iu.id) as active_staff,
+          COALESCE(
+            AVG(EXTRACT(EPOCH FROM (COALESCE(t.resolved_at, t.updated_at) - t.created_at)) / 3600)
+            FILTER (WHERE t.status IN ('resolved', 'closed')),
+            0
+          ) as avg_resolution_hours
+        FROM internal_users iu
+        LEFT JOIN tickets t ON t.assigned_to_id = iu.id
+        WHERE iu.role IN ('admin', 'it_staff', 'admin_staff')
+          AND iu.is_active = true
+        GROUP BY CASE WHEN iu.role = 'admin_staff' THEN 'administrativo' ELSE 'ti' END
+        ORDER BY CASE WHEN CASE WHEN iu.role = 'admin_staff' THEN 'administrativo' ELSE 'ti' END = 'ti' THEN 1 ELSE 2 END
+      `),
+      database.query(`
+        SELECT
+          iu.id,
+          iu.name,
+          iu.role,
+          CASE WHEN iu.role = 'admin_staff' THEN 'administrativo' ELSE 'ti' END as team,
+          COUNT(t.id) as total_tickets,
+          COUNT(*) FILTER (WHERE t.status IN ('resolved', 'closed')) as resolved_tickets,
+          COUNT(*) FILTER (WHERE t.status = 'open') as open_tickets,
+          COUNT(*) FILTER (WHERE t.status = 'in_progress') as in_progress_tickets,
+          COUNT(*) FILTER (WHERE t.status = 'waiting_user') as waiting_tickets,
+          COUNT(*) FILTER (WHERE DATE(t.updated_at) = CURRENT_DATE) as handled_today,
+          COALESCE(
+            AVG(EXTRACT(EPOCH FROM (COALESCE(t.resolved_at, t.updated_at) - t.created_at)) / 3600)
+            FILTER (WHERE t.status IN ('resolved', 'closed')),
+            0
+          ) as avg_resolution_hours,
+          MAX(t.updated_at) as last_activity_date
+        FROM internal_users iu
+        LEFT JOIN tickets t ON t.assigned_to_id = iu.id
+        WHERE iu.role IN ('admin', 'it_staff', 'admin_staff')
+          AND iu.is_active = true
+        GROUP BY iu.id, iu.name, iu.role
+        ORDER BY CASE WHEN iu.role = 'admin_staff' THEN 2 ELSE 1 END, total_tickets DESC, iu.name ASC
+      `),
+    ]);
 
-    // Chamados por status
-    const statusResult = await database.query(`
-      SELECT status, COUNT(*) as count 
-      FROM tickets 
-      GROUP BY status
-    `);
+    const totalTickets = toInt(totalResult.rows[0]?.count);
 
     const ticketsByStatus: Record<string, number> = {};
     let openTickets = 0;
     let inProgressTickets = 0;
+    let waitingTickets = 0;
     let resolvedTickets = 0;
 
-    statusResult.rows.forEach((row: any) => {
+    statusResult.rows.forEach((row: { status: string; count: string }) => {
       const status = row.status;
-      const count = parseInt(row.count);
+      const count = toInt(row.count);
       ticketsByStatus[status] = count;
 
-      if (status === 'open') openTickets = count;
-      else if (status === 'in_progress') inProgressTickets = count;
-      // NÃO mais contar resolved/closed aqui - será contado abaixo apenas os de HOJE
+      if (status === 'open') {
+        openTickets = count;
+      } else if (status === 'in_progress') {
+        inProgressTickets = count;
+      } else if (status === 'waiting_user') {
+        waitingTickets = count;
+      } else if (status === 'resolved' || status === 'closed') {
+        resolvedTickets += count;
+      }
     });
-
-    // Contar tickets resolvidos HOJE (não todos)
-    const resolvedTodayResult = await database.query(`
-      SELECT COUNT(*) as count 
-      FROM tickets 
-      WHERE (status = 'resolved' OR status = 'closed')
-        AND DATE(updated_at) = CURRENT_DATE
-    `);
-    resolvedTickets = parseInt(resolvedTodayResult.rows[0].count || 0);
-
-    // Chamados por prioridade
-    const priorityResult = await database.query(`
-      SELECT priority, COUNT(*) as count 
-      FROM tickets 
-      GROUP BY priority
-    `);
 
     const ticketsByPriority: Record<string, number> = {};
-    priorityResult.rows.forEach((row: any) => {
-      ticketsByPriority[row.priority] = parseInt(row.count);
+    priorityResult.rows.forEach((row: { priority: string; count: string }) => {
+      ticketsByPriority[row.priority] = toInt(row.count);
     });
 
-    // Calcular tempo médio de resolução em horas
-    const slaResult = await database.query(`
-      SELECT AVG(EXTRACT(EPOCH FROM (updated_at - created_at))/3600) as avg_hours
-      FROM tickets
-      WHERE status IN ('resolved', 'closed')
-    `);
+    const averageResolutionTime = Number(toFloat(slaResult.rows[0]?.avg_hours).toFixed(1));
 
-    const averageResolutionTime = slaResult.rows[0].avg_hours 
-      ? Math.round(parseFloat(slaResult.rows[0].avg_hours))
-      : 0;
-
-    // Tendência mensal (últimos 6 meses)
-    const monthlyTrendResult = await database.query(`
-      SELECT 
-        TO_CHAR(created_at, 'Mon') as month,
-        COUNT(*) as tickets
-      FROM tickets
-      WHERE created_at >= NOW() - INTERVAL '6 months'
-      GROUP BY TO_CHAR(created_at, 'Mon'), EXTRACT(MONTH FROM created_at)
-      ORDER BY EXTRACT(MONTH FROM created_at) DESC
-      LIMIT 6
-    `);
-
-    const monthlyTrend = monthlyTrendResult.rows.map((row: any) => ({
+    const monthlyTrend = monthlyTrendResult.rows.map((row: { month: string; tickets: string }) => ({
       month: row.month,
-      tickets: parseInt(row.tickets)
+      tickets: toInt(row.tickets),
     }));
 
-    // Top issues (tipos de chamados mais comuns)
-    const topIssuesResult = await database.query(`
-      SELECT type as title, COUNT(*) as count
-      FROM tickets
-      WHERE created_at >= NOW() - INTERVAL '3 months'
-      GROUP BY type
-      ORDER BY count DESC
-      LIMIT 5
-    `);
-
-    const topIssues = topIssuesResult.rows.map((row: any) => ({
+    const topIssues = topIssuesResult.rows.map((row: { title: string; count: string }) => ({
       title: row.title,
-      count: parseInt(row.count)
+      count: toInt(row.count),
     }));
 
-    // Estatísticas por departamento (mock - adaptável conforme estrutura)
-    const departmentStats = {
-      'TI': { tickets: openTickets + inProgressTickets, resolved: resolvedTickets },
-      'Suporte': { tickets: Math.floor(totalTickets * 0.3), resolved: Math.floor(resolvedTickets * 0.4) }
-    };
+    const departmentStats = departmentStatsResult.rows.reduce((acc: Record<string, { tickets: number; resolved: number }>, row: { department: string; total_tickets: string; resolved_tickets: string }) => {
+      const label = row.department === 'administrativo' ? 'Auxiliar Administrativo' : 'TI';
+      acc[label] = {
+        tickets: toInt(row.total_tickets),
+        resolved: toInt(row.resolved_tickets),
+      };
+      return acc;
+    }, {});
 
-    // Satisfação do usuário (mock - implementar com pesquisas reais)
+    const teamSummaries = teamSummaryResult.rows.map((row: any) => ({
+      key: row.team,
+      label: row.team === 'administrativo' ? 'Auxiliar Administrativo' : 'TI',
+      totalTickets: toInt(row.total_tickets),
+      resolvedTickets: toInt(row.resolved_tickets),
+      openTickets: toInt(row.open_tickets),
+      inProgressTickets: toInt(row.in_progress_tickets),
+      waitingTickets: toInt(row.waiting_tickets),
+      handledToday: toInt(row.handled_today),
+      activeStaff: toInt(row.active_staff),
+      avgResolutionHours: Number(toFloat(row.avg_resolution_hours).toFixed(1)),
+    }));
+
+    const staffPerformance = staffPerformanceResult.rows.map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      role: row.role,
+      team: row.team,
+      teamLabel: row.team === 'administrativo' ? 'Auxiliar Administrativo' : 'TI',
+      totalTickets: toInt(row.total_tickets),
+      resolvedTickets: toInt(row.resolved_tickets),
+      openTickets: toInt(row.open_tickets),
+      inProgressTickets: toInt(row.in_progress_tickets),
+      waitingTickets: toInt(row.waiting_tickets),
+      handledToday: toInt(row.handled_today),
+      avgResolutionHours: Number(toFloat(row.avg_resolution_hours).toFixed(1)),
+      lastActivityDate: row.last_activity_date,
+    }));
+
     const userSatisfaction = 87;
 
     res.json({
       totalTickets,
       openTickets,
       inProgressTickets,
+      waitingTickets,
       resolvedTickets,
       averageResolutionTime,
       userSatisfaction,
@@ -627,6 +716,8 @@ dashboardRouter.get("/gestor", async (req: Request, res: Response) => {
       monthlyTrend,
       topIssues,
       departmentStats,
+      teamSummaries,
+      staffPerformance,
     });
   } catch (error) {
     console.error("Erro ao buscar dashboard gestor:", error);

@@ -8,12 +8,42 @@ import { BACKEND_URL } from '../services/api';
 
 interface GestorData {
   totalTickets: number;
+  openTickets: number;
+  inProgressTickets: number;
+  waitingTickets: number;
   resolvedTickets: number;
   averageResolutionTime: number;
   userSatisfaction: number;
   monthlyTrend: Array<{ month: string; tickets: number }>;
   topIssues: Array<{ title: string; count: number }>;
   departmentStats: Record<string, { tickets: number; resolved: number }>;
+  teamSummaries: Array<{
+    key: string;
+    label: string;
+    totalTickets: number;
+    resolvedTickets: number;
+    openTickets: number;
+    inProgressTickets: number;
+    waitingTickets: number;
+    handledToday: number;
+    activeStaff: number;
+    avgResolutionHours: number;
+  }>;
+  staffPerformance: Array<{
+    id: string;
+    name: string;
+    role: string;
+    team: string;
+    teamLabel: string;
+    totalTickets: number;
+    resolvedTickets: number;
+    openTickets: number;
+    inProgressTickets: number;
+    waitingTickets: number;
+    handledToday: number;
+    avgResolutionHours: number;
+    lastActivityDate?: string;
+  }>;
 }
 
 interface InventorySummary {
@@ -114,6 +144,10 @@ export default function GestorDashboardPage() {
     ? ((data.resolvedTickets / data.totalTickets) * 100).toFixed(0)
     : '0';
 
+  const pendingTickets = data
+    ? data.openTickets + data.inProgressTickets + data.waitingTickets
+    : 0;
+
   const getPurchaseStatusLabel = (status: string) => {
     const map: Record<string, string> = {
       pending: 'Pendente', approved: 'Aprovado', purchased: 'Comprado',
@@ -144,6 +178,25 @@ export default function GestorDashboardPage() {
     };
     return map[status] || 'badge-neutral';
   };
+
+  const getRoleLabel = (role: string) => {
+    const map: Record<string, string> = {
+      admin: 'Administrador',
+      it_staff: 'TI',
+      admin_staff: 'Auxiliar Administrativo',
+    };
+
+    return map[role] || role;
+  };
+
+  const staffByTeam = (data?.staffPerformance || []).reduce<Record<string, GestorData['staffPerformance']>>((acc, member) => {
+    const key = member.team || 'ti';
+    if (!acc[key]) {
+      acc[key] = [];
+    }
+    acc[key].push(member);
+    return acc;
+  }, {});
 
   const formattedUpdate = lastUpdate
     ? `${lastUpdate.toLocaleDateString('pt-BR')} as ${lastUpdate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
@@ -176,7 +229,7 @@ export default function GestorDashboardPage() {
 
           {/* Chamados */}
           <section className="gd-section">
-            <h2 className="gd-section-title">🎫 Chamados de TI</h2>
+            <h2 className="gd-section-title">🎫 Chamados Gerais</h2>
             <div className="gd-kpi-grid">
               <div className="gd-kpi-card">
                 <div className="gd-kpi-icon">🎫</div>
@@ -197,11 +250,110 @@ export default function GestorDashboardPage() {
               </div>
               <div className="gd-kpi-card accent-orange">
                 <div className="gd-kpi-icon">🔔</div>
-                <div className="gd-kpi-value">{data ? (data.totalTickets - data.resolvedTickets) : '—'}</div>
-                <div className="gd-kpi-label">Em Aberto</div>
+                <div className="gd-kpi-value">{data ? pendingTickets : '—'}</div>
+                <div className="gd-kpi-label">Pendentes</div>
+                <div className="gd-kpi-sub">Abertos, em atendimento e aguardando</div>
               </div>
             </div>
           </section>
+
+          {data?.teamSummaries && data.teamSummaries.length > 0 && (
+            <section className="gd-section">
+              <h2 className="gd-section-title">👥 Performance por Equipe</h2>
+              <div className="gd-team-grid">
+                {data.teamSummaries.map((team) => {
+                  const teamPending = team.openTickets + team.inProgressTickets + team.waitingTickets;
+
+                  return (
+                    <article key={team.key} className={`gd-team-card gd-team-${team.key}`}>
+                      <div className="gd-team-card-header">
+                        <div>
+                          <h3>{team.label}</h3>
+                          <p>{team.activeStaff} colaborador(es) ativo(s)</p>
+                        </div>
+                        <span className="gd-team-chip">{team.handledToday} atualizado(s) hoje</span>
+                      </div>
+
+                      <div className="gd-team-stats">
+                        <div>
+                          <strong>{team.totalTickets}</strong>
+                          <span>Total</span>
+                        </div>
+                        <div>
+                          <strong>{team.resolvedTickets}</strong>
+                          <span>Resolvidos</span>
+                        </div>
+                        <div>
+                          <strong>{teamPending}</strong>
+                          <span>Pendentes</span>
+                        </div>
+                        <div>
+                          <strong>{team.avgResolutionHours}h</strong>
+                          <span>Tempo médio</span>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {data?.staffPerformance && data.staffPerformance.length > 0 && (
+            <section className="gd-section">
+              <h2 className="gd-section-title">🧑‍💼 Atendimentos por Responsável</h2>
+              <div className="gd-staff-grid">
+                {['ti', 'administrativo'].filter((teamKey) => staffByTeam[teamKey]?.length > 0).map((teamKey) => {
+                  const teamMembers = staffByTeam[teamKey];
+                  const teamLabel = teamMembers[0]?.teamLabel || (teamKey === 'administrativo' ? 'Auxiliar Administrativo' : 'TI');
+
+                  return (
+                    <div key={teamKey} className="gd-table-card">
+                      <div className="gd-table-header">
+                        <h3>{teamLabel}</h3>
+                        <span className="gd-team-chip">{teamMembers.length} pessoa(s)</span>
+                      </div>
+
+                      <table className="gd-table">
+                        <thead>
+                          <tr>
+                            <th>Nome</th>
+                            <th>Perfil</th>
+                            <th>Total</th>
+                            <th>Resolvidos</th>
+                            <th>Abertos</th>
+                            <th>Em atendimento</th>
+                            <th>Aguardando</th>
+                            <th>Hoje</th>
+                            <th>Tempo médio</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {teamMembers.map((member) => (
+                            <tr key={member.id}>
+                              <td>{member.name}</td>
+                              <td>
+                                <span className={`gd-role-pill gd-role-${member.team}`}>
+                                  {getRoleLabel(member.role)}
+                                </span>
+                              </td>
+                              <td>{member.totalTickets}</td>
+                              <td>{member.resolvedTickets}</td>
+                              <td>{member.openTickets}</td>
+                              <td>{member.inProgressTickets}</td>
+                              <td>{member.waitingTickets}</td>
+                              <td>{member.handledToday}</td>
+                              <td>{member.avgResolutionHours}h</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
 
           {/* Inventário */}
           <section className="gd-section">

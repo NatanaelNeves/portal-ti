@@ -19,7 +19,7 @@ async function createUsers() {
       {
         email: 'admin@opequenonazareno.org.br',
         name: 'Administrador',
-        password: 'admin123',
+        password: 'Opn@TI2026!',
         role: 'admin'
       },
       {
@@ -69,7 +69,7 @@ async function createUsers() {
     console.log('ADMINISTRADOR:');
     console.log('  URL: http://localhost:3000/login-interno');
     console.log('  Email: admin@opequenonazareno.org.br');
-    console.log('  Senha: admin123\n');
+    console.log('  Senha: Opn@TI2026!\n');
     
     console.log('EQUIPE DE TI:');
     console.log('  URL: http://localhost:3000/login-interno');

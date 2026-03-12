@@ -94,7 +94,7 @@ Ou crie manualmente via script SQL.
 -- Conecte ao PostgreSQL
 psql -U postgres -d portal_ti
 
--- Criar admin (senha: admin123)
+-- Criar admin (senha: Opn@TI2026!)
 INSERT INTO internal_users (email, name, password_hash, role, is_active)
 VALUES (
   'admin@example.com',
@@ -109,7 +109,7 @@ Para gerar hash de senha em Node.js:
 
 ```javascript
 const bcrypt = require('bcryptjs');
-const hash = await bcrypt.hash('admin123', 10);
+const hash = await bcrypt.hash('Opn@TI2026!', 10);
 console.log(hash);
 ```
 

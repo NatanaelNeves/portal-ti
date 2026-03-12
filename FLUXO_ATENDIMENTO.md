@@ -203,7 +203,7 @@ Prioridades:
 **Login:**
 ```
 TI: ti@opequenonazareno.org.br / ti123
-Admin: admin@opequenonazareno.org.br / admin123
+Admin: admin@opequenonazareno.org.br / Opn@TI2026!
 ```
 
 ---

@@ -1,8 +1,77 @@
 import { Router, Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
 import { database } from '../database/connection';
+import { config } from '../config/environment';
+import { UserRole } from '../types/enums';
 import { ExcelReportService } from '../services/excelReportService';
 
 const reportsRouter = Router();
+
+interface InternalUserClaims {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  type?: string;
+}
+
+const toInt = (value: unknown): number => {
+  const parsed = Number.parseInt(String(value ?? 0), 10);
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
+
+const toFloat = (value: unknown): number => {
+  const parsed = Number.parseFloat(String(value ?? 0));
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
+
+const getInternalUserFromToken = (req: Request, res: Response): InternalUserClaims | null => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+
+  if (!token) {
+    res.status(401).json({ error: 'Autenticação necessária' });
+    return null;
+  }
+
+  try {
+    const decoded = jwt.verify(token, config.jwt.secret as string) as InternalUserClaims;
+    if (decoded.type && decoded.type !== 'internal') {
+      res.status(401).json({ error: 'Token inválido' });
+      return null;
+    }
+    return decoded;
+  } catch {
+    res.status(401).json({ error: 'Token inválido ou expirado' });
+    return null;
+  }
+};
+
+const ensureReportsAccess = (req: Request, res: Response): InternalUserClaims | null => {
+  const user = getInternalUserFromToken(req, res);
+  if (!user) {
+    return null;
+  }
+
+  if (![UserRole.ADMIN, UserRole.IT_STAFF, UserRole.MANAGER].includes(user.role)) {
+    res.status(403).json({ error: 'Acesso negado' });
+    return null;
+  }
+
+  return user;
+};
+
+const formatTeamLabel = (team: string): string =>
+  team === 'administrativo' ? 'Auxiliar Administrativo' : 'TI';
+
+reportsRouter.use((req: Request, res: Response, next) => {
+  const user = ensureReportsAccess(req, res);
+  if (!user) {
+    return;
+  }
+
+  next();
+});
 
 /**
  * GET /stats/overview - Estatísticas gerais do sistema
@@ -27,84 +96,115 @@ reportsRouter.get('/stats/overview', async (req: Request, res: Response) => {
       params.push(date_to);
     }
 
-    // Total de tickets
-    const totalTickets = await database.query(
-      `SELECT COUNT(*) as total FROM tickets ${dateCondition}`,
-      params
-    );
+    const [
+      totalTickets,
+      ticketsByStatus,
+      ticketsByPriority,
+      teamBreakdown,
+      avgFirstResponse,
+      avgResolution,
+      ticketsPerDay,
+      resolutionRate,
+    ] = await Promise.all([
+      database.query(
+        `SELECT COUNT(*) as total FROM tickets ${dateCondition}`,
+        params
+      ),
+      database.query(
+        `SELECT status, COUNT(*) as count 
+         FROM tickets ${dateCondition}
+         GROUP BY status`,
+        params
+      ),
+      database.query(
+        `SELECT priority, COUNT(*) as count 
+         FROM tickets ${dateCondition}
+         GROUP BY priority`,
+        params
+      ),
+      database.query(
+        `SELECT
+           COALESCE(department, 'ti') as team,
+           COUNT(*) as total_tickets,
+           COUNT(*) FILTER (WHERE status IN ('resolved', 'closed')) as resolved_tickets,
+           COUNT(*) FILTER (WHERE status IN ('open', 'in_progress', 'waiting_user')) as pending_tickets,
+           COALESCE(
+             AVG(EXTRACT(EPOCH FROM (COALESCE(resolved_at, updated_at) - created_at)) / 3600)
+             FILTER (WHERE status IN ('resolved', 'closed')),
+             0
+           ) as avg_resolution_hours
+         FROM tickets
+         ${dateCondition}
+         GROUP BY COALESCE(department, 'ti')
+         ORDER BY CASE COALESCE(department, 'ti')
+           WHEN 'ti' THEN 1
+           ELSE 2
+         END`,
+        params
+      ),
+      database.query(
+        `SELECT AVG(EXTRACT(EPOCH FROM (first_msg.created_at - t.created_at)) / 3600) as avg_hours
+         FROM tickets t
+         INNER JOIN (
+           SELECT ticket_id, MIN(created_at) as created_at
+           FROM ticket_messages
+           WHERE author_type = 'it_staff'
+           GROUP BY ticket_id
+         ) first_msg ON first_msg.ticket_id = t.id
+         ${dateCondition}`,
+        params
+      ),
+      database.query(
+        `SELECT AVG(EXTRACT(EPOCH FROM (COALESCE(resolved_at, updated_at) - created_at)) / 3600) as avg_hours
+         FROM tickets
+         WHERE status IN ('resolved', 'closed') ${dateCondition ? 'AND ' + dateCondition.replace('WHERE ', '') : ''}`,
+        params
+      ),
+      database.query(
+        `SELECT DATE(created_at) as date, COUNT(*) as count
+         FROM tickets
+         WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+         GROUP BY DATE(created_at)
+         ORDER BY date DESC`
+      ),
+      database.query(
+        `SELECT 
+           COUNT(CASE WHEN status IN ('resolved', 'closed') THEN 1 END) as resolved,
+           COUNT(*) as total
+         FROM tickets ${dateCondition}`,
+        params
+      ),
+    ]);
 
-    // Tickets por status
-    const ticketsByStatus = await database.query(
-      `SELECT status, COUNT(*) as count 
-       FROM tickets ${dateCondition}
-       GROUP BY status`,
-      params
-    );
-
-    // Tickets por prioridade
-    const ticketsByPriority = await database.query(
-      `SELECT priority, COUNT(*) as count 
-       FROM tickets ${dateCondition}
-       GROUP BY priority`,
-      params
-    );
-
-    // Tempo médio de primeira resposta (em horas)
-    const avgFirstResponse = await database.query(
-      `SELECT AVG(EXTRACT(EPOCH FROM (first_msg.created_at - t.created_at)) / 3600) as avg_hours
-       FROM tickets t
-       INNER JOIN (
-         SELECT ticket_id, MIN(created_at) as created_at
-         FROM ticket_messages
-         WHERE author_type = 'it_staff'
-         GROUP BY ticket_id
-       ) first_msg ON first_msg.ticket_id = t.id
-       ${dateCondition}`,
-      params
-    );
-
-    // Tempo médio de resolução (em horas)
-    const avgResolution = await database.query(
-      `SELECT AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 3600) as avg_hours
-       FROM tickets
-       WHERE resolved_at IS NOT NULL ${dateCondition ? 'AND ' + dateCondition.replace('WHERE ', '') : ''}`,
-      params
-    );
-
-    // Tickets criados por dia (últimos 30 dias)
-    const ticketsPerDay = await database.query(
-      `SELECT DATE(created_at) as date, COUNT(*) as count
-       FROM tickets
-       WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
-       GROUP BY DATE(created_at)
-       ORDER BY date DESC`
-    );
-
-    // Taxa de resolução (resolvidos vs total)
-    const resolutionRate = await database.query(
-      `SELECT 
-         COUNT(CASE WHEN status IN ('resolved', 'closed') THEN 1 END) as resolved,
-         COUNT(*) as total
-       FROM tickets ${dateCondition}`,
-      params
-    );
-
-    const resolved = parseInt(resolutionRate.rows[0].resolved);
-    const total = parseInt(resolutionRate.rows[0].total);
+    const resolved = toInt(resolutionRate.rows[0].resolved);
+    const total = toInt(resolutionRate.rows[0].total);
     const resolutionPercentage = total > 0 ? parseFloat(((resolved / total) * 100).toFixed(1)) : 0;
 
     res.json({
-      total: parseInt(totalTickets.rows[0].total),
+      total: toInt(totalTickets.rows[0].total),
       byStatus: ticketsByStatus.rows.reduce((acc: any, row: any) => {
-        acc[row.status] = parseInt(row.count);
+        acc[row.status] = toInt(row.count);
         return acc;
       }, {}),
       byPriority: ticketsByPriority.rows.reduce((acc: any, row: any) => {
-        acc[row.priority] = parseInt(row.count);
+        acc[row.priority] = toInt(row.count);
         return acc;
       }, {}),
-      avgFirstResponseHours: parseFloat(avgFirstResponse.rows[0]?.avg_hours || 0).toFixed(1),
-      avgResolutionHours: parseFloat(avgResolution.rows[0]?.avg_hours || 0).toFixed(1),
+      teamBreakdown: teamBreakdown.rows.map((row: any) => {
+        const teamTotal = toInt(row.total_tickets);
+        const teamResolved = toInt(row.resolved_tickets);
+        return {
+          key: row.team,
+          label: formatTeamLabel(row.team),
+          total: teamTotal,
+          resolved: teamResolved,
+          pending: toInt(row.pending_tickets),
+          avgResolutionHours: toFloat(row.avg_resolution_hours).toFixed(1),
+          resolutionRate: teamTotal > 0 ? parseFloat(((teamResolved / teamTotal) * 100).toFixed(1)) : 0,
+        };
+      }),
+      avgFirstResponseHours: toFloat(avgFirstResponse.rows[0]?.avg_hours).toFixed(1),
+      avgResolutionHours: toFloat(avgResolution.rows[0]?.avg_hours).toFixed(1),
       ticketsPerDay: ticketsPerDay.rows,
       resolutionRate: {
         resolved,
@@ -132,6 +232,12 @@ reportsRouter.get('/stats/technicians', async (req: Request, res: Response) => {
     if (date_from && date_to) {
       dateCondition = 'AND t.created_at BETWEEN $1 AND $2';
       params.push(date_from, date_to);
+    } else if (date_from) {
+      dateCondition = 'AND t.created_at >= $1';
+      params.push(date_from);
+    } else if (date_to) {
+      dateCondition = 'AND t.created_at <= $1';
+      params.push(date_to);
     }
 
     const technicianStats = await database.query(
@@ -139,36 +245,53 @@ reportsRouter.get('/stats/technicians', async (req: Request, res: Response) => {
          iu.id,
          iu.name,
          iu.email,
+         iu.role,
+         CASE WHEN iu.role = 'admin_staff' THEN 'administrativo' ELSE 'ti' END as team,
          COUNT(t.id) as total_tickets,
-         COUNT(CASE WHEN t.status = 'resolved' THEN 1 END) as resolved_tickets,
+         COUNT(CASE WHEN t.status IN ('resolved', 'closed') THEN 1 END) as resolved_tickets,
          COUNT(CASE WHEN t.status = 'closed' THEN 1 END) as closed_tickets,
          COUNT(CASE WHEN t.status = 'in_progress' THEN 1 END) as in_progress_tickets,
-         AVG(EXTRACT(EPOCH FROM (t.resolved_at - t.created_at)) / 3600) as avg_resolution_hours,
+         COUNT(CASE WHEN t.status IN ('open', 'waiting_user') THEN 1 END) as pending_tickets,
+         COUNT(CASE WHEN DATE(t.updated_at) = CURRENT_DATE THEN 1 END) as handled_today,
+         AVG(EXTRACT(EPOCH FROM (COALESCE(t.resolved_at, t.updated_at) - t.created_at)) / 3600)
+           FILTER (WHERE t.status IN ('resolved', 'closed')) as avg_resolution_hours,
          MIN(t.created_at) as first_ticket_date,
          MAX(t.updated_at) as last_activity_date
        FROM internal_users iu
        LEFT JOIN tickets t ON t.assigned_to_id = iu.id ${dateCondition}
-       WHERE iu.role IN ('it_staff', 'admin') AND iu.is_active = true
-       GROUP BY iu.id, iu.name, iu.email
-       ORDER BY total_tickets DESC`,
+       WHERE iu.role IN ('it_staff', 'admin_staff', 'admin') AND iu.is_active = true
+       GROUP BY iu.id, iu.name, iu.email, iu.role
+       ORDER BY CASE WHEN iu.role = 'admin_staff' THEN 2 ELSE 1 END, total_tickets DESC, iu.name ASC`,
       params
     );
 
-    const formattedStats = technicianStats.rows.map((tech: any) => ({
-      id: tech.id,
-      name: tech.name,
-      email: tech.email,
-      totalTickets: parseInt(tech.total_tickets),
-      resolvedTickets: parseInt(tech.resolved_tickets),
-      closedTickets: parseInt(tech.closed_tickets),
-      inProgressTickets: parseInt(tech.in_progress_tickets),
-      avgResolutionHours: parseFloat(tech.avg_resolution_hours || 0).toFixed(1),
-      resolutionRate: tech.total_tickets > 0 
-        ? ((parseInt(tech.resolved_tickets) / parseInt(tech.total_tickets)) * 100).toFixed(1)
-        : 0,
-      firstTicketDate: tech.first_ticket_date,
-      lastActivityDate: tech.last_activity_date
-    }));
+    const formattedStats = technicianStats.rows.map((tech: any) => {
+      const totalTickets = toInt(tech.total_tickets);
+      const resolvedTickets = toInt(tech.resolved_tickets);
+      const resolutionRate = totalTickets > 0
+        ? parseFloat(((resolvedTickets / totalTickets) * 100).toFixed(1))
+        : 0;
+
+      return {
+        id: tech.id,
+        name: tech.name,
+        email: tech.email,
+        role: tech.role,
+        team: tech.team,
+        teamLabel: formatTeamLabel(tech.team),
+        totalTickets,
+        resolvedTickets,
+        closedTickets: toInt(tech.closed_tickets),
+        inProgressTickets: toInt(tech.in_progress_tickets),
+        pendingTickets: toInt(tech.pending_tickets),
+        handledToday: toInt(tech.handled_today),
+        avgResolutionHours: toFloat(tech.avg_resolution_hours).toFixed(1),
+        resolutionRate,
+        slaCompliance: resolutionRate,
+        firstTicketDate: tech.first_ticket_date,
+        lastActivityDate: tech.last_activity_date
+      };
+    });
 
     res.json(formattedStats);
   } catch (error) {
@@ -587,6 +710,12 @@ reportsRouter.get('/export/excel/technicians', async (req: Request, res: Respons
     if (date_from && date_to) {
       dateCondition = 'AND t.created_at BETWEEN $1 AND $2';
       params.push(date_from, date_to);
+    } else if (date_from) {
+      dateCondition = 'AND t.created_at >= $1';
+      params.push(date_from);
+    } else if (date_to) {
+      dateCondition = 'AND t.created_at <= $1';
+      params.push(date_to);
     }
 
     const technicianStats = await database.query(
@@ -594,32 +723,44 @@ reportsRouter.get('/export/excel/technicians', async (req: Request, res: Respons
          iu.id,
          iu.name,
          iu.email,
+         iu.role,
+         CASE WHEN iu.role = 'admin_staff' THEN 'administrativo' ELSE 'ti' END as team,
          COUNT(t.id) as total_tickets,
-         COUNT(CASE WHEN t.status = 'resolved' THEN 1 END) as resolved_tickets,
+         COUNT(CASE WHEN t.status IN ('resolved', 'closed') THEN 1 END) as resolved_tickets,
          COUNT(CASE WHEN t.status = 'in_progress' THEN 1 END) as in_progress_tickets,
-         AVG(EXTRACT(EPOCH FROM (t.resolved_at - t.created_at)) / 3600) as avg_resolution_hours,
+         COUNT(CASE WHEN DATE(t.updated_at) = CURRENT_DATE THEN 1 END) as handled_today,
+         AVG(EXTRACT(EPOCH FROM (COALESCE(t.resolved_at, t.updated_at) - t.created_at)) / 3600)
+           FILTER (WHERE t.status IN ('resolved', 'closed')) as avg_resolution_hours,
          MAX(t.updated_at) as last_activity_date
        FROM internal_users iu
        LEFT JOIN tickets t ON t.assigned_to_id = iu.id ${dateCondition}
-       WHERE iu.role IN ('it_staff', 'admin') AND iu.is_active = true
-       GROUP BY iu.id, iu.name, iu.email
-       ORDER BY total_tickets DESC`,
+       WHERE iu.role IN ('it_staff', 'admin_staff', 'admin') AND iu.is_active = true
+       GROUP BY iu.id, iu.name, iu.email, iu.role
+       ORDER BY CASE WHEN iu.role = 'admin_staff' THEN 2 ELSE 1 END, total_tickets DESC, iu.name ASC`,
       params
     );
 
-    const formattedStats = technicianStats.rows.map((tech: any) => ({
-      id: tech.id,
-      name: tech.name,
-      email: tech.email,
-      totalTickets: parseInt(tech.total_tickets),
-      resolvedTickets: parseInt(tech.resolved_tickets),
-      inProgressTickets: parseInt(tech.in_progress_tickets),
-      avgResolutionHours: parseFloat(tech.avg_resolution_hours || 0).toFixed(1),
-      resolutionRate: tech.total_tickets > 0 
-        ? ((parseInt(tech.resolved_tickets) / parseInt(tech.total_tickets)) * 100).toFixed(1)
-        : '0',
-      lastActivityDate: tech.last_activity_date
-    }));
+    const formattedStats = technicianStats.rows.map((tech: any) => {
+      const totalTickets = toInt(tech.total_tickets);
+      const resolvedTickets = toInt(tech.resolved_tickets);
+
+      return {
+        id: tech.id,
+        name: tech.name,
+        email: tech.email,
+        team: tech.team,
+        teamLabel: formatTeamLabel(tech.team),
+        totalTickets,
+        resolvedTickets,
+        inProgressTickets: toInt(tech.in_progress_tickets),
+        handledToday: toInt(tech.handled_today),
+        avgResolutionHours: toFloat(tech.avg_resolution_hours).toFixed(1),
+        resolutionRate: totalTickets > 0
+          ? ((resolvedTickets / totalTickets) * 100).toFixed(1)
+          : '0',
+        lastActivityDate: tech.last_activity_date
+      };
+    });
 
     await ExcelReportService.generateTechniciansReport(formattedStats, res);
   } catch (error) {
@@ -698,24 +839,28 @@ reportsRouter.get('/export/excel/consolidated', async (req: Request, res: Respon
     const technicians = await database.query(
       `SELECT 
          iu.name,
+         CASE WHEN iu.role = 'admin_staff' THEN 'administrativo' ELSE 'ti' END as team,
          COUNT(t.id) as total_tickets,
-         COUNT(CASE WHEN t.status = 'resolved' THEN 1 END) as resolved_tickets,
-         AVG(EXTRACT(EPOCH FROM (t.resolved_at - t.created_at)) / 3600) as avg_resolution_hours
+         COUNT(CASE WHEN t.status IN ('resolved', 'closed') THEN 1 END) as resolved_tickets,
+         AVG(EXTRACT(EPOCH FROM (COALESCE(t.resolved_at, t.updated_at) - t.created_at)) / 3600)
+           FILTER (WHERE t.status IN ('resolved', 'closed')) as avg_resolution_hours
        FROM internal_users iu
        LEFT JOIN tickets t ON t.assigned_to_id = iu.id
-       WHERE iu.role IN ('it_staff', 'admin') AND iu.is_active = true
-       GROUP BY iu.id, iu.name
-       ORDER BY total_tickets DESC`
+       WHERE iu.role IN ('it_staff', 'admin_staff', 'admin') AND iu.is_active = true
+       GROUP BY iu.id, iu.name, iu.role
+       ORDER BY CASE WHEN iu.role = 'admin_staff' THEN 2 ELSE 1 END, total_tickets DESC, iu.name ASC`
     );
 
     const formattedTechnicians = technicians.rows.map((tech: any) => ({
       name: tech.name,
-      totalTickets: parseInt(tech.total_tickets),
-      resolvedTickets: parseInt(tech.resolved_tickets),
-      resolutionRate: tech.total_tickets > 0 
-        ? ((parseInt(tech.resolved_tickets) / parseInt(tech.total_tickets)) * 100).toFixed(1)
+      team: tech.team,
+      teamLabel: formatTeamLabel(tech.team),
+      totalTickets: toInt(tech.total_tickets),
+      resolvedTickets: toInt(tech.resolved_tickets),
+      resolutionRate: toInt(tech.total_tickets) > 0 
+        ? ((toInt(tech.resolved_tickets) / toInt(tech.total_tickets)) * 100).toFixed(1)
         : '0',
-      avgResolutionHours: parseFloat(tech.avg_resolution_hours || 0).toFixed(1)
+      avgResolutionHours: toFloat(tech.avg_resolution_hours).toFixed(1)
     }));
 
     await ExcelReportService.generateConsolidatedReport(

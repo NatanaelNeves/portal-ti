@@ -40,7 +40,6 @@
 
 /* ─── Sections ─── */
 .gd-content { display: flex; flex-direction: column; gap: 2rem; }
-.gd-section { }
 .gd-section-title { font-size: 1.1rem; font-weight: 700; color: #2d3748; margin: 0 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #e2e8f0; }
 
 /* ─── KPI Grid ─── */
@@ -65,6 +64,81 @@
 .gd-kpi-label { font-size: 0.85rem; color: #718096; margin-top: 0.25rem; }
 .gd-kpi-sub { font-size: 0.78rem; color: #a0aec0; margin-top: 0.2rem; }
 
+/* ─── Team Summary ─── */
+.gd-team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.gd-team-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  border-left: 4px solid #4A90E2;
+}
+
+.gd-team-card.gd-team-administrativo {
+  border-left-color: #1a5c38;
+}
+
+.gd-team-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.gd-team-card-header h3 {
+  margin: 0 0 0.2rem 0;
+  font-size: 1rem;
+  color: #1a202c;
+}
+
+.gd-team-card-header p {
+  margin: 0;
+  color: #718096;
+  font-size: 0.82rem;
+}
+
+.gd-team-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: #edf2f7;
+  color: #4a5568;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.gd-team-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.gd-team-stats div {
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 0.85rem 0.7rem;
+  text-align: center;
+}
+
+.gd-team-stats strong {
+  display: block;
+  font-size: 1.15rem;
+  color: #1a202c;
+}
+
+.gd-team-stats span {
+  color: #718096;
+  font-size: 0.75rem;
+}
+
 /* ─── Charts Row ─── */
 .gd-charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
 @media (max-width: 900px) { .gd-charts-row { grid-template-columns: 1fr; } }
@@ -88,6 +162,12 @@
 /* ─── Tables Row ─── */
 .gd-tables-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
 @media (max-width: 900px) { .gd-tables-row { grid-template-columns: 1fr; } }
+
+.gd-staff-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
 
 .gd-table-card {
   background: white;
@@ -117,6 +197,25 @@
 .badge-danger { background: #fee2e2; color: #dc2626; }
 .badge-neutral { background: #f1f5f9; color: #64748b; }
 
+.gd-role-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.gd-role-ti {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.gd-role-administrativo {
+  background: #dcfce7;
+  color: #166534;
+}
+
 /* ─── Progress Bar ─── */
 .gd-progress-wrap { display: flex; align-items: center; gap: 0.5rem; }
 .gd-progress-bar { flex: 1; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; }
@@ -128,4 +227,5 @@
   .gestor-dashboard-page { padding: 1rem; }
   .gd-header { flex-direction: column; }
   .gd-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .gd-team-stats { grid-template-columns: repeat(2, 1fr); }
 }

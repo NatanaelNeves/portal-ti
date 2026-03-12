@@ -34,7 +34,7 @@ Após executar o script, você terá acesso com:
 ### 👑 ADMINISTRADOR
 - **URL**: http://localhost:3000/admin/login
 - **Email**: `admin@opequenonazareno.org.br`
-- **Senha**: `admin123`
+- **Senha**: `Opn@TI2026!`
 - **Pode fazer**: Tudo (criar usuários, gerenciar sistema completo)
 
 ### 🛠️ EQUIPE DE TI
@@ -148,7 +148,7 @@ node create-users.js
 # 3. Acesse a interface
 # http://localhost:3000/admin/login
 
-# 4. Login: admin@opequenonazareno.org.br / admin123
+# 4. Login: admin@opequenonazareno.org.br / Opn@TI2026!
 
 # 5. Crie seus usuários reais e altere as senhas!
 ```

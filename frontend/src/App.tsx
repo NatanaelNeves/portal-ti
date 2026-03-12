@@ -82,11 +82,11 @@ function App() {
             <Route path="/admin/auxiliar/dashboard" element={<InternalProtectedRoute allowedRoles={['admin_staff']}><AdminStaffDashboardPage /></InternalProtectedRoute>} />
             <Route path="/admin/chamados" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff', 'admin_staff']}><AdminTicketsPage /></InternalProtectedRoute>} />
             <Route path="/admin/chamados/:id" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff', 'admin_staff']}><AdminTicketDetailPage /></InternalProtectedRoute>} />
-            <Route path="/admin/conhecimento" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff', 'admin_staff']}><KnowledgeManagementPage /></InternalProtectedRoute>} />
+            <Route path="/admin/conhecimento" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff']}><KnowledgeManagementPage /></InternalProtectedRoute>} />
             <Route path="/admin/usuarios" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff']}><UsersManagementPage /></InternalProtectedRoute>} />
             <Route path="/admin/estoque" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff']}><InventoryPage /></InternalProtectedRoute>} />
-            <Route path="/admin/documentos" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff', 'admin_staff']}><DocumentsPage /></InternalProtectedRoute>} />
-            <Route path="/admin/relatorios" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff', 'admin_staff']}><ReportsPage /></InternalProtectedRoute>} />
+            <Route path="/admin/documentos" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff']}><DocumentsPage /></InternalProtectedRoute>} />
+            <Route path="/admin/relatorios" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff', 'manager']}><ReportsPage /></InternalProtectedRoute>} />
 
             {/* Inventory Module Routes - IT Staff Only */}
             <Route path="/inventario" element={<InternalProtectedRoute requireITStaff={true}><InventoryDashboardPage /></InternalProtectedRoute>} />

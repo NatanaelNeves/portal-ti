@@ -30,17 +30,31 @@ interface OverviewStats {
     total: number;
     percentage: number;
   };
+  teamBreakdown?: Array<{
+    key: string;
+    label: string;
+    total: number;
+    resolved: number;
+    pending: number;
+    avgResolutionHours: string;
+    resolutionRate: number;
+  }>;
 }
 
 interface TechnicianStats {
-  id: number;
+  id: string;
   name: string;
   email: string;
+  role: string;
+  team: string;
+  teamLabel: string;
   totalTickets: number;
   resolvedTickets: number;
   inProgressTickets: number;
   pendingTickets: number;
+  handledToday: number;
   avgResolutionHours: string;
+  resolutionRate: number;
   slaCompliance: number;
 }
 
@@ -241,6 +255,7 @@ const ReportsPage: React.FC = () => {
     const labels: Record<string, string> = {
       open: 'Aberto',
       in_progress: 'Em Andamento',
+      waiting_user: 'Aguardando Usuário',
       awaiting_user: 'Aguardando Usuário',
       resolved: 'Resolvido',
       closed: 'Fechado'
@@ -253,9 +268,31 @@ const ReportsPage: React.FC = () => {
       low: 'Baixa',
       medium: 'Média',
       high: 'Alta',
+      critical: 'Crítica',
     };
     return labels[priority] || priority;
   };
+
+  const getRoleLabel = (role: string) => {
+    const labels: Record<string, string> = {
+      admin: 'Administrador',
+      it_staff: 'TI',
+      admin_staff: 'Auxiliar Administrativo',
+    };
+
+    return labels[role] || role;
+  };
+
+  const groupedTeamStats = technicianStats.reduce<Record<string, TechnicianStats[]>>((acc, member) => {
+    const key = member.team || 'ti';
+    if (!acc[key]) {
+      acc[key] = [];
+    }
+    acc[key].push(member);
+    return acc;
+  }, {});
+
+  const orderedTeams = ['ti', 'administrativo'].filter((team) => groupedTeamStats[team]?.length > 0);
 
   return (
     <div className="reports-page">
@@ -266,7 +303,7 @@ const ReportsPage: React.FC = () => {
             📥 Exportar Tickets
           </button>
           <button onClick={handleExportTechnicians} className="export-btn">
-            📥 Exportar Técnicos
+            📥 Exportar Equipe
           </button>
           <button onClick={handleExportConsolidated} className="export-btn primary">
             📥 Relatório Completo
@@ -310,7 +347,7 @@ const ReportsPage: React.FC = () => {
           className={activeTab === 'technicians' ? 'active' : ''}
           onClick={() => setActiveTab('technicians')}
         >
-          👥 Técnicos
+          👥 Equipe
         </button>
         <button
           className={activeTab === 'sla' ? 'active' : ''}
@@ -355,6 +392,37 @@ const ReportsPage: React.FC = () => {
                   </div>
                 </div>
 
+                {overviewStats.teamBreakdown && overviewStats.teamBreakdown.length > 0 && (
+                  <div className="team-overview-grid">
+                    {overviewStats.teamBreakdown.map((team) => (
+                      <div key={team.key} className={`team-overview-card team-${team.key}`}>
+                        <div className="team-overview-header">
+                          <h3>{team.label}</h3>
+                          <span>{team.resolutionRate}% resolvido</span>
+                        </div>
+                        <div className="team-overview-metrics">
+                          <div>
+                            <strong>{team.total}</strong>
+                            <small>Total</small>
+                          </div>
+                          <div>
+                            <strong>{team.resolved}</strong>
+                            <small>Resolvidos</small>
+                          </div>
+                          <div>
+                            <strong>{team.pending}</strong>
+                            <small>Pendentes</small>
+                          </div>
+                          <div>
+                            <strong>{team.avgResolutionHours}h</strong>
+                            <small>Tempo médio</small>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <div className="charts-row">
                   <div className="chart-card">
                     <h3>Tickets por Status</h3>
@@ -385,39 +453,70 @@ const ReportsPage: React.FC = () => {
 
             {activeTab === 'technicians' && (
               <div className="technicians-section">
-                <h2>Performance dos Técnicos</h2>
-                <div className="technicians-table">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Nome</th>
-                        <th>Total de Tickets</th>
-                        <th>Resolvidos</th>
-                        <th>Em Andamento</th>
-                        <th>Pendentes</th>
-                        <th>Tempo Médio de Resolução</th>
-                        <th>Conformidade SLA</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {technicianStats.map((tech) => (
-                        <tr key={tech.id}>
-                          <td>{tech.name}</td>
-                          <td>{tech.totalTickets}</td>
-                          <td>{tech.resolvedTickets}</td>
-                          <td>{tech.inProgressTickets}</td>
-                          <td>{tech.pendingTickets}</td>
-                          <td>{tech.avgResolutionHours}h</td>
-                          <td>
-                            <span className={`sla-badge ${tech.slaCompliance >= 80 ? 'good' : tech.slaCompliance >= 60 ? 'warning' : 'critical'}`}>
-                              {tech.slaCompliance}%
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <h2>Performance por Equipe</h2>
+
+                {orderedTeams.length === 0 ? (
+                  <div className="empty-state">
+                    <p>📊 Nenhum atendimento encontrado para a equipe no período selecionado.</p>
+                  </div>
+                ) : (
+                  <div className="team-staff-grid">
+                    {orderedTeams.map((teamKey) => {
+                      const members = groupedTeamStats[teamKey];
+                      const teamLabel = members[0]?.teamLabel || (teamKey === 'administrativo' ? 'Auxiliar Administrativo' : 'TI');
+
+                      return (
+                        <div key={teamKey} className="team-staff-card">
+                          <div className="team-staff-header">
+                            <h3>{teamLabel}</h3>
+                            <span>{members.length} colaborador(es)</span>
+                          </div>
+
+                          <div className="technicians-table">
+                            <table>
+                              <thead>
+                                <tr>
+                                  <th>Nome</th>
+                                  <th>Perfil</th>
+                                  <th>Total</th>
+                                  <th>Resolvidos</th>
+                                  <th>Em Atendimento</th>
+                                  <th>Pendentes</th>
+                                  <th>Hoje</th>
+                                  <th>Tempo Médio</th>
+                                  <th>Taxa</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {members.map((tech) => (
+                                  <tr key={tech.id}>
+                                    <td>{tech.name}</td>
+                                    <td>
+                                      <span className={`role-pill role-${tech.team}`}>
+                                        {getRoleLabel(tech.role)}
+                                      </span>
+                                    </td>
+                                    <td>{tech.totalTickets}</td>
+                                    <td>{tech.resolvedTickets}</td>
+                                    <td>{tech.inProgressTickets}</td>
+                                    <td>{tech.pendingTickets}</td>
+                                    <td>{tech.handledToday}</td>
+                                    <td>{tech.avgResolutionHours}h</td>
+                                    <td>
+                                      <span className={`sla-badge ${tech.resolutionRate >= 80 ? 'good' : tech.resolutionRate >= 60 ? 'warning' : 'critical'}`}>
+                                        {tech.resolutionRate}%
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 

@@ -80,9 +80,10 @@ export class ExcelReportService {
     res: Response
   ): Promise<void> {
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Performance Técnicos');
+    const worksheet = workbook.addWorksheet('Performance Equipe');
 
     worksheet.columns = [
+      { header: 'Equipe', key: 'team', width: 24 },
       { header: 'Nome', key: 'name', width: 30 },
       { header: 'Email', key: 'email', width: 35 },
       { header: 'Total Tickets', key: 'total', width: 15 },
@@ -104,6 +105,7 @@ export class ExcelReportService {
 
     technicians.forEach((tech) => {
       worksheet.addRow({
+        team: tech.teamLabel || tech.team || 'TI',
         name: tech.name,
         email: tech.email,
         total: tech.totalTickets,
@@ -117,7 +119,7 @@ export class ExcelReportService {
       });
     });
 
-    worksheet.autoFilter = { from: 'A1', to: 'H1' };
+    worksheet.autoFilter = { from: 'A1', to: 'I1' };
 
     res.setHeader(
       'Content-Type',
@@ -125,7 +127,7 @@ export class ExcelReportService {
     );
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename=relatorio-tecnicos-${Date.now()}.xlsx`
+      `attachment; filename=relatorio-equipe-${Date.now()}.xlsx`
     );
 
     await workbook.xlsx.write(res);
@@ -210,9 +212,10 @@ export class ExcelReportService {
       });
     });
 
-    // Aba 3: Performance Técnicos
-    const techSheet = workbook.addWorksheet('Técnicos');
+    // Aba 3: Performance da equipe
+    const techSheet = workbook.addWorksheet('Equipe');
     techSheet.columns = [
+      { header: 'Equipe', key: 'team', width: 24 },
       { header: 'Nome', key: 'name', width: 30 },
       { header: 'Total Tickets', key: 'total', width: 15 },
       { header: 'Resolvidos', key: 'resolved', width: 12 },
@@ -230,6 +233,7 @@ export class ExcelReportService {
 
     technicians.forEach((tech) => {
       techSheet.addRow({
+        team: tech.teamLabel || tech.team || 'TI',
         name: tech.name,
         total: tech.totalTickets,
         resolved: tech.resolvedTickets,

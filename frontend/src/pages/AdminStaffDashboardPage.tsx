@@ -264,18 +264,11 @@ export default function AdminStaffDashboardPage() {
       action: () => navigate('/admin/chamados'),
     },
     {
-      key: 'knowledge',
-      icon: '📖',
-      label: 'Consultar conhecimento',
-      description: 'Acessar base de artigos e soluções internas',
-      action: () => navigate('/admin/conhecimento'),
-    },
-    {
-      key: 'documents',
-      icon: '📁',
-      label: 'Abrir documentos',
-      description: 'Ver procedimentos e modelos administrativos',
-      action: () => navigate('/admin/documentos'),
+      key: 'refresh',
+      icon: '🔄',
+      label: 'Atualizar painel',
+      description: 'Recarregar indicadores e últimos chamados',
+      action: () => void fetchDashboard(),
     },
   ];
 

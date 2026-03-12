@@ -286,7 +286,7 @@ Todas as regras da especificação técnica foram implementadas:
 ADMINISTRADOR:
   URL: http://localhost:3000/login-interno
   Email: admin@opequenonazareno.org.br
-  Senha: admin123
+   Senha: Opn@TI2026!
 
 EQUIPE DE TI:
   URL: http://localhost:3000/login-interno
