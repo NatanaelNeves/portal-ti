@@ -49,8 +49,6 @@ const EMPTY_DATA: AdminStaffDashboardData = {
   recentTickets: [],
 };
 
-const priorityOrder = ['urgent', 'critical', 'high', 'medium', 'low'];
-
 export default function AdminStaffDashboardPage() {
   const navigate = useNavigate();
   const [data, setData] = useState<AdminStaffDashboardData>(EMPTY_DATA);
@@ -181,12 +179,114 @@ export default function AdminStaffDashboardPage() {
   }
 
   const pendingMine = data.myOpenTickets + data.myInProgressTickets + data.myWaitingTickets;
-  const priorityData = priorityOrder.map((priorityKey) => ({
-    key: priorityKey,
-    label: getPriorityLabel(priorityKey),
-    value: data.myTicketsByPriority?.[priorityKey] ?? 0,
-  }));
+  const topKpis = [
+    {
+      key: 'myTicketsTotal',
+      title: 'Meus chamados',
+      value: data.myTicketsTotal,
+      subtitle: 'Total sob minha responsabilidade',
+    },
+    {
+      key: 'pendingMine',
+      title: 'Pendentes',
+      value: pendingMine,
+      subtitle: 'Abertos, em atendimento e aguardando',
+    },
+    {
+      key: 'myResolvedToday',
+      title: 'Resolvidos hoje',
+      value: data.myResolvedToday,
+      subtitle: 'Finalizados hoje',
+    },
+    {
+      key: 'unassignedAdministrativeTickets',
+      title: 'Sem responsável',
+      value: data.unassignedAdministrativeTickets,
+      subtitle: 'Fila sem atribuição',
+    },
+  ];
+
+  const secondaryKpis = [
+    {
+      key: 'myOpenTickets',
+      title: 'Abertos',
+      value: data.myOpenTickets,
+      subtitle: 'Aguardando primeiro atendimento',
+    },
+    {
+      key: 'myInProgressTickets',
+      title: 'Em atendimento',
+      value: data.myInProgressTickets,
+      subtitle: 'Já em tratativa',
+    },
+    {
+      key: 'myWaitingTickets',
+      title: 'Aguardando usuário',
+      value: data.myWaitingTickets,
+      subtitle: 'Dependem de retorno do solicitante',
+    },
+    {
+      key: 'myHighPriorityOpen',
+      title: 'Alta prioridade',
+      value: data.myHighPriorityOpen,
+      subtitle: 'Urgente, crítica e alta',
+    },
+    {
+      key: 'myAverageResolutionHours',
+      title: 'SLA médio',
+      value: data.myAverageResolutionHours,
+      subtitle: 'Tempo médio para concluir',
+      suffix: 'h',
+    },
+  ];
+
+  const priorityData = [
+    { key: 'urgent', label: 'Urgente', value: data.myTicketsByPriority?.urgent ?? 0, colorClass: 'asd-priority-urgent' },
+    { key: 'critical', label: 'Crítica', value: data.myTicketsByPriority?.critical ?? 0, colorClass: 'asd-priority-critical' },
+    { key: 'high', label: 'Alta', value: data.myTicketsByPriority?.high ?? 0, colorClass: 'asd-priority-high' },
+    { key: 'medium', label: 'Média', value: data.myTicketsByPriority?.medium ?? 0, colorClass: 'asd-priority-medium' },
+    { key: 'low', label: 'Baixa', value: data.myTicketsByPriority?.low ?? 0, colorClass: 'asd-priority-low' },
+  ];
+
+  const quickActions = [
+    {
+      key: 'queue',
+      icon: '📋',
+      label: 'Ver fila',
+      description: 'Visualizar chamados e priorizar atendimentos',
+      action: () => navigate('/admin/chamados'),
+    },
+    {
+      key: 'pending',
+      icon: '⚡',
+      label: 'Atender pendentes',
+      description: 'Assumir e tratar os chamados em aberto',
+      action: () => navigate('/admin/chamados'),
+    },
+    {
+      key: 'knowledge',
+      icon: '📖',
+      label: 'Consultar conhecimento',
+      description: 'Acessar base de artigos e soluções internas',
+      action: () => navigate('/admin/conhecimento'),
+    },
+    {
+      key: 'documents',
+      icon: '📁',
+      label: 'Abrir documentos',
+      description: 'Ver procedimentos e modelos administrativos',
+      action: () => navigate('/admin/documentos'),
+    },
+  ];
+
   const maxPriorityValue = Math.max(1, ...priorityData.map((item) => item.value));
+
+  const getKpiCardClass = (value: number, compact = false) => {
+    const baseClass = compact ? 'asd-kpi-card asd-kpi-card-compact' : 'asd-kpi-card';
+    return `${baseClass} ${value > 0 ? 'asd-kpi-card-positive' : 'asd-kpi-card-zero'}`;
+  };
+
+  const formatCardValue = (value: number, suffix?: string) => `${value}${suffix || ''}`;
 
   return (
     <div className="admin-staff-dashboard-page">
@@ -196,10 +296,10 @@ export default function AdminStaffDashboardPage() {
           <p>Olá, {currentUserName}. Aqui está a visão dos seus chamados e do administrativo.</p>
         </div>
         <div className="asd-header-actions">
-          <button className="btn btn-secondary" onClick={() => void fetchDashboard()}>
+          <button className="asd-btn-refresh" onClick={() => void fetchDashboard()}>
             Atualizar
           </button>
-          <button className="btn btn-primary" onClick={() => navigate('/admin/chamados')}>
+          <button className="asd-btn-chamados" onClick={() => navigate('/admin/chamados')}>
             Ir para chamados
           </button>
         </div>
@@ -211,57 +311,24 @@ export default function AdminStaffDashboardPage() {
         <div className="asd-loading">Carregando dados...</div>
       ) : (
         <>
-          <section className="asd-kpis-grid">
-            <div className="asd-kpi-card asd-kpi-primary">
-              <span className="asd-kpi-title">Meus chamados</span>
-              <strong>{data.myTicketsTotal}</strong>
-              <small>Total sob minha responsabilidade</small>
-            </div>
-            <div className="asd-kpi-card">
-              <span className="asd-kpi-title">Pendentes (meus)</span>
-              <strong>{pendingMine}</strong>
-              <small>Abertos + em atendimento + aguardando</small>
-            </div>
-            <div className="asd-kpi-card">
-              <span className="asd-kpi-title">Resolvidos (meus)</span>
-              <strong>{data.myResolvedTickets}</strong>
-              <small>Resolvidos + fechados</small>
-            </div>
-            <div className="asd-kpi-card">
-              <span className="asd-kpi-title">Atualizados hoje</span>
-              <strong>{data.myUpdatedToday}</strong>
-              <small>Movimentações feitas hoje</small>
-            </div>
-            <div className="asd-kpi-card">
-              <span className="asd-kpi-title">Resolvidos hoje</span>
-              <strong>{data.myResolvedToday}</strong>
-              <small>Chamados finalizados hoje</small>
-            </div>
-            <div className="asd-kpi-card">
-              <span className="asd-kpi-title">Alta prioridade pendente</span>
-              <strong>{data.myHighPriorityOpen}</strong>
-              <small>Alta, crítica e urgente</small>
-            </div>
-            <div className="asd-kpi-card">
-              <span className="asd-kpi-title">Mais antigo pendente</span>
-              <strong>{data.myOldestPendingDays}d</strong>
-              <small>Tempo máximo de espera</small>
-            </div>
-            <div className="asd-kpi-card">
-              <span className="asd-kpi-title">SLA médio</span>
-              <strong>{data.myAverageResolutionHours}h</strong>
-              <small>Média para concluir chamados</small>
-            </div>
-            <div className="asd-kpi-card">
-              <span className="asd-kpi-title">Pendentes do administrativo</span>
-              <strong>{data.administrativePendingTotal}</strong>
-              <small>Total em aberto no departamento</small>
-            </div>
-            <div className="asd-kpi-card">
-              <span className="asd-kpi-title">Sem responsável</span>
-              <strong>{data.unassignedAdministrativeTickets}</strong>
-              <small>Administrativo sem atribuição</small>
-            </div>
+          <section className="asd-kpis-top-row">
+            {topKpis.map((item) => (
+              <div key={item.key} className={getKpiCardClass(item.value)}>
+                <span className="asd-kpi-title">{item.title}</span>
+                <strong>{formatCardValue(item.value)}</strong>
+                <small>{item.subtitle}</small>
+              </div>
+            ))}
+          </section>
+
+          <section className="asd-kpis-secondary-row">
+            {secondaryKpis.map((item) => (
+              <div key={item.key} className={getKpiCardClass(item.value, true)}>
+                <span className="asd-kpi-title">{item.title}</span>
+                <strong>{formatCardValue(item.value, item.suffix)}</strong>
+                <small>{item.subtitle}</small>
+              </div>
+            ))}
           </section>
 
           <section className="asd-panels-grid">
@@ -278,7 +345,7 @@ export default function AdminStaffDashboardPage() {
                     </div>
                     <div className="asd-priority-bar">
                       <div
-                        className={`asd-priority-fill asd-priority-${item.key}`}
+                        className={`asd-priority-fill ${item.colorClass}`}
                         style={{ width: `${(item.value / maxPriorityValue) * 100}%` }}
                       />
                     </div>
@@ -292,29 +359,26 @@ export default function AdminStaffDashboardPage() {
                 <h2>Ações rápidas</h2>
               </div>
               <div className="asd-actions-grid">
-                <button className="asd-action-btn" onClick={() => navigate('/admin/chamados')}>
-                  Ver fila de chamados
-                </button>
-                <button className="asd-action-btn" onClick={() => navigate('/admin/chamados')}>
-                  Atender pendentes
-                </button>
-                <button className="asd-action-btn" onClick={() => navigate('/admin/conhecimento')}>
-                  Consultar conhecimento
-                </button>
-                <button className="asd-action-btn" onClick={() => navigate('/admin/documentos')}>
-                  Abrir documentos
-                </button>
+                {quickActions.map((action) => (
+                  <button key={action.key} className="asd-action-btn" onClick={action.action}>
+                    <span className="asd-action-icon" aria-hidden="true">{action.icon}</span>
+                    <span className="asd-action-content">
+                      <strong>{action.label}</strong>
+                      <small>{action.description}</small>
+                    </span>
+                  </button>
+                ))}
               </div>
               <div className="asd-status-summary">
-                <div>
+                <div className="asd-status-summary-card asd-status-open">
                   <span>Abertos</span>
                   <strong>{data.myOpenTickets}</strong>
                 </div>
-                <div>
+                <div className="asd-status-summary-card asd-status-progress">
                   <span>Em atendimento</span>
                   <strong>{data.myInProgressTickets}</strong>
                 </div>
-                <div>
+                <div className="asd-status-summary-card asd-status-waiting">
                   <span>Aguardando usuário</span>
                   <strong>{data.myWaitingTickets}</strong>
                 </div>

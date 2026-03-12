@@ -1,7 +1,7 @@
 .admin-staff-dashboard-page {
   min-height: 100vh;
   background: #f5f7fa;
-  padding: 1.25rem;
+  padding: 1.1rem;
 }
 
 .asd-header {
@@ -20,7 +20,7 @@
 
 .asd-header h1 {
   margin: 0;
-  font-size: 1.55rem;
+  font-size: 1.5rem;
   color: #1f2937;
 }
 
@@ -34,15 +34,54 @@
   gap: 0.5rem;
 }
 
+.asd-btn-refresh,
+.asd-btn-chamados {
+  border-radius: 8px;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.asd-btn-refresh {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  color: #4b5563;
+}
+
+.asd-btn-refresh:hover {
+  border-color: #9ca3af;
+  background: #f9fafb;
+}
+
+.asd-btn-chamados {
+  background: #1a5c38;
+  border: 1px solid #1a5c38;
+  color: #ffffff;
+}
+
+.asd-btn-chamados:hover {
+  background: #154a2d;
+  border-color: #154a2d;
+}
+
 .asd-loading {
   text-align: center;
   padding: 2rem;
   color: #6b7280;
 }
 
-.asd-kpis-grid {
+.asd-kpis-top-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.asd-kpis-secondary-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.75rem;
   margin-bottom: 1rem;
 }
@@ -50,33 +89,41 @@
 .asd-kpi-card {
   background: #fff;
   border-radius: 12px;
-  padding: 0.9rem;
+  padding: 0.88rem;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  border-left: 4px solid #4a90e2;
+  border-left: 4px solid #e5e7eb;
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
 }
 
-.asd-kpi-primary {
-  border-left-color: #2563eb;
+.asd-kpi-card-compact {
+  padding: 0.7rem;
+}
+
+.asd-kpi-card-positive {
+  border-left-color: #1a5c38;
+}
+
+.asd-kpi-card-zero {
+  border-left-color: #e5e7eb;
 }
 
 .asd-kpi-card strong {
   display: block;
-  margin-top: 0.25rem;
-  font-size: 1.45rem;
+  margin-top: 0.2rem;
+  font-size: 1.35rem;
   color: #1f2937;
 }
 
 .asd-kpi-card small {
   color: #6b7280;
-  font-size: 0.78rem;
+  font-size: 0.75rem;
 }
 
 .asd-kpi-title {
   color: #6b7280;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
 }
 
 .asd-panels-grid {
@@ -139,23 +186,27 @@
 .asd-priority-fill {
   height: 100%;
   border-radius: 999px;
+  min-width: 0.25rem;
 }
 
-.asd-priority-urgent,
-.asd-priority-critical {
+.asd-priority-urgent {
   background: #ef4444;
 }
 
-.asd-priority-high {
+.asd-priority-critical {
   background: #f97316;
 }
 
+.asd-priority-high {
+  background: #eab308;
+}
+
 .asd-priority-medium {
-  background: #2563eb;
+  background: #60a5fa;
 }
 
 .asd-priority-low {
-  background: #10b981;
+  background: #22c55e;
 }
 
 .asd-actions-grid {
@@ -166,19 +217,44 @@
 }
 
 .asd-action-btn {
-  border: 1px solid #d1d5db;
+  border: 1px solid #e5e7eb;
   background: #ffffff;
   color: #1f2937;
   border-radius: 8px;
-  padding: 0.55rem 0.6rem;
+  padding: 0.75rem;
   font-size: 0.84rem;
   cursor: pointer;
   transition: all 0.2s ease;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  text-align: left;
 }
 
 .asd-action-btn:hover {
-  background: #f9fafb;
-  border-color: #9ca3af;
+  background: #f0fdf4;
+  border-color: #1a5c38;
+}
+
+.asd-action-icon {
+  font-size: 1.1rem;
+  line-height: 1.2;
+}
+
+.asd-action-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.asd-action-content strong {
+  font-size: 0.86rem;
+  color: #1f2937;
+}
+
+.asd-action-content small {
+  font-size: 0.74rem;
+  color: #6b7280;
 }
 
 .asd-status-summary {
@@ -187,7 +263,7 @@
   gap: 0.5rem;
 }
 
-.asd-status-summary div {
+.asd-status-summary-card {
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   padding: 0.45rem 0.55rem;
@@ -204,6 +280,18 @@
 .asd-status-summary strong {
   color: #111827;
   font-size: 1rem;
+}
+
+.asd-status-open strong {
+  color: #2563eb;
+}
+
+.asd-status-progress strong {
+  color: #1a5c38;
+}
+
+.asd-status-waiting strong {
+  color: #ca8a04;
 }
 
 .asd-recent {
@@ -323,6 +411,19 @@
 
   .asd-header-actions .btn {
     flex: 1;
+  }
+
+  .asd-btn-refresh,
+  .asd-btn-chamados {
+    flex: 1;
+  }
+
+  .asd-kpis-top-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .asd-kpis-secondary-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .asd-panels-grid {

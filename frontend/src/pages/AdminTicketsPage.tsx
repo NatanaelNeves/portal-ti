@@ -66,6 +66,7 @@ export default function AdminTicketsPage() {
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [departmentFilter, setDepartmentFilter] = useState<string>('');
   const [userRole, setUserRole] = useState<string>('');
+  const [isContextReady, setIsContextReady] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('internal_token');
@@ -76,23 +77,40 @@ export default function AdminTicketsPage() {
       return;
     }
 
-    if (userData) {
+    if (!userData) {
+      navigate('/admin/login');
+      return;
+    }
+
+    try {
       const user = JSON.parse(userData);
-      setCurrentUserId(user.id);
-      setUserRole(user.role);
-      // Auto-set department filter based on role
+      setCurrentUserId(user.id || '');
+      setUserRole(user.role || '');
+      setCurrentPage(1);
+
       if (user.role === 'admin_staff') {
         setDepartmentFilter('administrativo');
         setAssignmentFilter('mine');
       } else if (user.role === 'it_staff') {
         setDepartmentFilter('ti');
+        setAssignmentFilter('all');
+      } else {
+        setDepartmentFilter('');
+        setAssignmentFilter('all');
       }
-      // admin and manager see all by default (empty filter)
-    }
 
+      setIsContextReady(true);
+    } catch {
+      navigate('/admin/login');
+      return;
+    }
+  }, [navigate]);
+
+  useEffect(() => {
+    if (!isContextReady) return;
     fetchTickets();
     fetchUsers();
-  }, [filterStatus, assignmentFilter, selectedStatuses, selectedPriorities, searchText, currentPage, departmentFilter, currentUserId, navigate]);
+  }, [isContextReady, filterStatus, assignmentFilter, selectedStatuses, selectedPriorities, searchText, currentPage, departmentFilter, currentUserId]);
 
   const fetchUsers = async () => {
     try {
@@ -171,6 +189,12 @@ export default function AdminTicketsPage() {
     try {
       setLoading(true);
       const params = new URLSearchParams();
+      const effectiveAssignmentFilter = userRole === 'admin_staff' ? 'mine' : assignmentFilter;
+      const effectiveDepartmentFilter = userRole === 'admin_staff'
+        ? 'administrativo'
+        : userRole === 'it_staff'
+          ? 'ti'
+          : departmentFilter;
       
       // Filtros avançados
       if (selectedStatuses.length > 0) {
@@ -185,15 +209,15 @@ export default function AdminTicketsPage() {
         params.append('search', searchText.trim());
       }
       
-      if (assignmentFilter === 'mine' && currentUserId) {
+      if (effectiveAssignmentFilter === 'mine' && currentUserId) {
         params.append('assigned_to', currentUserId);
-      } else if (assignmentFilter === 'unassigned') {
+      } else if (effectiveAssignmentFilter === 'unassigned') {
         params.append('assigned_to', 'unassigned');
       }
       
       // Filtro por departamento
-      if (departmentFilter) {
-        params.append('department', departmentFilter);
+      if (effectiveDepartmentFilter) {
+        params.append('department', effectiveDepartmentFilter);
       }
       
       // Paginação
