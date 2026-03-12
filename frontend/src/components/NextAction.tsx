@@ -2,17 +2,21 @@ import '../styles/NextAction.css';
 
 interface NextActionProps {
   status: string;
+  department?: string;
   lastUpdate?: string;
   estimatedTime?: string;
 }
 
-export default function NextAction({ status, lastUpdate, estimatedTime }: NextActionProps) {
+export default function NextAction({ status, department, lastUpdate, estimatedTime }: NextActionProps) {
+  const isAdminDept = department === 'administrativo';
+  const teamLabel = isAdminDept ? 'equipe administrativa' : 'equipe de TI';
+
   const getActionMessage = () => {
     switch (status) {
       case 'open':
         return {
           icon: '🔔',
-          title: 'Aguardando equipe de TI',
+          title: `Aguardando ${teamLabel}`,
           message: 'Seu chamado já está na fila e será atendido em breve.',
           type: 'info'
         };
@@ -20,7 +24,7 @@ export default function NextAction({ status, lastUpdate, estimatedTime }: NextAc
         return {
           icon: '🔧',
           title: 'Em atendimento',
-          message: 'Um técnico já está trabalhando na sua solicitação.',
+          message: `Um responsável da ${teamLabel} já está trabalhando na sua solicitação.`,
           type: 'working'
         };
       case 'waiting_user':

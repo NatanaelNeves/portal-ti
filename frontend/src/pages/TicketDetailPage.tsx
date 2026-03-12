@@ -255,7 +255,8 @@ export default function TicketDetailPage() {
 
         {/* Próxima ação esperada */}
         <NextAction 
-          status={ticket.status} 
+          status={ticket.status}
+          department={ticket.department}
           lastUpdate={ticket.updated_at}
         />
 
