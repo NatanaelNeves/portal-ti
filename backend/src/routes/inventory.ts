@@ -215,7 +215,7 @@ inventoryRouter.get('/peripherals', async (req: Request, res: Response) => {
       byType[item.type].total++;
       if (['available', 'in_stock'].includes(item.current_status)) byType[item.type].available++;
       if (item.current_status === 'in_use') byType[item.type].in_use++;
-      if (item.current_status === 'maintenance') byType[item.type].maintenance++;
+      if (item.current_status === 'maintenance' || item.current_status === 'in_maintenance') byType[item.type].maintenance++;
     });
 
     res.json({ peripherals: result.rows, total: result.rows.length, byType });
@@ -1334,7 +1334,7 @@ inventoryRouter.get('/view/by-unit', async (req: Request, res: Response) => {
         units[row.unit].notebooks.total += parseInt(row.count);
         if (['available', 'in_stock'].includes(row.status)) units[row.unit].notebooks.available += parseInt(row.count);
         if (row.status === 'in_use') units[row.unit].notebooks.in_use += parseInt(row.count);
-        if (row.status === 'maintenance') units[row.unit].notebooks.maintenance += parseInt(row.count);
+        if (['maintenance', 'in_maintenance'].includes(row.status)) units[row.unit].notebooks.maintenance += parseInt(row.count);
       } else {
         if (!units[row.unit].peripherals[row.type]) {
           units[row.unit].peripherals[row.type] = { total: 0, available: 0, in_use: 0, maintenance: 0 };
@@ -1342,7 +1342,7 @@ inventoryRouter.get('/view/by-unit', async (req: Request, res: Response) => {
         units[row.unit].peripherals[row.type].total += parseInt(row.count);
         if (['available', 'in_stock'].includes(row.status)) units[row.unit].peripherals[row.type].available += parseInt(row.count);
         if (row.status === 'in_use') units[row.unit].peripherals[row.type].in_use += parseInt(row.count);
-        if (row.status === 'maintenance') units[row.unit].peripherals[row.type].maintenance += parseInt(row.count);
+        if (['maintenance', 'in_maintenance'].includes(row.status)) units[row.unit].peripherals[row.type].maintenance += parseInt(row.count);
       }
     });
 
@@ -1629,7 +1629,7 @@ inventoryRouter.get('/dashboard/summary', async (req: Request, res: Response) =>
       SELECT 
         COUNT(*) FILTER (WHERE current_status = 'in_use') as equipment_in_use,
         COUNT(*) FILTER (WHERE current_status IN ('available', 'in_stock')) as equipment_in_stock,
-        COUNT(*) FILTER (WHERE current_status = 'maintenance') as equipment_in_maintenance,
+        COUNT(*) FILTER (WHERE current_status IN ('maintenance', 'in_maintenance')) as equipment_in_maintenance,
         COUNT(*) FILTER (WHERE category = 'NOTEBOOK') as total_notebooks,
         COUNT(*) FILTER (WHERE category = 'PERIPHERAL') as total_peripherals
       FROM inventory_equipment
@@ -1724,7 +1724,7 @@ inventoryRouter.get('/alerts', async (req: Request, res: Response) => {
         ie.type as equipment_type,
         EXTRACT(DAY FROM (CURRENT_TIMESTAMP - ie.updated_at)) as days
       FROM inventory_equipment ie
-      WHERE ie.current_status = 'maintenance'
+      WHERE ie.current_status IN ('maintenance', 'in_maintenance')
       AND ie.updated_at < CURRENT_TIMESTAMP - INTERVAL '15 days'
       ORDER BY ie.updated_at ASC
       LIMIT 5
