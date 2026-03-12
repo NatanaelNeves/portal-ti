@@ -371,7 +371,18 @@ dashboardRouter.get('/admin-staff', async (req: Request, res: Response) => {
       return;
     }
 
-    const [myTicketsResult, myStatusResult, pendingDeptResult, recentTicketsResult] = await Promise.all([
+    const [
+      myTicketsResult,
+      myStatusResult,
+      pendingDeptResult,
+      unassignedDeptResult,
+      myPriorityResult,
+      myTodayMetricsResult,
+      myHighPriorityOpenResult,
+      myOldestPendingResult,
+      mySlaResult,
+      recentTicketsResult,
+    ] = await Promise.all([
       database.query(
         `SELECT COUNT(*) AS count
          FROM tickets
@@ -392,11 +403,59 @@ dashboardRouter.get('/admin-staff', async (req: Request, res: Response) => {
            AND status IN ('open', 'in_progress', 'waiting_user')`,
       ),
       database.query(
-        `SELECT id, title, status, priority, created_at, updated_at
+        `SELECT COUNT(*) AS count
+         FROM tickets
+         WHERE COALESCE(department, 'ti') = 'administrativo'
+           AND status IN ('open', 'in_progress', 'waiting_user')
+           AND assigned_to_id IS NULL`,
+      ),
+      database.query(
+        `SELECT priority, COUNT(*) AS count
          FROM tickets
          WHERE assigned_to_id = $1
+         GROUP BY priority`,
+        [user.id]
+      ),
+      database.query(
+        `SELECT
+           COUNT(*) FILTER (WHERE DATE(updated_at) = CURRENT_DATE) AS updated_today,
+           COUNT(*) FILTER (WHERE status IN ('resolved', 'closed') AND DATE(updated_at) = CURRENT_DATE) AS resolved_today
+         FROM tickets
+         WHERE assigned_to_id = $1`,
+        [user.id]
+      ),
+      database.query(
+        `SELECT COUNT(*) AS count
+         FROM tickets
+         WHERE assigned_to_id = $1
+           AND status IN ('open', 'in_progress', 'waiting_user')
+           AND priority IN ('high', 'critical', 'urgent')`,
+        [user.id]
+      ),
+      database.query(
+        `SELECT COALESCE(MAX(EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400), 0) AS oldest_days
+         FROM tickets
+         WHERE assigned_to_id = $1
+           AND status IN ('open', 'in_progress', 'waiting_user')`,
+        [user.id]
+      ),
+      database.query(
+        `SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (updated_at - created_at)) / 3600), 0) AS avg_hours
+         FROM tickets
+         WHERE assigned_to_id = $1
+           AND status IN ('resolved', 'closed')`,
+        [user.id]
+      ),
+      database.query(
+        `SELECT t.id, t.title, t.status, t.priority, t.created_at, t.updated_at,
+                pu.name AS requester_name,
+                COALESCE(t.department, 'ti') AS department,
+                t.category
+         FROM tickets t
+         LEFT JOIN public_users pu ON t.requester_type = 'public' AND t.requester_id = pu.id
+         WHERE assigned_to_id = $1
          ORDER BY updated_at DESC
-         LIMIT 8`,
+         LIMIT 10`,
         [user.id]
       ),
     ]);
@@ -412,13 +471,31 @@ dashboardRouter.get('/admin-staff', async (req: Request, res: Response) => {
     const myWaitingTickets = myTicketsByStatus.waiting_user ?? 0;
     const myResolvedTickets = (myTicketsByStatus.resolved ?? 0) + (myTicketsByStatus.closed ?? 0);
 
+    const myTicketsByPriority: Record<string, number> = {};
+    myPriorityResult.rows.forEach((row: { priority: string; count: string }) => {
+      myTicketsByPriority[row.priority || 'medium'] = toInt(row.count);
+    });
+
+    const myUpdatedToday = toInt(myTodayMetricsResult.rows[0]?.updated_today);
+    const myResolvedToday = toInt(myTodayMetricsResult.rows[0]?.resolved_today);
+    const myHighPriorityOpen = toInt(myHighPriorityOpenResult.rows[0]?.count);
+    const myOldestPendingDays = Math.max(0, Math.round(toFloat(myOldestPendingResult.rows[0]?.oldest_days)));
+    const myAverageResolutionHours = Number(toFloat(mySlaResult.rows[0]?.avg_hours).toFixed(1));
+
     res.json({
       myTicketsTotal,
       myOpenTickets,
       myInProgressTickets,
       myWaitingTickets,
       myResolvedTickets,
+      myUpdatedToday,
+      myResolvedToday,
+      myHighPriorityOpen,
+      myOldestPendingDays,
+      myAverageResolutionHours,
+      myTicketsByPriority,
       administrativePendingTotal: toInt(pendingDeptResult.rows[0]?.count),
+      unassignedAdministrativeTickets: toInt(unassignedDeptResult.rows[0]?.count),
       recentTickets: recentTicketsResult.rows,
     });
   } catch (error) {

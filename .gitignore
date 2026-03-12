@@ -13,6 +13,7 @@ pnpm-debug.log*
 
 # Deploy and runtime artifacts
 backend/backend-deploy.zip
+backend/backend-full-deploy.zip
 webapp-logs/*.zip
 
 # IDEs
