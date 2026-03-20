@@ -35,9 +35,9 @@ export default function InternalProtectedRoute({ children, requireITStaff = fals
 
   if (allowedRoles && !allowedRoles.includes(userRole)) {
     return <Navigate to={getDefaultRouteByRole(userRole)} replace />;
-  }
-
-  if (requireITStaff) {
+  } 
+  
+    if (requireITStaff) {
     if (userRole !== 'it_staff' && userRole !== 'admin') {
       return <Navigate to={getDefaultRouteByRole(userRole)} replace />;
     }
