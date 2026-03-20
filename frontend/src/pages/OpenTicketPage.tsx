@@ -818,7 +818,7 @@ export default function OpenTicketPage() {
             
             <div className="success-message-box">
               <p className="success-message">
-                ✉️ Você receberá um e-mail de confirmação em <strong>{formData.email}</strong>
+                Sua solicitação foi registrada com sucesso. Nossa equipe irá analisá-la e entrar em contato.
               </p>
               <p className="success-hint">
                 Guarde o número do protocolo para acompanhar sua solicitação
