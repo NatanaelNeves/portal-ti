@@ -12,7 +12,8 @@ interface OverviewStats {
   byStatus: {
     open: number;
     in_progress: number;
-    awaiting_user: number;
+    waiting_user: number;
+    aguardando_confirmacao: number;
     resolved: number;
     closed: number;
   };
@@ -83,6 +84,26 @@ interface TrendsData {
   byPriority: Array<{ name: string; value: number }>;
 }
 
+interface SatisfactionData {
+  averageRating: number;
+  totalRatings: number;
+  positiveRate: number;
+  byStaff: Array<{
+    staffId: string;
+    staffName: string;
+    averageRating: number;
+    totalRatings: number;
+    positiveRate: number;
+  }>;
+  byDepartment: Array<{
+    department: string;
+    departmentLabel: string;
+    averageRating: number;
+    totalRatings: number;
+    positiveRate: number;
+  }>;
+}
+
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
 const ReportsPage: React.FC = () => {
@@ -90,16 +111,18 @@ const ReportsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [satisfactionDepartment, setSatisfactionDepartment] = useState<'all' | 'ti' | 'administrativo'>('all');
   
   const [overviewStats, setOverviewStats] = useState<OverviewStats | null>(null);
   const [technicianStats, setTechnicianStats] = useState<TechnicianStats[]>([]);
   const [slaStats, setSlaStats] = useState<SLAStats | null>(null);
   const [trendsData, setTrendsData] = useState<TrendsData | null>(null);
+  const [satisfactionData, setSatisfactionData] = useState<SatisfactionData | null>(null);
   const [trendsPeriod, setTrendsPeriod] = useState<'7days' | '30days' | '90days' | '12months'>('30days');
 
   useEffect(() => {
     loadData();
-  }, [activeTab, dateFrom, dateTo, trendsPeriod]);
+  }, [activeTab, dateFrom, dateTo, trendsPeriod, satisfactionDepartment]);
 
   const loadData = async () => {
     setLoading(true);
@@ -112,14 +135,35 @@ const ReportsPage: React.FC = () => {
       const queryString = params.toString();
       
       if (activeTab === 'overview') {
-        const response = await fetch(
-          `${BACKEND_URL}/api/reports/stats/overview${queryString ? '?' + queryString : ''}`,
-          {
-            headers: { Authorization: `Bearer ${token}` }
-          }
-        );
-        const data = await response.json();
-        setOverviewStats(data);
+        const [overviewResponse, satisfactionResponse] = await Promise.all([
+          fetch(
+            `${BACKEND_URL}/api/reports/stats/overview${queryString ? '?' + queryString : ''}`,
+            {
+              headers: { Authorization: `Bearer ${token}` }
+            }
+          ),
+          fetch(
+            `${BACKEND_URL}/api/reports/satisfaction${(() => {
+              const satisfactionParams = new URLSearchParams();
+              if (dateFrom) satisfactionParams.append('date_from', dateFrom);
+              if (dateTo) satisfactionParams.append('date_to', dateTo);
+              if (satisfactionDepartment !== 'all') satisfactionParams.append('department', satisfactionDepartment);
+              const qs = satisfactionParams.toString();
+              return qs ? `?${qs}` : '';
+            })()}`,
+            {
+              headers: { Authorization: `Bearer ${token}` }
+            }
+          ),
+        ]);
+
+        const overview = await overviewResponse.json();
+        setOverviewStats(overview);
+
+        if (satisfactionResponse.ok) {
+          const satisfaction = await satisfactionResponse.json();
+          setSatisfactionData(satisfaction);
+        }
       } else if (activeTab === 'technicians') {
         const response = await fetch(
           `${BACKEND_URL}/api/reports/stats/technicians${queryString ? '?' + queryString : ''}`,
@@ -257,8 +301,9 @@ const ReportsPage: React.FC = () => {
       in_progress: 'Em Andamento',
       waiting_user: 'Aguardando Usuário',
       awaiting_user: 'Aguardando Usuário',
+      aguardando_confirmacao: 'Aguardando Confirmação',
       resolved: 'Resolvido',
-      closed: 'Fechado'
+      closed: 'Concluído'
     };
     return labels[status] || status;
   };
@@ -328,8 +373,19 @@ const ReportsPage: React.FC = () => {
             onChange={(e) => setDateTo(e.target.value)}
           />
         </label>
+        <label>
+          Departamento (Satisfação):
+          <select
+            value={satisfactionDepartment}
+            onChange={(e) => setSatisfactionDepartment(e.target.value as 'all' | 'ti' | 'administrativo')}
+          >
+            <option value="all">Todos</option>
+            <option value="ti">TI</option>
+            <option value="administrativo">Administrativo</option>
+          </select>
+        </label>
         <button 
-          onClick={() => { setDateFrom(''); setDateTo(''); }} 
+          onClick={() => { setDateFrom(''); setDateTo(''); setSatisfactionDepartment('all'); }} 
           className="clear-filters-btn"
         >
           Limpar Filtros
@@ -390,7 +446,71 @@ const ReportsPage: React.FC = () => {
                     <h3>Tempo Médio de Resolução</h3>
                     <div className="stat-value">{overviewStats.avgResolutionHours}h</div>
                   </div>
+                  <div className="stat-card">
+                    <h3>Média de Avaliação</h3>
+                    <div className="stat-value">{satisfactionData?.averageRating?.toFixed(2) ?? '0.00'}</div>
+                  </div>
+                  <div className="stat-card">
+                    <h3>Total de Avaliações</h3>
+                    <div className="stat-value">{satisfactionData?.totalRatings ?? 0}</div>
+                  </div>
+                  <div className="stat-card">
+                    <h3>Avaliações ≥ 4</h3>
+                    <div className="stat-value">{satisfactionData?.positiveRate ?? 0}%</div>
+                  </div>
                 </div>
+
+                {satisfactionData && satisfactionData.byStaff.length > 0 && (
+                  <div className="chart-container">
+                    <h3>Satisfação por Atendente</h3>
+                    <table className="technicians-table">
+                      <thead>
+                        <tr>
+                          <th>Atendente</th>
+                          <th>Média</th>
+                          <th>Avaliações</th>
+                          <th>% Positivas</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {satisfactionData.byStaff.map((item) => (
+                          <tr key={item.staffId}>
+                            <td>{item.staffName}</td>
+                            <td>{item.averageRating.toFixed(2)}</td>
+                            <td>{item.totalRatings}</td>
+                            <td>{item.positiveRate}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {satisfactionData && satisfactionData.byDepartment.length > 0 && (
+                  <div className="chart-container">
+                    <h3>Satisfação por Departamento</h3>
+                    <table className="technicians-table">
+                      <thead>
+                        <tr>
+                          <th>Departamento</th>
+                          <th>Média</th>
+                          <th>Avaliações</th>
+                          <th>% Positivas</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {satisfactionData.byDepartment.map((item) => (
+                          <tr key={item.department}>
+                            <td>{item.departmentLabel}</td>
+                            <td>{item.averageRating.toFixed(2)}</td>
+                            <td>{item.totalRatings}</td>
+                            <td>{item.positiveRate}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
 
                 {overviewStats.teamBreakdown && overviewStats.teamBreakdown.length > 0 && (
                   <div className="team-overview-grid">

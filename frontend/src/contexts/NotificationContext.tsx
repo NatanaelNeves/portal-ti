@@ -202,10 +202,23 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
     schedule();
 
+    const incrementFromRealtime = () => {
+      setUnseenCount((prev) => prev + 1);
+    };
+
+    window.addEventListener('ticket:updated', incrementFromRealtime);
+    window.addEventListener('ticket:resolved', incrementFromRealtime);
+    window.addEventListener('ticket:reopened', incrementFromRealtime);
+    window.addEventListener('ticket:auto_close_warning', incrementFromRealtime);
+
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       document.removeEventListener('click', unlockAudioCtx);
       document.removeEventListener('keydown', unlockAudioCtx);
+      window.removeEventListener('ticket:updated', incrementFromRealtime);
+      window.removeEventListener('ticket:resolved', incrementFromRealtime);
+      window.removeEventListener('ticket:reopened', incrementFromRealtime);
+      window.removeEventListener('ticket:auto_close_warning', incrementFromRealtime);
     };
   }, [poll]);
 

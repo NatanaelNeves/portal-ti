@@ -214,8 +214,9 @@ export default function AdminTicketDetailPage() {
       open: { label: 'Aberto', className: 'badge-open' },
       in_progress: { label: 'Em Progresso', className: 'badge-progress' },
       waiting_user: { label: 'Aguardando Usuário', className: 'badge-waiting' },
+      aguardando_confirmacao: { label: 'Aguardando Confirmação', className: 'badge-waiting' },
       resolved: { label: 'Resolvido', className: 'badge-resolved' },
-      closed: { label: 'Fechado', className: 'badge-closed' },
+      closed: { label: 'Concluído', className: 'badge-closed' },
     };
     return badges[status] || { label: status, className: '' };
   };
@@ -360,7 +361,7 @@ export default function AdminTicketDetailPage() {
       <div className="ticket-content">
         {/* Ações Rápidas */}
         <QuickActionsCard
-          status={ticket.status as 'open' | 'in_progress' | 'waiting_user' | 'resolved' | 'closed'}
+          status={ticket.status as 'open' | 'in_progress' | 'waiting_user' | 'aguardando_confirmacao' | 'resolved' | 'closed'}
           isSubmitting={submitting}
           onAssume={() => handleQuickAction('assume')}
           onWaitingUser={() => handleQuickAction('waiting')}
@@ -440,6 +441,7 @@ export default function AdminTicketDetailPage() {
                   <option value="open">Aberto</option>
                   <option value="in_progress">Em Progresso</option>
                   <option value="waiting_user">Aguardando Usuário</option>
+                  <option value="aguardando_confirmacao">Aguardando Confirmação</option>
                   <option value="resolved">Resolvido</option>
                   <option value="closed">Fechado</option>
                 </select>

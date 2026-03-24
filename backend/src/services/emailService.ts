@@ -230,6 +230,7 @@ export class EmailService {
       open: 'Aberto',
       in_progress: 'Em Atendimento',
       waiting_user: 'Aguardando Resposta',
+      aguardando_confirmacao: 'Aguardando Confirmação',
       resolved: 'Resolvido',
       closed: 'Fechado',
     };
@@ -238,6 +239,7 @@ export class EmailService {
       open: '#9e9e9e',
       in_progress: '#4A90E2',
       waiting_user: '#F28C38',
+      aguardando_confirmacao: '#2563eb',
       resolved: '#007A33',
       closed: '#666',
     };
@@ -284,6 +286,7 @@ export class EmailService {
 
             ${newStatus === 'waiting_user' ? '<p style="color: #F28C38; font-weight: bold;">⏳ A equipe de TI aguarda sua resposta.</p>' : ''}
             ${newStatus === 'resolved' ? '<p style="color: #007A33; font-weight: bold;">✅ Seu chamado foi marcado como resolvido. Se o problema persistir, responda no chamado.</p>' : ''}
+            ${newStatus === 'aguardando_confirmacao' ? '<p style="color: #2563eb; font-weight: bold;">🔎 Seu chamado aguarda confirmação de resolução.</p>' : ''}
           </div>
           
           <div class="footer">
@@ -300,6 +303,62 @@ export class EmailService {
       subject: `📢 Atualização: ${title} - ${statusLabels[newStatus]}`,
       html,
       text: `Atualização do Chamado\n\nTítulo: ${title}\nStatus: ${statusLabels[oldStatus]} → ${statusLabels[newStatus]}\n\nAcesse: ${config.frontend.url}/chamado/${ticketId}`,
+    });
+  }
+
+  /**
+   * Aviso: chamado será encerrado automaticamente em 24h
+   */
+  static async notifyAutoCloseWarning(
+    ticketId: string,
+    title: string,
+    requesterEmail: string,
+    requesterName: string
+  ): Promise<void> {
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #1d4ed8; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f9f9f9; padding: 30px; border: 1px solid #ddd; }
+          .alert { background: #eff6ff; color: #1e3a8a; border-left: 4px solid #1d4ed8; padding: 14px; margin: 18px 0; }
+          .button { display: inline-block; background: #1d4ed8; color: white; padding: 12px 30px;
+                    text-decoration: none; border-radius: 5px; margin: 20px 0; }
+          .footer { text-align: center; color: #666; font-size: 12px; margin-top: 30px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>⏰ Aviso de Encerramento Automático</h1>
+          </div>
+          <div class="content">
+            <p>Olá ${requesterName},</p>
+            <p>Seu chamado <strong>${title}</strong> foi marcado como resolvido e está aguardando sua confirmação.</p>
+            <div class="alert">
+              Seu chamado será encerrado automaticamente em 24h caso não haja resposta.
+            </div>
+            <a href="${config.frontend.url}/chamado/${ticketId}" class="button">
+              Confirmar Agora
+            </a>
+          </div>
+          <div class="footer">
+            <p>Portal de TI - O Pequeno Nazareno</p>
+            <p>Esta é uma mensagem automática, não responda este email.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    await this.sendEmail({
+      to: requesterEmail,
+      subject: `⏰ Seu chamado será encerrado em 24h: ${title}`,
+      html,
+      text: `Seu chamado será encerrado automaticamente em 24h caso não haja resposta.\n\nAcesse: ${config.frontend.url}/chamado/${ticketId}`,
     });
   }
 

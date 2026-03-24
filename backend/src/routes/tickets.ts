@@ -5,8 +5,16 @@ import { UserRole } from '../types/enums';
 import { EmailService } from '../services/emailService';
 // v2026.03.10g - strengthened UPDATE with RETURNING to confirm row was modified
 import { uploadTicketAttachment, deleteFile } from '../services/uploadService';
-import { validate, createTicketSchema, updateTicketSchema, addMessageSchema } from '../middleware/validation';
+import {
+  validate,
+  createTicketSchema,
+  updateTicketSchema,
+  addMessageSchema,
+  confirmResolutionSchema,
+  ticketRatingSchema,
+} from '../middleware/validation';
 import { pollingLimiter } from '../middleware/rateLimiter';
+import { getWebSocketService } from '../services/websocketService';
 import path from 'path';
 
 const ticketsRouter = Router();
@@ -26,6 +34,76 @@ const canAdminStaffAccessAdministrativeTicket = (ticket: TicketAccessRow, userId
   const ticketDepartment = ticket.department || 'ti';
   if (ticketDepartment !== 'administrativo') return false;
   return !ticket.assigned_to_id || ticket.assigned_to_id === userId;
+};
+
+const STATUS_AWAITING_CONFIRMATION = 'aguardando_confirmacao';
+
+const canManuallyCloseRole = (role: string) => {
+  return [UserRole.IT_STAFF, UserRole.ADMIN, UserRole.MANAGER].includes(role as UserRole) || role === 'gestor';
+};
+
+const emitTicketEvent = (event: string, payload: any) => {
+  try {
+    const ws = getWebSocketService();
+    if (!ws) return;
+    ws.getIO().emit(event, {
+      ...payload,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error(`Error emitting websocket event ${event}:`, error);
+  }
+};
+
+const emitTicketUpdatedEvent = (payload: any) => {
+  emitTicketEvent('ticket:updated', payload);
+};
+
+const notifyResponsibleTeamForReopenedTicket = async (ticket: any): Promise<void> => {
+  try {
+    const recipientEmails = new Set<string>();
+
+    if (ticket.assigned_to_id) {
+      const assignedUser = await database.query(
+        'SELECT email FROM internal_users WHERE id = $1 AND is_active = true',
+        [ticket.assigned_to_id],
+      );
+      if (assignedUser.rows[0]?.email) {
+        recipientEmails.add(assignedUser.rows[0].email);
+      }
+    }
+
+    if (recipientEmails.size === 0) {
+      const targetRoles = (ticket.department || 'ti') === 'administrativo'
+        ? ['admin_staff', 'admin']
+        : ['it_staff', 'admin'];
+
+      const teamUsers = await database.query(
+        `SELECT email FROM internal_users WHERE role = ANY($1) AND is_active = true`,
+        [targetRoles],
+      );
+
+      teamUsers.rows.forEach((row: any) => {
+        if (row.email) recipientEmails.add(row.email);
+      });
+    }
+
+    for (const email of recipientEmails) {
+      await EmailService.sendEmail({
+        to: email,
+        subject: `🔁 Chamado reaberto pelo solicitante: ${ticket.title}`,
+        html: `
+          <p>O solicitante informou que o chamado ainda precisa de ajuda.</p>
+          <p><strong>Chamado:</strong> ${ticket.title}</p>
+          <p><strong>ID:</strong> #${String(ticket.id).substring(0, 8)}</p>
+          <p><a href="${process.env.FRONTEND_URL || ''}/admin/chamados/${ticket.id}">Abrir chamado</a></p>
+        `,
+        text: `Chamado reaberto pelo solicitante. ID: ${ticket.id}. Título: ${ticket.title}`,
+      });
+    }
+  } catch (error) {
+    console.error('Error notifying team about reopened ticket:', error);
+  }
 };
 
 /**
@@ -497,6 +575,30 @@ ticketsRouter.post('/', validate(createTicketSchema), async (req: Request, res: 
 
     console.log('POST /tickets - Ticket created:', ticket.rows[0].id);
 
+    await database.query(
+      `INSERT INTO ticket_history (
+        ticket_id, action, changed_by_type, changed_by_id, old_value, new_value, metadata
+      ) VALUES ($1, 'created', 'public', $2, NULL, 'open', $3::jsonb)`,
+      [
+        ticket.rows[0].id,
+        publicUser.rows[0].id,
+        JSON.stringify({
+          department: ticket.rows[0].department,
+          priority: ticket.rows[0].priority,
+          category: ticket.rows[0].category,
+        }),
+      ],
+    ).catch(() => undefined);
+
+    emitTicketEvent('ticket:new', {
+      ticketId: ticket.rows[0].id,
+      title: ticket.rows[0].title,
+      status: ticket.rows[0].status,
+      priority: ticket.rows[0].priority,
+      department: ticket.rows[0].department,
+      action: 'created',
+    });
+
     // 📧 NOTIFICAÇÃO: Novo chamado para equipe responsável
     try {
       // Direcionar notificação conforme departamento do chamado
@@ -673,6 +775,28 @@ ticketsRouter.post('/:id/messages', validate(addMessageSchema), async (req: Requ
       [id, authorType, authorId, message, is_internal || false]
     );
 
+    if (authorType === 'it_staff') {
+      await database.query(
+        `UPDATE tickets
+         SET first_response_at = COALESCE(first_response_at, NOW()),
+             updated_at = NOW()
+         WHERE id = $1`,
+        [id],
+      );
+    }
+
+    await database.query(
+      `INSERT INTO ticket_history (
+        ticket_id, action, changed_by_type, changed_by_id, old_value, new_value, metadata
+      ) VALUES ($1, 'message_added', $2, $3, NULL, NULL, $4::jsonb)`,
+      [
+        id,
+        authorType,
+        authorId,
+        JSON.stringify({ is_internal: !!is_internal, message_preview: String(message).slice(0, 120) }),
+      ],
+    ).catch(() => undefined);
+
     // Auto-update: público respondeu → volta para 'em atendimento'
     if (authorType === 'public') {
       const beforeStatus = await database.query('SELECT status FROM tickets WHERE id = $1', [id]);
@@ -706,6 +830,14 @@ ticketsRouter.post('/:id/messages', validate(addMessageSchema), async (req: Requ
     );
     const currentTicketStatus = ticketStatus.rows[0]?.status;
     console.log(`[AUTO-STATUS] Ticket ${id}: ticket_status retornado = ${currentTicketStatus}`);
+
+    emitTicketUpdatedEvent({
+      ticketId: id,
+      status: currentTicketStatus,
+      action: authorType === 'public' ? 'reopened_by_message' : 'message_added',
+      authorType,
+      message,
+    });
 
     // 📧 NOTIFICAÇÃO: Nova mensagem (não enviar se for mensagem interna)
     if (!is_internal) {
@@ -774,6 +906,298 @@ ticketsRouter.post('/:id/messages', validate(addMessageSchema), async (req: Requ
   } catch (error) {
     console.error('Error adding message:', error);
     res.status(500).json({ error: 'Failed to add message' });
+  }
+});
+
+/**
+ * POST /:id/confirm-resolution - Usuário confirma se foi resolvido
+ */
+ticketsRouter.post('/:id/confirm-resolution', validate(confirmResolutionSchema), async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { resolved, reopen_reason } = req.body as { resolved: boolean; reopen_reason?: string };
+    const userToken = req.headers['x-user-token'] as string;
+
+    if (!userToken) {
+      return res.status(401).json({ error: 'Token do usuário é obrigatório' });
+    }
+
+    const publicUser = await database.query(
+      'SELECT id FROM public_users WHERE user_token = $1',
+      [userToken],
+    );
+
+    if (!publicUser.rows.length) {
+      return res.status(401).json({ error: 'Token inválido' });
+    }
+
+    const ticketResult = await database.query(
+      `SELECT * FROM tickets WHERE id = $1`,
+      [id],
+    );
+
+    if (!ticketResult.rows.length) {
+      return res.status(404).json({ error: 'Chamado não encontrado' });
+    }
+
+    const ticket = ticketResult.rows[0];
+    if (ticket.requester_id !== publicUser.rows[0].id) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+
+    if (ticket.status === 'closed') {
+      return res.status(400).json({ error: 'Chamado já concluído e não pode ser confirmado novamente' });
+    }
+
+    if (ticket.status !== STATUS_AWAITING_CONFIRMATION) {
+      return res.status(400).json({ error: 'Chamado não está aguardando confirmação' });
+    }
+
+    if (resolved) {
+      const updateResult = await database.query(
+        `UPDATE tickets
+         SET status = 'closed',
+             resolved_at = COALESCE(resolved_at, NOW()),
+             confirmed_resolved = true,
+             confirmation_response_at = NOW(),
+             auto_closed = false,
+             closed_at = NOW(),
+             updated_at = NOW()
+         WHERE id = $1
+         RETURNING *, assigned_to_id as assigned_to`,
+        [id],
+      );
+
+      await database.query(
+        `INSERT INTO ticket_history (
+          ticket_id, action, changed_by_type, changed_by_id, old_value, new_value, metadata
+        ) VALUES ($1, 'confirmed_by_requester', 'public', $2, $3, 'closed', $4::jsonb)`,
+        [id, publicUser.rows[0].id, ticket.status, JSON.stringify({ confirmed_resolved: true })],
+      ).catch(() => undefined);
+
+      emitTicketUpdatedEvent({
+        ticketId: id,
+        action: 'resolved_confirmed',
+        oldStatus: ticket.status,
+        status: 'closed',
+      });
+      emitTicketEvent('ticket:resolved', {
+        ticketId: id,
+        title: ticket.title,
+        status: 'closed',
+      });
+
+      return res.json({
+        message: 'Confirmação registrada com sucesso',
+        ticket: updateResult.rows[0],
+      });
+    }
+
+    const reason = (reopen_reason || '').trim();
+    if (reason.length < 10) {
+      return res.status(400).json({ error: 'Informe uma justificativa com pelo menos 10 caracteres' });
+    }
+
+    const reopenedResult = await database.query(
+      `UPDATE tickets
+       SET status = 'open',
+           resolved_at = NULL,
+           confirmed_resolved = false,
+           confirmation_response_at = NOW(),
+           reopen_reason = $2,
+           auto_closed = false,
+           closed_at = NULL,
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING *, assigned_to_id as assigned_to`,
+      [id, reason],
+    );
+
+    await database.query(
+      `INSERT INTO ticket_history (
+        ticket_id, action, changed_by_type, changed_by_id, old_value, new_value, metadata
+      ) VALUES ($1, 'reopened_by_requester', 'public', $2, $3, 'open', $4::jsonb)`,
+      [id, publicUser.rows[0].id, ticket.status, JSON.stringify({ reason, reopen_reason: reason })],
+    ).catch(() => undefined);
+
+    await notifyResponsibleTeamForReopenedTicket(reopenedResult.rows[0]);
+
+    emitTicketUpdatedEvent({
+      ticketId: id,
+      action: 'reopened_by_requester',
+      oldStatus: ticket.status,
+      status: 'open',
+      reopen_reason: reason,
+    });
+    emitTicketEvent('ticket:reopened', {
+      ticketId: id,
+      title: ticket.title,
+      reopen_reason: reason,
+      status: 'open',
+    });
+
+    return res.json({
+      message: 'Chamado reaberto e equipe notificada',
+      ticket: reopenedResult.rows[0],
+    });
+  } catch (error) {
+    console.error('Error confirming resolution:', error);
+    return res.status(500).json({ error: 'Falha ao confirmar resolução' });
+  }
+});
+
+/**
+ * POST /:id/rating - Avaliação do atendimento após confirmação positiva
+ */
+ticketsRouter.post('/:id/rating', validate(ticketRatingSchema), async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { rating, feedback } = req.body as { rating: number; feedback?: string };
+    const userToken = req.headers['x-user-token'] as string;
+
+    if (!userToken) {
+      return res.status(401).json({ error: 'Token do usuário é obrigatório' });
+    }
+
+    const publicUser = await database.query(
+      'SELECT id FROM public_users WHERE user_token = $1',
+      [userToken],
+    );
+
+    if (!publicUser.rows.length) {
+      return res.status(401).json({ error: 'Token inválido' });
+    }
+
+    const ticketResult = await database.query(
+      `SELECT * FROM tickets WHERE id = $1`,
+      [id],
+    );
+
+    if (!ticketResult.rows.length) {
+      return res.status(404).json({ error: 'Chamado não encontrado' });
+    }
+
+    const ticket = ticketResult.rows[0];
+    if (ticket.requester_id !== publicUser.rows[0].id) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+
+    if (!ticket.confirmed_resolved || ticket.status !== 'closed') {
+      return res.status(400).json({ error: 'Avaliação só é permitida após confirmação positiva' });
+    }
+
+    if (ticket.rated_at || ticket.rating !== null) {
+      return res.status(400).json({ error: 'Este chamado já foi avaliado' });
+    }
+
+    const updateResult = await database.query(
+      `UPDATE tickets
+       SET rating = $1,
+           feedback = $2,
+           rated_at = NOW(),
+           updated_at = NOW()
+       WHERE id = $3
+       RETURNING id, rating, feedback, rated_at`,
+      [rating, feedback || null, id],
+    );
+
+    await database.query(
+      `INSERT INTO ticket_history (
+        ticket_id, action, changed_by_type, changed_by_id, old_value, new_value, metadata
+      ) VALUES ($1, 'rating_submitted', 'public', $2, NULL, $3, $4::jsonb)`,
+      [id, publicUser.rows[0].id, String(rating), JSON.stringify({ feedback: feedback || null })],
+    ).catch(() => undefined);
+
+    emitTicketEvent('ticket:rated', {
+      ticketId: id,
+      rating,
+      action: 'rating_submitted',
+    });
+
+    return res.status(201).json({
+      message: 'Avaliação registrada com sucesso',
+      data: updateResult.rows[0],
+    });
+  } catch (error) {
+    console.error('Error saving rating:', error);
+    return res.status(500).json({ error: 'Falha ao registrar avaliação' });
+  }
+});
+
+/**
+ * POST /:id/manual-close - Encerramento manual por TI/Admin/Gestor
+ */
+ticketsRouter.post('/:id/manual-close', authenticate, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const user = (req as any).user;
+
+    if (!user || !canManuallyCloseRole(user.role)) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+
+    const ticketResult = await database.query('SELECT * FROM tickets WHERE id = $1', [id]);
+    if (!ticketResult.rows.length) {
+      return res.status(404).json({ error: 'Chamado não encontrado' });
+    }
+
+    const ticket = ticketResult.rows[0];
+    if (ticket.status === 'closed') {
+      return res.status(400).json({ error: 'Chamado já está concluído' });
+    }
+
+    const updateResult = await database.query(
+      `UPDATE tickets
+       SET status = 'closed',
+           resolved_at = COALESCE(resolved_at, NOW()),
+           closed_at = NOW(),
+           auto_closed = false,
+           confirmation_response_at = COALESCE(confirmation_response_at, NOW()),
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING *, assigned_to_id as assigned_to`,
+      [id],
+    );
+
+    await database.query(
+      `INSERT INTO ticket_history (
+        ticket_id, action, changed_by_type, changed_by_id, old_value, new_value, metadata
+      ) VALUES ($1, 'manual_closed_by_staff', 'it_staff', $2, $3, 'closed', $4::jsonb)`,
+      [id, user.id, ticket.status, JSON.stringify({ auto_closed: false, reason: 'manual_close' })],
+    ).catch(() => undefined);
+
+    emitTicketUpdatedEvent({
+      ticketId: id,
+      action: 'manual_closed',
+      oldStatus: ticket.status,
+      status: 'closed',
+    });
+
+    if (ticket.requester_type === 'public') {
+      const publicUser = await database.query(
+        'SELECT email, name FROM public_users WHERE id = $1',
+        [ticket.requester_id],
+      );
+
+      if (publicUser.rows.length > 0) {
+        await EmailService.notifyStatusUpdate(
+          ticket.id,
+          ticket.title,
+          publicUser.rows[0].email,
+          publicUser.rows[0].name,
+          ticket.status,
+          'closed',
+        );
+      }
+    }
+
+    return res.json({
+      message: 'Chamado encerrado manualmente pelo atendente',
+      ticket: updateResult.rows[0],
+    });
+  } catch (error) {
+    console.error('Error manually closing ticket:', error);
+    return res.status(500).json({ error: 'Falha ao encerrar chamado manualmente' });
   }
 });
 
@@ -852,15 +1276,59 @@ ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (r
       }
     }
 
+    const existingTicketResult = await database.query(
+      `SELECT id, status, title, requester_type, requester_id, department, assigned_to_id
+       FROM tickets
+       WHERE id = $1`,
+      [id],
+    );
+
+    if (!existingTicketResult.rows.length) {
+      return res.status(404).json({ error: 'Chamado não encontrado' });
+    }
+
+    const existingTicket = existingTicketResult.rows[0];
+    const oldStatus = existingTicket.status;
+    const oldAssignedTo = existingTicket.assigned_to_id;
+    let nextStatus = status as string | undefined;
+
     // Construir query de update
     const fields = [];
     const values = [];
     let paramCount = 1;
 
     if (status !== undefined) {
+      if (status === 'closed' && !canManuallyCloseRole(userRole)) {
+        return res.status(403).json({
+          error: 'Acesso negado',
+          message: 'Somente TI, gestão ou administração podem encerrar chamado manualmente.',
+        });
+      }
+
+      if (status === 'closed' && oldStatus === 'closed') {
+        return res.status(400).json({ error: 'Chamado já está concluído' });
+      }
+
+      if (status === 'resolved') {
+        nextStatus = STATUS_AWAITING_CONFIRMATION;
+        fields.push(`resolved_at = NOW()`);
+        fields.push(`confirmation_requested_at = NOW()`);
+        fields.push(`confirmation_response_at = NULL`);
+        fields.push(`confirmed_resolved = NULL`);
+        fields.push(`auto_closed = false`);
+        fields.push(`closed_at = NULL`);
+        fields.push(`auto_close_warning_sent_at = NULL`);
+      }
+
+      if (status === 'closed') {
+        fields.push(`resolved_at = COALESCE(resolved_at, NOW())`);
+        fields.push(`closed_at = NOW()`);
+        fields.push(`auto_closed = false`);
+      }
+
       fields.push(`status = $${paramCount}`);
-      values.push(status);
-      console.log(`✅ Atualizando status para: ${status}`);
+      values.push(nextStatus);
+      console.log(`✅ Atualizando status para: ${nextStatus}`);
       paramCount++;
     }
 
@@ -900,11 +1368,59 @@ ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (r
     console.log('✅ Ticket atualizado com sucesso!');
     console.log('Dados atualizados:', result.rows[0]);
 
+    const updatedStatus = result.rows[0].status;
+
+    if (status !== undefined && oldStatus !== updatedStatus) {
+      await database.query(
+        `INSERT INTO ticket_history (
+          ticket_id, action, changed_by_type, changed_by_id, old_value, new_value, metadata
+        ) VALUES ($1, 'status_changed', 'it_staff', $2, $3, $4, $5::jsonb)`,
+        [id, userId, oldStatus, updatedStatus, JSON.stringify({ requested_status: status })],
+      ).catch(() => undefined);
+
+      emitTicketUpdatedEvent({
+        ticketId: id,
+        action: updatedStatus === STATUS_AWAITING_CONFIRMATION ? 'marked_resolved_pending_confirmation' : 'status_changed',
+        oldStatus,
+        status: updatedStatus,
+      });
+
+      if (updatedStatus === STATUS_AWAITING_CONFIRMATION) {
+        emitTicketEvent('ticket:resolved', {
+          ticketId: id,
+          title: result.rows[0].title,
+          status: updatedStatus,
+        });
+      }
+    }
+
+    if (assigned_to_id !== undefined && oldAssignedTo !== assigned_to_id) {
+      await database.query(
+        `INSERT INTO ticket_history (
+          ticket_id, action, changed_by_type, changed_by_id, old_value, new_value, metadata
+        ) VALUES ($1, $2, 'it_staff', $3, $4, $5, $6::jsonb)`,
+        [
+          id,
+          assigned_to_id ? 'assigned' : 'unassigned',
+          userId,
+          oldAssignedTo || null,
+          assigned_to_id || null,
+          JSON.stringify({ assigned_to_id }),
+        ],
+      ).catch(() => undefined);
+
+      emitTicketUpdatedEvent({
+        ticketId: id,
+        action: assigned_to_id ? 'assigned' : 'unassigned',
+        assigned_to_id,
+      });
+    }
+
     // AUDITORIA: Registrar alteração
     await database.query(
       `INSERT INTO ticket_audit_log (ticket_id, user_id, action, changes, created_at)
        VALUES ($1, $2, $3, $4, NOW())`,
-      [id, userId, 'update', JSON.stringify({ status, assigned_to_id, priority })]
+      [id, userId, 'update', JSON.stringify({ status: nextStatus, assigned_to_id, priority })]
     ).catch(() => {
       // Log de auditoria é opcional se a tabela não existir ainda
       console.log('Audit log not available');
@@ -949,19 +1465,13 @@ ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (r
         );
 
         if (publicUser.rows.length > 0) {
-          // Buscar status antigo
-          const oldTicket = await database.query(
-            'SELECT status FROM tickets WHERE id = $1',
-            [id]
-          );
-
           await EmailService.notifyStatusUpdate(
             ticket.id,
             ticket.title,
             publicUser.rows[0].email,
             publicUser.rows[0].name,
-            oldTicket.rows[0]?.status || 'open',
-            status
+            oldStatus || 'open',
+            updatedStatus
           );
         }
       }
@@ -1218,11 +1728,11 @@ ticketsRouter.get('/:id/history', async (req: Request, res: Response) => {
         h.*,
         CASE 
           WHEN h.changed_by_id IS NOT NULL THEN
-            COALESCE(u.name, pu.name, 'Sistema')
+            COALESCE(iu.name, pu.name, 'Sistema')
           ELSE 'Sistema'
         END as changed_by_name
        FROM ticket_history h
-       LEFT JOIN users u ON u.id = h.changed_by_id
+       LEFT JOIN internal_users iu ON iu.id = h.changed_by_id
        LEFT JOIN public_users pu ON pu.id = h.changed_by_id
        WHERE h.ticket_id = $1 
        ORDER BY h.created_at DESC`,

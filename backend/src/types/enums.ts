@@ -12,6 +12,7 @@ export enum TicketStatus {
   OPEN = 'open',                  // Aberto
   IN_PROGRESS = 'in_progress',    // Em andamento
   WAITING = 'waiting',            // Aguardando
+  AWAITING_CONFIRMATION = 'aguardando_confirmacao', // Aguardando confirmação do solicitante
   RESOLVED = 'resolved',          // Resolvido
   CLOSED = 'closed',              // Fechado
   CANCELLED = 'cancelled',        // Cancelado

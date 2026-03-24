@@ -34,6 +34,13 @@ export default function NextAction({ status, department, lastUpdate, estimatedTi
           message: 'Precisamos de uma informação sua para continuar o atendimento.',
           type: 'warning'
         };
+      case 'aguardando_confirmacao':
+        return {
+          icon: '✅',
+          title: 'Confirme a resolução',
+          message: 'Confirme se o problema foi resolvido para concluir o chamado. Sem resposta, ele será encerrado automaticamente.',
+          type: 'warning'
+        };
       case 'resolved':
         return {
           icon: '✅',

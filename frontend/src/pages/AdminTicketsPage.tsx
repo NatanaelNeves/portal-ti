@@ -17,6 +17,8 @@ interface Ticket {
   requester_id: string;
   requester_type?: string;
   assigned_to?: string;
+  first_response_at?: string | null;
+  resolved_at?: string | null;
   message_count?: number;
   requester_name?: string;
   requester_email?: string;
@@ -110,6 +112,33 @@ export default function AdminTicketsPage() {
     if (!isContextReady) return;
     fetchTickets();
     fetchUsers();
+  }, [isContextReady, filterStatus, assignmentFilter, selectedStatuses, selectedPriorities, searchText, currentPage, departmentFilter, currentUserId]);
+
+  useEffect(() => {
+    if (!isContextReady) return;
+
+    const handleRealtimeUpdate = () => {
+      fetchTickets();
+    };
+
+    window.addEventListener('ticket:new', handleRealtimeUpdate);
+    window.addEventListener('ticket:updated', handleRealtimeUpdate);
+    window.addEventListener('ticket:resolved', handleRealtimeUpdate);
+    window.addEventListener('ticket:reopened', handleRealtimeUpdate);
+    window.addEventListener('ticket:auto_close_warning', handleRealtimeUpdate);
+
+    const refreshInterval = window.setInterval(() => {
+      fetchTickets();
+    }, 30000);
+
+    return () => {
+      window.removeEventListener('ticket:new', handleRealtimeUpdate);
+      window.removeEventListener('ticket:updated', handleRealtimeUpdate);
+      window.removeEventListener('ticket:resolved', handleRealtimeUpdate);
+      window.removeEventListener('ticket:reopened', handleRealtimeUpdate);
+      window.removeEventListener('ticket:auto_close_warning', handleRealtimeUpdate);
+      window.clearInterval(refreshInterval);
+    };
   }, [isContextReady, filterStatus, assignmentFilter, selectedStatuses, selectedPriorities, searchText, currentPage, departmentFilter, currentUserId]);
 
   const fetchUsers = async () => {
@@ -243,6 +272,7 @@ export default function AdminTicketsPage() {
       console.log('  - In Progress:', ticketList.filter((t: Ticket) => t.status === 'in_progress').length);
       console.log('  - Closed:', ticketList.filter((t: Ticket) => t.status === 'closed').length);
       console.log('  - Resolved:', ticketList.filter((t: Ticket) => t.status === 'resolved').length);
+      console.log('  - Awaiting Confirmation:', ticketList.filter((t: Ticket) => t.status === 'aguardando_confirmacao').length);
       
       setTickets(ticketList);
       
@@ -275,10 +305,12 @@ export default function AdminTicketsPage() {
         return 'Em Atendimento';
       case 'waiting_user':
         return 'Aguardando Usuário';
+      case 'aguardando_confirmacao':
+        return 'Aguardando Confirmação';
       case 'resolved':
         return 'Resolvido';
       case 'closed':
-        return 'Fechado';
+        return 'Concluído';
       default:
         return status;
     }
@@ -305,6 +337,8 @@ export default function AdminTicketsPage() {
       case 'in_progress':
         return 'badge-status-progress';
       case 'waiting_user':
+        return 'badge-status-warning';
+      case 'aguardando_confirmacao':
         return 'badge-status-warning';
       case 'resolved':
         return 'badge-status-success';
@@ -345,7 +379,7 @@ export default function AdminTicketsPage() {
   const getPriorityCount = (priority: 'high' | 'medium' | 'low') => {
     return tickets.filter(ticket => {
       // Só conta chamados ativos (open, in_progress ou waiting)
-      const activeStatuses = ['open', 'in_progress', 'waiting', 'waiting_user'];
+      const activeStatuses = ['open', 'in_progress', 'waiting', 'waiting_user', 'aguardando_confirmacao'];
       if (!activeStatuses.includes(ticket.status)) {
         return false;
       }
@@ -365,6 +399,25 @@ export default function AdminTicketsPage() {
     return 'agora';
   };
 
+  const getSLAThresholdHours = (priority: string) => {
+    if (priority === 'critical') return 4;
+    if (priority === 'high') return 24;
+    if (priority === 'medium') return 72;
+    return 168;
+  };
+
+  const getSlaElapsedHours = (ticket: Ticket) => {
+    const start = new Date(ticket.created_at).getTime();
+    const end = ticket.resolved_at ? new Date(ticket.resolved_at).getTime() : Date.now();
+    const diff = Math.max(0, end - start);
+    return Math.round(diff / (1000 * 60 * 60));
+  };
+
+  const isTicketOverdue = (ticket: Ticket) => {
+    if (ticket.status === 'closed' || ticket.status === 'resolved') return false;
+    return getSlaElapsedHours(ticket) > getSLAThresholdHours(ticket.priority);
+  };
+
   // Verifica se há filtros avançados ativos
   const hasAdvancedFilters = selectedStatuses.length > 0 || selectedPriorities.length > 0 || searchText.trim() !== '';
 
@@ -373,7 +426,7 @@ export default function AdminTicketsPage() {
     // Filtro rápido por prioridade (apenas quando filtros avançados não estão ativos)
     if (!hasAdvancedFilters && filterPriority) {
       // Só mostrar chamados ativos (open, in_progress ou waiting)
-      const activeStatuses = ['open', 'in_progress', 'waiting', 'waiting_user'];
+      const activeStatuses = ['open', 'in_progress', 'waiting', 'waiting_user', 'aguardando_confirmacao'];
       if (!activeStatuses.includes(ticket.status)) {
         return false;
       }
@@ -392,7 +445,7 @@ export default function AdminTicketsPage() {
     // Se filterStatus for 'all' e não há filtros avançados,
     // mostra apenas tickets ativos (não resolvidos nem fechados)
     if (filterStatus === 'all') {
-      const activeStatuses = ['open', 'in_progress', 'waiting', 'waiting_user'];
+      const activeStatuses = ['open', 'in_progress', 'waiting', 'waiting_user', 'aguardando_confirmacao'];
       return activeStatuses.includes(ticket.status);
     }
     
@@ -720,6 +773,7 @@ export default function AdminTicketsPage() {
                   { value: 'open', label: '⚪ Aberto' },
                   { value: 'in_progress', label: '🔵 Em Atendimento' },
                   { value: 'waiting_user', label: '🟡 Aguardando' },
+                  { value: 'aguardando_confirmacao', label: '🔎 Aguardando Confirmação' },
                   { value: 'resolved', label: '✅ Resolvido' },
                   { value: 'closed', label: '🔒 Fechado' }
                 ].map(status => (
@@ -873,6 +927,10 @@ export default function AdminTicketsPage() {
                   <div className="ticket-card-footer">
                     <span className="assigned">
                       👤 {getUserName(ticket.assigned_to)}
+                    </span>
+                    <span className={`sla-chip ${isTicketOverdue(ticket) ? 'sla-chip-overdue' : ''}`}>
+                      ⏱️ {getSlaElapsedHours(ticket)}h
+                      {isTicketOverdue(ticket) ? ' • Atrasado' : ''}
                     </span>
                     <div className="footer-actions">
                       {!ticket.assigned_to && ticket.status === 'open' && (

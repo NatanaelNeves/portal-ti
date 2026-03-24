@@ -9,7 +9,8 @@ export default function StatusTimeline({ currentStatus }: StatusTimelineProps) {
     { key: 'open', label: 'Aberto', icon: '📝' },
     { key: 'in_progress', label: 'Em Atendimento', icon: '🔧' },
     { key: 'waiting_user', label: 'Aguardando Você', icon: '⏳' },
-    { key: 'resolved', label: 'Resolvido', icon: '✅' },
+    { key: 'aguardando_confirmacao', label: 'Aguardando Confirmação', icon: '🔎' },
+    { key: 'closed', label: 'Concluído', icon: '✅' },
   ];
 
   const getCurrentIndex = () => {

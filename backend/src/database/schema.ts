@@ -100,6 +100,17 @@ export async function initializeDatabase(): Promise<void> {
         assigned_to_id UUID REFERENCES internal_users(id),
         department_id UUID REFERENCES departments(id),
         resolved_at TIMESTAMP,
+        first_response_at TIMESTAMP,
+        confirmation_requested_at TIMESTAMP,
+        confirmation_response_at TIMESTAMP,
+        confirmed_resolved BOOLEAN,
+        reopen_reason TEXT,
+        rating SMALLINT,
+        feedback TEXT,
+        rated_at TIMESTAMP,
+        auto_closed BOOLEAN NOT NULL DEFAULT false,
+        closed_at TIMESTAMP,
+        auto_close_warning_sent_at TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
@@ -130,6 +141,25 @@ export async function initializeDatabase(): Promise<void> {
         is_internal BOOLEAN DEFAULT false,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
+    `);
+
+    await database.query(`
+      CREATE TABLE IF NOT EXISTS ticket_history (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        ticket_id UUID NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+        action VARCHAR(50) NOT NULL,
+        changed_by_type VARCHAR(20) NOT NULL CHECK (changed_by_type IN ('public', 'it_staff', 'system')),
+        changed_by_id UUID,
+        old_value TEXT,
+        new_value TEXT,
+        metadata JSONB DEFAULT '{}',
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    await database.query(`
+      CREATE INDEX IF NOT EXISTS idx_ticket_history_ticket_id ON ticket_history(ticket_id);
+      CREATE INDEX IF NOT EXISTS idx_ticket_history_created_at ON ticket_history(created_at DESC);
     `);
 
     // Tabela de anexos de chamados
@@ -590,6 +620,71 @@ export async function initializeDatabase(): Promise<void> {
                    WHERE constraint_name='tickets_requester_id_fkey') THEN
           ALTER TABLE tickets DROP CONSTRAINT tickets_requester_id_fkey;
         END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name='tickets' AND column_name='first_response_at') THEN
+          ALTER TABLE tickets ADD COLUMN first_response_at TIMESTAMP;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name='tickets' AND column_name='confirmation_requested_at') THEN
+          ALTER TABLE tickets ADD COLUMN confirmation_requested_at TIMESTAMP;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name='tickets' AND column_name='confirmation_response_at') THEN
+          ALTER TABLE tickets ADD COLUMN confirmation_response_at TIMESTAMP;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name='tickets' AND column_name='confirmed_resolved') THEN
+          ALTER TABLE tickets ADD COLUMN confirmed_resolved BOOLEAN;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name='tickets' AND column_name='reopen_reason') THEN
+          ALTER TABLE tickets ADD COLUMN reopen_reason TEXT;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name='tickets' AND column_name='rating') THEN
+          ALTER TABLE tickets ADD COLUMN rating SMALLINT;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name='tickets' AND column_name='feedback') THEN
+          ALTER TABLE tickets ADD COLUMN feedback TEXT;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name='tickets' AND column_name='rated_at') THEN
+          ALTER TABLE tickets ADD COLUMN rated_at TIMESTAMP;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name='tickets' AND column_name='auto_closed') THEN
+          ALTER TABLE tickets ADD COLUMN auto_closed BOOLEAN NOT NULL DEFAULT false;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name='tickets' AND column_name='closed_at') THEN
+          ALTER TABLE tickets ADD COLUMN closed_at TIMESTAMP;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name='tickets' AND column_name='auto_close_warning_sent_at') THEN
+          ALTER TABLE tickets ADD COLUMN auto_close_warning_sent_at TIMESTAMP;
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'tickets_rating_range_check'
+            AND conrelid = 'tickets'::regclass
+        ) THEN
+          ALTER TABLE tickets
+          ADD CONSTRAINT tickets_rating_range_check
+          CHECK (rating IS NULL OR (rating >= 1 AND rating <= 5));
+        END IF;
       END $$;
     `);
 
@@ -601,6 +696,8 @@ export async function initializeDatabase(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_tickets_requester ON tickets(requester_id);
       CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status);
       CREATE INDEX IF NOT EXISTS idx_tickets_assigned_to ON tickets(assigned_to_id);
+      CREATE INDEX IF NOT EXISTS idx_tickets_confirmation_requested_at ON tickets(confirmation_requested_at);
+      CREATE INDEX IF NOT EXISTS idx_tickets_auto_close_warning ON tickets(auto_close_warning_sent_at);
       CREATE INDEX IF NOT EXISTS idx_inventory_status ON inventory_items(status);
       CREATE INDEX IF NOT EXISTS idx_inventory_assigned ON inventory_items(assigned_to_id);
       CREATE INDEX IF NOT EXISTS idx_documents_type ON documents(document_type);

@@ -894,6 +894,21 @@
   gap: var(--space-1);
 }
 
+.sla-chip {
+  font-size: 0.74rem;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #075985;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sla-chip-overdue {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
 .btn-assume {
   min-width: 96px;
 }

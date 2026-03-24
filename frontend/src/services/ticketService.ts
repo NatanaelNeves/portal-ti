@@ -31,4 +31,19 @@ export const ticketService = {
     const response = await api.patch(`/tickets/${id}/assign`, { assignedToId });
     return response.data;
   },
+
+  confirmResolution: async (id: string, resolved: boolean) => {
+    const response = await api.post(`/tickets/${id}/confirm-resolution`, { resolved });
+    return response.data;
+  },
+
+  submitRating: async (id: string, rating: number, feedback?: string) => {
+    const response = await api.post(`/tickets/${id}/rating`, { rating, feedback });
+    return response.data;
+  },
+
+  manualClose: async (id: string) => {
+    const response = await api.post(`/tickets/${id}/manual-close`);
+    return response.data;
+  },
 };

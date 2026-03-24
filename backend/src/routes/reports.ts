@@ -74,6 +74,125 @@ reportsRouter.use((req: Request, res: Response, next) => {
 });
 
 /**
+ * GET /satisfaction - Indicadores de satisfação de atendimento
+ */
+reportsRouter.get('/satisfaction', async (req: Request, res: Response) => {
+  try {
+    const { date_from, date_to, department } = req.query as {
+      date_from?: string;
+      date_to?: string;
+      department?: string;
+    };
+
+    const baseConditions: string[] = ['t.rating IS NOT NULL'];
+    const params: any[] = [];
+    let paramCount = 1;
+
+    if (date_from) {
+      baseConditions.push(`t.rated_at >= $${paramCount}`);
+      params.push(date_from);
+      paramCount++;
+    }
+
+    if (date_to) {
+      baseConditions.push(`t.rated_at <= $${paramCount}`);
+      params.push(date_to);
+      paramCount++;
+    }
+
+    if (department && department !== 'all') {
+      baseConditions.push(`COALESCE(t.department, 'ti') = $${paramCount}`);
+      params.push(department);
+      paramCount++;
+    }
+
+    const whereClause = `WHERE ${baseConditions.join(' AND ')}`;
+
+    const [overallResult, byStaffResult, byDepartmentResult] = await Promise.all([
+      database.query(
+        `SELECT
+           COALESCE(AVG(rating), 0) AS avg_rating,
+           COUNT(*) FILTER (WHERE rating IS NOT NULL) AS total_ratings,
+           COUNT(*) FILTER (WHERE rating >= 4) AS positive_ratings
+         FROM tickets t
+         ${whereClause}`,
+        params,
+      ),
+      database.query(
+        `SELECT
+           iu.id AS staff_id,
+           iu.name AS staff_name,
+           COUNT(*) FILTER (WHERE t.rating IS NOT NULL) AS total_ratings,
+           COALESCE(AVG(t.rating), 0) AS avg_rating,
+           COUNT(*) FILTER (WHERE t.rating >= 4) AS positive_ratings
+         FROM internal_users iu
+         JOIN tickets t ON t.assigned_to_id = iu.id
+         WHERE iu.role IN ('it_staff', 'admin_staff', 'admin')
+           AND ${baseConditions.join(' AND ')}
+         GROUP BY iu.id, iu.name
+         HAVING COUNT(*) FILTER (WHERE t.rating IS NOT NULL) > 0
+         ORDER BY avg_rating DESC, total_ratings DESC`,
+        params,
+      ),
+      database.query(
+        `SELECT
+           COALESCE(t.department, 'ti') AS department,
+           COUNT(*) FILTER (WHERE t.rating IS NOT NULL) AS total_ratings,
+           COALESCE(AVG(t.rating), 0) AS avg_rating,
+           COUNT(*) FILTER (WHERE t.rating >= 4) AS positive_ratings
+         FROM tickets t
+         ${whereClause}
+         GROUP BY COALESCE(t.department, 'ti')
+         ORDER BY avg_rating DESC, total_ratings DESC`,
+        params,
+      ),
+    ]);
+
+    const overall = overallResult.rows[0] || {};
+    const totalRatings = toInt(overall.total_ratings);
+    const positiveRatings = toInt(overall.positive_ratings);
+
+    return res.json({
+      averageRating: Number(toFloat(overall.avg_rating).toFixed(2)),
+      totalRatings,
+      positiveRate: totalRatings > 0 ? Number(((positiveRatings / totalRatings) * 100).toFixed(1)) : 0,
+      byStaff: byStaffResult.rows.map((row: any) => {
+        const staffTotalRatings = toInt(row.total_ratings);
+        const staffPositiveRatings = toInt(row.positive_ratings);
+        return {
+          staffId: row.staff_id,
+          staffName: row.staff_name,
+          averageRating: Number(toFloat(row.avg_rating).toFixed(2)),
+          totalRatings: staffTotalRatings,
+          positiveRate: staffTotalRatings > 0
+            ? Number(((staffPositiveRatings / staffTotalRatings) * 100).toFixed(1))
+            : 0,
+        };
+      }),
+      byDepartment: byDepartmentResult.rows.map((row: any) => {
+        const total = toInt(row.total_ratings);
+        const positive = toInt(row.positive_ratings);
+        return {
+          department: row.department,
+          departmentLabel: row.department === 'administrativo' ? 'Administrativo' : 'TI',
+          averageRating: Number(toFloat(row.avg_rating).toFixed(2)),
+          totalRatings: total,
+          positiveRate: total > 0 ? Number(((positive / total) * 100).toFixed(1)) : 0,
+        };
+      }),
+      filters: {
+        date_from: date_from || null,
+        date_to: date_to || null,
+        department: department || 'all',
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching satisfaction report:', error);
+    return res.status(500).json({ error: 'Failed to fetch satisfaction report' });
+  }
+});
+
+/**
  * GET /stats/overview - Estatísticas gerais do sistema
  * Retorna contadores e médias gerais
  */
@@ -127,7 +246,7 @@ reportsRouter.get('/stats/overview', async (req: Request, res: Response) => {
            COALESCE(department, 'ti') as team,
            COUNT(*) as total_tickets,
            COUNT(*) FILTER (WHERE status IN ('resolved', 'closed')) as resolved_tickets,
-           COUNT(*) FILTER (WHERE status IN ('open', 'in_progress', 'waiting_user')) as pending_tickets,
+           COUNT(*) FILTER (WHERE status IN ('open', 'in_progress', 'waiting_user', 'aguardando_confirmacao')) as pending_tickets,
            COALESCE(
              AVG(EXTRACT(EPOCH FROM (COALESCE(resolved_at, updated_at) - created_at)) / 3600)
              FILTER (WHERE status IN ('resolved', 'closed')),
@@ -143,15 +262,9 @@ reportsRouter.get('/stats/overview', async (req: Request, res: Response) => {
         params
       ),
       database.query(
-        `SELECT AVG(EXTRACT(EPOCH FROM (first_msg.created_at - t.created_at)) / 3600) as avg_hours
+        `SELECT AVG(EXTRACT(EPOCH FROM (t.first_response_at - t.created_at)) / 3600) as avg_hours
          FROM tickets t
-         INNER JOIN (
-           SELECT ticket_id, MIN(created_at) as created_at
-           FROM ticket_messages
-           WHERE author_type = 'it_staff'
-           GROUP BY ticket_id
-         ) first_msg ON first_msg.ticket_id = t.id
-         ${dateCondition}`,
+         ${dateCondition ? dateCondition + ' AND t.first_response_at IS NOT NULL' : 'WHERE t.first_response_at IS NOT NULL'}`,
         params
       ),
       database.query(
@@ -251,7 +364,7 @@ reportsRouter.get('/stats/technicians', async (req: Request, res: Response) => {
          COUNT(CASE WHEN t.status IN ('resolved', 'closed') THEN 1 END) as resolved_tickets,
          COUNT(CASE WHEN t.status = 'closed' THEN 1 END) as closed_tickets,
          COUNT(CASE WHEN t.status = 'in_progress' THEN 1 END) as in_progress_tickets,
-         COUNT(CASE WHEN t.status IN ('open', 'waiting_user') THEN 1 END) as pending_tickets,
+         COUNT(CASE WHEN t.status IN ('open', 'waiting_user', 'aguardando_confirmacao') THEN 1 END) as pending_tickets,
          COUNT(CASE WHEN DATE(t.updated_at) = CURRENT_DATE THEN 1 END) as handled_today,
          AVG(EXTRACT(EPOCH FROM (COALESCE(t.resolved_at, t.updated_at) - t.created_at)) / 3600)
            FILTER (WHERE t.status IN ('resolved', 'closed')) as avg_resolution_hours,
@@ -325,7 +438,7 @@ reportsRouter.get('/stats/sla', async (req: Request, res: Response) => {
          p.priority,
          COUNT(t.id) as total,
          COUNT(CASE 
-           WHEN EXTRACT(EPOCH FROM (first_msg.first_response_at - t.created_at)) / 3600 <= 
+           WHEN t.first_response_at IS NOT NULL AND EXTRACT(EPOCH FROM (t.first_response_at - t.created_at)) / 3600 <= 
              CASE p.priority
                WHEN 'critical' THEN 1
                WHEN 'high' THEN 4
@@ -345,16 +458,10 @@ reportsRouter.get('/stats/sla', async (req: Request, res: Response) => {
              END
            THEN 1 
          END) as within_sla_resolution,
-         AVG(EXTRACT(EPOCH FROM (first_msg.first_response_at - t.created_at)) / 3600) as avg_response_hours,
+         AVG(EXTRACT(EPOCH FROM (t.first_response_at - t.created_at)) / 3600) as avg_response_hours,
          AVG(EXTRACT(EPOCH FROM (t.resolved_at - t.created_at)) / 3600) as avg_resolution_hours
        FROM priorities p
        LEFT JOIN tickets t ON t.priority = p.priority ${dateFilter}
-       LEFT JOIN (
-         SELECT ticket_id, MIN(created_at) as first_response_at
-         FROM ticket_messages
-         WHERE author_type = 'it_staff'
-         GROUP BY ticket_id
-       ) first_msg ON first_msg.ticket_id = t.id
        GROUP BY p.priority
        ORDER BY CASE p.priority
          WHEN 'critical' THEN 1
@@ -457,9 +564,10 @@ reportsRouter.get('/stats/trends', async (req: Request, res: Response) => {
          CASE 
            WHEN status = 'open' THEN 'Aberto'
            WHEN status = 'in_progress' THEN 'Em Andamento'
-           WHEN status = 'awaiting_user' THEN 'Aguardando Usuário'
+           WHEN status = 'waiting_user' THEN 'Aguardando Usuário'
+           WHEN status = 'aguardando_confirmacao' THEN 'Aguardando Confirmação'
            WHEN status = 'resolved' THEN 'Resolvido'
-           WHEN status = 'closed' THEN 'Fechado'
+           WHEN status = 'closed' THEN 'Concluído'
            ELSE status
          END as name,
          COUNT(*) as value
@@ -783,13 +891,9 @@ reportsRouter.get('/export/excel/consolidated', async (req: Request, res: Respon
       'SELECT priority, COUNT(*) as count FROM tickets GROUP BY priority'
     );
     const avgFirstResponse = await database.query(
-      `SELECT AVG(EXTRACT(EPOCH FROM (first_msg.created_at - t.created_at)) / 3600) as avg_hours
-       FROM tickets t
-       INNER JOIN (
-         SELECT ticket_id, MIN(created_at) as created_at
-         FROM ticket_messages WHERE author_type = 'it_staff'
-         GROUP BY ticket_id
-       ) first_msg ON first_msg.ticket_id = t.id`
+      `SELECT AVG(EXTRACT(EPOCH FROM (first_response_at - created_at)) / 3600) as avg_hours
+       FROM tickets
+       WHERE first_response_at IS NOT NULL`
     );
     const avgResolution = await database.query(
       `SELECT AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 3600) as avg_hours

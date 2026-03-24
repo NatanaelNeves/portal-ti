@@ -59,6 +59,31 @@ export default function MyTicketsPage() {
     }
   }, [navigate]);
 
+  useEffect(() => {
+    const token = localStorage.getItem('user_token');
+    if (!token || showEmailForm) return;
+
+    const refresh = () => fetchTickets(token);
+    const interval = window.setInterval(refresh, 30000);
+
+    const onRealtime = (event: Event) => {
+      const detail = (event as CustomEvent<any>).detail;
+      if (!detail?.ticketId) return;
+      refresh();
+    };
+
+    window.addEventListener('ticket:updated', onRealtime);
+    window.addEventListener('ticket:resolved', onRealtime);
+    window.addEventListener('ticket:reopened', onRealtime);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('ticket:updated', onRealtime);
+      window.removeEventListener('ticket:resolved', onRealtime);
+      window.removeEventListener('ticket:reopened', onRealtime);
+    };
+  }, [showEmailForm]);
+
   const handleSearchByEmail = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchEmail.trim()) {
@@ -241,6 +266,8 @@ export default function MyTicketsPage() {
         return 'status-progress';
       case 'waiting_user':
         return 'status-waiting';
+      case 'aguardando_confirmacao':
+        return 'status-awaiting-confirmation';
       case 'resolved':
         return 'status-resolved';
       case 'closed':
@@ -258,6 +285,8 @@ export default function MyTicketsPage() {
         return '⏱️ Em Atendimento';
       case 'waiting_user':
         return '⏳ Aguardando Você';
+      case 'aguardando_confirmacao':
+        return '🔎 Aguardando Confirmação';
       case 'resolved':
         return '✅ Resolvido';
       case 'closed':

@@ -53,11 +53,29 @@ export const createTicketSchema = z.object({
 });
 
 export const updateTicketSchema = z.object({
-  status: z.enum(['open', 'in_progress', 'waiting_user', 'resolved', 'closed']).optional(),
+  status: z.enum(['open', 'in_progress', 'waiting_user', 'aguardando_confirmacao', 'resolved', 'closed']).optional(),
   priority: z.enum(['low', 'medium', 'high']).optional(),
   assigned_to_id: z.string().uuid().nullable().optional(),
 }).refine((data) => Object.keys(data).length > 0, {
   message: 'Pelo menos um campo deve ser fornecido',
+});
+
+export const confirmResolutionSchema = z.object({
+  resolved: z.boolean(),
+  reopen_reason: z.string().max(2000, 'Justificativa deve ter no máximo 2000 caracteres').optional(),
+}).superRefine((data, ctx) => {
+  if (data.resolved === false && (!data.reopen_reason || data.reopen_reason.trim().length < 10)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['reopen_reason'],
+      message: 'Informe uma justificativa com pelo menos 10 caracteres',
+    });
+  }
+});
+
+export const ticketRatingSchema = z.object({
+  rating: z.number().int().min(1).max(5),
+  feedback: z.string().max(2000, 'Comentário deve ter no máximo 2000 caracteres').optional(),
 });
 
 export const addMessageSchema = z.object({

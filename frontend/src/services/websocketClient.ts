@@ -98,9 +98,38 @@ class WebSocketClient {
     // Ticket atualizado
     this.socket?.on('ticket:updated', (data: any) => {
       console.log('🔄 Ticket atualizado:', data);
-      showToast.info('Um chamado foi atualizado');
+      const action = data?.action;
+      if (action === 'reopened_by_requester') {
+        showToast.warning('Chamado reaberto pelo usuário');
+      } else if (action === 'marked_resolved_pending_confirmation') {
+        showToast.success('Chamado aguardando confirmação do usuário');
+      } else if (action === 'auto_closed') {
+        showToast.info('Chamado encerrado automaticamente por prazo');
+      } else if (action === 'manual_closed') {
+        showToast.success('Chamado encerrado manualmente');
+      } else {
+        showToast.info('Um chamado foi atualizado');
+      }
       
       window.dispatchEvent(new CustomEvent('ticket:updated', { detail: data }));
+    });
+
+    this.socket?.on('ticket:resolved', (data: any) => {
+      console.log('✅ Ticket resolvido:', data);
+      showToast.success('Chamado marcado como resolvido');
+      window.dispatchEvent(new CustomEvent('ticket:resolved', { detail: data }));
+    });
+
+    this.socket?.on('ticket:reopened', (data: any) => {
+      console.log('🔁 Ticket reaberto:', data);
+      showToast.warning('Chamado reaberto pelo solicitante');
+      window.dispatchEvent(new CustomEvent('ticket:reopened', { detail: data }));
+    });
+
+    this.socket?.on('ticket:auto_close_warning', (data: any) => {
+      console.log('⏰ Aviso de fechamento automático:', data);
+      showToast.warning('Chamado perto do encerramento automático (24h)');
+      window.dispatchEvent(new CustomEvent('ticket:auto_close_warning', { detail: data }));
     });
 
     // Nova mensagem
