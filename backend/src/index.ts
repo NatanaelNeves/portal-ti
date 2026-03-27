@@ -5,7 +5,7 @@ import http from 'http';
 import { config } from './config/environment';
 import { database } from './database/connection';
 import { initializeDatabase } from './database/schema';
-import { generalLimiter, authLimiter, createLimiter } from './middleware/rateLimiter';
+import { generalLimiter, authLimiter } from './middleware/rateLimiter';
 import { initializeWebSocket } from './services/websocketService';
 import { initializeScheduler } from './services/schedulerService';
 
@@ -70,6 +70,7 @@ app.use((req, res, next) => {
 
 // Rate limiting geral (excluindo endpoints de polling que têm limiter próprio)
 app.use('/api/', (req, res, next) => {
+  if (/^\/(auth|public-auth|internal-auth)(\/|$)/.test(req.path)) return next();
   if (req.path.includes('/tickets/new-since')) return next();
   return generalLimiter(req, res, next);
 });
@@ -101,9 +102,9 @@ app.post('/api/internal/restart', (req, res) => {
 });
 
 // Rotas da API (authLimiter desabilitado em desenvolvimento)
-app.use('/api/auth', require('./routes/auth').default);
-app.use('/api/public-auth', require('./routes/publicAuth').default);
-app.use('/api/internal-auth', require('./routes/internalAuth').default);
+app.use('/api/auth', authLimiter, require('./routes/auth').default);
+app.use('/api/public-auth', authLimiter, require('./routes/publicAuth').default);
+app.use('/api/internal-auth', authLimiter, require('./routes/internalAuth').default);
 app.use('/api/tickets', require('./routes/tickets').default);
 app.use('/api/assets', require('./routes/assets').default);
 app.use('/api/purchases', require('./routes/purchases').default);
