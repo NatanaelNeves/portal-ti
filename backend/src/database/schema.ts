@@ -119,6 +119,8 @@ export async function initializeDatabase(): Promise<void> {
     // Migração: adicionar coluna department se não existir
     await database.query(`
       DO $$
+      DECLARE
+        history_constraint_name TEXT;
       BEGIN
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'tickets' AND column_name = 'department') THEN
           ALTER TABLE tickets ADD COLUMN department VARCHAR(50) NOT NULL DEFAULT 'ti';
@@ -148,7 +150,7 @@ export async function initializeDatabase(): Promise<void> {
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         ticket_id UUID NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
         action VARCHAR(50) NOT NULL,
-        changed_by_type VARCHAR(20) NOT NULL CHECK (changed_by_type IN ('public', 'it_staff', 'system')),
+        changed_by_type VARCHAR(20) NOT NULL CHECK (changed_by_type IN ('public', 'it_staff', 'admin_staff', 'admin', 'manager', 'system')),
         changed_by_id UUID,
         old_value TEXT,
         new_value TEXT,
@@ -684,6 +686,33 @@ export async function initializeDatabase(): Promise<void> {
           ALTER TABLE tickets
           ADD CONSTRAINT tickets_rating_range_check
           CHECK (rating IS NULL OR (rating >= 1 AND rating <= 5));
+        END IF;
+
+        IF EXISTS (
+          SELECT 1 FROM information_schema.tables
+          WHERE table_name = 'ticket_history'
+        ) THEN
+          SELECT c.conname
+          INTO history_constraint_name
+          FROM pg_constraint c
+          JOIN pg_class t ON t.oid = c.conrelid
+          WHERE t.relname = 'ticket_history'
+            AND c.contype = 'c'
+            AND pg_get_constraintdef(c.oid) ILIKE '%changed_by_type%'
+          LIMIT 1;
+
+          IF history_constraint_name IS NOT NULL THEN
+            EXECUTE format('ALTER TABLE ticket_history DROP CONSTRAINT %I', history_constraint_name);
+          END IF;
+
+          BEGIN
+            ALTER TABLE ticket_history
+              ADD CONSTRAINT ticket_history_changed_by_type_check
+              CHECK (changed_by_type IN ('public', 'it_staff', 'admin_staff', 'admin', 'manager', 'system'));
+          EXCEPTION
+            WHEN duplicate_object THEN
+              NULL;
+          END;
         END IF;
       END $$;
     `);

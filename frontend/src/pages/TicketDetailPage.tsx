@@ -441,6 +441,10 @@ export default function TicketDetailPage() {
     }
   };
 
+  const normalizedRating = ticket.rating !== null && ticket.rating !== undefined
+    ? Number(ticket.rating)
+    : null;
+
   return (
     <div className="ticket-detail-page">
       <div className="ticket-container">
@@ -483,7 +487,7 @@ export default function TicketDetailPage() {
               Seu chamado foi marcado como resolvido pela equipe. Confirme para concluirmos o atendimento.
             </p>
             <p className="confirmation-warning">
-              Seu chamado será encerrado automaticamente em 24h caso não haja resposta.
+              O chamado será encerrado automaticamente após 48h sem resposta (com aviso após 24h).
             </p>
             {getAutoCloseTimeText() && (
               <p className="confirmation-time">{getAutoCloseTimeText()}</p>
@@ -695,6 +699,24 @@ export default function TicketDetailPage() {
               <div className="detail-item">
                 <label>Resolvido em:</label>
                 <span>{new Date(ticket.resolved_at).toLocaleString('pt-BR')}</span>
+              </div>
+            )}
+            <div className="detail-item">
+              <label>Avaliação:</label>
+              <span>
+                {normalizedRating !== null
+                  ? `${'★'.repeat(Math.max(0, Math.min(5, normalizedRating)))} (${normalizedRating}/5)`
+                  : 'Sem avaliação registrada'}
+              </span>
+            </div>
+            <div className="detail-item">
+              <label>Feedback:</label>
+              <span>{ticket.feedback?.trim() ? ticket.feedback : 'Nenhum comentário informado'}</span>
+            </div>
+            {ticket.rated_at && (
+              <div className="detail-item">
+                <label>Avaliado em:</label>
+                <span>{new Date(ticket.rated_at).toLocaleString('pt-BR')}</span>
               </div>
             )}
           </div>

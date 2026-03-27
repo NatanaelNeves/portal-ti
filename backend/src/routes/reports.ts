@@ -53,7 +53,7 @@ const ensureReportsAccess = (req: Request, res: Response): InternalUserClaims | 
     return null;
   }
 
-  if (![UserRole.ADMIN, UserRole.IT_STAFF, UserRole.MANAGER].includes(user.role)) {
+  if (![UserRole.ADMIN, UserRole.IT_STAFF, UserRole.ADMIN_STAFF, UserRole.MANAGER].includes(user.role)) {
     res.status(403).json({ error: 'Acesso negado' });
     return null;
   }
@@ -108,7 +108,7 @@ reportsRouter.get('/satisfaction', async (req: Request, res: Response) => {
 
     const whereClause = `WHERE ${baseConditions.join(' AND ')}`;
 
-    const [overallResult, byStaffResult, byDepartmentResult] = await Promise.all([
+    const [overallResult, byStaffResult, byDepartmentResult, feedbackEntriesResult] = await Promise.all([
       database.query(
         `SELECT
            COALESCE(AVG(rating), 0) AS avg_rating,
@@ -146,6 +146,26 @@ reportsRouter.get('/satisfaction', async (req: Request, res: Response) => {
          ORDER BY avg_rating DESC, total_ratings DESC`,
         params,
       ),
+      database.query(
+        `SELECT
+           t.id AS ticket_id,
+           t.title AS ticket_title,
+           t.rating,
+           t.feedback,
+           t.rated_at,
+           COALESCE(t.department, 'ti') AS department,
+           iu.name AS assignee_name,
+           pu.name AS requester_name
+         FROM tickets t
+         LEFT JOIN internal_users iu ON iu.id = t.assigned_to_id
+         LEFT JOIN public_users pu ON pu.id = t.requester_id AND t.requester_type = 'public'
+         ${whereClause}
+           AND t.feedback IS NOT NULL
+           AND LENGTH(TRIM(t.feedback)) > 0
+         ORDER BY t.rated_at DESC
+         LIMIT 100`,
+        params,
+      ),
     ]);
 
     const overall = overallResult.rows[0] || {};
@@ -180,6 +200,17 @@ reportsRouter.get('/satisfaction', async (req: Request, res: Response) => {
           positiveRate: total > 0 ? Number(((positive / total) * 100).toFixed(1)) : 0,
         };
       }),
+      feedbackEntries: feedbackEntriesResult.rows.map((row: any) => ({
+        ticketId: row.ticket_id,
+        ticketTitle: row.ticket_title,
+        rating: toInt(row.rating),
+        feedback: row.feedback,
+        ratedAt: row.rated_at,
+        department: row.department,
+        departmentLabel: row.department === 'administrativo' ? 'Administrativo' : 'TI',
+        assigneeName: row.assignee_name || 'Não atribuído',
+        requesterName: row.requester_name || 'Solicitante',
+      })),
       filters: {
         date_from: date_from || null,
         date_to: date_to || null,

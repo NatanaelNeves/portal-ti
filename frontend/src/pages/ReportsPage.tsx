@@ -102,6 +102,17 @@ interface SatisfactionData {
     totalRatings: number;
     positiveRate: number;
   }>;
+  feedbackEntries: Array<{
+    ticketId: string;
+    ticketTitle: string;
+    rating: number;
+    feedback: string;
+    ratedAt: string;
+    department: string;
+    departmentLabel: string;
+    assigneeName: string;
+    requesterName: string;
+  }>;
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
@@ -505,6 +516,38 @@ const ReportsPage: React.FC = () => {
                             <td>{item.averageRating.toFixed(2)}</td>
                             <td>{item.totalRatings}</td>
                             <td>{item.positiveRate}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {satisfactionData && satisfactionData.feedbackEntries.length > 0 && (
+                  <div className="chart-container">
+                    <h3>Feedbacks Recentes</h3>
+                    <table className="technicians-table">
+                      <thead>
+                        <tr>
+                          <th>Data</th>
+                          <th>Chamado</th>
+                          <th>Nota</th>
+                          <th>Departamento</th>
+                          <th>Atendente</th>
+                          <th>Solicitante</th>
+                          <th>Comentário</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {satisfactionData.feedbackEntries.map((item) => (
+                          <tr key={`${item.ticketId}-${item.ratedAt}`}>
+                            <td>{new Date(item.ratedAt).toLocaleString('pt-BR')}</td>
+                            <td>{item.ticketTitle}</td>
+                            <td>{item.rating}/5</td>
+                            <td>{item.departmentLabel}</td>
+                            <td>{item.assigneeName}</td>
+                            <td>{item.requesterName}</td>
+                            <td>{item.feedback}</td>
                           </tr>
                         ))}
                       </tbody>

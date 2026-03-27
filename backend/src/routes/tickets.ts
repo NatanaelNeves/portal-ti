@@ -42,6 +42,13 @@ const canManuallyCloseRole = (role: string) => {
   return [UserRole.IT_STAFF, UserRole.ADMIN_STAFF, UserRole.ADMIN, UserRole.MANAGER].includes(role as UserRole) || role === 'gestor';
 };
 
+const getHistoryInternalActorType = (role: string): 'it_staff' | 'admin_staff' | 'admin' | 'manager' => {
+  if (role === UserRole.ADMIN_STAFF) return 'admin_staff';
+  if (role === UserRole.ADMIN) return 'admin';
+  if (role === UserRole.MANAGER || role === 'gestor') return 'manager';
+  return 'it_staff';
+};
+
 const emitTicketEvent = (event: string, payload: any) => {
   try {
     const ws = getWebSocketService();
@@ -1125,7 +1132,7 @@ ticketsRouter.post('/:id/rating', validate(ticketRatingSchema), async (req: Requ
 });
 
 /**
- * POST /:id/manual-close - Encerramento manual por TI/Admin/Gestor
+ * POST /:id/manual-close - Encerramento manual por TI/Administrativo/Admin/Gestor
  */
 ticketsRouter.post('/:id/manual-close', authenticate, async (req: Request, res: Response) => {
   try {
@@ -1159,11 +1166,13 @@ ticketsRouter.post('/:id/manual-close', authenticate, async (req: Request, res: 
       [id],
     );
 
+    const historyActorType = getHistoryInternalActorType(user.role);
+
     await database.query(
       `INSERT INTO ticket_history (
         ticket_id, action, changed_by_type, changed_by_id, old_value, new_value, metadata
-      ) VALUES ($1, 'manual_closed_by_staff', 'it_staff', $2, $3, 'closed', $4::jsonb)`,
-      [id, user.id, ticket.status, JSON.stringify({ auto_closed: false, reason: 'manual_close' })],
+      ) VALUES ($1, 'manual_closed_by_staff', $2, $3, $4, 'closed', $5::jsonb)`,
+      [id, historyActorType, user.id, ticket.status, JSON.stringify({ auto_closed: false, reason: 'manual_close' })],
     ).catch(() => undefined);
 
     emitTicketUpdatedEvent({
@@ -1369,13 +1378,14 @@ ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (r
     console.log('Dados atualizados:', result.rows[0]);
 
     const updatedStatus = result.rows[0].status;
+    const historyActorType = getHistoryInternalActorType(userRole);
 
     if (status !== undefined && oldStatus !== updatedStatus) {
       await database.query(
         `INSERT INTO ticket_history (
           ticket_id, action, changed_by_type, changed_by_id, old_value, new_value, metadata
-        ) VALUES ($1, 'status_changed', 'it_staff', $2, $3, $4, $5::jsonb)`,
-        [id, userId, oldStatus, updatedStatus, JSON.stringify({ requested_status: status })],
+        ) VALUES ($1, 'status_changed', $2, $3, $4, $5, $6::jsonb)`,
+        [id, historyActorType, userId, oldStatus, updatedStatus, JSON.stringify({ requested_status: status })],
       ).catch(() => undefined);
 
       emitTicketUpdatedEvent({
@@ -1398,10 +1408,11 @@ ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (r
       await database.query(
         `INSERT INTO ticket_history (
           ticket_id, action, changed_by_type, changed_by_id, old_value, new_value, metadata
-        ) VALUES ($1, $2, 'it_staff', $3, $4, $5, $6::jsonb)`,
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
         [
           id,
           assigned_to_id ? 'assigned' : 'unassigned',
+          historyActorType,
           userId,
           oldAssignedTo || null,
           assigned_to_id || null,
