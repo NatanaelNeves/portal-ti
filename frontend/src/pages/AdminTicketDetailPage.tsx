@@ -19,6 +19,10 @@ interface TicketDetail {
   created_at: string;
   updated_at: string;
   resolved_at?: string;
+  closed_at?: string;
+  rating?: number | null;
+  feedback?: string | null;
+  rated_at?: string | null;
   requester_type: string;
   requester_name?: string;
   requester_email?: string;
@@ -259,6 +263,9 @@ export default function AdminTicketDetailPage() {
 
   const statusBadge = getStatusBadge(ticket.status);
   const priorityBadge = getPriorityBadge(ticket.priority);
+  const normalizedRating = ticket.rating !== null && ticket.rating !== undefined
+    ? Number(ticket.rating)
+    : null;
 
   // Ações rápidas de status
   const handleQuickAction = async (action: 'assume' | 'waiting' | 'resolve' | 'close' | 'resume') => {
@@ -578,6 +585,37 @@ export default function AdminTicketDetailPage() {
                 {Math.floor((Date.now() - new Date(ticket.created_at).getTime()) / (1000 * 60 * 60))}h
               </div>
             </div>
+
+            <div className="info-item info-item-full">
+              <label>⭐ Avaliação do Solicitante:</label>
+              <div className="value">
+                {normalizedRating !== null
+                  ? `${'★'.repeat(Math.max(0, Math.min(5, normalizedRating)))} (${normalizedRating}/5)`
+                  : 'Sem avaliação registrada'}
+              </div>
+            </div>
+
+            <div className="info-item info-item-full">
+              <label>💬 Feedback do Solicitante:</label>
+              <div className="value value-description">
+                {ticket.feedback?.trim() ? ticket.feedback : 'Nenhum comentário informado'}
+              </div>
+            </div>
+
+            {ticket.rated_at && (
+              <div className="info-item">
+                <label>🕒 Avaliado em:</label>
+                <div className="value value-date">
+                  {new Date(ticket.rated_at).toLocaleString('pt-BR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

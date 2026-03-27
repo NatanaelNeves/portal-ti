@@ -39,7 +39,7 @@ const canAdminStaffAccessAdministrativeTicket = (ticket: TicketAccessRow, userId
 const STATUS_AWAITING_CONFIRMATION = 'aguardando_confirmacao';
 
 const canManuallyCloseRole = (role: string) => {
-  return [UserRole.IT_STAFF, UserRole.ADMIN, UserRole.MANAGER].includes(role as UserRole) || role === 'gestor';
+  return [UserRole.IT_STAFF, UserRole.ADMIN_STAFF, UserRole.ADMIN, UserRole.MANAGER].includes(role as UserRole) || role === 'gestor';
 };
 
 const emitTicketEvent = (event: string, payload: any) => {

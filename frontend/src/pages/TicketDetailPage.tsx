@@ -314,7 +314,7 @@ export default function TicketDetailPage() {
 
   const canManualClose = () => {
     const role = getInternalRole();
-    return role === 'it_staff' || role === 'admin' || role === 'manager';
+    return role === 'it_staff' || role === 'admin_staff' || role === 'admin' || role === 'manager' || role === 'gestor';
   };
 
   const handleManualClose = async () => {
