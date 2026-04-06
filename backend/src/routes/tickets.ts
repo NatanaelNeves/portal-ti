@@ -629,13 +629,15 @@ ticketsRouter.post('/', validate(createTicketSchema), async (req: Request, res: 
       const staffEmails = staffUsers.rows.map((u: any) => u.email);
       
       if (staffEmails.length > 0) {
-        await EmailService.notifyNewTicket(
+        void EmailService.notifyNewTicket(
           ticket.rows[0].id,
           title,
           publicUser.rows[0].name,
           priority || 'medium',
           staffEmails
-        );
+        ).catch((emailError) => {
+          console.error('Error sending notification email:', emailError);
+        });
       }
     } catch (emailError) {
       console.error('Error sending notification email:', emailError);
@@ -894,14 +896,16 @@ ticketsRouter.post('/:id/messages', validate(addMessageSchema), async (req: Requ
           }
 
           if (recipientEmail) {
-            await EmailService.notifyNewMessage(
+            void EmailService.notifyNewMessage(
               id,
               ticket.rows[0].title,
               recipientEmail,
               recipientName,
               authorName,
               message
-            );
+            ).catch((emailError) => {
+              console.error('Error sending notification email:', emailError);
+            });
           }
         }
       } catch (emailError) {
@@ -1027,7 +1031,9 @@ ticketsRouter.post('/:id/confirm-resolution', validate(confirmResolutionSchema),
       [id, publicUser.rows[0].id, ticket.status, JSON.stringify({ reason, reopen_reason: reason })],
     ).catch(() => undefined);
 
-    await notifyResponsibleTeamForReopenedTicket(reopenedResult.rows[0]);
+    void notifyResponsibleTeamForReopenedTicket(reopenedResult.rows[0]).catch((emailError) => {
+      console.error('Error notifying team about reopened ticket:', emailError);
+    });
 
     emitTicketUpdatedEvent({
       ticketId: id,
@@ -1189,14 +1195,16 @@ ticketsRouter.post('/:id/manual-close', authenticate, async (req: Request, res: 
       );
 
       if (publicUser.rows.length > 0) {
-        await EmailService.notifyStatusUpdate(
+        void EmailService.notifyStatusUpdate(
           ticket.id,
           ticket.title,
           publicUser.rows[0].email,
           publicUser.rows[0].name,
           ticket.status,
           'closed',
-        );
+        ).catch((emailError) => {
+          console.error('Error sending notification email:', emailError);
+        });
       }
     }
 
@@ -1458,13 +1466,15 @@ ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (r
             requesterName = publicUser.rows[0]?.name || 'Usuário';
           }
 
-          await EmailService.notifyTicketAssigned(
+          void EmailService.notifyTicketAssigned(
             ticket.id,
             ticket.title,
             requesterName,
             assignedUser.rows[0].email,
             assignedUser.rows[0].name
-          );
+          ).catch((emailError) => {
+            console.error('Error sending notification email:', emailError);
+          });
         }
       }
 
@@ -1476,14 +1486,16 @@ ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (r
         );
 
         if (publicUser.rows.length > 0) {
-          await EmailService.notifyStatusUpdate(
+          void EmailService.notifyStatusUpdate(
             ticket.id,
             ticket.title,
             publicUser.rows[0].email,
             publicUser.rows[0].name,
             oldStatus || 'open',
             updatedStatus
-          );
+          ).catch((emailError) => {
+            console.error('Error sending notification email:', emailError);
+          });
         }
       }
     } catch (emailError) {
