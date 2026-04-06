@@ -2002,8 +2002,10 @@ inventoryRouter.post('/equipment/:id/photo', uploadEquipmentPhoto, async (req: R
       return res.status(404).json({ error: 'Equipment not found' });
     }
     
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+
     // Gerar URL pública
-    const photoUrl = getFileUrl(req.file.filename, 'photo');
+    const photoUrl = getFileUrl(req.file.filename, 'photo', baseUrl);
     
     // Salvar referência no banco (assumindo que temos campo photos como array JSON)
     // Primeiro, buscar fotos existentes
@@ -2093,6 +2095,8 @@ inventoryRouter.delete('/equipment/:id/photo', async (req: Request, res: Respons
       return res.status(404).json({ error: 'Equipment not found' });
     }
     
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+
     let photos: string[] = [];
     if (result.rows[0].photos) {
       photos = Array.isArray(result.rows[0].photos)
@@ -2101,7 +2105,7 @@ inventoryRouter.delete('/equipment/:id/photo', async (req: Request, res: Respons
     }
     
     // Remover a foto do array
-    const photoUrl = getFileUrl(filename, 'photo');
+    const photoUrl = getFileUrl(filename, 'photo', baseUrl);
     photos = photos.filter(p => p !== photoUrl);
     
     // Atualizar no banco
@@ -2146,7 +2150,8 @@ inventoryRouter.post('/equipment/:id/document', uploadDocument, async (req: Requ
       return res.status(404).json({ error: 'Equipment not found' });
     }
     
-    const documentUrl = getFileUrl(req.file.filename, 'document');
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const documentUrl = getFileUrl(req.file.filename, 'document', baseUrl);
     
     // Salvar referência no banco
     const result = await database.query(

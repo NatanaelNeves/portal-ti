@@ -364,6 +364,7 @@ export async function initializeDatabase(): Promise<void> {
         warranty_expiration DATE,
         invoice_file VARCHAR(500),
         photos TEXT[],
+        documents TEXT,
         qr_code VARCHAR(255),
         
         notes TEXT,
@@ -801,6 +802,11 @@ export async function initializeDatabase(): Promise<void> {
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
                        WHERE table_name='inventory_equipment' AND column_name='photos') THEN
           ALTER TABLE inventory_equipment ADD COLUMN photos TEXT[];
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                       WHERE table_name='inventory_equipment' AND column_name='documents') THEN
+          ALTER TABLE inventory_equipment ADD COLUMN documents TEXT;
         END IF;
         
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns 

@@ -1,4 +1,5 @@
 import multer from 'multer';
+import type { Request } from 'express';
 import path from 'path';
 import fs from 'fs';
 
@@ -106,10 +107,40 @@ export const deleteFile = (filePath: string): boolean => {
 };
 
 // Helper para obter URL pública do arquivo
-export const getFileUrl = (filename: string, type: 'photo' | 'document' | 'term'): string => {
-  const baseUrl = process.env.API_URL || 'http://localhost:3001';
+const normalizeBaseUrl = (value: string): string => value.replace(/\/+$/, '');
+
+const getRequestBaseUrl = (req?: Request): string => {
+  const configuredBaseUrl = process.env.API_URL || process.env.BACKEND_URL;
+  if (configuredBaseUrl) {
+    return normalizeBaseUrl(configuredBaseUrl);
+  }
+
+  if (req) {
+    const forwardedProto = Array.isArray(req.headers['x-forwarded-proto'])
+      ? req.headers['x-forwarded-proto'][0]
+      : req.headers['x-forwarded-proto'];
+    const forwardedHost = Array.isArray(req.headers['x-forwarded-host'])
+      ? req.headers['x-forwarded-host'][0]
+      : req.headers['x-forwarded-host'];
+    const protocol = (forwardedProto || req.protocol || 'http').split(',')[0].trim();
+    const host = (forwardedHost || req.get('host') || '').split(',')[0].trim();
+
+    if (host) {
+      return `${protocol}://${host}`;
+    }
+  }
+
+  return 'http://localhost:3001';
+};
+
+export const getFileUrl = (
+  filename: string,
+  type: 'photo' | 'document' | 'term',
+  baseUrl?: string
+): string => {
+  const resolvedBaseUrl = normalizeBaseUrl(baseUrl || getRequestBaseUrl());
   const typePath = type === 'photo' ? 'equipment-photos' : type === 'document' ? 'documents' : 'terms';
-  return `${baseUrl}/uploads/${typePath}/${filename}`;
+  return `${resolvedBaseUrl}/uploads/${typePath}/${filename}`;
 };
 
 export default upload;
