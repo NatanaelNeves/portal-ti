@@ -2,6 +2,36 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const parseBooleanEnv = (value?: string): boolean => {
+  if (!value) return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on';
+};
+
+const parseFromAddress = (rawFrom?: string): { fromEmail: string; fromName: string } => {
+  const fallback = {
+    fromEmail: process.env.EMAIL_FROM || 'noreply@pequenonazareno.org',
+    fromName: process.env.EMAIL_FROM_NAME || 'Portal TI - O Pequeno Nazareno',
+  };
+
+  if (!rawFrom) return fallback;
+
+  const match = rawFrom.match(/^(.*)<\s*([^>]+)\s*>\s*$/);
+  if (!match) {
+    return {
+      fromEmail: rawFrom.trim(),
+      fromName: fallback.fromName,
+    };
+  }
+
+  return {
+    fromName: match[1].trim() || fallback.fromName,
+    fromEmail: match[2].trim() || fallback.fromEmail,
+  };
+};
+
+const smtpFrom = parseFromAddress(process.env.SMTP_FROM);
+
 // Validate critical env vars in production
 const isProduction = (process.env.NODE_ENV || 'development') === 'production';
 if (isProduction) {
@@ -39,14 +69,14 @@ export const config = {
       : ['http://localhost:3000', 'http://localhost:5173'],
   },
   email: {
-    enabled: process.env.EMAIL_ENABLED === 'true',
-    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.EMAIL_PORT || '587', 10),
-    secure: process.env.EMAIL_SECURE === 'true',
-    user: process.env.EMAIL_USER || '',
-    password: process.env.EMAIL_PASSWORD || '',
-    fromEmail: process.env.EMAIL_FROM || 'noreply@pequenonazareno.org',
-    fromName: process.env.EMAIL_FROM_NAME || 'Portal TI - O Pequeno Nazareno',
+    enabled: parseBooleanEnv(process.env.EMAIL_ENABLED) || parseBooleanEnv(process.env.SMTP_ENABLED),
+    host: process.env.EMAIL_HOST || process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.EMAIL_PORT || process.env.SMTP_PORT || '587', 10),
+    secure: parseBooleanEnv(process.env.EMAIL_SECURE) || parseBooleanEnv(process.env.SMTP_SECURE),
+    user: process.env.EMAIL_USER || process.env.SMTP_USER || '',
+    password: process.env.EMAIL_PASSWORD || process.env.SMTP_PASSWORD || '',
+    fromEmail: process.env.EMAIL_FROM || smtpFrom.fromEmail,
+    fromName: process.env.EMAIL_FROM_NAME || smtpFrom.fromName,
   },
   frontend: {
     url: process.env.FRONTEND_URL || 'http://localhost:5173',

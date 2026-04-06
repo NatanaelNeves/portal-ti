@@ -715,7 +715,7 @@ inventoryRouter.get('/terms/:termId/delivery-pdf', async (req: Request, res: Res
       deliveredBy: {
         name: term.issued_by_name
       },
-      location: `Maracanaú/CE`
+      location: `Fortaleza/CE`
     };
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -1044,7 +1044,7 @@ inventoryRouter.get('/terms/:termId/return-pdf', async (req: Request, res: Respo
       receivedBy: {
         name: term.received_by || 'N/A'
       },
-      location: `Maracanaú/CE`
+      location: `Fortaleza/CE`
     };
 
     res.setHeader('Content-Type', 'application/pdf');
