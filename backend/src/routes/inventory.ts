@@ -2213,29 +2213,69 @@ inventoryRouter.get('/equipment/:id/documents', async (req: Request, res: Respon
   }
 });
 
-// Upload de documento
-inventoryRouter.post('/equipment/:id/document', uploadDocument, async (req: Request, res: Response) => {
+// Upload de documento (com tratamento de erros do multer)
+inventoryRouter.post('/equipment/:id/document', (req: Request, res: Response, next) => {
+  uploadDocument(req, res, (err) => {
+    if (err) {
+      console.error('❌ Multer error during upload:', err.message);
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ error: 'Arquivo muito grande. Máximo 10MB.' });
+      }
+      return res.status(400).json({ error: `Erro no upload: ${err.message}` });
+    }
+    next();
+  });
+}, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { document_type, description } = req.body;
 
+    console.log(`📤 Upload document request for equipment ${id}`);
+    console.log('  - File:', req.file ? req.file.filename : 'NO FILE');
+    console.log('  - document_type:', document_type);
+    console.log('  - description:', description);
+
     if (!req.file) {
+      console.error('❌ No file in request');
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    // Verificar se equipamento existe
+    // Verificar se equipamento existe E tem coluna documents
     const equipmentCheck = await database.query(
-      'SELECT id FROM inventory_equipment WHERE id = $1',
+      `SELECT id, 
+              CASE 
+                WHEN EXISTS (
+                  SELECT 1 FROM information_schema.columns 
+                  WHERE table_name='inventory_equipment' AND column_name='documents'
+                ) THEN true 
+                ELSE false 
+              END as has_documents_column
+       FROM inventory_equipment 
+       WHERE id = $1`,
       [id]
     );
 
     if (equipmentCheck.rows.length === 0) {
-      deleteFile(req.file.path);
+      console.error('❌ Equipment not found:', id);
+      if (req.file?.path) {
+        deleteFile(req.file.path);
+      }
       return res.status(404).json({ error: 'Equipment not found' });
+    }
+
+    if (!equipmentCheck.rows[0].has_documents_column) {
+      console.error('❌ Documents column does not exist in inventory_equipment table');
+      if (req.file?.path) {
+        deleteFile(req.file.path);
+      }
+      return res.status(500).json({ 
+        error: 'Documents column not found. Please run database migration.' 
+      });
     }
 
     // Armazenar caminho relativo ao invés de URL absoluta
     const relativeUrl = `/uploads/documents/${req.file.filename}`;
+    console.log('  - Relative URL:', relativeUrl);
 
     // Salvar referência no banco
     const result = await database.query(
@@ -2244,10 +2284,29 @@ inventoryRouter.post('/equipment/:id/document', uploadDocument, async (req: Requ
     );
 
     let documents: any[] = [];
-    if (result.rows[0]?.documents) {
-      documents = Array.isArray(result.rows[0].documents)
-        ? result.rows[0].documents
-        : JSON.parse(result.rows[0].documents);
+    const rawDocs = result.rows[0]?.documents;
+    
+    if (rawDocs && rawDocs !== '' && rawDocs !== 'null') {
+      try {
+        // Se já é um array (PostgreSQL array), converter diretamente
+        if (Array.isArray(rawDocs)) {
+          documents = rawDocs;
+        } else {
+          // Se é string (TEXT column), fazer parse do JSON
+          documents = JSON.parse(rawDocs);
+        }
+        
+        if (!Array.isArray(documents)) {
+          console.warn('  - Documents was not an array, resetting');
+          documents = [];
+        }
+      } catch (parseError) {
+        console.warn('  - Error parsing documents JSON, resetting:', parseError.message);
+        console.warn('  - Raw value:', rawDocs);
+        documents = [];
+      }
+    } else {
+      console.log('  - No existing documents, starting fresh');
     }
 
     documents.push({
@@ -2260,10 +2319,14 @@ inventoryRouter.post('/equipment/:id/document', uploadDocument, async (req: Requ
       mimetype: req.file.mimetype
     });
 
+    console.log('  - Saving', documents.length, 'documents');
+
     await database.query(
       'UPDATE inventory_equipment SET documents = $1 WHERE id = $2',
       [JSON.stringify(documents), id]
     );
+
+    console.log('✅ Document uploaded successfully');
 
     res.json({
       success: true,
@@ -2273,11 +2336,15 @@ inventoryRouter.post('/equipment/:id/document', uploadDocument, async (req: Requ
     });
 
   } catch (error: any) {
-    if (req.file) {
+    console.error('❌ Error uploading document:', error.message);
+    console.error('Stack:', error.stack);
+    if (req.file?.path) {
       deleteFile(req.file.path);
     }
-    console.error('Error uploading document:', error);
-    res.status(500).json({ error: 'Failed to upload document' });
+    res.status(500).json({ 
+      error: 'Failed to upload document',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
