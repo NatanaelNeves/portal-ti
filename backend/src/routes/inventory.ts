@@ -2258,18 +2258,28 @@ inventoryRouter.post('/equipment/:id/document', (req: Request, res: Response, ne
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    // Verificar se equipamento existe E tem coluna documents
+    // GARANTIR que a coluna documents existe (criar se não existir)
+    try {
+      await database.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name='inventory_equipment' AND column_name='documents'
+          ) THEN
+            ALTER TABLE inventory_equipment ADD COLUMN documents TEXT;
+            RAISE NOTICE 'Added documents column to inventory_equipment';
+          END IF;
+        END $$;
+      `);
+      console.log('  ✓ Verified documents column exists');
+    } catch (columnError) {
+      console.error('⚠️ Warning: Could not verify/create documents column:', columnError);
+    }
+
+    // Verificar se equipamento existe
     const equipmentCheck = await database.query(
-      `SELECT id, 
-              CASE 
-                WHEN EXISTS (
-                  SELECT 1 FROM information_schema.columns 
-                  WHERE table_name='inventory_equipment' AND column_name='documents'
-                ) THEN true 
-                ELSE false 
-              END as has_documents_column
-       FROM inventory_equipment 
-       WHERE id = $1`,
+      'SELECT id FROM inventory_equipment WHERE id = $1',
       [id]
     );
 
@@ -2279,18 +2289,6 @@ inventoryRouter.post('/equipment/:id/document', (req: Request, res: Response, ne
         deleteFile(req.file.path);
       }
       return res.status(404).json({ error: 'Equipment not found' });
-    }
-
-    if (!equipmentCheck.rows[0].has_documents_column) {
-      console.error('❌ Documents column does not exist in inventory_equipment table');
-      if (req.file?.path) {
-        deleteFile(req.file.path);
-      }
-      return res.status(500).json({ 
-        error: 'Inventory schema is missing the documents column required for uploads.',
-        code: 'DOCUMENTS_COLUMN_MISSING',
-        details: 'Run backend/migrations/002_add_photos_documents_fields.sql and redeploy the backend.'
-      });
     }
 
     // Armazenar caminho relativo ao invés de URL absoluta
