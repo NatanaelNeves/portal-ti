@@ -109,33 +109,62 @@ documentsRouter.get('/:id/download', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
+    console.log(`📥 Download request for document ${id}`);
+
     const result = await database.query(
       'SELECT file_url, title FROM documents WHERE id = $1',
       [id]
     );
 
     if (result.rows.length === 0) {
+      console.error('❌ Document not found:', id);
       return res.status(404).json({ error: 'Documento não encontrado' });
     }
 
     const doc = result.rows[0];
 
     if (!doc.file_url) {
+      console.error('❌ No file_url for document:', id);
       return res.status(404).json({ error: 'Arquivo não disponível para este documento' });
     }
 
+    console.log('  - File URL:', doc.file_url);
+    console.log('  - Title:', doc.title);
+
     // Construir caminho absoluto do arquivo
     const filePath = path.join(__dirname, '../..', doc.file_url);
+    console.log('  - Full path:', filePath);
 
     if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'Arquivo não encontrado no servidor' });
+      console.error('❌ File not found on disk:', filePath);
+      return res.status(404).json({ 
+        error: 'Arquivo não encontrado no servidor',
+        debug: { file_url: doc.file_url, fullPath: filePath }
+      });
     }
 
+    console.log('✅ Serving file:', filePath);
+
     // Enviar arquivo com headers apropriados
-    res.download(filePath, `${doc.title}${path.extname(doc.file_url)}`);
-  } catch (error) {
-    console.error('Error downloading document:', error);
-    res.status(500).json({ error: 'Erro ao baixar documento' });
+    const ext = path.extname(doc.file_url);
+    const filename = `${doc.title}${ext}`;
+    
+    res.download(filePath, filename, (err) => {
+      if (err) {
+        console.error('❌ Error sending file:', err.message);
+        // Fallback: try to serve file directly
+        res.sendFile(filePath, (sendErr) => {
+          if (sendErr) {
+            console.error('❌ Fallback also failed:', sendErr.message);
+            res.status(500).json({ error: 'Erro ao enviar arquivo' });
+          }
+        });
+      }
+    });
+  } catch (error: any) {
+    console.error('❌ Error downloading document:', error.message);
+    console.error('Stack:', error.stack);
+    res.status(500).json({ error: 'Erro ao baixar documento', details: error.message });
   }
 });
 

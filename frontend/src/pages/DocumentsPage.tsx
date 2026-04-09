@@ -181,33 +181,39 @@ export default function DocumentsPage() {
   };
 
   const handleDownload = async (doc: Document) => {
-    if (doc.file_url) {
-      try {
-        // Usar o endpoint de download da API para melhor confiabilidade
-        const response = await fetch(`${BACKEND_URL}/api/documents/${doc.id}/download`);
-        if (!response.ok) {
-          throw new Error('Falha ao baixar documento');
-        }
-        
-        // Obter blob e criar link de download
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        
-        // Extrair nome do arquivo da URL ou usar título
-        const filename = doc.file_url.split('/').pop() || `${doc.title}.pdf`;
-        link.download = filename;
-        
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-      } catch (error) {
-        console.error('Erro ao baixar documento:', error);
-        // Fallback: abrir URL diretamente
-        window.open(`${BACKEND_URL}${doc.file_url}`, '_blank');
+    if (!doc.file_url) return;
+
+    try {
+      console.log('📥 Downloading document:', doc.id, doc.title);
+      
+      // Usar o endpoint de download da API para melhor confiabilidade
+      const response = await fetch(`${BACKEND_URL}/api/documents/${doc.id}/download`);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('❌ Download failed:', errorData);
+        throw new Error(errorData.error || `HTTP ${response.status}: Falha ao baixar documento`);
       }
+
+      // Obter blob e criar link de download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+
+      // Extrair nome do arquivo da URL ou usar título
+      const ext = doc.file_url.split('.').pop() || 'pdf';
+      link.download = `${doc.title}.${ext}`;
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      console.log('✅ Download successful');
+    } catch (error: any) {
+      console.error('❌ Erro ao baixar documento:', error.message);
+      alert(`Erro ao baixar documento: ${error.message}\n\nTente novamente ou contate o suporte de TI.`);
     }
   };
 
@@ -445,11 +451,16 @@ export default function DocumentsPage() {
                 <div className="doc-actions">
                   {doc.file_url && (
                     <button
-                      className="btn-icon btn-download"
+                      className="btn-action btn-download-action"
                       onClick={() => handleDownload(doc)}
-                      title="Baixar"
+                      title="Baixar documento"
                     >
-                      ⬇️ Baixar
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                      </svg>
+                      Baixar
                     </button>
                   )}
                   <button

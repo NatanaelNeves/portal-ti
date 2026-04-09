@@ -241,53 +241,73 @@
   border-top: 1px solid #f3f4f6;
 }
 
-.btn-icon {
+.btn-icon,
+.btn-action {
   border: none;
-  padding: 0.5rem 0.85rem;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  font-weight: 500;
+  padding: 0.625rem 0.875rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  justify-content: center;
+  gap: 0.375rem;
 }
 
-.btn-download {
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+.btn-download,
+.btn-download-action {
+  background: linear-gradient(135deg, #10b981, #059669);
   color: white;
-  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25);
 }
-.btn-download:hover {
-  background: linear-gradient(135deg, #1d4ed8, #1e40af);
-  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.35);
+.btn-download:hover,
+.btn-download-action:hover {
+  background: linear-gradient(135deg, #059669, #047857);
+  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.35);
   transform: translateY(-1px);
 }
-.btn-download:active {
+.btn-download:active,
+.btn-download-action:active {
   transform: translateY(0);
-  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2);
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.2);
 }
 
-.btn-edit {
+.btn-edit,
+.btn-edit-action {
   background: #ecfdf5;
   color: #047857;
-  font-weight: 500;
+  font-weight: 600;
 }
-.btn-edit:hover {
+.btn-edit:hover,
+.btn-edit-action:hover {
   background: #d1fae5;
   transform: translateY(-1px);
 }
 
-.btn-delete {
-  background: #fef2f2;
-  color: #dc2626;
+.btn-delete,
+.btn-delete-action {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
   margin-left: auto;
-  font-weight: 500;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.25);
 }
-.btn-delete:hover {
-  background: #fee2e2;
+.btn-delete:hover,
+.btn-delete-action:hover {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  box-shadow: 0 4px 10px rgba(239, 68, 68, 0.35);
   transform: translateY(-1px);
+}
+.btn-delete:active,
+.btn-delete-action:active {
+  transform: translateY(0);
+}
+
+.btn-icon svg,
+.btn-action svg {
+  flex-shrink: 0;
 }
 
 /* ── Empty State ─────────────────────────── */
