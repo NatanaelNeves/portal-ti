@@ -2149,6 +2149,44 @@ inventoryRouter.delete('/equipment/:id/photo', async (req: Request, res: Respons
   }
 });
 
+// PUT - Atualizar lista de documentos (excluir um documento)
+inventoryRouter.put('/equipment/:id/documents', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { documents } = req.body;
+
+    console.log(`🗑️ Update documents request for equipment ${id}`);
+    console.log('  - Documents count:', documents?.length || 0);
+
+    // Verificar se equipamento existe
+    const equipmentCheck = await database.query(
+      'SELECT id FROM inventory_equipment WHERE id = $1',
+      [id]
+    );
+
+    if (equipmentCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Equipment not found' });
+    }
+
+    // Atualizar lista de documentos
+    await database.query(
+      'UPDATE inventory_equipment SET documents = $1 WHERE id = $2',
+      [JSON.stringify(documents || []), id]
+    );
+
+    console.log('✅ Documents updated successfully');
+
+    res.json({
+      success: true,
+      documents: documents || [],
+      message: 'Documents updated successfully'
+    });
+  } catch (error: any) {
+    console.error('❌ Error updating documents:', error.message);
+    res.status(500).json({ error: 'Failed to update documents' });
+  }
+});
+
 // GET - Download documento de equipamento
 inventoryRouter.get('/equipment/:equipmentId/document/:filename', async (req: Request, res: Response) => {
   try {
