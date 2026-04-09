@@ -1992,9 +1992,18 @@ inventoryRouter.post('/equipment/:id/photo', uploadEquipmentPhoto, async (req: R
       return res.status(400).json({ error: 'No file uploaded' });
     }
     
-    // Verificar se equipamento existe
+    // Verificar se equipamento existe e se coluna photos está disponível
     const equipmentCheck = await database.query(
-      'SELECT id FROM inventory_equipment WHERE id = $1',
+      `SELECT id,
+              CASE
+                WHEN EXISTS (
+                  SELECT 1 FROM information_schema.columns
+                  WHERE table_name = 'inventory_equipment' AND column_name = 'photos'
+                ) THEN true
+                ELSE false
+              END AS has_photos_column
+       FROM inventory_equipment
+       WHERE id = $1`,
       [id]
     );
     
@@ -2002,6 +2011,15 @@ inventoryRouter.post('/equipment/:id/photo', uploadEquipmentPhoto, async (req: R
       // Deletar arquivo se equipamento não existe
       deleteFile(req.file.path);
       return res.status(404).json({ error: 'Equipment not found' });
+    }
+
+    if (!equipmentCheck.rows[0].has_photos_column) {
+      deleteFile(req.file.path);
+      return res.status(500).json({
+        error: 'Inventory schema is missing the photos column required for uploads.',
+        code: 'PHOTOS_COLUMN_MISSING',
+        details: 'Run database migrations and redeploy the backend.'
+      });
     }
     
     const baseUrl = `${req.protocol}://${req.get('host')}`;

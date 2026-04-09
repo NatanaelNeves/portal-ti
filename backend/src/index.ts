@@ -5,6 +5,7 @@ import http from 'http';
 import { config } from './config/environment';
 import { database } from './database/connection';
 import { initializeDatabase } from './database/schema';
+import { applyPendingMigrations } from './database/migrationRunner';
 import { generalLimiter, authLimiter } from './middleware/rateLimiter';
 import { initializeWebSocket } from './services/websocketService';
 import { initializeScheduler } from './services/schedulerService';
@@ -153,6 +154,9 @@ async function startServer(): Promise<void> {
         await database.connect();
         console.log('✓ Initializing database schema...');
         await initializeDatabase();
+        console.log('✓ Applying pending migrations...');
+        await applyPendingMigrations();
+        console.log('✓ Migrations checked');
         console.log('✓ Database initialized');
         dbReady = true;
 

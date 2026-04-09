@@ -363,7 +363,7 @@ export async function initializeDatabase(): Promise<void> {
         purchase_value DECIMAL(12, 2),
         warranty_expiration DATE,
         invoice_file VARCHAR(500),
-        photos TEXT[],
+        photos TEXT,
         documents TEXT,
         qr_code VARCHAR(255),
         

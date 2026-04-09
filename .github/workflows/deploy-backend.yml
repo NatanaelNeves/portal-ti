@@ -47,6 +47,7 @@ jobs:
         run: |
           mkdir -p backend-deploy
           cp -r backend/dist         backend-deploy/
+          cp -r backend/migrations    backend-deploy/
           cp backend/package*.json   backend-deploy/
           echo "=== Artifact contents ==="
           find backend-deploy/dist -name "*.js" | wc -l
@@ -104,14 +105,11 @@ jobs:
             return 0
           }
           
-          # Upload all compiled JS files from dist/
+          # Upload all files required by the runtime (compiled JS + migrations)
           cd backend-deploy
-          find dist -name "*.js" -type f | while read FILE; do
+          find . -type f | sed 's#^./##' | while read FILE; do
             upload_file "$FILE" "$FILE"
           done
-          
-          # Upload package.json
-          upload_file "package.json" "package.json"
           
           echo "=== Step 2: Verify new files on server ==="
           curl -s -X POST "${SCM}/api/command" \

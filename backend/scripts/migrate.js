@@ -12,6 +12,8 @@ const path = require('path');
 const { Pool } = require('pg');
 require('dotenv').config({ path: path.join(process.cwd(), '.env') });
 
+const MIGRATION_TABLE = 'schema_migrations';
+
 // Initialize database connection
 async function initDatabase() {
   try {
@@ -38,111 +40,60 @@ async function initDatabase() {
 }
 
 // Read migration file
-function readMigration(filename) {
-  // Migration está em backend/migrations/
-  const migrationPath = path.join(process.cwd(), 'migrations', filename);
-  
-  if (!fs.existsSync(migrationPath)) {
-    throw new Error(`Arquivo de migration não encontrado: ${migrationPath}\n   Procurando em: ${migrationPath}`);
-  }
-  
-  return fs.readFileSync(migrationPath, 'utf-8');
+function getMigrationDirectories() {
+  const candidates = [
+    process.env.MIGRATIONS_DIR,
+    path.join(process.cwd(), 'migrations'),
+    path.join(process.cwd(), 'backend', 'migrations')
+  ].filter(Boolean);
+
+  return Array.from(new Set(candidates)).filter((dir) => fs.existsSync(dir));
 }
 
-// Execute migration
-async function executeMigration(pool, sql) {
+function resolveMigrationsDir() {
+  const dirs = getMigrationDirectories();
+  return dirs.length > 0 ? dirs[0] : null;
+}
+
+async function ensureMigrationTable(pool) {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ${MIGRATION_TABLE} (
+      filename VARCHAR(255) PRIMARY KEY,
+      applied_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `);
+}
+
+async function getAppliedMigrations(pool) {
+  const result = await pool.query(`SELECT filename FROM ${MIGRATION_TABLE}`);
+  return new Set(result.rows.map((row) => row.filename));
+}
+
+function listMigrationFiles(migrationsDir) {
+  return fs.readdirSync(migrationsDir)
+    .filter((file) => file.endsWith('.sql'))
+    .sort((left, right) => left.localeCompare(right, undefined, { numeric: true }));
+}
+
+async function applyMigration(pool, migrationsDir, filename) {
+  const migrationPath = path.join(migrationsDir, filename);
+  const sql = fs.readFileSync(migrationPath, 'utf-8').trim();
+
+  if (!sql) {
+    console.log(`⚠️  Migration vazia ignorada: ${filename}`);
+    return;
+  }
+
+  console.log(`📦 Aplicando migration: ${filename}`);
+  await pool.query('BEGIN');
   try {
-    console.log('⏳ Executando migration...\n');
-    
-    const result = await pool.query(sql);
-    
-    console.log('✅ Migration executada com sucesso!');
-    console.log(`   Comandos executados: ${sql.split(';').filter(s => s.trim()).length}`);
-    
-    return result;
+    await pool.query(sql);
+    await pool.query(`INSERT INTO ${MIGRATION_TABLE} (filename) VALUES ($1)`, [filename]);
+    await pool.query('COMMIT');
+    console.log(`✅ Migration aplicada: ${filename}`);
   } catch (error) {
-    if (error.message.includes('already exists')) {
-      console.log('⚠️  Alguns campos já existem (isso é normal)');
-      console.log('   Continuando...\n');
-      return;
-    }
-    
+    await pool.query('ROLLBACK');
     throw error;
-  }
-}
-
-// Verify migration
-async function verifyMigration(pool) {
-  try {
-    console.log('\n📋 Verificando campos adicionados...\n');
-    
-    const result = await pool.query(`
-      SELECT column_name, data_type 
-      FROM information_schema.columns 
-      WHERE table_name = 'responsibility_terms'
-      ORDER BY ordinal_position
-    `);
-    
-    if (result.rows.length === 0) {
-      console.log('⚠️  Nenhuma coluna encontrada na tabela responsibility_terms');
-      return;
-    }
-    
-    const newFields = [
-      'responsible_name',
-      'responsible_cpf',
-      'responsible_position',
-      'responsible_department',
-      'equipment_details',
-      'accessories',
-      'signature_date',
-      'return_reason',
-      'reason_other',
-      'received_by',
-      'equipment_condition',
-      'checklist',
-      'damage_description',
-      'witness_name'
-    ];
-    
-    const currentFields = result.rows.map(r => r.column_name);
-    const addedFields = newFields.filter(f => currentFields.includes(f));
-    const missingFields = newFields.filter(f => !currentFields.includes(f));
-    
-    console.log(`✅ Campos adicionados: ${addedFields.length}/${newFields.length}`);
-    addedFields.forEach(field => {
-      const fieldInfo = result.rows.find(r => r.column_name === field);
-      console.log(`   ✓ ${field} (${fieldInfo.data_type})`);
-    });
-    
-    if (missingFields.length > 0) {
-      console.log(`\n⚠️  Campos faltando: ${missingFields.length}`);
-      missingFields.forEach(field => console.log(`   ✗ ${field}`));
-    }
-    
-    // Check indexes
-    console.log('\n📊 Verificando índices...\n');
-    const indexResult = await pool.query(`
-      SELECT indexname 
-      FROM pg_indexes 
-      WHERE tablename = 'responsibility_terms'
-      AND indexname LIKE 'idx_%'
-    `);
-    
-    const expectedIndexes = [
-      'idx_responsibility_terms_equipment_id',
-      'idx_responsibility_terms_status',
-      'idx_responsibility_terms_responsible_name'
-    ];
-    
-    const createdIndexes = indexResult.rows.map(r => r.indexname);
-    const addedIndexes = expectedIndexes.filter(idx => createdIndexes.includes(idx));
-    
-    console.log(`✅ Índices criados: ${addedIndexes.length}/${expectedIndexes.length}`);
-    addedIndexes.forEach(idx => console.log(`   ✓ ${idx}`));
-    
-  } catch (error) {
-    console.error('❌ Erro ao verificar migration:', error.message);
   }
 }
 
@@ -159,16 +110,26 @@ async function main() {
     pool = await initDatabase();
     console.log('✅ Conectado ao banco de dados\n');
     
-    // Read migration
-    console.log('📂 Lendo arquivo de migration...');
-    const migration = readMigration('001_add_responsibility_terms_fields.sql');
-    console.log(`✅ Arquivo lido (${migration.length} caracteres)\n`);
-    
-    // Execute migration
-    await executeMigration(pool, migration);
-    
-    // Verify migration
-    await verifyMigration(pool);
+    const migrationsDir = resolveMigrationsDir();
+    if (!migrationsDir) {
+      throw new Error('Diretório de migrations não encontrado.');
+    }
+
+    console.log(`📂 Lendo migrations de: ${migrationsDir}`);
+    await ensureMigrationTable(pool);
+
+    const appliedMigrations = await getAppliedMigrations(pool);
+    const migrationFiles = listMigrationFiles(migrationsDir);
+    const pendingMigrations = migrationFiles.filter((filename) => !appliedMigrations.has(filename));
+
+    if (pendingMigrations.length === 0) {
+      console.log('✅ Nenhuma migration pendente');
+    } else {
+      console.log(`⏳ ${pendingMigrations.length} migration(s) pendente(s) encontradas\n`);
+      for (const filename of pendingMigrations) {
+        await applyMigration(pool, migrationsDir, filename);
+      }
+    }
     
     console.log('\n═══════════════════════════════════════════════════════════');
     console.log('\n🎉 Migration concluída com sucesso!\n');
@@ -190,7 +151,7 @@ async function main() {
     
     console.error('Dicas de resolução:');
     console.error('  • Verifique a conexão com o banco de dados');
-    console.error('  • Confirme que a tabela responsibility_terms existe');
+    console.error('  • Confirme que o diretório migrations existe');
     console.error('  • Verifique as permissões do usuário PostgreSQL');
     console.error('  • Consulte DATABASE_MIGRATION_GUIDE.md para troubleshooting\n');
     
