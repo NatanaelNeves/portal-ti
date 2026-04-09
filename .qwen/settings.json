@@ -4,7 +4,21 @@
       "Bash(npm run *)",
       "Bash(findstr *)",
       "Bash(select-string *)",
+<<<<<<< HEAD
       "Bash(select-object *)"
+=======
+      "Bash(select-object *)",
+      "Bash(npx *)",
+      "Bash(node *)",
+      "Bash(compress-archive *)",
+      "Bash(powershell *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(rm *)",
+      "Bash(git checkout *)",
+      "Bash(del *)"
+>>>>>>> 18e5c17b93cad4df9abb70f5e0a472282a15f79f
     ]
   },
   "$version": 3
