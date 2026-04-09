@@ -2,6 +2,8 @@ import { Router, Request, Response } from 'express';
 import { database } from '../database/connection';
 import { PDFService } from '../services/pdfService';
 import { uploadEquipmentPhoto, uploadDocument, getFileUrl, deleteFile } from '../services/uploadService';
+import path from 'path';
+import fs from 'fs';
 
 const inventoryRouter = Router();
 
@@ -2129,6 +2131,52 @@ inventoryRouter.delete('/equipment/:id/photo', async (req: Request, res: Respons
   }
 });
 
+// GET - Download documento de equipamento
+inventoryRouter.get('/equipment/:equipmentId/document/:filename', async (req: Request, res: Response) => {
+  try {
+    const { equipmentId, filename } = req.params;
+
+    // Verificar se equipamento existe e obter documentos
+    const result = await database.query(
+      'SELECT id, internal_code, documents FROM inventory_equipment WHERE id = $1',
+      [equipmentId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Equipment not found' });
+    }
+
+    const equipment = result.rows[0];
+    let documents: any[] = [];
+
+    if (equipment.documents) {
+      documents = Array.isArray(equipment.documents)
+        ? equipment.documents
+        : JSON.parse(equipment.documents);
+    }
+
+    // Encontrar documento pelo filename
+    const doc = documents.find((d: any) => d.filename === filename);
+
+    if (!doc) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    // Construir caminho absoluto do arquivo (url já é relativa /uploads/documents/...)
+    const filePath = path.join(__dirname, '../..', doc.url);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'File not found on server' });
+    }
+
+    // Enviar arquivo com headers apropriados
+    res.download(filePath, doc.description || filename);
+  } catch (error: any) {
+    console.error('Error downloading equipment document:', error);
+    res.status(500).json({ error: 'Failed to download document' });
+  }
+});
+
 // GET - Listar documentos de um equipamento
 inventoryRouter.get('/equipment/:id/documents', async (req: Request, res: Response) => {
   try {
@@ -2186,8 +2234,8 @@ inventoryRouter.post('/equipment/:id/document', uploadDocument, async (req: Requ
       return res.status(404).json({ error: 'Equipment not found' });
     }
 
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const documentUrl = getFileUrl(req.file.filename, 'document', baseUrl);
+    // Armazenar caminho relativo ao invés de URL absoluta
+    const relativeUrl = `/uploads/documents/${req.file.filename}`;
 
     // Salvar referência no banco
     const result = await database.query(
@@ -2204,7 +2252,7 @@ inventoryRouter.post('/equipment/:id/document', uploadDocument, async (req: Requ
 
     documents.push({
       filename: req.file.filename,
-      url: documentUrl,
+      url: relativeUrl,
       type: document_type || 'other',
       description: description || '',
       uploaded_at: new Date().toISOString(),
@@ -2220,7 +2268,7 @@ inventoryRouter.post('/equipment/:id/document', uploadDocument, async (req: Requ
     res.json({
       success: true,
       filename: req.file.filename,
-      url: documentUrl,
+      url: relativeUrl,
       message: 'Document uploaded successfully'
     });
 

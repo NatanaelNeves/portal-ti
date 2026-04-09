@@ -138,6 +138,30 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
     });
   };
 
+  const handleDownload = async (doc: Document) => {
+    try {
+      // Usar o endpoint de download da API para melhor confiabilidade
+      const response = await api.get(
+        `/inventory/equipment/${equipmentId}/document/${doc.filename}`,
+        { responseType: 'blob' }
+      );
+
+      // Criar link de download
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = doc.filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Erro ao baixar documento:', error);
+      // Fallback: abrir URL diretamente
+      window.open(doc.url, '_blank');
+    }
+  };
+
   const getTypeLabel = (type: string): string => {
     const typeObj = documentTypes.find(t => t.value === type);
     return typeObj ? typeObj.label : '📄 Outro';
@@ -226,7 +250,8 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
               <div className="document-actions">
                 <button
                   className="btn-download"
-                  onClick={() => window.open(doc.url, '_blank')}
+                  onClick={() => handleDownload(doc)}
+                  title="Baixar documento"
                 >
                   ⬇️ Baixar
                 </button>
