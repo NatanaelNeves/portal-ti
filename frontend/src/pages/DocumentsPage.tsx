@@ -180,9 +180,34 @@ export default function DocumentsPage() {
     }
   };
 
-  const handleDownload = (doc: Document) => {
+  const handleDownload = async (doc: Document) => {
     if (doc.file_url) {
-      window.open(`${BACKEND_URL}${doc.file_url}`, '_blank');
+      try {
+        // Usar o endpoint de download da API para melhor confiabilidade
+        const response = await fetch(`${BACKEND_URL}/api/documents/${doc.id}/download`);
+        if (!response.ok) {
+          throw new Error('Falha ao baixar documento');
+        }
+        
+        // Obter blob e criar link de download
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        
+        // Extrair nome do arquivo da URL ou usar título
+        const filename = doc.file_url.split('/').pop() || `${doc.title}.pdf`;
+        link.download = filename;
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error('Erro ao baixar documento:', error);
+        // Fallback: abrir URL diretamente
+        window.open(`${BACKEND_URL}${doc.file_url}`, '_blank');
+      }
     }
   };
 

@@ -3,6 +3,8 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config/environment';
 import { database } from '../database/connection';
 import { upload, deleteFile } from '../services/uploadService';
+import path from 'path';
+import fs from 'fs';
 
 const documentsRouter = Router();
 
@@ -98,6 +100,42 @@ documentsRouter.get('/stats', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error getting document stats:', error);
     res.status(500).json({ error: 'Erro ao buscar estatísticas' });
+  }
+});
+
+// ── GET /api/documents/:id/download ──────────────────────────
+// Download document file
+documentsRouter.get('/:id/download', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const result = await database.query(
+      'SELECT file_url, title FROM documents WHERE id = $1',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Documento não encontrado' });
+    }
+
+    const doc = result.rows[0];
+
+    if (!doc.file_url) {
+      return res.status(404).json({ error: 'Arquivo não disponível para este documento' });
+    }
+
+    // Construir caminho absoluto do arquivo
+    const filePath = path.join(__dirname, '../..', doc.file_url);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Arquivo não encontrado no servidor' });
+    }
+
+    // Enviar arquivo com headers apropriados
+    res.download(filePath, `${doc.title}${path.extname(doc.file_url)}`);
+  } catch (error) {
+    console.error('Error downloading document:', error);
+    res.status(500).json({ error: 'Erro ao baixar documento' });
   }
 });
 

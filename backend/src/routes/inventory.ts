@@ -2129,43 +2129,79 @@ inventoryRouter.delete('/equipment/:id/photo', async (req: Request, res: Respons
   }
 });
 
+// GET - Listar documentos de um equipamento
+inventoryRouter.get('/equipment/:id/documents', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Verificar se equipamento existe
+    const equipmentCheck = await database.query(
+      'SELECT id, internal_code, documents FROM inventory_equipment WHERE id = $1',
+      [id]
+    );
+
+    if (equipmentCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Equipment not found' });
+    }
+
+    const equipment = equipmentCheck.rows[0];
+    let documents: any[] = [];
+
+    if (equipment.documents) {
+      documents = Array.isArray(equipment.documents)
+        ? equipment.documents
+        : JSON.parse(equipment.documents);
+    }
+
+    res.json({
+      equipment_id: id,
+      internal_code: equipment.internal_code,
+      documents,
+      total: documents.length
+    });
+  } catch (error: any) {
+    console.error('Error fetching equipment documents:', error);
+    res.status(500).json({ error: 'Failed to fetch equipment documents' });
+  }
+});
+
 // Upload de documento
 inventoryRouter.post('/equipment/:id/document', uploadDocument, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { document_type, description } = req.body;
-    
+
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
-    
+
     // Verificar se equipamento existe
     const equipmentCheck = await database.query(
       'SELECT id FROM inventory_equipment WHERE id = $1',
       [id]
     );
-    
+
     if (equipmentCheck.rows.length === 0) {
       deleteFile(req.file.path);
       return res.status(404).json({ error: 'Equipment not found' });
     }
-    
+
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const documentUrl = getFileUrl(req.file.filename, 'document', baseUrl);
-    
+
     // Salvar referência no banco
     const result = await database.query(
       'SELECT documents FROM inventory_equipment WHERE id = $1',
       [id]
     );
-    
+
     let documents: any[] = [];
     if (result.rows[0]?.documents) {
       documents = Array.isArray(result.rows[0].documents)
         ? result.rows[0].documents
         : JSON.parse(result.rows[0].documents);
     }
-    
+
     documents.push({
       filename: req.file.filename,
       url: documentUrl,
@@ -2175,19 +2211,19 @@ inventoryRouter.post('/equipment/:id/document', uploadDocument, async (req: Requ
       size: req.file.size,
       mimetype: req.file.mimetype
     });
-    
+
     await database.query(
       'UPDATE inventory_equipment SET documents = $1 WHERE id = $2',
       [JSON.stringify(documents), id]
     );
-    
+
     res.json({
       success: true,
       filename: req.file.filename,
       url: documentUrl,
       message: 'Document uploaded successfully'
     });
-    
+
   } catch (error: any) {
     if (req.file) {
       deleteFile(req.file.path);

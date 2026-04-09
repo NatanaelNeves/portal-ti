@@ -243,36 +243,51 @@
 
 .btn-icon {
   border: none;
-  padding: 0.4rem 0.75rem;
+  padding: 0.5rem 0.85rem;
   border-radius: 6px;
   font-size: 0.85rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .btn-download {
-  background: #eff6ff;
-  color: #1d4ed8;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: white;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
 }
 .btn-download:hover {
-  background: #dbeafe;
+  background: linear-gradient(135deg, #1d4ed8, #1e40af);
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.35);
+  transform: translateY(-1px);
+}
+.btn-download:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2);
 }
 
 .btn-edit {
   background: #ecfdf5;
   color: #047857;
+  font-weight: 500;
 }
 .btn-edit:hover {
   background: #d1fae5;
+  transform: translateY(-1px);
 }
 
 .btn-delete {
   background: #fef2f2;
   color: #dc2626;
   margin-left: auto;
+  font-weight: 500;
 }
 .btn-delete:hover {
   background: #fee2e2;
+  transform: translateY(-1px);
 }
 
 /* ── Empty State ─────────────────────────── */

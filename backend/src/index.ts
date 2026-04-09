@@ -76,7 +76,16 @@ app.use('/api/', (req, res, next) => {
 });
 
 // Servir arquivos estáticos (uploads)
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+// Configuração com opções otimizadas para produção
+app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
+  maxAge: config.nodeEnv === 'production' ? '1d' : 0,
+  setHeaders: (res, filePath) => {
+    // Forçar download de documentos PDF
+    if (filePath.endsWith('.pdf')) {
+      res.setHeader('Content-Disposition', 'attachment');
+    }
+  }
+}));
 
 // Health check — always responds, independent of DB status
 const BUILD_VERSION = 'v2026.06.14d';
