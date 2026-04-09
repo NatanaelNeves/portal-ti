@@ -1,4 +1,5 @@
 ﻿#!/bin/sh
-echo "Starting Portal TI Backend..."
+# Startup script - installs dependencies then starts the app
 cd /home/site/wwwroot
+npm install --production
 node dist/index.js
