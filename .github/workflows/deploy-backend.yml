@@ -44,101 +44,80 @@ jobs:
           ls dist/index.js && echo "dist/index.js OK" || (echo "dist/index.js MISSING" && exit 1)
 
       - name: Prepare deployment artifact
+        working-directory: ./backend
         run: |
-          mkdir -p backend-deploy
-          cp -r backend/dist         backend-deploy/
-          cp -r backend/migrations    backend-deploy/
-          cp backend/package*.json   backend-deploy/
-          cp backend/startup.sh      backend-deploy/
-          chmod +x backend-deploy/startup.sh
+          mkdir -p ../backend-deploy
+          cp -r dist                    ../backend-deploy/
+          cp -r migrations              ../backend-deploy/
+          cp package*.json              ../backend-deploy/
+          cp startup.sh                 ../backend-deploy/
+          chmod +x                      ../backend-deploy/startup.sh
           echo "=== Artifact contents ==="
-          find backend-deploy -type f | head -20
+          ls -la ../backend-deploy/
           echo "Deployment artifact ready"
 
-      - name: Configure Azure App Settings via Kudu
+      - name: Deploy via Kudu ZipDeploy (installs npm automatically)
         env:
           KUDU_USER: ${{ secrets.AZURE_KUDU_USER }}
           KUDU_PASS: ${{ secrets.AZURE_KUDU_PASS }}
         run: |
-          echo "=== Setting app config ==="
+          set -e
+
+          SCM="https://portal-ti-backend.scm.azurewebsites.net"
+          APP="https://portal-ti-backend.azurewebsites.net"
+
+          echo "=== Step 1: Configure app settings ==="
           curl -s -X POST \
-            "https://portal-ti-backend.scm.azurewebsites.net/api/settings" \
+            "${SCM}/api/settings" \
             --user "${KUDU_USER}:${KUDU_PASS}" \
             -H "Content-Type: application/json" \
             -d '{
               "CORS_ORIGIN":"https://green-ocean-096bd050f.2.azurestaticapps.net",
               "SCM_DO_BUILD_DURING_DEPLOYMENT":"true",
-              "WEBSITE_RUN_FROM_PACKAGE":"0"
-            }' \
-            -w "\nHTTP Status: %{http_code}\n"
+              "WEBSITE_NODE_DEFAULT_VERSION":"~20"
+            }'
 
-      - name: Deploy files via Kudu VFS API
-        env:
-          KUDU_USER: ${{ secrets.AZURE_KUDU_USER }}
-          KUDU_PASS: ${{ secrets.AZURE_KUDU_PASS }}
-        run: |
-          SCM="https://portal-ti-backend.scm.azurewebsites.net"
-          APP="https://portal-ti-backend.azurewebsites.net"
-          WWWROOT="${SCM}/api/vfs/site/wwwroot"
-          
-          echo "=== Step 1: Upload dist/ files via VFS ==="
-          upload_file() {
-            local SRC="$1" DEST="$2"
-            # Ensure parent directory exists (VFS needs trailing / for dirs)
-            local DIR=$(dirname "$DEST")
-            if [ "$DIR" != "." ]; then
-              curl -s -o /dev/null -X PUT "${WWWROOT}/${DIR}/" \
-                --user "${KUDU_USER}:${KUDU_PASS}" \
-                -H "If-Match: *" \
-                --max-time 15 || true
-            fi
-            HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
-              -X PUT "${WWWROOT}/${DEST}" \
-              --user "${KUDU_USER}:${KUDU_PASS}" \
-              -H "If-Match: *" \
-              -H "Content-Type: application/octet-stream" \
-              --data-binary "@${SRC}" \
-              --max-time 60)
-            echo "  ${DEST}: HTTP ${HTTP}"
-            if [ "$HTTP" != "200" ] && [ "$HTTP" != "201" ] && [ "$HTTP" != "204" ]; then
-              echo "  WARNING: Upload failed for ${DEST}"
-              return 1
-            fi
-            return 0
-          }
-          
-          # Upload all files required by the runtime (compiled JS + migrations)
+          echo "=== Step 2: Create zip package ==="
           cd backend-deploy
-          find . -type f | sed 's#^./##' | while read FILE; do
-            upload_file "$FILE" "$FILE"
-          done
-          
-          echo "=== Step 2: Verify new files on server ==="
-          curl -s -X POST "${SCM}/api/command" \
+          zip -r ../deploy.zip . -q
+          cd ..
+
+          echo "=== Step 3: ZipDeploy via Kudu API ==="
+          HTTP=$(curl -s -o /tmp/deploy-result.json -w "%{http_code}" \
+            -X POST "https://portal-ti-backend.scm.azurewebsites.net/api/zipdeploy" \
             --user "${KUDU_USER}:${KUDU_PASS}" \
-            -H "Content-Type: application/json" \
-            -d '{"command":"grep BUILD_VERSION /home/site/wwwroot/dist/index.js | head -1","dir":"/"}' \
-            --max-time 15 | jq -r '.Output // "Could not verify"'
-          
-          echo "=== Step 3: Restart app via self-restart endpoint ==="
-          HTTP=$(curl -s -o /tmp/restart-resp.txt -w "%{http_code}" \
-            -X POST "${APP}/api/internal/restart" \
-            -H "X-Restart-Token: deploy-restart-2026" \
-            --max-time 15)
-          echo "Restart HTTP: $HTTP"
-          cat /tmp/restart-resp.txt 2>/dev/null || true
-          
-          echo "=== Step 4: Wait for app to come back ==="
-          sleep 30
+            -H "Content-Type: application/zip" \
+            --data-binary "@deploy.zip" \
+            -H "x-ms-async" \
+            --max-time 600)
+
+          echo "Deploy HTTP status: $HTTP"
+          cat /tmp/deploy-result.json 2>/dev/null | jq '.' 2>/dev/null || true
+
+          if [ "$HTTP" != "202" ] && [ "$HTTP" != "200" ] && [ "$HTTP" != "201" ]; then
+            echo "ZipDeploy failed! Checking logs..."
+            curl -s "https://portal-ti-backend.scm.azurewebsites.net/api/deployments?top=1" \
+              --user "${KUDU_USER}:${KUDU_PASS}" | jq '.' 2>/dev/null || true
+            exit 1
+          fi
+
+          echo "=== Step 4: Wait for deployment to complete ==="
+          sleep 60
+
+          echo "=== Step 5: Check deployment status ==="
           for i in 1 2 3 4 5 6 7 8 9 10; do
             HTTP=$(curl -s -o /tmp/health.txt -w "%{http_code}" \
               "${APP}/api/health" --max-time 15)
             echo "Health check $i: HTTP $HTTP"
             if [ "$HTTP" = "200" ]; then
-              echo "App is running!"
+              echo "✅ App is running!"
               cat /tmp/health.txt 2>/dev/null || true
               exit 0
             fi
+            echo "Waiting 15s before next check..."
             sleep 15
           done
-          echo "App may still be starting. Deploy files are in place."
+
+          echo "⚠️ App may still be starting. Checking Kudu logs..."
+          curl -s "https://portal-ti-backend.scm.azurewebsites.net/api/deployments?top=1" \
+            --user "${KUDU_USER}:${KUDU_PASS}" | jq '.[0]' 2>/dev/null || true
