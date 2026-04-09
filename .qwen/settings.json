@@ -4,14 +4,7 @@
       "Bash(npm run *)",
       "Bash(findstr *)",
       "Bash(select-string *)",
-      "Bash(select-object *)",
-      "Bash(npx *)",
-      "Bash(node *)",
-      "Bash(compress-archive *)",
-      "Bash(powershell *)",
-      "Bash(git add *)",
-      "Bash(git commit *)",
-      "Bash(git push *)"
+      "Bash(select-object *)"
     ]
   },
   "$version": 3
