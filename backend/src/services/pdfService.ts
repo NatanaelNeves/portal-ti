@@ -43,11 +43,14 @@ interface ReturnTermData {
     model: string;
     internalCode: string;
     serialNumber: string;
+    patrimonio?: string;
   };
   responsible: {
     name: string;
+    cpf?: string;
     department: string;
     unit: string;
+    position?: string;
   };
   history: {
     deliveryDate: Date;
@@ -59,7 +62,9 @@ interface ReturnTermData {
     condition: string;
     checklist: Record<string, boolean>;
     notes?: string;
+    damageDescription?: string;
   };
+  returnedItems: string[];
   returnReason: string;
   returnDestination: string;
   receivedBy: {
@@ -188,173 +193,254 @@ export class PDFService {
   }
 
   /**
-   * Gera termo de devolução de equipamento
+   * Gera termo de devolução de equipamento - Versão profissional completa
    */
   static generateReturnTerm(data: ReturnTermData, res: Response): void {
     const doc = new PDFDocument({ size: 'A4', margin: 50 });
-    
+
     // Pipe para response
     doc.pipe(res);
 
-    // Header
-    doc.fontSize(16).font('Helvetica-Bold').text('PEQUENO NAZARENO', { align: 'center' });
-    doc.fontSize(14).text('TERMO DE DEVOLUÇÃO', { align: 'center' });
-    doc.fontSize(12).text('EQUIPAMENTO DE TI', { align: 'center' });
-    doc.moveDown();
+    // ═══════════════════════════════════════════════════════════
+    // HEADER INSTITUCIONAL
+    // ═══════════════════════════════════════════════════════════
+    doc.fontSize(18).font('Helvetica-Bold').text('PEQUENO NAZARENO', { align: 'center' });
+    doc.fontSize(14).text('TERMO DE DEVOLUÇÃO DE EQUIPAMENTO', { align: 'center' });
+    doc.fontSize(10).text(`Nº ${data.movementNumber}`, { align: 'center' });
+    doc.moveDown(0.5);
+
+    // Linha divisória
+    doc.moveTo(50, doc.y).lineTo(545, doc.y).lineWidth(2).stroke();
+    doc.moveDown(0.5);
+
+    // ═══════════════════════════════════════════════════════════
+    // SEÇÃO 1: DADOS DO COLABORADOR
+    // ═══════════════════════════════════════════════════════════
+    doc.fontSize(12).font('Helvetica-Bold').fillColor('#1e3a8a').text('1. DADOS DO COLABORADOR', { underline: true });
+    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(10).fillColor('#000000');
     
-    // Linha divisória
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-    doc.moveDown();
+    const respName = (data.responsible.name || 'N/A').toUpperCase();
+    const respDept = data.responsible.department || 'N/A';
+    const respUnit = data.responsible.unit || 'N/A';
+    const respPosition = data.responsible.position || 'N/A';
+    const respCPF = data.responsible.cpf || 'N/A';
 
-    // Equipamento
-    doc.fontSize(12).font('Helvetica-Bold').text('EQUIPAMENTO:', { underline: true });
+    doc.text(`Nome: ${respName}`, { continued: true });
+    doc.text(`CPF: ${respCPF}`);
+    doc.text(`Cargo: ${respPosition}`, { continued: true });
+    doc.text(`Setor: ${respDept}`);
+    doc.text(`Unidade: ${respUnit}`);
     doc.moveDown(0.5);
-    doc.font('Helvetica').fontSize(10);
-    doc.text(`Tipo: ${data.equipment.type}`);
-    doc.text(`Marca/Modelo: ${data.equipment.brand} ${data.equipment.model}`);
-    doc.text(`ID: ${data.equipment.internalCode}`);
-    doc.text(`Série: ${data.equipment.serialNumber}`);
-    doc.moveDown();
-
-    // Linha divisória
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-    doc.moveDown();
-
-    // Responsável
-    doc.fontSize(12).font('Helvetica-Bold').text('RESPONSÁVEL:', { underline: true });
-    doc.moveDown(0.5);
-    doc.font('Helvetica').fontSize(10);
-    doc.text(`Nome: ${(data.responsible.name || 'N/A').toUpperCase()}`);
-    doc.text(`Setor: ${data.responsible.department || 'N/A'}`);
-    doc.text(`Unidade: ${data.responsible.unit || 'N/A'}`);
-    doc.moveDown();
 
     // Linha divisória
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-    doc.moveDown();
-
-    // Histórico
-    doc.fontSize(12).font('Helvetica-Bold').text('HISTÓRICO:', { underline: true });
+    doc.moveTo(50, doc.y).lineTo(545, doc.y).lineWidth(1).stroke();
     doc.moveDown(0.5);
-    doc.font('Helvetica').fontSize(10);
+
+    // ═══════════════════════════════════════════════════════════
+    // SEÇÃO 2: DADOS DO EQUIPAMENTO
+    // ═══════════════════════════════════════════════════════════
+    doc.fontSize(12).font('Helvetica-Bold').fillColor('#1e3a8a').text('2. DADOS DO EQUIPAMENTO', { underline: true });
+    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(10).fillColor('#000000');
+    
+    doc.text(`Tipo: ${data.equipment.type}`, { continued: true });
+    doc.text(`Categoria: ${data.equipment.category}`);
+    doc.text(`Marca: ${data.equipment.brand}`, { continued: true });
+    doc.text(`Modelo: ${data.equipment.model}`);
+    doc.text(`Patrimônio: ${data.equipment.patrimonio || data.equipment.internalCode}`, { continued: true });
+    doc.text(`Nº Série: ${data.equipment.serialNumber}`);
+    doc.moveDown(0.5);
+
+    // Linha divisória
+    doc.moveTo(50, doc.y).lineTo(545, doc.y).lineWidth(1).stroke();
+    doc.moveDown(0.5);
+
+    // ═══════════════════════════════════════════════════════════
+    // SEÇÃO 3: HISTÓRICO
+    // ═══════════════════════════════════════════════════════════
+    doc.fontSize(12).font('Helvetica-Bold').fillColor('#1e3a8a').text('3. HISTÓRICO DE USO', { underline: true });
+    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(10).fillColor('#000000');
+    
     const fmtDelivery = data.history.deliveryDate instanceof Date && !isNaN(data.history.deliveryDate.getTime())
       ? data.history.deliveryDate.toLocaleDateString('pt-BR') : 'N/A';
     const fmtReturn = data.history.returnDate instanceof Date && !isNaN(data.history.returnDate.getTime())
-      ? data.history.returnDate.toLocaleDateString('pt-BR') : 'N/A';
-    doc.text(`Entrega: ${fmtDelivery}`);
-    doc.text(`Devolução: ${fmtReturn}`);
-    doc.text(`Tempo de uso: ${data.history.daysInUse} dias`);
-    if (data.history.deliveryTermFile) {
-      doc.text(`Termo entrega: ${data.history.deliveryTermFile}`);
-    }
-    doc.moveDown();
+      ? data.history.returnDate.toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
+    
+    doc.text(`Data de Entrega: ${fmtDelivery}`, { continued: true });
+    doc.text(`Data de Devolução: ${fmtReturn}`);
+    doc.text(`Tempo de Uso: ${data.history.daysInUse} dias`);
+    doc.moveDown(0.5);
 
     // Linha divisória
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-    doc.moveDown();
+    doc.moveTo(50, doc.y).lineTo(545, doc.y).lineWidth(1).stroke();
+    doc.moveDown(0.5);
 
-    // Vistoria
-    doc.fontSize(12).font('Helvetica-Bold').text('VISTORIA DE DEVOLUÇÃO:', { underline: true });
-    doc.moveDown(0.5);
-    doc.font('Helvetica').fontSize(10);
+    // ═══════════════════════════════════════════════════════════
+    // SEÇÃO 4: ESTADO DO EQUIPAMENTO
+    // ═══════════════════════════════════════════════════════════
+    doc.fontSize(12).font('Helvetica-Bold').fillColor('#1e3a8a').text('4. ESTADO DO EQUIPAMENTO', { underline: true });
+    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(10).fillColor('#000000');
+
+    const conditionLabel =
+      data.inspection.condition === 'perfect' || data.inspection.condition === 'excellent' ? 'EXCELENTE' :
+      data.inspection.condition === 'good' ? 'BOM' :
+      data.inspection.condition === 'fair' || data.inspection.condition === 'regular' ? 'REGULAR' :
+      data.inspection.condition === 'poor' ? 'RUIM' :
+      data.inspection.condition === 'damaged' ? 'DANIFICADO' : 'N/A';
+
+    doc.text(`Estado Geral: `, { continued: true });
+    doc.font('Helvetica-Bold');
+    doc.text(conditionLabel);
+    doc.font('Helvetica');
+    doc.moveDown(0.3);
+
+    // Checklist
+    doc.font('Helvetica-Bold');
+    doc.text('Checklist de Verificação:');
+    doc.font('Helvetica');
+    doc.moveDown(0.2);
     
-    const conditionLabel = 
-      data.inspection.condition === 'perfect' ? '[EXCELENTE]' :
-      data.inspection.condition === 'excellent' ? '[EXCELENTE]' :
-      data.inspection.condition === 'good' ? '[BOM]' :
-      data.inspection.condition === 'fair' ? '[REGULAR]' :
-      data.inspection.condition === 'regular' ? '[REGULAR]' :
-      data.inspection.condition === 'poor' ? '[RUIM]' :
-      data.inspection.condition === 'damaged' ? '[DANIFICADO]' : '[N/A]';
-    
-    doc.text(`Estado Geral: ${conditionLabel} ${(data.inspection.condition || 'N/A').toUpperCase()}`);
-    doc.moveDown(0.5);
-    
-    // Render checklist - handle both old keys (screen/keyboard) and new keys (physicalIntegrity/accessories)
     const cl = data.inspection.checklist || {};
-    doc.text('Checklist:');
     const checkItems: Array<{key: string, label: string}> = [
-      { key: 'physicalIntegrity', label: 'Integridade fisica' },
-      { key: 'accessories', label: 'Acessorios incluidos' },
+      { key: 'physicalIntegrity', label: 'Integridade física sem danos' },
+      { key: 'accessories', label: 'Acessórios completos' },
       { key: 'powerCable', label: 'Cabo de energia/carregador' },
-      { key: 'functionalTest', label: 'Teste funcional' },
+      { key: 'functionalTest', label: 'Teste funcional OK' },
       { key: 'cleaningDone', label: 'Limpeza realizada' },
-      { key: 'screen', label: 'Tela sem trincas' },
-      { key: 'keyboard', label: 'Teclado funcionando' },
-      { key: 'touchpad', label: 'Touchpad funcionando' },
-      { key: 'charger', label: 'Carregador incluido' },
+      { key: 'screen', label: 'Tela sem trincas/danos' },
+      { key: 'keyboard', label: 'Teclado funcional' },
+      { key: 'touchpad', label: 'Touchpad funcional' },
+      { key: 'charger', label: 'Carregador incluso' },
       { key: 'battery', label: 'Bateria com carga' },
     ];
+    
     let hasCheckItems = false;
     for (const item of checkItems) {
-      if ((cl as any)[item.key] !== undefined) {
-        doc.text(`[${(cl as any)[item.key] ? 'X' : ' '}] ${item.label}`);
+      if (cl[item.key] !== undefined) {
+        const mark = cl[item.key] ? '✓' : '✗';
+        doc.text(`  [${mark}] ${item.label}`);
         hasCheckItems = true;
       }
     }
     if (!hasCheckItems) {
       doc.text('  Nenhum item verificado');
     }
-    doc.moveDown(0.5);
-    
+    doc.moveDown(0.3);
+
+    // Descrição de danos (se houver)
+    if (data.inspection.damageDescription) {
+      doc.font('Helvetica-Bold');
+      doc.text('Descrição de Danos/Observações:');
+      doc.font('Helvetica');
+      doc.text(data.inspection.damageDescription, { width: 495, align: 'justify' });
+      doc.moveDown(0.3);
+    }
+
     if (data.inspection.notes) {
-      doc.text('Observações:');
-      doc.text(data.inspection.notes, { width: 495 });
+      doc.font('Helvetica-Bold');
+      doc.text('Observações Adicionais:');
+      doc.font('Helvetica');
+      doc.text(data.inspection.notes, { width: 495, align: 'justify' });
+      doc.moveDown(0.3);
+    }
+
+    doc.text(`Motivo da Devolução: ${data.returnReason}`);
+    doc.moveDown(0.5);
+
+    // Linha divisória
+    doc.moveTo(50, doc.y).lineTo(545, doc.y).lineWidth(1).stroke();
+    doc.moveDown(0.5);
+
+    // ═══════════════════════════════════════════════════════════
+    // SEÇÃO 5: ITENS DEVOLVIDOS
+    // ═══════════════════════════════════════════════════════════
+    doc.fontSize(12).font('Helvetica-Bold').fillColor('#1e3a8a').text('5. ITENS DEVOLVIDOS', { underline: true });
+    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(10).fillColor('#000000');
+    
+    if (data.returnedItems && data.returnedItems.length > 0) {
+      doc.font('Helvetica-Bold');
+      doc.text('Os seguintes itens foram devolvidos:');
+      doc.font('Helvetica');
+      doc.moveDown(0.2);
+      data.returnedItems.forEach((item, index) => {
+        doc.text(`  ${index + 1}. ${item}`);
+      });
+    } else {
+      doc.text('Nenhum item adicional listado');
     }
     doc.moveDown(0.5);
-    
-    doc.text(`Motivo Devolução: ${data.returnReason}`);
-    doc.moveDown();
 
     // Linha divisória
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-    doc.moveDown();
-
-    // Declaração
-    doc.fontSize(12).font('Helvetica-Bold').text('DECLARAÇÃO:', { underline: true });
+    doc.moveTo(50, doc.y).lineTo(545, doc.y).lineWidth(1).stroke();
     doc.moveDown(0.5);
-    doc.font('Helvetica').fontSize(10);
+
+    // ═══════════════════════════════════════════════════════════
+    // SEÇÃO 6: DECLARAÇÃO
+    // ═══════════════════════════════════════════════════════════
+    doc.fontSize(12).font('Helvetica-Bold').fillColor('#1e3a8a').text('6. DECLARAÇÃO', { underline: true });
+    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(10).fillColor('#000000');
+    
     doc.text(
-      `Eu, ${(data.responsible.name || 'N/A').toUpperCase()}, declaro que devolvi o equipamento acima em perfeitas condições, conforme vistoria, e não possuo mais responsabilidade sobre o mesmo.`,
-      { width: 495, align: 'justify' }
+      `Declaro que estou devolvendo o equipamento acima descrito nas condições informadas, ciente de que as informações prestadas refletem o estado real do equipamento no momento da devolução.`,
+      { width: 495, align: 'justify', lineGap: 2 }
     );
-    doc.moveDown();
+    doc.moveDown(0.5);
 
     // Linha divisória
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-    doc.moveDown();
+    doc.moveTo(50, doc.y).lineTo(545, doc.y).lineWidth(1).stroke();
+    doc.moveDown(0.5);
 
-    // Assinaturas
-    doc.fontSize(12).font('Helvetica-Bold').text('ASSINATURAS:', { underline: true });
-    doc.moveDown(2);
+    // ═══════════════════════════════════════════════════════════
+    // SEÇÃO 7: ASSINATURAS
+    // ═══════════════════════════════════════════════════════════
+    doc.fontSize(12).font('Helvetica-Bold').fillColor('#1e3a8a').text('7. ASSINATURAS', { underline: true });
+    doc.moveDown(1.5);
 
     const signatureY = doc.y;
-    doc.fontSize(10).font('Helvetica');
+    doc.fontSize(9).font('Helvetica').fillColor('#000000');
+
+    // Assinatura do colaborador (esquerda)
+    const leftX = 60;
+    const rightX = 320;
+    const lineWidth = 220;
     
-    // Assinatura responsável
-    doc.text('_'.repeat(40), 50, signatureY);
-    doc.text((data.responsible.name || 'N/A').toUpperCase(), 50, signatureY + 15, { width: 200 });
-    doc.text('Responsável que Devolveu', 50, signatureY + 30, { width: 200 });
+    // Linha de assinatura esquerda
+    doc.moveTo(leftX, signatureY).lineTo(leftX + lineWidth, signatureY).lineWidth(1).stroke();
+    doc.text(respName, leftX, signatureY + 10, { width: lineWidth, align: 'center' });
+    doc.text('Colaborador que Devolveu', leftX, signatureY + 22, { width: lineWidth, align: 'center' });
+    if (respPosition !== 'N/A') {
+      doc.fontSize(8);
+      doc.text(respPosition, leftX, signatureY + 32, { width: lineWidth, align: 'center' });
+      doc.fontSize(9);
+    }
 
-    // Assinatura recebedor
-    doc.text('_'.repeat(40), 320, signatureY);
-    doc.text((data.receivedBy.name || 'N/A').toUpperCase(), 320, signatureY + 15, { width: 200 });
-    doc.text('Responsável que Recebeu', 320, signatureY + 30, { width: 200 });
+    // Assinatura do responsável TI (direita)
+    doc.moveTo(rightX, signatureY).lineTo(rightX + lineWidth, signatureY).lineWidth(1).stroke();
+    doc.text((data.receivedBy.name || 'N/A').toUpperCase(), rightX, signatureY + 10, { width: lineWidth, align: 'center' });
+    doc.text('Responsável TI que Recebeu', rightX, signatureY + 22, { width: lineWidth, align: 'center' });
 
-    doc.moveDown(4);
-    const fmtReturnDate = data.history.returnDate instanceof Date && !isNaN(data.history.returnDate.getTime())
-      ? data.history.returnDate.toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
-    doc.text(`${data.location}, ${fmtReturnDate}`, { align: 'center' });
-    doc.moveDown(2);
+    doc.moveDown(3.5);
+
+    // Data e local
+    doc.fontSize(10).text(`${data.location}, ${fmtReturn}`, { align: 'center' });
+    doc.moveDown(1);
 
     // Linha divisória
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-    doc.moveDown(0.5);
-    
-    // Rodapé
-    doc.fontSize(8).text(`Doc ID: ${data.movementNumber}`, { align: 'center' });
-    doc.text(`Status: ${data.returnDestination} - ${data.location}`, { align: 'center' });
-    doc.text('Sistema de TI - Pequeno Nazareno', { align: 'center' });
+    doc.moveTo(50, doc.y).lineTo(545, doc.y).lineWidth(1).stroke();
+    doc.moveDown(0.3);
+
+    // ═══════════════════════════════════════════════════════════
+    // RODAPÉ
+    // ═══════════════════════════════════════════════════════════
+    doc.fontSize(7).fillColor('#64748b');
+    doc.text(`Documento gerado automaticamente pelo Sistema de TI - Pequeno Nazareno`, { align: 'center' });
+    doc.text(`ID: ${data.movementNumber} | Destino: ${data.returnDestination}`, { align: 'center' });
+    doc.text(`Data de geração: ${new Date().toLocaleString('pt-BR')}`, { align: 'center' });
 
     doc.end();
   }

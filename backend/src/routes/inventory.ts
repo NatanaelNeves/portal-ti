@@ -741,9 +741,12 @@ inventoryRouter.post('/movements/return', async (req: Request, res: Response) =>
       return_checklist,
       return_problems,
       return_destination, // 'available', 'maintenance', 'storage', 'disposal'
+      returned_items, // Array de itens devolvidos
       received_by_id,
       received_by_name
     } = req.body;
+
+    console.log('📥 Return equipment request:', { equipment_id, return_condition, returned_items });
 
     // Verificar se equipamento existe e está em uso
     const equipment = await database.query(`
@@ -760,7 +763,7 @@ inventoryRouter.post('/movements/return', async (req: Request, res: Response) =>
 
     // Buscar termo ativo (pode não existir para equipamentos importados)
     const activeTerm = await database.query(`
-      SELECT * FROM responsibility_terms 
+      SELECT * FROM responsibility_terms
       WHERE equipment_id = $1 AND status = 'active'
       ORDER BY issued_date DESC
       LIMIT 1
@@ -796,7 +799,7 @@ inventoryRouter.post('/movements/return', async (req: Request, res: Response) =>
 
     // Criar movimentação de devolução
     const eq = equipment.rows[0];
-    
+
     // registered_by_id é NOT NULL — usar received_by_id ou buscar um admin
     let registeredById = received_by_id;
     if (!registeredById) {
@@ -807,20 +810,26 @@ inventoryRouter.post('/movements/return', async (req: Request, res: Response) =>
       registeredById = adminUser.rows.length > 0 ? adminUser.rows[0].id : null;
     }
 
+    // Armazenar returned_items no campo notes como JSON
+    const movementNotes = JSON.stringify({
+      returned_items: returned_items || [],
+      type: 'return'
+    });
+
     if (registeredById) {
       await database.query(`
         INSERT INTO equipment_movements (
           movement_number, equipment_id, term_id, movement_type, movement_date,
           from_user_id, from_user_name, from_unit, from_department,
-          condition_after, reason, registered_by_id, registered_by_name
-        ) VALUES ($1, $2, $3, 'return', CURRENT_TIMESTAMP, $4, $5, $6, $7, $8, $9, $10, $11)
+          condition_after, reason, notes, registered_by_id, registered_by_name
+        ) VALUES ($1, $2, $3, 'return', CURRENT_TIMESTAMP, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       `, [
         movement_number, equipment_id, term ? term.id : null,
         term ? term.responsible_id : eq.current_responsible_id,
         term ? term.responsible_name : (eq.current_responsible_name || 'Desconhecido'),
         term ? term.responsible_unit : eq.current_unit,
         term ? term.responsible_department : null,
-        return_condition, return_problems || 'Devolução', registeredById, received_by_name || 'Sistema'
+        return_condition, movementNotes, registeredById, received_by_name || 'Sistema'
       ]);
     } else {
       console.warn('⚠️ No registered_by_id available for movement, skipping movement record');
@@ -973,7 +982,7 @@ inventoryRouter.get('/terms/:termId/return-pdf', async (req: Request, res: Respo
     const { termId } = req.params;
 
     const result = await database.query(`
-      SELECT 
+      SELECT
         rt.*,
         ie.internal_code,
         ie.category,
@@ -981,9 +990,13 @@ inventoryRouter.get('/terms/:termId/return-pdf', async (req: Request, res: Respo
         ie.brand,
         ie.model,
         ie.serial_number,
-        em.movement_number
+        iu.full_name as responsible_full_name,
+        iu.role as responsible_role,
+        em.movement_number,
+        em.notes as movement_notes
       FROM responsibility_terms rt
       JOIN inventory_equipment ie ON rt.equipment_id = ie.id
+      LEFT JOIN internal_users iu ON rt.responsible_id = iu.id
       LEFT JOIN equipment_movements em ON rt.id = em.term_id AND em.movement_type = 'return'
       WHERE rt.id = $1
     `, [termId]);
@@ -1015,6 +1028,39 @@ inventoryRouter.get('/terms/:termId/return-pdf', async (req: Request, res: Respo
       console.warn('Failed to parse return_checklist:', e);
     }
 
+    // Parse returned items from movement notes if available
+    let returnedItems: string[] = [];
+    try {
+      // Try parsing movement_notes (JSON string)
+      if (term.movement_notes) {
+        const notesData = JSON.parse(term.movement_notes);
+        if (notesData.returned_items && Array.isArray(notesData.returned_items)) {
+          returnedItems = notesData.returned_items;
+        }
+      }
+    } catch (e) {
+      // If parsing fails, try getting from return_problems as fallback
+      console.warn('Could not parse movement_notes, using empty array');
+    }
+
+    // Fallback: if no items found, check if there's a direct returned_items column
+    if (returnedItems.length === 0) {
+      try {
+        const directItems = await database.query(
+          `SELECT notes FROM equipment_movements WHERE term_id = $1 AND movement_type = 'return' LIMIT 1`,
+          [termId]
+        );
+        if (directItems.rows.length > 0 && directItems.rows[0].notes) {
+          const notesData = JSON.parse(directItems.rows[0].notes);
+          if (notesData.returned_items && Array.isArray(notesData.returned_items)) {
+            returnedItems = notesData.returned_items;
+          }
+        }
+      } catch (e) {
+        console.warn('Could not fetch returned_items from movement');
+      }
+    }
+
     const pdfData = {
       movementNumber: term.movement_number || 'N/A',
       equipment: {
@@ -1023,12 +1069,15 @@ inventoryRouter.get('/terms/:termId/return-pdf', async (req: Request, res: Respo
         brand: term.brand || 'N/A',
         model: term.model || 'N/A',
         internalCode: term.internal_code || 'N/A',
-        serialNumber: term.serial_number || 'N/A'
+        serialNumber: term.serial_number || 'N/A',
+        patrimonio: term.internal_code || 'N/A'
       },
       responsible: {
         name: term.responsible_name || 'N/A',
+        cpf: term.responsible_cpf || 'N/A',
         department: term.responsible_department || 'N/A',
-        unit: term.responsible_unit || 'N/A'
+        unit: term.responsible_unit || 'N/A',
+        position: term.responsible_role || term.responsible_full_name || 'N/A'
       },
       history: {
         deliveryDate,
@@ -1039,8 +1088,10 @@ inventoryRouter.get('/terms/:termId/return-pdf', async (req: Request, res: Respo
       inspection: {
         condition: term.return_condition || 'N/A',
         checklist,
-        notes: term.return_problems || ''
+        notes: term.return_problems || '',
+        damageDescription: term.return_condition === 'damaged' ? (term.return_problems || '') : undefined
       },
+      returnedItems,
       returnReason: 'Devolução regular',
       returnDestination: term.return_destination || 'available',
       receivedBy: {

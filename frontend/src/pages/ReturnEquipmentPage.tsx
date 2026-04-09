@@ -33,6 +33,15 @@ interface ReturnForm {
     functionalTest: boolean;
     cleaningDone: boolean;
   };
+  returnedItems: {
+    charger: boolean;
+    mouse: boolean;
+    bag: boolean;
+    keyboard: boolean;
+    headset: boolean;
+    other: boolean;
+  };
+  otherItems: string;
 }
 
 const ReturnEquipmentPage: React.FC = () => {
@@ -55,7 +64,16 @@ const ReturnEquipmentPage: React.FC = () => {
       powerCable: false,
       functionalTest: false,
       cleaningDone: false
-    }
+    },
+    returnedItems: {
+      charger: false,
+      mouse: false,
+      bag: false,
+      keyboard: false,
+      headset: false,
+      other: false
+    },
+    otherItems: ''
   });
 
   const returnConditions = [
@@ -112,6 +130,14 @@ const ReturnEquipmentPage: React.FC = () => {
     }));
   };
 
+  const handleReturnedItemChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      returnedItems: { ...prev.returnedItems, [name]: checked }
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -133,12 +159,23 @@ const ReturnEquipmentPage: React.FC = () => {
       const currentUser = JSON.parse(localStorage.getItem('internal_user') || '{}');
       
       // Format payload with snake_case field names to match backend
+      const returnedItemsList: string[] = [];
+      if (formData.returnedItems.charger) returnedItemsList.push('Carregador');
+      if (formData.returnedItems.mouse) returnedItemsList.push('Mouse');
+      if (formData.returnedItems.bag) returnedItemsList.push('Bolsa/Mochila');
+      if (formData.returnedItems.keyboard) returnedItemsList.push('Teclado Externo');
+      if (formData.returnedItems.headset) returnedItemsList.push('Headset/Fone');
+      if (formData.returnedItems.other && formData.otherItems.trim()) {
+        returnedItemsList.push(`Outros: ${formData.otherItems.trim()}`);
+      }
+
       const payload = {
         equipment_id: formData.equipmentId,
         return_condition: formData.returnCondition,
         return_checklist: formData.checklist,
         return_problems: formData.returnProblems || 'Nenhum problema relatado',
         return_destination: formData.returnDestination,
+        returned_items: returnedItemsList,
         received_by_id: currentUser.id || null,
         received_by_name: currentUser.name || currentUser.full_name || 'Sistema'
       };
@@ -334,7 +371,100 @@ const ReturnEquipmentPage: React.FC = () => {
         </div>
 
         <div className="form-section">
-          <h2>4. Destino do Equipamento</h2>
+          <h2>4. Itens Devolvidos</h2>
+          <p className="section-description">Selecione todos os itens que estão sendo devolvidos:</p>
+
+          <div className="checklist">
+            <label className="checkbox-item">
+              <input
+                type="checkbox"
+                name="charger"
+                checked={formData.returnedItems.charger}
+                onChange={handleReturnedItemChange}
+              />
+              <span className="checkbox-label">
+                <strong>Carregador</strong> - Cabo de energia e fonte
+              </span>
+            </label>
+
+            <label className="checkbox-item">
+              <input
+                type="checkbox"
+                name="mouse"
+                checked={formData.returnedItems.mouse}
+                onChange={handleReturnedItemChange}
+              />
+              <span className="checkbox-label">
+                <strong>Mouse</strong> - Mouse externo (se aplicável)
+              </span>
+            </label>
+
+            <label className="checkbox-item">
+              <input
+                type="checkbox"
+                name="bag"
+                checked={formData.returnedItems.bag}
+                onChange={handleReturnedItemChange}
+              />
+              <span className="checkbox-label">
+                <strong>Bolsa/Mochila</strong> - Bolsa de transporte
+              </span>
+            </label>
+
+            <label className="checkbox-item">
+              <input
+                type="checkbox"
+                name="keyboard"
+                checked={formData.returnedItems.keyboard}
+                onChange={handleReturnedItemChange}
+              />
+              <span className="checkbox-label">
+                <strong>Teclado Externo</strong> - Teclado USB (se aplicável)
+              </span>
+            </label>
+
+            <label className="checkbox-item">
+              <input
+                type="checkbox"
+                name="headset"
+                checked={formData.returnedItems.headset}
+                onChange={handleReturnedItemChange}
+              />
+              <span className="checkbox-label">
+                <strong>Headset/Fone</strong> - Fone de ouvido (se aplicável)
+              </span>
+            </label>
+
+            <label className="checkbox-item">
+              <input
+                type="checkbox"
+                name="other"
+                checked={formData.returnedItems.other}
+                onChange={handleReturnedItemChange}
+              />
+              <span className="checkbox-label">
+                <strong>Outros</strong> - Itens adicionais (especificar abaixo)
+              </span>
+            </label>
+          </div>
+
+          {formData.returnedItems.other && (
+            <div className="form-group" style={{ marginTop: '1rem' }}>
+              <label htmlFor="otherItems">Especificar Outros Itens</label>
+              <textarea
+                id="otherItems"
+                name="otherItems"
+                value={formData.otherItems}
+                onChange={handleInputChange}
+                rows={2}
+                placeholder="Ex: Monitor USB, docking station, cabo HDMI..."
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="form-section">
+          <h2>5. Destino do Equipamento</h2>
           <div className="form-group">
             <label htmlFor="returnDestination">Próxima Ação *</label>
             <select
