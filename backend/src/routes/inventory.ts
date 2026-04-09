@@ -2269,7 +2269,9 @@ inventoryRouter.post('/equipment/:id/document', (req: Request, res: Response, ne
         deleteFile(req.file.path);
       }
       return res.status(500).json({ 
-        error: 'Documents column not found. Please run database migration.' 
+        error: 'Inventory schema is missing the documents column required for uploads.',
+        code: 'DOCUMENTS_COLUMN_MISSING',
+        details: 'Run backend/migrations/002_add_photos_documents_fields.sql and redeploy the backend.'
       });
     }
 
@@ -2300,7 +2302,7 @@ inventoryRouter.post('/equipment/:id/document', (req: Request, res: Response, ne
           console.warn('  - Documents was not an array, resetting');
           documents = [];
         }
-      } catch (parseError) {
+      } catch (parseError: any) {
         console.warn('  - Error parsing documents JSON, resetting:', parseError.message);
         console.warn('  - Raw value:', rawDocs);
         documents = [];
