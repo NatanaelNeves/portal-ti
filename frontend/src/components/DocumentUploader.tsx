@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import api from '../services/api';
+import ConfirmDialog from './ConfirmDialog';
 import '../styles/DocumentUploader.css';
 
 interface Document {
@@ -27,6 +28,10 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   const [error, setError] = useState('');
   const [documentType, setDocumentType] = useState('invoice');
   const [description, setDescription] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; doc: Document | null }>({ 
+    isOpen: false, 
+    doc: null 
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const documentTypes = [
@@ -165,9 +170,13 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   };
 
   const handleDelete = async (doc: Document) => {
-    if (!confirm(`Tem certeza que deseja excluir o documento "${doc.description}"?\n\nEsta ação não pode ser desfeita.`)) {
-      return;
-    }
+    setDeleteConfirm({ isOpen: true, doc });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm.doc) return;
+
+    const doc = deleteConfirm.doc;
 
     try {
       // Remover documento da lista
@@ -181,9 +190,11 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
 
       console.log('✅ Document deleted:', doc.filename);
       onDocumentsChange(updatedDocs);
+      setDeleteConfirm({ isOpen: false, doc: null });
     } catch (err: any) {
       console.error('❌ Erro ao excluir documento:', err);
-      alert('Erro ao excluir documento. Tente novamente.');
+      setError('Erro ao excluir documento. Tente novamente.');
+      setDeleteConfirm({ isOpen: false, doc: null });
     }
   };
 
@@ -346,6 +357,17 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
           <p className="no-documents-hint">Use o formulário acima para adicionar documentos</p>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        title="Excluir Documento"
+        message={`Tem certeza que deseja excluir "${deleteConfirm.doc?.description}"?\n\nEsta ação não pode ser desfeita.`}
+        confirmText="Sim, Excluir"
+        cancelText="Cancelar"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirm({ isOpen: false, doc: null })}
+        type="danger"
+      />
     </div>
   );
 };
