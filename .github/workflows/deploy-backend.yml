@@ -49,9 +49,11 @@ jobs:
           cp -r backend/dist         backend-deploy/
           cp -r backend/migrations    backend-deploy/
           cp backend/package*.json   backend-deploy/
+          cp backend/startup.sh      backend-deploy/
+          chmod +x backend-deploy/startup.sh
           echo "=== Artifact contents ==="
-          find backend-deploy/dist -name "*.js" | wc -l
-          echo " JS files ready for deploy"
+          find backend-deploy -type f | head -20
+          echo "Deployment artifact ready"
 
       - name: Configure Azure App Settings via Kudu
         env:
@@ -66,7 +68,8 @@ jobs:
             -d '{
               "CORS_ORIGIN":"https://green-ocean-096bd050f.2.azurestaticapps.net",
               "SCM_DO_BUILD_DURING_DEPLOYMENT":"false",
-              "WEBSITE_RUN_FROM_PACKAGE":"0"
+              "WEBSITE_RUN_FROM_PACKAGE":"0",
+              "POST_BUILD_COMMAND":"chmod +x startup.sh && ./startup.sh"
             }' \
             -w "\nHTTP Status: %{http_code}\n"
 
