@@ -11,7 +11,10 @@
       "Bash(powershell *)",
       "Bash(git add *)",
       "Bash(git commit *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(rm *)",
+      "Bash(git checkout *)",
+      "Bash(del *)"
     ]
   },
   "$version": 3
