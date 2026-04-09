@@ -184,33 +184,43 @@ export default function DocumentsPage() {
     if (!doc.file_url) return;
 
     try {
-      console.log('📥 Downloading document:', doc.id, doc.title);
-      
-      // Usar o endpoint de download da API para melhor confiabilidade
-      const response = await fetch(`${BACKEND_URL}/api/documents/${doc.id}/download`);
-      
+      console.log('📥 Downloading document:', doc.id, doc.title, doc.file_url);
+
+      // Construir URL completa do arquivo
+      const fileUrl = doc.file_url.startsWith('http') 
+        ? doc.file_url 
+        : `${BACKEND_URL}${doc.file_url}`;
+
+      console.log('🔗 Full URL:', fileUrl);
+
+      // Fazer download direto do arquivo
+      const response = await fetch(fileUrl);
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('❌ Download failed:', errorData);
-        throw new Error(errorData.error || `HTTP ${response.status}: Falha ao baixar documento`);
+        throw new Error(`Falha ao baixar documento (HTTP ${response.status})`);
       }
 
-      // Obter blob e criar link de download
+      // Obter blob do arquivo
       const blob = await response.blob();
+      console.log('📦 Downloaded blob size:', blob.size);
+
+      // Criar link temporário para download
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
 
-      // Extrair nome do arquivo da URL ou usar título
+      // Usar título do documento como nome do arquivo
       const ext = doc.file_url.split('.').pop() || 'pdf';
-      link.download = `${doc.title}.${ext}`;
+      const safeFileName = doc.title.replace(/[^a-zA-Z0-9À-ÿ\s-]/g, '_').substring(0, 100);
+      link.download = `${safeFileName}.${ext}`;
 
+      // Trigger download
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
-      console.log('✅ Download successful');
+
+      console.log('✅ Download successful:', link.download);
     } catch (error: any) {
       console.error('❌ Erro ao baixar documento:', error.message);
       alert(`Erro ao baixar documento: ${error.message}\n\nTente novamente ou contate o suporte de TI.`);
