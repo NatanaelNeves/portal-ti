@@ -126,19 +126,30 @@ export default function EquipmentDetailPage() {
     try {
       setLoading(true);
       const token = localStorage.getItem('internal_token');
-      
-      const response = await fetch(`${BACKEND_URL}/api/inventory/equipment/${equipmentId}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
 
-      if (!response.ok) throw new Error('Equipamento não encontrado');
+      // Buscar detalhes do equipamento e documentos em paralelo
+      const [equipmentResponse, documentsResponse] = await Promise.all([
+        fetch(`${BACKEND_URL}/api/inventory/equipment/${equipmentId}`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        }),
+        fetch(`${BACKEND_URL}/api/inventory/equipment/${equipmentId}/documents`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        })
+      ]);
 
-      const data = await response.json();
-      setEquipment(data.equipment);
-      setPhotos(data.photos || []);
-      setDocuments(data.documents || []);
-      setMovements(data.movements || []);
-      setTerms(data.terms || []);
+      if (!equipmentResponse.ok) throw new Error('Equipamento não encontrado');
+
+      const equipmentData = await equipmentResponse.json();
+      setEquipment(equipmentData.equipment);
+      setPhotos(equipmentData.photos || []);
+      setMovements(equipmentData.movements || []);
+      setTerms(equipmentData.terms || []);
+
+      // Carregar documentos do endpoint correto
+      if (documentsResponse.ok) {
+        const documentsData = await documentsResponse.json();
+        setDocuments(documentsData.documents || []);
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {

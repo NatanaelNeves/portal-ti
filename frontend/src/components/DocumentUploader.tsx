@@ -72,22 +72,24 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
     try {
       setUploading(true);
 
-      await api.post(
+      const uploadResponse = await api.post(
         `/inventory/equipment/${equipmentId}/document`,
         formData
       );
 
-      // Buscar documentos atualizados
+      console.log('✅ Upload response:', uploadResponse.data);
+
+      // Buscar documentos atualizados do endpoint correto
       const docsResponse = await api.get(
-        `/inventory/equipment/${equipmentId}`
+        `/inventory/equipment/${equipmentId}/documents`
       );
 
-      if (docsResponse.data.documents) {
-        const docs = typeof docsResponse.data.documents === 'string' 
-          ? JSON.parse(docsResponse.data.documents) 
-          : docsResponse.data.documents;
-        onDocumentsChange(docs);
-      }
+      console.log('📄 Documents response:', docsResponse.data);
+
+      const docs = docsResponse.data.documents || [];
+      console.log('📝 Setting documents:', docs);
+      
+      onDocumentsChange(docs);
 
       // Limpar formulário
       setDescription('');
@@ -96,7 +98,8 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
       }
 
     } catch (err: any) {
-      console.error('Erro ao fazer upload:', err);
+      console.error('❌ Erro ao fazer upload:', err);
+      console.error('Error response:', err.response?.data);
       setError(err.response?.data?.error || 'Erro ao fazer upload do documento');
     } finally {
       setUploading(false);

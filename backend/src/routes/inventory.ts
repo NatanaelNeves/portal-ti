@@ -2214,10 +2214,22 @@ inventoryRouter.get('/equipment/:id/documents', async (req: Request, res: Respon
     let documents: any[] = [];
 
     if (equipment.documents) {
-      documents = Array.isArray(equipment.documents)
-        ? equipment.documents
-        : JSON.parse(equipment.documents);
+      try {
+        documents = Array.isArray(equipment.documents)
+          ? equipment.documents
+          : JSON.parse(equipment.documents);
+        
+        if (!Array.isArray(documents)) {
+          console.warn('Documents is not an array, resetting');
+          documents = [];
+        }
+      } catch (parseError) {
+        console.error('Error parsing documents:', parseError);
+        documents = [];
+      }
     }
+
+    console.log(`📄 Returning ${documents.length} documents for equipment ${id}`);
 
     res.json({
       equipment_id: id,
@@ -2338,13 +2350,17 @@ inventoryRouter.post('/equipment/:id/document', (req: Request, res: Response, ne
     });
 
     console.log('  - Saving', documents.length, 'documents');
+    console.log('  - Document data:', JSON.stringify(documents[documents.length - 1], null, 2));
+
+    const jsonDocuments = JSON.stringify(documents);
+    console.log('  - JSON length:', jsonDocuments.length, 'bytes');
 
     await database.query(
       'UPDATE inventory_equipment SET documents = $1 WHERE id = $2',
-      [JSON.stringify(documents), id]
+      [jsonDocuments, id]
     );
 
-    console.log('✅ Document uploaded successfully');
+    console.log('✅ Document uploaded successfully to database');
 
     res.json({
       success: true,
