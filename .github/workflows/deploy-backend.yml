@@ -67,9 +67,8 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{
               "CORS_ORIGIN":"https://green-ocean-096bd050f.2.azurestaticapps.net",
-              "SCM_DO_BUILD_DURING_DEPLOYMENT":"false",
-              "WEBSITE_RUN_FROM_PACKAGE":"0",
-              "POST_BUILD_COMMAND":"chmod +x startup.sh && ./startup.sh"
+              "SCM_DO_BUILD_DURING_DEPLOYMENT":"true",
+              "WEBSITE_RUN_FROM_PACKAGE":"0"
             }' \
             -w "\nHTTP Status: %{http_code}\n"
 
