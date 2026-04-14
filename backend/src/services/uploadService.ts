@@ -29,7 +29,7 @@ const storage = multer.diskStorage({
     
     if (file.fieldname === 'equipmentPhoto') {
       uploadPath = equipmentPhotosDir;
-    } else if (file.fieldname === 'document') {
+    } else if (file.fieldname === 'document' || file.fieldname === 'file') {
       uploadPath = documentsDir;
     } else if (file.fieldname === 'term') {
       uploadPath = termsDir;

@@ -131,22 +131,41 @@ documentsRouter.get('/:id/download', async (req: Request, res: Response) => {
     console.log('  - File URL:', doc.file_url);
     console.log('  - Title:', doc.title);
 
-    // Construir caminho absoluto do arquivo
-    const filePath = path.join(__dirname, '../..', doc.file_url);
-    console.log('  - Full path:', filePath);
+    // Construir caminhos candidatos (suporta registros legados e uploads em diretórios alternativos)
+    const appRoot = path.resolve(__dirname, '../..');
+    const rawFileUrl = String(doc.file_url || '').trim();
+    const sanitizedUrl = rawFileUrl
+      .replace(/^https?:\/\/[^/]+/i, '')
+      .replace(/^\/+/g, '');
+    const fileName = path.basename(sanitizedUrl || rawFileUrl);
 
-    if (!fs.existsSync(filePath)) {
-      console.error('❌ File not found on disk:', filePath);
+    const candidatePaths = [
+      path.resolve(appRoot, sanitizedUrl),
+      path.resolve(appRoot, 'uploads', sanitizedUrl),
+      path.resolve(appRoot, 'uploads', 'documents', fileName),
+      path.resolve(appRoot, 'uploads', fileName)
+    ];
+
+    if (path.isAbsolute(rawFileUrl)) {
+      candidatePaths.unshift(rawFileUrl);
+    }
+
+    const filePath = candidatePaths.find((candidate) => fs.existsSync(candidate));
+    console.log('  - Candidate paths:', candidatePaths);
+    console.log('  - Resolved path:', filePath || 'NOT_FOUND');
+
+    if (!filePath) {
+      console.error('❌ File not found on disk:', candidatePaths[0]);
       return res.status(404).json({ 
         error: 'Arquivo não encontrado no servidor',
-        debug: { file_url: doc.file_url, fullPath: filePath }
+        debug: { file_url: doc.file_url, candidates: candidatePaths }
       });
     }
 
     console.log('✅ Serving file:', filePath);
 
     // Enviar arquivo com headers apropriados
-    const ext = path.extname(doc.file_url);
+    const ext = path.extname(filePath);
     const filename = `${doc.title}${ext}`;
     
     res.download(filePath, filename, (err) => {
