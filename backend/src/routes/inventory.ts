@@ -761,11 +761,13 @@ inventoryRouter.post('/movements/return', async (req: Request, res: Response) =>
       return res.status(400).json({ error: 'Equipment is not in use' });
     }
 
-    // Buscar termo ativo (pode não existir para equipamentos importados)
+    // Buscar termo em aberto (status ativo OU ainda sem data de devolução)
+    // Isso cobre bases antigas/inconsistentes onde o status pode não estar exatamente como 'active'.
     const activeTerm = await database.query(`
       SELECT * FROM responsibility_terms
-      WHERE equipment_id = $1 AND status = 'active'
-      ORDER BY issued_date DESC
+      WHERE equipment_id = $1
+        AND (status = 'active' OR returned_date IS NULL)
+      ORDER BY issued_date DESC, created_at DESC
       LIMIT 1
     `, [equipment_id]);
 
@@ -855,7 +857,8 @@ inventoryRouter.post('/movements/return', async (req: Request, res: Response) =>
     res.status(200).json({ 
       message: 'Equipment returned successfully',
       movement_number,
-      term_id: term ? term.id : null
+      term_id: term ? term.id : null,
+      return_pdf_url: term ? `/api/inventory/terms/${term.id}/return-pdf` : null
     });
   } catch (error: any) {
     console.error('Error returning equipment:', error?.message || error);

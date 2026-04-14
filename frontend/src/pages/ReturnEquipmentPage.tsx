@@ -190,7 +190,11 @@ const ReturnEquipmentPage: React.FC = () => {
       // Abrir PDF do termo em nova aba (somente se houver termo)
       const termId = response.data.term_id;
       if (termId) {
-        window.open(`${BACKEND_URL}/api/inventory/terms/${termId}/return-pdf`, '_blank');
+        const token = localStorage.getItem('internal_token');
+        const url = token
+          ? `${BACKEND_URL}/api/inventory/terms/${termId}/return-pdf?token=${token}`
+          : `${BACKEND_URL}/api/inventory/terms/${termId}/return-pdf`;
+        window.open(url, '_blank');
       }
 
       // Redirecionar após 2 segundos
