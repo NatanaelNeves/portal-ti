@@ -23,6 +23,7 @@ export default function UsersManagementPage() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [toggleStatusConfirm, setToggleStatusConfirm] = useState<{ isOpen: boolean; userId: string | null }>({ isOpen: false, userId: null });
+  const [deleteUserConfirm, setDeleteUserConfirm] = useState<{ isOpen: boolean; userId: string | null }>({ isOpen: false, userId: null });
   const [formData, setFormData] = useState({
     email: '',
     name: '',
@@ -216,6 +217,36 @@ export default function UsersManagementPage() {
     setNewPassword('');
     setShowPasswordModal(true);
     setFormError('');
+  };
+
+  const handleDeleteUser = (userId: string) => {
+    setDeleteUserConfirm({ isOpen: true, userId });
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!deleteUserConfirm.userId) return;
+
+    try {
+      const token = localStorage.getItem('internal_token');
+      const response = await fetch(`${BACKEND_URL}/api/internal-auth/users/${deleteUserConfirm.userId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Erro ao excluir usuário');
+      }
+
+      setFormSuccess('Usuário excluído com sucesso!');
+      setDeleteUserConfirm({ isOpen: false, userId: null });
+      if (token) fetchUsers(token);
+    } catch (err: any) {
+      setFormError(err.message || 'Erro ao excluir usuário');
+      setDeleteUserConfirm({ isOpen: false, userId: null });
+    }
   };
 
   const handleSubmitPasswordReset = async (e: React.FormEvent) => {
@@ -423,6 +454,13 @@ export default function UsersManagementPage() {
                           >
                             🔑
                           </button>
+                          <button
+                            className="btn-action btn-delete"
+                            onClick={() => handleDeleteUser(user.id)}
+                            title="Excluir usuário"
+                          >
+                            🗑️
+                          </button>
                         </div>
                       </td>
                     )}
@@ -546,6 +584,17 @@ export default function UsersManagementPage() {
         type="warning"
         onConfirm={confirmToggleStatus}
         onCancel={() => setToggleStatusConfirm({ isOpen: false, userId: null })}
+      />
+
+      <ConfirmDialog
+        isOpen={deleteUserConfirm.isOpen}
+        title="Excluir Usuário"
+        message="Esta ação é permanente e não poderá ser desfeita. Deseja realmente excluir este usuário?"
+        confirmText="Sim, excluir"
+        cancelText="Cancelar"
+        type="danger"
+        onConfirm={confirmDeleteUser}
+        onCancel={() => setDeleteUserConfirm({ isOpen: false, userId: null })}
       />
     </div>
   );

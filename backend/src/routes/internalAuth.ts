@@ -327,6 +327,76 @@ router.patch('/users/:id/toggle-status', async (req: Request, res: Response) => 
   }
 });
 
+// Delete user permanently (admin only)
+router.delete('/users/:id', async (req: Request, res: Response) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    const userId = req.params.id;
+
+    if (!token) {
+      res.status(401).json({ error: 'No token provided' });
+      return;
+    }
+
+    const decoded = jwt.verify(token, config.jwt.secret as string) as InternalUser & {
+      role: string;
+    };
+
+    if (decoded.role !== 'admin') {
+      res.status(403).json({ error: 'Only admins can delete users' });
+      return;
+    }
+
+    if (decoded.id === userId) {
+      res.status(400).json({ error: 'You cannot delete your own account' });
+      return;
+    }
+
+    const targetUser = await database.query(
+      'SELECT id, role FROM internal_users WHERE id = $1',
+      [userId]
+    );
+
+    if (targetUser.rows.length === 0) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    if (targetUser.rows[0].role === 'admin') {
+      const adminCount = await database.query(
+        "SELECT COUNT(*)::int AS total FROM internal_users WHERE role = 'admin'"
+      );
+      if (adminCount.rows[0].total <= 1) {
+        res.status(400).json({ error: 'Cannot delete the last admin user' });
+        return;
+      }
+    }
+
+    const result = await database.query(
+      `DELETE FROM internal_users
+       WHERE id = $1
+       RETURNING id, email, name, role`,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    res.json({ message: 'User deleted successfully', user: result.rows[0] });
+  } catch (error: any) {
+    if (error?.code === '23503') {
+      res.status(409).json({
+        error: 'Não foi possível excluir o usuário porque ele possui vínculos no sistema. Desative o usuário em vez de excluir.'
+      });
+      return;
+    }
+    console.error('Error deleting user:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Reset user password (admin only)
 router.post('/users/:id/reset-password', async (req: Request, res: Response) => {
   try {

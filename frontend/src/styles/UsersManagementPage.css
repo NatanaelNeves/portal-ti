@@ -247,6 +247,14 @@ tbody tr:hover {
   background: #ff9800;
 }
 
+.btn-delete {
+  background: #fdecea;
+}
+
+.btn-delete:hover {
+  background: #d32f2f;
+}
+
 /* Modal Styles */
 .modal-overlay {
   position: fixed;
