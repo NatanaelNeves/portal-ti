@@ -829,7 +829,7 @@ inventoryRouter.post('/movements/return', async (req: Request, res: Response) =>
         term ? term.responsible_name : (eq.current_responsible_name || 'Desconhecido'),
         term ? term.responsible_unit : eq.current_unit,
         term ? term.responsible_department : null,
-        return_condition, movementNotes, registeredById, received_by_name || 'Sistema'
+        return_condition, return_problems || 'Devolução de equipamento', movementNotes, registeredById, received_by_name || 'Sistema'
       ]);
     } else {
       console.warn('⚠️ No registered_by_id available for movement, skipping movement record');
