@@ -77,6 +77,13 @@ export const config = {
     password: process.env.EMAIL_PASSWORD || process.env.SMTP_PASSWORD || '',
     fromEmail: process.env.EMAIL_FROM || smtpFrom.fromEmail,
     fromName: process.env.EMAIL_FROM_NAME || smtpFrom.fromName,
+    provider: (process.env.EMAIL_PROVIDER || 'smtp').toLowerCase(),
+    graph: {
+      tenantId: process.env.AZURE_TENANT_ID || '',
+      clientId: process.env.AZURE_CLIENT_ID || '',
+      clientSecret: process.env.AZURE_CLIENT_SECRET || '',
+      senderUser: process.env.EMAIL_FROM || smtpFrom.fromEmail,
+    },
   },
   frontend: {
     url: process.env.FRONTEND_URL || 'http://localhost:5173',

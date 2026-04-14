@@ -12,6 +12,84 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+const isGraphConfigured = (): boolean => {
+  const graph = config.email.graph;
+  return Boolean(graph.tenantId && graph.clientId && graph.clientSecret && graph.senderUser);
+};
+
+const getGraphAccessToken = async (): Promise<string> => {
+  const { tenantId, clientId, clientSecret } = config.email.graph;
+  const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+
+  const body = new URLSearchParams({
+    client_id: clientId,
+    client_secret: clientSecret,
+    scope: 'https://graph.microsoft.com/.default',
+    grant_type: 'client_credentials',
+  });
+
+  const response = await fetch(tokenUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`Graph token error ${response.status}: ${errorBody}`);
+  }
+
+  const tokenData = (await response.json()) as { access_token?: string };
+  if (!tokenData.access_token) {
+    throw new Error('Graph token response missing access_token');
+  }
+
+  return tokenData.access_token;
+};
+
+const sendViaGraph = async (options: EmailOptions): Promise<void> => {
+  const accessToken = await getGraphAccessToken();
+  const { senderUser } = config.email.graph;
+
+  const recipients = options.to
+    .split(',')
+    .map((address) => address.trim())
+    .filter(Boolean)
+    .map((address) => ({ emailAddress: { address } }));
+
+  const payload = {
+    message: {
+      subject: options.subject,
+      body: {
+        contentType: 'HTML',
+        content: options.html,
+      },
+      toRecipients: recipients,
+      from: {
+        emailAddress: {
+          address: config.email.fromEmail,
+          name: config.email.fromName,
+        },
+      },
+    },
+    saveToSentItems: 'true',
+  };
+
+  const response = await fetch(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(senderUser)}/sendMail`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`Graph sendMail error ${response.status}: ${errorBody}`);
+  }
+};
+
 // Verificar conexão (opcional, para desenvolvimento)
 // Desabilitado para evitar warnings em uso interno
 // transporter.verify((error, success) => {
@@ -40,13 +118,22 @@ export class EmailService {
         return true;
       }
 
-      await transporter.sendMail({
-        from: `"${config.email.fromName}" <${config.email.fromEmail}>`,
-        to: options.to,
-        subject: options.subject,
-        text: options.text,
-        html: options.html,
-      });
+      const useGraph = config.email.provider === 'graph';
+
+      if (useGraph) {
+        if (!isGraphConfigured()) {
+          throw new Error('EMAIL_PROVIDER=graph, but AZURE_TENANT_ID/AZURE_CLIENT_ID/AZURE_CLIENT_SECRET/EMAIL_FROM are missing');
+        }
+        await sendViaGraph(options);
+      } else {
+        await transporter.sendMail({
+          from: `"${config.email.fromName}" <${config.email.fromEmail}>`,
+          to: options.to,
+          subject: options.subject,
+          text: options.text,
+          html: options.html,
+        });
+      }
 
       console.log(`✓ Email sent to ${options.to}`);
       return true;
