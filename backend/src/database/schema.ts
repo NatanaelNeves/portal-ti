@@ -608,6 +608,8 @@ export async function initializeDatabase(): Promise<void> {
     console.log('✓ Colunas de equipment_movements atualizadas');
     await database.query(`
       DO $$ 
+      DECLARE
+        history_constraint_name TEXT;
       BEGIN
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
                        WHERE table_name='tickets' AND column_name='requester_type') THEN
