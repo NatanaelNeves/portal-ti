@@ -993,13 +993,10 @@ inventoryRouter.get('/terms/:termId/return-pdf', async (req: Request, res: Respo
         ie.brand,
         ie.model,
         ie.serial_number,
-        iu.full_name as responsible_full_name,
-        iu.role as responsible_role,
         em.movement_number,
         em.notes as movement_notes
       FROM responsibility_terms rt
       JOIN inventory_equipment ie ON rt.equipment_id = ie.id
-      LEFT JOIN internal_users iu ON rt.responsible_id = iu.id
       LEFT JOIN equipment_movements em ON rt.id = em.term_id AND em.movement_type = 'return'
       WHERE rt.id = $1
     `, [termId]);
@@ -1080,7 +1077,7 @@ inventoryRouter.get('/terms/:termId/return-pdf', async (req: Request, res: Respo
         cpf: term.responsible_cpf || 'N/A',
         department: term.responsible_department || 'N/A',
         unit: term.responsible_unit || 'N/A',
-        position: term.responsible_role || term.responsible_full_name || 'N/A'
+        position: term.responsible_position || 'N/A'
       },
       history: {
         deliveryDate,
