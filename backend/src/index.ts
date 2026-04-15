@@ -6,7 +6,7 @@ import { config } from './config/environment';
 import { database } from './database/connection';
 import { initializeDatabase } from './database/schema';
 import { applyPendingMigrations } from './database/migrationRunner';
-import { generalLimiter, authLimiter } from './middleware/rateLimiter';
+import { generalLimiter } from './middleware/rateLimiter';
 import { initializeWebSocket } from './services/websocketService';
 import { initializeScheduler } from './services/schedulerService';
 
@@ -111,10 +111,10 @@ app.post('/api/internal/restart', (req, res) => {
   }, 2000);
 });
 
-// Rotas da API (authLimiter desabilitado em desenvolvimento)
-app.use('/api/auth', authLimiter, require('./routes/auth').default);
-app.use('/api/public-auth', authLimiter, require('./routes/publicAuth').default);
-app.use('/api/internal-auth', authLimiter, require('./routes/internalAuth').default);
+// Rotas da API
+app.use('/api/auth', require('./routes/auth').default);
+app.use('/api/public-auth', require('./routes/publicAuth').default);
+app.use('/api/internal-auth', require('./routes/internalAuth').default);
 app.use('/api/tickets', require('./routes/tickets').default);
 app.use('/api/assets', require('./routes/assets').default);
 app.use('/api/purchases', require('./routes/purchases').default);

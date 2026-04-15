@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { database } from '../database/connection';
 import { config } from '../config/environment';
 import { validate, loginSchema, registerSchema } from '../middleware/validation';
+import { authLimiter } from '../middleware/rateLimiter';
 
 const router = express.Router();
 
@@ -15,7 +16,7 @@ interface InternalUser {
 }
 
 // Login for internal staff
-router.post('/internal-login', validate(loginSchema), async (req: Request, res: Response) => {
+router.post('/internal-login', authLimiter, validate(loginSchema), async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
     const normalizedEmail = String(email || '').trim().toLowerCase();
@@ -75,7 +76,7 @@ router.post('/internal-login', validate(loginSchema), async (req: Request, res: 
 });
 
 // Create internal user (admin and IT staff)
-router.post('/internal-register', validate(registerSchema), async (req: Request, res: Response) => {
+router.post('/internal-register', authLimiter, validate(registerSchema), async (req: Request, res: Response) => {
   try {
     const { email, name, password, role = 'it_staff' } = req.body;
     const token = req.headers.authorization?.split(' ')[1];

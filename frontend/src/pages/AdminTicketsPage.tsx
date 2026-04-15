@@ -218,6 +218,8 @@ export default function AdminTicketsPage() {
     try {
       setLoading(true);
       const params = new URLSearchParams();
+      const hasAdvancedFilters = selectedStatuses.length > 0 || selectedPriorities.length > 0 || searchText.trim() !== '';
+      const activeStatuses = ['open', 'in_progress', 'waiting_user', 'aguardando_confirmacao'];
       const effectiveAssignmentFilter = userRole === 'admin_staff' ? 'mine' : assignmentFilter;
       const effectiveDepartmentFilter = userRole === 'admin_staff'
         ? 'administrativo'
@@ -237,6 +239,16 @@ export default function AdminTicketsPage() {
       if (searchText.trim()) {
         params.append('search', searchText.trim());
       }
+
+      if (selectedStatuses.length > 0) {
+        selectedStatuses.forEach((status) => params.append('status', status));
+      } else if (!hasAdvancedFilters) {
+        if (filterStatus === 'all') {
+          activeStatuses.forEach((status) => params.append('status', status));
+        } else if (filterStatus !== 'all') {
+          params.append('status', filterStatus);
+        }
+      }
       
       if (effectiveAssignmentFilter === 'mine' && currentUserId) {
         params.append('assigned_to', currentUserId);
@@ -247,6 +259,12 @@ export default function AdminTicketsPage() {
       // Filtro por departamento
       if (effectiveDepartmentFilter) {
         params.append('department', effectiveDepartmentFilter);
+      }
+
+      if (selectedPriorities.length > 0) {
+        selectedPriorities.forEach((priority) => params.append('priority', priority));
+      } else if (!hasAdvancedFilters && filterPriority) {
+        params.append('priority', filterPriority);
       }
       
       // Paginação
@@ -418,46 +436,9 @@ export default function AdminTicketsPage() {
     return getSlaElapsedHours(ticket) > getSLAThresholdHours(ticket.priority);
   };
 
-  // Verifica se há filtros avançados ativos
+  // A filtragem agora é feita no backend para manter paginação e contagem consistentes
   const hasAdvancedFilters = selectedStatuses.length > 0 || selectedPriorities.length > 0 || searchText.trim() !== '';
-
-  // Aplicar filtro de status aos tickets
-  const filteredTickets = tickets.filter(ticket => {
-    // Filtro rápido por prioridade (apenas quando filtros avançados não estão ativos)
-    if (!hasAdvancedFilters && filterPriority) {
-      // Só mostrar chamados ativos (open, in_progress ou waiting)
-      const activeStatuses = ['open', 'in_progress', 'waiting', 'waiting_user', 'aguardando_confirmacao'];
-      if (!activeStatuses.includes(ticket.status)) {
-        return false;
-      }
-
-      if (!isPriorityMatch(ticket, filterPriority)) {
-        return false;
-      }
-    }
-    
-    // Se há filtros avançados ativos (status OU prioridades), não aplicar filtro frontend
-    // pois o backend já filtrou corretamente
-    if (selectedStatuses.length > 0 || selectedPriorities.length > 0) {
-      return true;
-    }
-    
-    // Se filterStatus for 'all' e não há filtros avançados,
-    // mostra apenas tickets ativos (não resolvidos nem fechados)
-    if (filterStatus === 'all') {
-      const activeStatuses = ['open', 'in_progress', 'waiting', 'waiting_user', 'aguardando_confirmacao'];
-      return activeStatuses.includes(ticket.status);
-    }
-    
-    // Se filterStatus for 'open', mostra apenas tickets abertos
-    // Incluindo os críticos (que são tickets abertos com prioridade alta/crítica)
-    if (filterStatus === 'open') {
-      return ticket.status === 'open';
-    }
-    
-    // Para outros status, filtra exatamente pelo status
-    return ticket.status === filterStatus;
-  });
+  const filteredTickets = tickets;
   
   console.log('🔍 Filtros ativos:', { 
     filterStatus, 
@@ -469,8 +450,8 @@ export default function AdminTicketsPage() {
     afterFilter: filteredTickets.length 
   });
   
-  // Não precisamos mais ordenar no client-side, a API já retorna ordenado
-  const sortedTickets = [...filteredTickets];
+  // A API já retorna ordenado e paginado
+  const sortedTickets = filteredTickets;
 
   const myTicketsCount = tickets.filter(t => 
     t.assigned_to === currentUserId && 
