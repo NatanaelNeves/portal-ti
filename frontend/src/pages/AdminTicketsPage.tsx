@@ -39,6 +39,8 @@ interface TicketStats {
   resolvedToday: number;
 }
 
+const FILTER_PRIORITY_STORAGE_KEY = 'adminTickets.filterPriority';
+
 export default function AdminTicketsPage() {
   const navigate = useNavigate();
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -69,6 +71,7 @@ export default function AdminTicketsPage() {
   const [departmentFilter, setDepartmentFilter] = useState<string>('');
   const [userRole, setUserRole] = useState<string>('');
   const [isContextReady, setIsContextReady] = useState(false);
+  const [priorityFeedback, setPriorityFeedback] = useState('');
 
   useEffect(() => {
     const token = localStorage.getItem('internal_token');
@@ -90,6 +93,11 @@ export default function AdminTicketsPage() {
       setUserRole(user.role || '');
       setCurrentPage(1);
 
+      const savedPriority = localStorage.getItem(FILTER_PRIORITY_STORAGE_KEY);
+      if (savedPriority === 'high' || savedPriority === 'medium' || savedPriority === 'low') {
+        setFilterPriority(savedPriority);
+      }
+
       if (user.role === 'admin_staff') {
         setDepartmentFilter('administrativo');
         setAssignmentFilter('mine');
@@ -107,6 +115,24 @@ export default function AdminTicketsPage() {
       return;
     }
   }, [navigate]);
+
+  useEffect(() => {
+    if (filterPriority) {
+      localStorage.setItem(FILTER_PRIORITY_STORAGE_KEY, filterPriority);
+    } else {
+      localStorage.removeItem(FILTER_PRIORITY_STORAGE_KEY);
+    }
+  }, [filterPriority]);
+
+  useEffect(() => {
+    if (!priorityFeedback) return;
+
+    const timer = window.setTimeout(() => {
+      setPriorityFeedback('');
+    }, 1800);
+
+    return () => window.clearTimeout(timer);
+  }, [priorityFeedback]);
 
   useEffect(() => {
     if (!isContextReady) return;
@@ -378,17 +404,6 @@ export default function AdminTicketsPage() {
     }
   };
 
-  const getPriorityMetricLabel = (priority: 'high' | 'medium' | 'low') => {
-    switch (priority) {
-      case 'high':
-        return 'Alta prioridade';
-      case 'medium':
-        return 'Média prioridade';
-      case 'low':
-        return 'Baixa prioridade';
-    }
-  };
-
   const getTypeLabel = (type?: string) => {
     switch (type) {
       case 'incident':
@@ -485,6 +500,27 @@ export default function AdminTicketsPage() {
     return 'agora';
   };
 
+  const getAgeToneClass = (date: string) => {
+    const now = new Date();
+    const then = new Date(date);
+    const diffMs = now.getTime() - then.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+
+    if (diffHours >= 24) return 'time-ago--critical';
+    if (diffHours >= 8) return 'time-ago--warning';
+    return 'time-ago--fresh';
+  };
+
+  const handlePriorityChipSelect = (value: 'high' | 'medium' | 'low' | null) => {
+    setFilterPriority(value);
+    if (value) {
+      setPriorityFeedback(`Prioridade ${getPriorityLabel(value)} aplicada`);
+    } else {
+      setPriorityFeedback('Filtro de prioridade limpo');
+    }
+    setCurrentPage(1);
+  };
+
   const getSLAThresholdHours = (priority: string) => {
     if (priority === 'critical') return 4;
     if (priority === 'high') return 24;
@@ -502,6 +538,18 @@ export default function AdminTicketsPage() {
   const isTicketOverdue = (ticket: Ticket) => {
     if (ticket.status === 'closed' || ticket.status === 'resolved') return false;
     return getSlaElapsedHours(ticket) > getSLAThresholdHours(ticket.priority);
+  };
+
+  const canQuickResolve = (ticket: Ticket) => {
+    if (!ticket.assigned_to) return false;
+    if (ticket.assigned_to !== currentUserId) return false;
+    return ticket.status !== 'closed' && ticket.status !== 'resolved';
+  };
+
+  const canMoveToWaiting = (ticket: Ticket) => {
+    if (!ticket.assigned_to) return false;
+    if (ticket.assigned_to !== currentUserId) return false;
+    return ticket.status !== 'closed' && ticket.status !== 'open';
   };
 
   // A filtragem agora é feita no backend para manter paginação e contagem consistentes
@@ -531,9 +579,14 @@ export default function AdminTicketsPage() {
   const formattedLastUpdate = lastUpdate
     ? `${lastUpdate.toLocaleDateString('pt-BR')} às ${lastUpdate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
     : 'Ainda sem atualização';
-  const panelActionsBlocked = selectedTicket
-    ? selectedTicket.status === 'open' || !selectedTicket.assigned_to || selectedTicket.status === 'closed'
-    : true;
+  const priorityOptions: Array<{ value: 'high' | 'medium' | 'low' | null; label: string; count: number }> = [
+    { value: null, label: 'Todas', count: totalTickets || sortedTickets.length },
+    { value: 'high', label: 'Alta', count: getPriorityCount('high') },
+    { value: 'medium', label: 'Media', count: getPriorityCount('medium') },
+    { value: 'low', label: 'Baixa', count: getPriorityCount('low') },
+  ];
+  const panelCanResolve = selectedTicket ? canQuickResolve(selectedTicket) : false;
+  const panelCanWait = selectedTicket ? canMoveToWaiting(selectedTicket) : false;
 
   if (!localStorage.getItem('internal_token')) {
     return null;
@@ -543,13 +596,12 @@ export default function AdminTicketsPage() {
     <div className="admin-tickets-dashboard">
       <header className="dashboard-header card">
         <div className="dashboard-header-main">
-          <h1>{departmentFilter === 'administrativo' ? '🏢 Central Operacional Administrativa' : '🧑‍💻 Central Operacional TI'}</h1>
-          <p>Painel de atendimento em tempo real</p>
+          <h1>{departmentFilter === 'administrativo' ? 'Central Operacional Administrativa' : 'Central Operacional TI'}</h1>
         </div>
         <div className="dashboard-header-status">
           <span className="status-chip">
             <span className="status-dot" aria-hidden="true"></span>
-            <span>Atualizado às {formattedLastUpdate}</span>
+            <span>{formattedLastUpdate}</span>
           </span>
           <span className="status-chip">
             <strong>{sortedTickets.length}</strong> na fila
@@ -594,117 +646,50 @@ export default function AdminTicketsPage() {
 
       {/* Filtros Rápidos por Prioridade */}
       <div className="stats-container">
-        <div className="stats-section">
-          <h3 className="stats-section-title">Filtrar por Prioridade</h3>
-          <div className="stats-grid stats-grid-filters stats-grid-priority">
-
-            <button
-              type="button"
-              className={`stat-card priority-card priority-card--high ${hasAdvancedFilters ? 'is-disabled' : ''} ${filterPriority === 'high' ? 'is-active' : ''}`}
-              onClick={() => {
-                if (!hasAdvancedFilters) {
-                  setFilterPriority(filterPriority === 'high' ? null : 'high');
-                }
-              }}
-              disabled={hasAdvancedFilters}
-              aria-pressed={filterPriority === 'high'}
-            >
-              <span className="priority-card-icon" aria-hidden="true">
-                <span className="stat-icon">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10"/>
-                    <polyline points="12 6 12 12 16 14"/>
-                  </svg>
-                </span>
-              </span>
-              <span className="priority-card-content">
-                <span className="stat-number stat-number--priority stat-number--high">{getPriorityCount('high')}</span>
-                <span className="stat-label stat-label--priority">{getPriorityMetricLabel('high')}</span>
-              </span>
-            </button>
-
-            <button
-              type="button"
-              className={`stat-card priority-card priority-card--medium ${hasAdvancedFilters ? 'is-disabled' : ''} ${filterPriority === 'medium' ? 'is-active' : ''}`}
-              onClick={() => {
-                if (!hasAdvancedFilters) {
-                  setFilterPriority(filterPriority === 'medium' ? null : 'medium');
-                }
-              }}
-              disabled={hasAdvancedFilters}
-              aria-pressed={filterPriority === 'medium'}
-            >
-              <span className="priority-card-icon" aria-hidden="true">
-                <span className="stat-icon">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#eab308" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10"/>
-                    <polyline points="12 6 12 12 16 14"/>
-                  </svg>
-                </span>
-              </span>
-              <span className="priority-card-content">
-                <span className="stat-number stat-number--priority stat-number--medium">{getPriorityCount('medium')}</span>
-                <span className="stat-label stat-label--priority">{getPriorityMetricLabel('medium')}</span>
-              </span>
-            </button>
-
-            <button
-              type="button"
-              className={`stat-card priority-card priority-card--low ${hasAdvancedFilters ? 'is-disabled' : ''} ${filterPriority === 'low' ? 'is-active' : ''}`}
-              onClick={() => {
-                if (!hasAdvancedFilters) {
-                  setFilterPriority(filterPriority === 'low' ? null : 'low');
-                }
-              }}
-              disabled={hasAdvancedFilters}
-              aria-pressed={filterPriority === 'low'}
-            >
-              <span className="priority-card-icon" aria-hidden="true">
-                <span className="stat-icon">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                    <polyline points="22 4 12 14.01 9 11.01"/>
-                  </svg>
-                </span>
-              </span>
-              <span className="priority-card-content">
-                <span className="stat-number stat-number--priority stat-number--low">{getPriorityCount('low')}</span>
-                <span className="stat-label stat-label--priority">{getPriorityMetricLabel('low')}</span>
-              </span>
-            </button>
+        <div className="priority-toolbar" role="group" aria-label="Filtrar por prioridade">
+          <span className="priority-toolbar-label">Prioridade</span>
+          <div className="priority-chip-row">
+            {priorityOptions.map((option) => {
+              const isActive = option.value === null ? filterPriority === null : filterPriority === option.value;
+              const optionClass = option.value === null ? 'all' : option.value;
+              return (
+                <button
+                  key={option.value ?? 'all'}
+                  type="button"
+                  className={`priority-chip priority-chip--${optionClass} ${isActive ? 'is-active' : ''}`}
+                  onClick={() => {
+                    if (!hasAdvancedFilters) {
+                      handlePriorityChipSelect(option.value);
+                    }
+                  }}
+                  disabled={hasAdvancedFilters}
+                  aria-pressed={isActive}
+                >
+                  <span>{option.label}</span>
+                  <span className="priority-chip-count">{option.count}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        <div className="stats-section">
-          <h3 className="stats-section-title">Resumo do Dia</h3>
-          <div className="stats-grid stats-grid-metrics">
-            <div className="stat-card new is-static">
-              <span className="stat-icon-wrap" aria-hidden="true">
-                <span className="stat-icon">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
-                  </svg>
-                </span>
-              </span>
-              <span className={getMetricValueClass(stats.newToday)}>{stats.newToday}</span>
-              <span className="stat-label">Novos Hoje</span>
-            </div>
-
-            <div className="stat-card resolved is-static">
-              <span className="stat-icon-wrap" aria-hidden="true">
-                <span className="stat-icon">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                    <polyline points="22 4 12 14.01 9 11.01"/>
-                  </svg>
-                </span>
-              </span>
-              <span className={getMetricValueClass(stats.resolvedToday)}>{stats.resolvedToday}</span>
-              <span className="stat-label">Resolvidos Hoje</span>
-            </div>
+        <div className="day-summary-compact" aria-label="Resumo do dia">
+          <div className="summary-pill">
+            <span className={getMetricValueClass(stats.newToday)}>{stats.newToday}</span>
+            <span className="summary-pill-label">Novos</span>
+          </div>
+          <div className="summary-pill">
+            <span className={getMetricValueClass(stats.resolvedToday)}>{stats.resolvedToday}</span>
+            <span className="summary-pill-label">Resolvidos</span>
           </div>
         </div>
       </div>
+
+      {priorityFeedback && (
+        <div className="priority-feedback" role="status" aria-live="polite">
+          {priorityFeedback}
+        </div>
+      )}
 
       {/* Indicador de Filtro Rápido Ativo */}
       {filterPriority && !hasAdvancedFilters && (
@@ -727,59 +712,6 @@ export default function AdminTicketsPage() {
         </div>
       )}
 
-      {/* Filtros de Atribuição */}
-      <div className="assignment-filters">
-        {userRole !== 'admin_staff' && (
-          <button 
-            className={`filter-btn ${assignmentFilter === 'all' && filterStatus === 'all' ? 'active' : ''}`}
-            onClick={() => {
-              setAssignmentFilter('all');
-              setFilterStatus('all');
-            }}
-          >
-            Fila ativa
-          </button>
-        )}
-        <button 
-          className={`filter-btn filter-mine ${assignmentFilter === 'mine' ? 'active' : ''}`}
-          onClick={() => {
-            setAssignmentFilter('mine');
-            setFilterStatus('all');
-          }}
-        >
-          Meus atendimentos ({myTicketsCount})
-        </button>
-        {userRole !== 'admin_staff' && (
-          <button 
-            className={`filter-btn ${assignmentFilter === 'unassigned' ? 'active' : ''}`}
-            onClick={() => {
-              setAssignmentFilter('unassigned');
-              setFilterStatus('all');
-            }}
-          >
-            Não atribuídos
-          </button>
-        )}
-        <button 
-          className={`filter-btn filter-btn-toggle ${showFilters ? 'active' : ''}`}
-          onClick={() => {
-            setShowFilters(!showFilters);
-            // Quando abrir filtros avançados, reseta o filtro rápido para evitar conflitos
-            if (!showFilters) {
-              setFilterStatus('all');
-              setFilterPriority(null);
-            }
-          }}
-        >
-          {showFilters ? 'Ocultar filtros' : 'Filtros avançados'}
-          {hasAdvancedFilters && (
-            <span className="filter-counter">
-              {activeFiltersCount}
-            </span>
-          )}
-        </button>
-      </div>
-
       {/* Filtros Avançados (Collapsible) */}
       {showFilters && (
         <div className="advanced-filters card">
@@ -793,8 +725,14 @@ export default function AdminTicketsPage() {
           )}
           <div className="advanced-filters-grid">
             <div className="filter-group">
-              <label className="filter-label">🔍 Buscar:</label>
+              <label className="filter-label">Buscar</label>
               <div className="filter-input-wrap">
+                <span className="filter-input-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
+                    <path d="M20 20L16.6 16.6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </span>
                 <input 
                   type="text"
                   placeholder="Buscar por título, descrição, usuário ou e-mail"
@@ -822,64 +760,62 @@ export default function AdminTicketsPage() {
             </div>
 
             <div className="filter-group">
-              <label className="filter-label">📊 Status:</label>
-              <div className="advanced-checkbox-list">
+              <label className="filter-label">Status</label>
+              <div className="advanced-chip-list">
                 {[
-                  { value: 'open', label: '⚪ Aberto' },
-                  { value: 'in_progress', label: '🔵 Em Atendimento' },
-                  { value: 'waiting_user', label: '🟡 Aguardando' },
-                  { value: 'aguardando_confirmacao', label: '🔎 Aguardando Confirmação' },
-                  { value: 'resolved', label: '✅ Resolvido' },
-                  { value: 'closed', label: '🔒 Fechado' }
+                  { value: 'open', label: 'Aberto', dotClass: 'advanced-chip-dot--open' },
+                  { value: 'in_progress', label: 'Em atendimento', dotClass: 'advanced-chip-dot--in-progress' },
+                  { value: 'waiting_user', label: 'Aguardando usuário', dotClass: 'advanced-chip-dot--waiting' },
+                  { value: 'aguardando_confirmacao', label: 'Aguardando confirmação', dotClass: 'advanced-chip-dot--confirm' },
+                  { value: 'resolved', label: 'Resolvido', dotClass: 'advanced-chip-dot--resolved' },
+                  { value: 'closed', label: 'Fechado', dotClass: 'advanced-chip-dot--closed' }
                 ].map(status => (
-                  <label
+                  <button
                     key={status.value}
-                    className={`advanced-checkbox-item ${selectedStatuses.includes(status.value) ? 'is-selected' : ''}`}
+                    type="button"
+                    className={`advanced-chip ${selectedStatuses.includes(status.value) ? 'is-selected' : ''}`}
+                    aria-pressed={selectedStatuses.includes(status.value)}
+                    onClick={() => {
+                      if (selectedStatuses.includes(status.value)) {
+                        setSelectedStatuses(selectedStatuses.filter(s => s !== status.value));
+                      } else {
+                        setSelectedStatuses([...selectedStatuses, status.value]);
+                      }
+                      setCurrentPage(1);
+                    }}
                   >
-                    <input
-                      type="checkbox"
-                      checked={selectedStatuses.includes(status.value)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedStatuses([...selectedStatuses, status.value]);
-                        } else {
-                          setSelectedStatuses(selectedStatuses.filter(s => s !== status.value));
-                        }
-                        setCurrentPage(1);
-                      }}
-                    />
+                    <span className={`advanced-chip-dot ${status.dotClass}`} aria-hidden="true"></span>
                     {status.label}
-                  </label>
+                  </button>
                 ))}
               </div>
             </div>
 
             <div className="filter-group">
-              <label className="filter-label">🚨 Prioridade:</label>
-              <div className="advanced-checkbox-list">
+              <label className="filter-label">Prioridade</label>
+              <div className="advanced-chip-list">
                 {[
-                  { value: 'high', label: '🟠 Alta' },
-                  { value: 'medium', label: '🟡 Média' },
-                  { value: 'low', label: '🟢 Baixa' }
+                  { value: 'high', label: 'Alta', dotClass: 'advanced-chip-dot--high' },
+                  { value: 'medium', label: 'Média', dotClass: 'advanced-chip-dot--medium' },
+                  { value: 'low', label: 'Baixa', dotClass: 'advanced-chip-dot--low' }
                 ].map(priority => (
-                  <label
+                  <button
                     key={priority.value}
-                    className={`advanced-checkbox-item ${selectedPriorities.includes(priority.value) ? 'is-selected' : ''}`}
+                    type="button"
+                    className={`advanced-chip ${selectedPriorities.includes(priority.value) ? 'is-selected' : ''}`}
+                    aria-pressed={selectedPriorities.includes(priority.value)}
+                    onClick={() => {
+                      if (selectedPriorities.includes(priority.value)) {
+                        setSelectedPriorities(selectedPriorities.filter(p => p !== priority.value));
+                      } else {
+                        setSelectedPriorities([...selectedPriorities, priority.value]);
+                      }
+                      setCurrentPage(1);
+                    }}
                   >
-                    <input
-                      type="checkbox"
-                      checked={selectedPriorities.includes(priority.value)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedPriorities([...selectedPriorities, priority.value]);
-                        } else {
-                          setSelectedPriorities(selectedPriorities.filter(p => p !== priority.value));
-                        }
-                        setCurrentPage(1);
-                      }}
-                    />
+                    <span className={`advanced-chip-dot ${priority.dotClass}`} aria-hidden="true"></span>
                     {priority.label}
-                  </label>
+                  </button>
                 ))}
               </div>
             </div>
@@ -888,7 +824,7 @@ export default function AdminTicketsPage() {
           <div className="advanced-filters-footer">
             <button 
               type="button"
-              className="advanced-clear-btn"
+              className="advanced-clear-btn advanced-clear-btn-inline"
               onClick={() => {
                 setSearchText('');
                 setSelectedStatuses([]);
@@ -907,138 +843,214 @@ export default function AdminTicketsPage() {
       {/* Layout Principal: Fila + Painel Lateral */}
       <div className="dashboard-layout">
         {/* Fila Inteligente */}
-        <section className="ticket-queue card">
-          <div className="queue-header card-header">
-            <h2>📋 Fila de Atendimento</h2>
-            <span className="queue-count">
-              {sortedTickets.length} chamados
-              {filterStatus !== 'all' && ` (${getStatusLabel(filterStatus)})`}
-              {filterPriority && ` • Prioridade ${getPriorityLabel(filterPriority)}`}
-            </span>
+        <div className="queue-column">
+          <div className="assignment-filters assignment-filters--integrated">
+            {userRole !== 'admin_staff' && (
+              <button
+                className={`filter-btn ${assignmentFilter === 'all' && filterStatus === 'all' ? 'active' : ''}`}
+                onClick={() => {
+                  setAssignmentFilter('all');
+                  setFilterStatus('all');
+                }}
+              >
+                Fila ativa
+              </button>
+            )}
+            <button
+              className={`filter-btn filter-mine ${assignmentFilter === 'mine' ? 'active' : ''}`}
+              onClick={() => {
+                setAssignmentFilter('mine');
+                setFilterStatus('all');
+              }}
+            >
+              Meus atendimentos ({myTicketsCount})
+            </button>
+            {userRole !== 'admin_staff' && (
+              <button
+                className={`filter-btn ${assignmentFilter === 'unassigned' ? 'active' : ''}`}
+                onClick={() => {
+                  setAssignmentFilter('unassigned');
+                  setFilterStatus('all');
+                }}
+              >
+                Não atribuídos
+              </button>
+            )}
+            <button
+              className={`filter-btn filter-btn-toggle ${showFilters ? 'active' : ''}`}
+              onClick={() => {
+                setShowFilters(!showFilters);
+                if (!showFilters) {
+                  setFilterStatus('all');
+                  setFilterPriority(null);
+                }
+              }}
+            >
+              {showFilters ? 'Ocultar filtros' : 'Filtros avançados'}
+              {hasAdvancedFilters && (
+                <span className="filter-counter">
+                  {activeFiltersCount}
+                </span>
+              )}
+            </button>
           </div>
-
-          {loading ? (
-            <div className="loading">Carregando...</div>
-          ) : sortedTickets.length === 0 ? (
-            <div className="empty-queue">
-              <span className="empty-icon">✨</span>
-              <p>Nenhum chamado na fila!</p>
-              <small>Você está em dia com o atendimento</small>
+          <section className="ticket-queue card ticket-queue--attached">
+            <div className="queue-header card-header">
+              <h2>Fila de Atendimento</h2>
+              <span className="queue-count">
+                {sortedTickets.length} chamados
+                {filterStatus !== 'all' && ` (${getStatusLabel(filterStatus)})`}
+                {filterPriority && ` • Prioridade ${getPriorityLabel(filterPriority)}`}
+              </span>
             </div>
-          ) : (
-            <div className="tickets-list">
-              {sortedTickets.map((ticket) => {
-                return (
-                <div
-                  key={ticket.id}
-                  className={`ticket-card ticket-status-${ticket.status} ${selectedTicket?.id === ticket.id ? 'active' : ''} ticket-priority-${ticket.priority || 'neutral'}`}
-                  onClick={() => setSelectedTicket(ticket)}
-                >
-                  <div className="ticket-card-top">
-                    <div className="ticket-card-main">
-                      <div className="ticket-card-title">{ticket.title}</div>
-                      <div className="ticket-card-requester">
-                        {ticket.requester_type === 'public' && ticket.requester_name ? (
-                          <>
-                            <span className="requester-name">{ticket.requester_name}</span>
-                            {ticket.requester_email && (
-                              <span className="requester-meta">{ticket.requester_email}</span>
-                            )}
-                            {(ticket.requester_department || ticket.requester_unit) && (
-                              <span className="requester-meta">
-                                {ticket.requester_department && `${ticket.requester_department}`}
-                                {ticket.requester_department && ticket.requester_unit && ' • '}
-                                {ticket.requester_unit && `${ticket.requester_unit}`}
-                              </span>
-                            )}
-                          </>
-                        ) : (
-                          <span className="requester-name">Solicitante interno</span>
-                        )}
+
+            {loading ? (
+              <div className="loading">Carregando...</div>
+            ) : sortedTickets.length === 0 ? (
+              <div className="empty-queue">
+                <span className="empty-icon">✨</span>
+                <p>Nenhum chamado na fila!</p>
+                <small>Voce esta em dia com o atendimento</small>
+              </div>
+            ) : (
+              <div className="tickets-list">
+                {sortedTickets.map((ticket) => {
+                  return (
+                  <div
+                    key={ticket.id}
+                    className={`ticket-card ticket-status-${ticket.status} ${selectedTicket?.id === ticket.id ? 'active' : ''} ticket-priority-${ticket.priority || 'neutral'}`}
+                    onClick={() => setSelectedTicket(ticket)}
+                  >
+                    <div className="ticket-card-top">
+                      <div className="ticket-card-main">
+                        <div className="ticket-card-title">{ticket.title}</div>
+                        <div className="ticket-card-requester">
+                          {ticket.requester_type === 'public' && ticket.requester_name ? (
+                            <>
+                              <span className="requester-name">{ticket.requester_name}</span>
+                              {ticket.requester_email && (
+                                <span className="requester-meta">{ticket.requester_email}</span>
+                              )}
+                              {(ticket.requester_department || ticket.requester_unit) && (
+                                <span className="requester-meta">
+                                  {ticket.requester_department && `${ticket.requester_department}`}
+                                  {ticket.requester_department && ticket.requester_unit && ' • '}
+                                  {ticket.requester_unit && `${ticket.requester_unit}`}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="requester-name">Solicitante interno</span>
+                          )}
+                        </div>
                       </div>
+                      <span className={`time-ago ${getAgeToneClass(ticket.created_at)}`}>{getTimeAgo(ticket.created_at)}</span>
                     </div>
-                    <span className="time-ago">{getTimeAgo(ticket.created_at)}</span>
-                  </div>
 
-                  <div className="ticket-card-badges">
-                    {ticket.department && ticket.department !== 'ti' && (
-                      <span className="badge badge-dept-admin">Administrativo</span>
-                    )}
-                    {(!ticket.department || ticket.department === 'ti') && departmentFilter === '' && (
-                      <span className="badge badge-dept-ti">TI</span>
-                    )}
-                    {ticket.category && (
-                      <span className="badge badge-category">{ticket.category}</span>
-                    )}
-                    <span className={`badge ${getTypeBadgeClass(ticket.type)}`}>
-                      {getTypeLabel(ticket.type)}
-                    </span>
-                    <span className={`badge ${getPriorityBadgeClass(ticket.priority)}`}>
-                      {getPriorityLabel(ticket.priority)}
-                    </span>
-                    <span className={`badge ${getStatusBadgeClass(ticket.status)}`}>
-                      {getStatusLabel(ticket.status)}
-                    </span>
-                  </div>
-
-                  <div className="ticket-card-footer">
-                    <span className="assigned">
-                      {getUserName(ticket.assigned_to)}
-                    </span>
-                    <span className={`sla-chip ${isTicketOverdue(ticket) ? 'sla-chip-overdue' : ''}`}>
-                      {getSlaElapsedHours(ticket)}h
-                      {isTicketOverdue(ticket) ? ' • Atrasado' : ''}
-                    </span>
-                    <div className="footer-actions">
-                      {!ticket.assigned_to && ticket.status === 'open' && (
-                        <button
-                          className="btn btn-primary btn-sm btn-assume"
-                          onClick={(e) => handleQuickAssume(ticket.id, e)}
-                          title="Assumir atendimento"
-                        >
-                          Assumir
-                        </button>
+                    <div className="ticket-card-badges">
+                      {ticket.department && ticket.department !== 'ti' && (
+                        <span className="badge badge-dept-admin">Administrativo</span>
                       )}
-                      <span className={`badge badge-mini ${getStatusBadgeClass(ticket.status)}`}>
+                      {(!ticket.department || ticket.department === 'ti') && departmentFilter === '' && (
+                        <span className="badge badge-dept-ti">TI</span>
+                      )}
+                      {ticket.category && (
+                        <span className="badge badge-category">{ticket.category}</span>
+                      )}
+                      <span className={`badge ${getTypeBadgeClass(ticket.type)}`}>
+                        {getTypeLabel(ticket.type)}
+                      </span>
+                      <span className={`badge ${getPriorityBadgeClass(ticket.priority)}`}>
+                        {getPriorityLabel(ticket.priority)}
+                      </span>
+                      <span className={`badge ${getStatusBadgeClass(ticket.status)}`}>
                         {getStatusLabel(ticket.status)}
                       </span>
                     </div>
-                  </div>
-                </div>
-              )})}
-            </div>
-          )}
 
-          {/* Paginação */}
-          {totalPages > 1 && (
-            <div className="pagination card">
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-              >
-                ◀ Anterior
-              </button>
-              
-              <span className="pagination-info">
-                Página {currentPage} de {totalPages} 
-                <small>
-                  ({totalTickets} chamados)
-                </small>
-              </span>
-              
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                disabled={currentPage === totalPages}
-              >
-                Próxima ▶
-              </button>
-            </div>
-          )}
-        </section>
+                    <div className="ticket-card-footer">
+                      <span className="assigned">
+                        {getUserName(ticket.assigned_to)}
+                      </span>
+                      <span className={`sla-chip ${isTicketOverdue(ticket) ? 'sla-chip-overdue' : ''}`}>
+                        {getSlaElapsedHours(ticket)}h
+                        {isTicketOverdue(ticket) ? ' • Atrasado' : ''}
+                      </span>
+                      <div className="footer-actions">
+                        <div className="card-quick-actions">
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/admin/chamados/${ticket.id}`);
+                            }}
+                            title="Ver detalhes"
+                          >
+                            Detalhes
+                          </button>
+                          {canQuickResolve(ticket) && (
+                            <button
+                              type="button"
+                              className="btn btn-success btn-sm"
+                              onClick={(e) => handleQuickStatusChange(ticket.id, 'resolved', e)}
+                              title="Resolver chamado"
+                            >
+                              Resolver
+                            </button>
+                          )}
+                        </div>
+                        {!ticket.assigned_to && ticket.status === 'open' && (
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm btn-assume"
+                            onClick={(e) => handleQuickAssume(ticket.id, e)}
+                            title="Assumir atendimento"
+                          >
+                            Assumir
+                          </button>
+                        )}
+                        <span className={`badge badge-mini ${getStatusBadgeClass(ticket.status)}`}>
+                          {getStatusLabel(ticket.status)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )})}
+              </div>
+            )}
+
+            {/* Paginação */}
+            {totalPages > 1 && (
+              <div className="pagination card">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                >
+                  ◀ Anterior
+                </button>
+
+                <span className="pagination-info">
+                  Página {currentPage} de {totalPages}
+                  <small>
+                    ({totalTickets} chamados)
+                  </small>
+                </span>
+
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Proxima ▶
+                </button>
+              </div>
+            )}
+          </section>
+        </div>
 
         {/* Painel Lateral do Ticket Selecionado */}
         {selectedTicket ? (
@@ -1084,16 +1096,16 @@ export default function AdminTicketsPage() {
                 <button 
                   className="btn btn-warning"
                   onClick={() => handleQuickStatusChange(selectedTicket.id, 'waiting_user')}
-                  disabled={panelActionsBlocked}
-                  title={panelActionsBlocked ? 'Assuma o chamado primeiro para realizar esta ação.' : 'Marcar como aguardando resposta do usuário'}
+                  disabled={!panelCanWait}
+                  title={panelCanWait ? 'Marcar como aguardando resposta do usuário' : 'Somente o responsável atual pode usar esta ação.'}
                 >
                   Aguardar
                 </button>
                 <button 
                   className="btn btn-success"
                   onClick={() => handleQuickStatusChange(selectedTicket.id, 'resolved')}
-                  disabled={panelActionsBlocked}
-                  title={panelActionsBlocked ? 'Assuma o chamado primeiro para realizar esta ação.' : 'Marcar ticket como resolvido'}
+                  disabled={!panelCanResolve}
+                  title={panelCanResolve ? 'Marcar ticket como resolvido' : 'Somente o responsável atual pode usar esta ação.'}
                 >
                   Resolver
                 </button>
