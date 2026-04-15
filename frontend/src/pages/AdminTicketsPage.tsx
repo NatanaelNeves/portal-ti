@@ -138,7 +138,7 @@ export default function AdminTicketsPage() {
     if (!isContextReady) return;
     fetchTickets();
     fetchUsers();
-  }, [isContextReady, filterStatus, assignmentFilter, selectedStatuses, selectedPriorities, searchText, currentPage, departmentFilter, currentUserId]);
+  }, [isContextReady, filterStatus, filterPriority, assignmentFilter, selectedStatuses, selectedPriorities, searchText, currentPage, departmentFilter, currentUserId]);
 
   useEffect(() => {
     if (!isContextReady) return;
@@ -165,7 +165,7 @@ export default function AdminTicketsPage() {
       window.removeEventListener('ticket:auto_close_warning', handleRealtimeUpdate);
       window.clearInterval(refreshInterval);
     };
-  }, [isContextReady, filterStatus, assignmentFilter, selectedStatuses, selectedPriorities, searchText, currentPage, departmentFilter, currentUserId]);
+  }, [isContextReady, filterStatus, filterPriority, assignmentFilter, selectedStatuses, selectedPriorities, searchText, currentPage, departmentFilter, currentUserId]);
 
   const fetchUsers = async () => {
     try {
