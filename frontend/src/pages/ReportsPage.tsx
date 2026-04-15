@@ -115,7 +115,58 @@ interface SatisfactionData {
   }>;
 }
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
+const STATUS_CHART_COLORS = ['#378ADD', '#3B6D11', '#BA7517', '#E24B4A', '#7A8A9A'];
+
+const PRIORITY_CHART_COLORS: Record<string, string> = {
+  alta: '#E24B4A',
+  high: '#E24B4A',
+  media: '#BA7517',
+  média: '#BA7517',
+  medium: '#BA7517',
+  baixa: '#3B6D11',
+  low: '#3B6D11',
+  default: '#7A8A9A',
+};
+
+const CHART_LEGEND_COLORS: Record<string, string> = {
+  criados: '#378ADD',
+  resolvidos: '#3B6D11',
+  alta: '#E24B4A',
+  high: '#E24B4A',
+  media: '#BA7517',
+  média: '#BA7517',
+  medium: '#BA7517',
+  baixa: '#3B6D11',
+  low: '#3B6D11',
+  default: '#64748b',
+};
+
+const getPriorityChartColor = (name?: string): string => {
+  const key = String(name || '').trim().toLowerCase();
+  return PRIORITY_CHART_COLORS[key] || PRIORITY_CHART_COLORS.default;
+};
+
+const formatChartLegend = (value: string) => {
+  const key = String(value || '').trim().toLowerCase();
+  const color = CHART_LEGEND_COLORS[key] || CHART_LEGEND_COLORS.default;
+  return <span style={{ color, fontSize: 12, fontWeight: 500 }}>{value}</span>;
+};
+
+const formatChartTooltip = (value: unknown, name?: string, entry?: any) => {
+  const key = String(name || '').trim().toLowerCase();
+  const semanticColor = CHART_LEGEND_COLORS[key] || entry?.color || CHART_LEGEND_COLORS.default;
+
+  return [
+    <span style={{ color: semanticColor, fontWeight: 500 }}>{String(value)}</span>,
+    <span style={{ color: semanticColor }}>{name}</span>,
+  ];
+};
+
+const getComplianceTone = (value: number): 'good' | 'warning' | 'bad' => {
+  if (value >= 80) return 'good';
+  if (value >= 50) return 'warning';
+  return 'bad';
+};
 
 const ReportsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'technicians' | 'sla' | 'trends'>('overview');
@@ -324,10 +375,22 @@ const ReportsPage: React.FC = () => {
       low: 'Baixa',
       medium: 'Média',
       high: 'Alta',
-      critical: 'Crítica',
+      critical: 'Alta',
     };
     return labels[priority] || priority;
   };
+
+  const getPriorityBadgeClass = (priority: string) => {
+    const normalized = priority === 'critical' ? 'high' : priority;
+    return `priority-pill priority-${normalized}`;
+  };
+
+  const getSlaBadgeClass = (value: number) => {
+    const tone = getComplianceTone(value);
+    return `sla-badge sla-badge--${tone}`;
+  };
+
+  const hasPriorityChartData = Boolean(trendsData?.byPriority?.some((item) => item.value > 0));
 
   const getRoleLabel = (role: string) => {
     const labels: Record<string, string> = {
@@ -353,21 +416,24 @@ const ReportsPage: React.FC = () => {
   return (
     <div className="reports-page">
       <div className="reports-header">
-        <h1>📊 Relatórios e Análises</h1>
+        <h1 className="page-title">Relatórios e Análises</h1>
         <div className="export-buttons">
-          <button onClick={handleExportTickets} className="export-btn">
-            📥 Exportar Tickets
+          <button onClick={handleExportTickets} className="export-btn" title="Exportar Tickets" aria-label="Exportar Tickets">
+            <span className="export-btn-icon" aria-hidden="true">📥</span>
+            <span className="export-btn-label">Exportar Tickets</span>
           </button>
-          <button onClick={handleExportTechnicians} className="export-btn">
-            📥 Exportar Equipe
+          <button onClick={handleExportTechnicians} className="export-btn" title="Exportar Equipe" aria-label="Exportar Equipe">
+            <span className="export-btn-icon" aria-hidden="true">📥</span>
+            <span className="export-btn-label">Exportar Equipe</span>
           </button>
-          <button onClick={handleExportConsolidated} className="export-btn primary">
-            📥 Relatório Completo
+          <button onClick={handleExportConsolidated} className="export-btn primary" title="Relatório Completo" aria-label="Relatório Completo">
+            <span className="export-btn-icon" aria-hidden="true">📥</span>
+            <span className="export-btn-label">Relatório Completo</span>
           </button>
         </div>
       </div>
 
-      <div className="date-filters">
+      <div className="date-filters filter-card">
         <label>
           Data Início:
           <input
@@ -408,25 +474,25 @@ const ReportsPage: React.FC = () => {
           className={activeTab === 'overview' ? 'active' : ''}
           onClick={() => setActiveTab('overview')}
         >
-          📈 Visão Geral
+          Visão Geral
         </button>
         <button
           className={activeTab === 'technicians' ? 'active' : ''}
           onClick={() => setActiveTab('technicians')}
         >
-          👥 Equipe
+          Equipe
         </button>
         <button
           className={activeTab === 'sla' ? 'active' : ''}
           onClick={() => setActiveTab('sla')}
         >
-          ⏱️ SLA
+          SLA
         </button>
         <button
           className={activeTab === 'trends' ? 'active' : ''}
           onClick={() => setActiveTab('trends')}
         >
-          📊 Tendências
+          Tendências
         </button>
       </div>
 
@@ -438,34 +504,34 @@ const ReportsPage: React.FC = () => {
             {activeTab === 'overview' && overviewStats && (
               <div className="overview-section">
                 <div className="stats-grid">
-                  <div className="stat-card">
+                  <div className="stat-card stat-card--default">
                     <h3>Total de Tickets</h3>
                     <div className="stat-value">{overviewStats.total}</div>
                   </div>
-                  <div className="stat-card">
+                  <div className="stat-card stat-card--alta">
                     <h3>Taxa de Resolução</h3>
                     <div className="stat-value">{overviewStats.resolutionRate.percentage}%</div>
                     <div className="stat-detail">
                       {overviewStats.resolutionRate.resolved} de {overviewStats.resolutionRate.total}
                     </div>
                   </div>
-                  <div className="stat-card">
+                  <div className="stat-card stat-card--tempo">
                     <h3>Tempo Médio de Primeira Resposta</h3>
                     <div className="stat-value">{overviewStats.avgFirstResponseHours}h</div>
                   </div>
-                  <div className="stat-card">
+                  <div className="stat-card stat-card--tempo">
                     <h3>Tempo Médio de Resolução</h3>
                     <div className="stat-value">{overviewStats.avgResolutionHours}h</div>
                   </div>
-                  <div className="stat-card">
+                  <div className="stat-card stat-card--avaliacao">
                     <h3>Média de Avaliação</h3>
                     <div className="stat-value">{satisfactionData?.averageRating?.toFixed(2) ?? '0.00'}</div>
                   </div>
-                  <div className="stat-card">
+                  <div className="stat-card stat-card--avaliacao">
                     <h3>Total de Avaliações</h3>
                     <div className="stat-value">{satisfactionData?.totalRatings ?? 0}</div>
                   </div>
-                  <div className="stat-card">
+                  <div className="stat-card stat-card--avaliacao">
                     <h3>Avaliações ≥ 4</h3>
                     <div className="stat-value">{satisfactionData?.positiveRate ?? 0}%</div>
                   </div>
@@ -473,7 +539,7 @@ const ReportsPage: React.FC = () => {
 
                 {satisfactionData && satisfactionData.byStaff.length > 0 && (
                   <div className="chart-container">
-                    <h3>Satisfação por Atendente</h3>
+                    <h3 className="section-header subsection-header">Satisfação por Atendente</h3>
                     <table className="technicians-table">
                       <thead>
                         <tr>
@@ -499,7 +565,7 @@ const ReportsPage: React.FC = () => {
 
                 {satisfactionData && satisfactionData.byDepartment.length > 0 && (
                   <div className="chart-container">
-                    <h3>Satisfação por Departamento</h3>
+                    <h3 className="section-header subsection-header">Satisfação por Departamento</h3>
                     <table className="technicians-table">
                       <thead>
                         <tr>
@@ -525,7 +591,7 @@ const ReportsPage: React.FC = () => {
 
                 {satisfactionData && satisfactionData.feedbackEntries.length > 0 && (
                   <div className="chart-container">
-                    <h3>Feedbacks Recentes</h3>
+                    <h3 className="section-header subsection-header">Feedbacks Recentes</h3>
                     <table className="technicians-table">
                       <thead>
                         <tr>
@@ -588,7 +654,7 @@ const ReportsPage: React.FC = () => {
 
                 <div className="charts-row">
                   <div className="chart-card">
-                    <h3>Tickets por Status</h3>
+                    <h3 className="section-header subsection-header">Tickets por Status</h3>
                     <div className="status-list">
                       {Object.entries(overviewStats.byStatus).map(([status, count]) => (
                         <div key={status} className="status-item">
@@ -600,10 +666,10 @@ const ReportsPage: React.FC = () => {
                   </div>
 
                   <div className="chart-card">
-                    <h3>Tickets por Prioridade</h3>
+                    <h3 className="section-header subsection-header">Tickets por Prioridade</h3>
                     <div className="priority-list">
                       {Object.entries(overviewStats.byPriority).map(([priority, count]) => (
-                        <div key={priority} className={`priority-item priority-${priority}`}>
+                        <div key={priority} className={`priority-item priority-${priority === 'critical' ? 'high' : priority}`}>
                           <span className="priority-label">{getPriorityLabel(priority)}</span>
                           <span className="priority-count">{count}</span>
                         </div>
@@ -616,7 +682,7 @@ const ReportsPage: React.FC = () => {
 
             {activeTab === 'technicians' && (
               <div className="technicians-section">
-                <h2>Performance por Equipe</h2>
+                <h2 className="section-header">Performance por Equipe</h2>
 
                 {orderedTeams.length === 0 ? (
                   <div className="empty-state">
@@ -653,7 +719,7 @@ const ReportsPage: React.FC = () => {
                               <tbody>
                                 {members.map((tech) => (
                                   <tr key={tech.id}>
-                                    <td>{tech.name}</td>
+                                    <td className="table-name-cell">{tech.name}</td>
                                     <td>
                                       <span className={`role-pill role-${tech.team}`}>
                                         {getRoleLabel(tech.role)}
@@ -666,7 +732,7 @@ const ReportsPage: React.FC = () => {
                                     <td>{tech.handledToday}</td>
                                     <td>{tech.avgResolutionHours}h</td>
                                     <td>
-                                      <span className={`sla-badge ${tech.resolutionRate >= 80 ? 'good' : tech.resolutionRate >= 60 ? 'warning' : 'critical'}`}>
+                                      <span className={getSlaBadgeClass(tech.resolutionRate)}>
                                         {tech.resolutionRate}%
                                       </span>
                                     </td>
@@ -685,7 +751,7 @@ const ReportsPage: React.FC = () => {
 
             {activeTab === 'sla' && slaStats && slaStats.overall && (
               <div className="sla-section">
-                <h2>Análise de SLA</h2>
+                <h2 className="section-header">Análise de SLA</h2>
                 
                 {slaStats.overall.total === 0 ? (
                   <div className="empty-state">
@@ -695,16 +761,18 @@ const ReportsPage: React.FC = () => {
                 ) : (
                   <>
                     <div className="sla-overview">
-                      <div className="stat-card">
-                        <h3>Conformidade Geral</h3>
-                        <div className="stat-value">{slaStats.overall.compliancePercentage}%</div>
+                      <div className="stat-card sla-overview-card">
+                        <h3 className="section-header subsection-header">Conformidade Geral</h3>
+                        <div className={`stat-value stat-value--${getComplianceTone(slaStats.overall.compliancePercentage)}`}>
+                          {slaStats.overall.compliancePercentage}%
+                        </div>
                         <div className="stat-detail">
                           {slaStats.overall.withinSLA} dentro / {slaStats.overall.breachedSLA} fora
                         </div>
                       </div>
                     </div>
 
-                    <h3>Por Prioridade</h3>
+                    <h3 className="section-header subsection-header">Por Prioridade</h3>
                     <div className="sla-table">
                       <table>
                         <thead>
@@ -722,7 +790,7 @@ const ReportsPage: React.FC = () => {
                           {slaStats.byPriority?.map((item) => (
                             <tr key={item.priority}>
                               <td>
-                                <span className={`priority-badge priority-${item.priority}`}>
+                                <span className={getPriorityBadgeClass(item.priority)}>
                                   {getPriorityLabel(item.priority)}
                                 </span>
                               </td>
@@ -730,7 +798,7 @@ const ReportsPage: React.FC = () => {
                               <td>{item.withinSLA}</td>
                               <td>{item.breachedSLA}</td>
                               <td>
-                                <span className={`sla-badge ${item.compliancePercentage >= 80 ? 'good' : item.compliancePercentage >= 60 ? 'warning' : 'critical'}`}>
+                                <span className={getSlaBadgeClass(item.compliancePercentage)}>
                                   {item.compliancePercentage}%
                                 </span>
                               </td>
@@ -755,7 +823,7 @@ const ReportsPage: React.FC = () => {
             {activeTab === 'trends' && trendsData && (
               <div className="trends-section">
                 <div className="trends-header">
-                  <h2>📊 Tendências e Análises</h2>
+                  <h2 className="section-header">Tendências e Análises</h2>
                   <div className="period-selector">
                     <button
                       className={trendsPeriod === '7days' ? 'active' : ''}
@@ -787,24 +855,27 @@ const ReportsPage: React.FC = () => {
                 <div className="charts-grid">
                   {/* Gráfico de Linha - Tickets Criados vs Resolvidos */}
                   <div className="chart-container">
-                    <h3>📈 Tickets Criados vs Resolvidos</h3>
-                    <ResponsiveContainer width="100%" height={300}>
+                    <h3 className="section-header subsection-header">Tickets Criados vs Resolvidos</h3>
+                    <div className="chart-plot">
+                    <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={mergeChartData(trendsData.created, trendsData.resolved)}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis 
                           dataKey="date" 
-                          tick={{ fontSize: 12 }}
+                          tick={{ fontSize: 10 }}
                           angle={-45}
                           textAnchor="end"
                           height={80}
+                          tickMargin={10}
+                          interval={0}
                         />
                         <YAxis />
-                        <Tooltip />
-                        <Legend />
+                        <Tooltip formatter={formatChartTooltip} />
+                        <Legend formatter={formatChartLegend} wrapperStyle={{ paddingTop: 8 }} />
                         <Line 
                           type="monotone" 
                           dataKey="created" 
-                          stroke="#1a73e8" 
+                          stroke="#378ADD" 
                           strokeWidth={2}
                           name="Criados"
                           dot={{ r: 4 }}
@@ -812,82 +883,96 @@ const ReportsPage: React.FC = () => {
                         <Line 
                           type="monotone" 
                           dataKey="resolved" 
-                          stroke="#34a853" 
+                          stroke="#3B6D11" 
                           strokeWidth={2}
                           name="Resolvidos"
                           dot={{ r: 4 }}
                         />
                       </LineChart>
                     </ResponsiveContainer>
+                    </div>
                   </div>
 
                   {/* Gráfico de Área - Tendência de Criação */}
                   <div className="chart-container">
-                    <h3>📉 Tendência de Abertura de Tickets</h3>
-                    <ResponsiveContainer width="100%" height={300}>
+                    <h3 className="section-header subsection-header">Tendência de Abertura de Tickets</h3>
+                    <div className="chart-plot">
+                    <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={trendsData.created}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis 
                           dataKey="date" 
-                          tick={{ fontSize: 12 }}
+                          tick={{ fontSize: 10 }}
                           angle={-45}
                           textAnchor="end"
                           height={80}
+                          tickMargin={10}
+                          interval={0}
                         />
                         <YAxis />
-                        <Tooltip />
+                        <Tooltip formatter={formatChartTooltip} />
                         <Area 
                           type="monotone" 
                           dataKey="count" 
-                          stroke="#1a73e8" 
-                          fill="#1a73e8"
-                          fillOpacity={0.6}
+                          stroke="#378ADD" 
+                          fill="#378ADD"
+                          fillOpacity={0.22}
                           name="Tickets"
                         />
                       </AreaChart>
                     </ResponsiveContainer>
+                    </div>
                   </div>
 
                   {/* Gráfico de Barras - Distribuição por Status */}
                   <div className="chart-container">
-                    <h3>📊 Distribuição por Status</h3>
-                    <ResponsiveContainer width="100%" height={300}>
+                    <h3 className="section-header subsection-header">Distribuição por Status</h3>
+                    <div className="chart-plot">
+                    <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={trendsData.byStatus}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
+                        <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                         <YAxis />
-                        <Tooltip />
-                        <Bar dataKey="value" fill="#1a73e8" name="Quantidade">
+                        <Tooltip formatter={formatChartTooltip} />
+                        <Bar dataKey="value" fill="#378ADD" name="Quantidade">
                           {trendsData.byStatus.map((_entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            <Cell key={`cell-${index}`} fill={STATUS_CHART_COLORS[index % STATUS_CHART_COLORS.length]} />
                           ))}
                         </Bar>
                       </BarChart>
                     </ResponsiveContainer>
+                    </div>
                   </div>
 
                   {/* Gráfico de Pizza - Distribuição por Prioridade */}
                   <div className="chart-container">
-                    <h3>🎯 Distribuição por Prioridade</h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={trendsData.byPriority}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          label={({ name, percent }) => `${name}: ${((percent || 0) * 100).toFixed(0)}%`}
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="value"
-                        >
-                          {trendsData.byPriority.map((_entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
+                    <h3 className="section-header subsection-header">Distribuição por Prioridade</h3>
+                    <div className="chart-plot">
+                      {hasPriorityChartData ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={trendsData.byPriority}
+                              cx="50%"
+                              cy="50%"
+                              labelLine={false}
+                              label={({ name, percent }) => `${name}: ${((percent || 0) * 100).toFixed(0)}%`}
+                              outerRadius={80}
+                              fill="#8884d8"
+                              dataKey="value"
+                            >
+                              {trendsData.byPriority.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={getPriorityChartColor(entry.name)} />
+                              ))}
+                            </Pie>
+                            <Tooltip formatter={formatChartTooltip} />
+                            <Legend formatter={formatChartLegend} wrapperStyle={{ paddingTop: 8 }} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="chart-empty-state">Sem dados disponíveis</div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

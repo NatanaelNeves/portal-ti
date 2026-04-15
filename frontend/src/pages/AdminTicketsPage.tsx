@@ -273,8 +273,22 @@ export default function AdminTicketsPage() {
       params.append('sort', 'created_at');
       params.append('order', 'desc');
 
-      const response = await api.get(`/tickets?${params.toString()}`);
+      const summaryParams = new URLSearchParams();
+      if (effectiveDepartmentFilter) {
+        summaryParams.append('department', effectiveDepartmentFilter);
+      }
+      summaryParams.append('page', '1');
+      summaryParams.append('limit', '1');
+      summaryParams.append('sort', 'updated_at');
+      summaryParams.append('order', 'desc');
+
+      const [response, summaryResponse] = await Promise.all([
+        api.get(`/tickets?${params.toString()}`),
+        api.get(`/tickets?${summaryParams.toString()}`)
+      ]);
+
       const responseData = response.data;
+      const summaryData = summaryResponse.data;
       
       // Suporte para a nova resposta com paginação e para a resposta antiga (array)
       const ticketList = responseData.data || (Array.isArray(responseData) ? responseData : []);
@@ -293,18 +307,34 @@ export default function AdminTicketsPage() {
       console.log('  - Awaiting Confirmation:', ticketList.filter((t: Ticket) => t.status === 'aguardando_confirmacao').length);
       
       setTickets(ticketList);
-      
-      // Calculate stats (do total, não apenas da página)
-      const today = new Date().toDateString();
-      setStats({
-        waitingUser: ticketList.filter((t: Ticket) => t.status === 'waiting_user').length,
-        inProgress: ticketList.filter((t: Ticket) => t.status === 'in_progress').length,
-        newToday: ticketList.filter((t: Ticket) => new Date(t.created_at).toDateString() === today).length,
-        resolvedToday: ticketList.filter((t: Ticket) => 
-          (t.status === 'resolved' || t.status === 'closed') && 
-          new Date(t.updated_at).toDateString() === today
-        ).length
-      });
+
+      // Resumo executivo: usa stats da consulta sem filtros da lista
+      if (summaryData?.stats) {
+        setStats({
+          waitingUser: Number(summaryData.stats.waitingUser || 0),
+          inProgress: Number(summaryData.stats.inProgress || 0),
+          newToday: Number(summaryData.stats.newToday || 0),
+          resolvedToday: Number(summaryData.stats.resolvedToday || 0),
+        });
+      } else if (responseData.stats) {
+        setStats({
+          waitingUser: Number(responseData.stats.waitingUser || 0),
+          inProgress: Number(responseData.stats.inProgress || 0),
+          newToday: Number(responseData.stats.newToday || 0),
+          resolvedToday: Number(responseData.stats.resolvedToday || 0),
+        });
+      } else {
+        const today = new Date().toDateString();
+        setStats({
+          waitingUser: ticketList.filter((t: Ticket) => t.status === 'waiting_user').length,
+          inProgress: ticketList.filter((t: Ticket) => t.status === 'in_progress').length,
+          newToday: ticketList.filter((t: Ticket) => new Date(t.created_at).toDateString() === today).length,
+          resolvedToday: ticketList.filter((t: Ticket) =>
+            (t.status === 'resolved' || t.status === 'closed') &&
+            new Date(t.updated_at).toDateString() === today
+          ).length
+        });
+      }
       
       // Atualizar timestamp
       setLastUpdate(new Date());
@@ -320,15 +350,15 @@ export default function AdminTicketsPage() {
       case 'open':
         return 'Aberto';
       case 'in_progress':
-        return 'Em Atendimento';
+        return 'Em atendimento';
       case 'waiting_user':
-        return 'Aguardando Usuário';
+        return 'Aguardando usuário';
       case 'aguardando_confirmacao':
-        return 'Aguardando Confirmação';
+        return 'Aguardando confirmação';
       case 'resolved':
         return 'Resolvido';
       case 'closed':
-        return 'Concluído';
+        return 'Fechado';
       default:
         return status;
     }
@@ -348,10 +378,36 @@ export default function AdminTicketsPage() {
     }
   };
 
+  const getPriorityMetricLabel = (priority: 'high' | 'medium' | 'low') => {
+    switch (priority) {
+      case 'high':
+        return 'Alta prioridade';
+      case 'medium':
+        return 'Média prioridade';
+      case 'low':
+        return 'Baixa prioridade';
+    }
+  };
+
+  const getTypeLabel = (type?: string) => {
+    switch (type) {
+      case 'incident':
+        return 'Incidente';
+      case 'request':
+        return 'Solicitação';
+      case 'change':
+        return 'Mudança';
+      case 'problem':
+        return 'Problema';
+      default:
+        return 'Outro';
+    }
+  };
+
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
       case 'open':
-        return 'badge-status-open';
+        return 'badge-status-neutral';
       case 'in_progress':
         return 'badge-status-progress';
       case 'waiting_user':
@@ -379,6 +435,18 @@ export default function AdminTicketsPage() {
       default:
         return 'badge-priority-neutral';
     }
+  };
+
+  const getTypeBadgeClass = (type?: string) => {
+    if (type === 'incident') {
+      return 'badge-type-incident';
+    }
+
+    return 'badge-type-neutral';
+  };
+
+  const getMetricValueClass = (value: number) => {
+    return value === 0 ? 'metric-value metric-value--muted' : 'metric-value metric-value--strong';
   };
 
   const getUserName = (userId?: string) => {
@@ -481,7 +549,7 @@ export default function AdminTicketsPage() {
         <div className="dashboard-header-status">
           <span className="status-chip">
             <span className="status-dot" aria-hidden="true"></span>
-            Última atualização: {formattedLastUpdate}
+            <span>Atualizado às {formattedLastUpdate}</span>
           </span>
           <span className="status-chip">
             <strong>{sortedTickets.length}</strong> na fila
@@ -532,7 +600,7 @@ export default function AdminTicketsPage() {
 
             <button
               type="button"
-              className={`stat-card stat-priority-high ${hasAdvancedFilters ? 'is-disabled' : ''} ${filterPriority === 'high' ? 'is-active' : ''}`}
+              className={`stat-card priority-card priority-card--high ${hasAdvancedFilters ? 'is-disabled' : ''} ${filterPriority === 'high' ? 'is-active' : ''}`}
               onClick={() => {
                 if (!hasAdvancedFilters) {
                   setFilterPriority(filterPriority === 'high' ? null : 'high');
@@ -541,7 +609,7 @@ export default function AdminTicketsPage() {
               disabled={hasAdvancedFilters}
               aria-pressed={filterPriority === 'high'}
             >
-              <span className="stat-icon-wrap" aria-hidden="true">
+              <span className="priority-card-icon" aria-hidden="true">
                 <span className="stat-icon">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="10"/>
@@ -549,13 +617,15 @@ export default function AdminTicketsPage() {
                   </svg>
                 </span>
               </span>
-              <span className="stat-number">{getPriorityCount('high')}</span>
-              <span className="stat-label">Alta</span>
+              <span className="priority-card-content">
+                <span className="stat-number stat-number--priority stat-number--high">{getPriorityCount('high')}</span>
+                <span className="stat-label stat-label--priority">{getPriorityMetricLabel('high')}</span>
+              </span>
             </button>
 
             <button
               type="button"
-              className={`stat-card stat-priority-medium ${hasAdvancedFilters ? 'is-disabled' : ''} ${filterPriority === 'medium' ? 'is-active' : ''}`}
+              className={`stat-card priority-card priority-card--medium ${hasAdvancedFilters ? 'is-disabled' : ''} ${filterPriority === 'medium' ? 'is-active' : ''}`}
               onClick={() => {
                 if (!hasAdvancedFilters) {
                   setFilterPriority(filterPriority === 'medium' ? null : 'medium');
@@ -564,7 +634,7 @@ export default function AdminTicketsPage() {
               disabled={hasAdvancedFilters}
               aria-pressed={filterPriority === 'medium'}
             >
-              <span className="stat-icon-wrap" aria-hidden="true">
+              <span className="priority-card-icon" aria-hidden="true">
                 <span className="stat-icon">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#eab308" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="10"/>
@@ -572,13 +642,15 @@ export default function AdminTicketsPage() {
                   </svg>
                 </span>
               </span>
-              <span className="stat-number">{getPriorityCount('medium')}</span>
-              <span className="stat-label">Média</span>
+              <span className="priority-card-content">
+                <span className="stat-number stat-number--priority stat-number--medium">{getPriorityCount('medium')}</span>
+                <span className="stat-label stat-label--priority">{getPriorityMetricLabel('medium')}</span>
+              </span>
             </button>
 
             <button
               type="button"
-              className={`stat-card stat-priority-low ${hasAdvancedFilters ? 'is-disabled' : ''} ${filterPriority === 'low' ? 'is-active' : ''}`}
+              className={`stat-card priority-card priority-card--low ${hasAdvancedFilters ? 'is-disabled' : ''} ${filterPriority === 'low' ? 'is-active' : ''}`}
               onClick={() => {
                 if (!hasAdvancedFilters) {
                   setFilterPriority(filterPriority === 'low' ? null : 'low');
@@ -587,7 +659,7 @@ export default function AdminTicketsPage() {
               disabled={hasAdvancedFilters}
               aria-pressed={filterPriority === 'low'}
             >
-              <span className="stat-icon-wrap" aria-hidden="true">
+              <span className="priority-card-icon" aria-hidden="true">
                 <span className="stat-icon">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
@@ -595,8 +667,10 @@ export default function AdminTicketsPage() {
                   </svg>
                 </span>
               </span>
-              <span className="stat-number">{getPriorityCount('low')}</span>
-              <span className="stat-label">Baixa</span>
+              <span className="priority-card-content">
+                <span className="stat-number stat-number--priority stat-number--low">{getPriorityCount('low')}</span>
+                <span className="stat-label stat-label--priority">{getPriorityMetricLabel('low')}</span>
+              </span>
             </button>
           </div>
         </div>
@@ -612,7 +686,7 @@ export default function AdminTicketsPage() {
                   </svg>
                 </span>
               </span>
-              <span className="stat-number">{stats.newToday}</span>
+              <span className={getMetricValueClass(stats.newToday)}>{stats.newToday}</span>
               <span className="stat-label">Novos Hoje</span>
             </div>
 
@@ -625,7 +699,7 @@ export default function AdminTicketsPage() {
                   </svg>
                 </span>
               </span>
-              <span className="stat-number">{stats.resolvedToday}</span>
+              <span className={getMetricValueClass(stats.resolvedToday)}>{stats.resolvedToday}</span>
               <span className="stat-label">Resolvidos Hoje</span>
             </div>
           </div>
@@ -663,7 +737,7 @@ export default function AdminTicketsPage() {
               setFilterStatus('all');
             }}
           >
-            📋 Fila Ativa
+            Fila ativa
           </button>
         )}
         <button 
@@ -673,7 +747,7 @@ export default function AdminTicketsPage() {
             setFilterStatus('all');
           }}
         >
-          👤 Meus Atendimentos ({myTicketsCount})
+          Meus atendimentos ({myTicketsCount})
         </button>
         {userRole !== 'admin_staff' && (
           <button 
@@ -683,7 +757,7 @@ export default function AdminTicketsPage() {
               setFilterStatus('all');
             }}
           >
-            ⚠️ Não Atribuídos
+            Não atribuídos
           </button>
         )}
         <button 
@@ -697,7 +771,7 @@ export default function AdminTicketsPage() {
             }
           }}
         >
-          🔍 {showFilters ? 'Ocultar' : 'Filtros Avançados'}
+          {showFilters ? 'Ocultar filtros' : 'Filtros avançados'}
           {hasAdvancedFilters && (
             <span className="filter-counter">
               {activeFiltersCount}
@@ -711,10 +785,10 @@ export default function AdminTicketsPage() {
         <div className="advanced-filters card">
           {hasAdvancedFilters && (
             <div className="advanced-filters-alert">
-              <strong>✅ Filtros ativos:</strong>
-              {searchText.trim() && <span>🔍 Busca: "{searchText}"</span>}
-              {selectedStatuses.length > 0 && <span>📊 Status: {selectedStatuses.length} selecionado(s)</span>}
-              {selectedPriorities.length > 0 && <span>🚨 Prioridades: {selectedPriorities.length} selecionada(s)</span>}
+              <strong>Filtros ativos:</strong>
+              {searchText.trim() && <span>Busca: "{searchText}"</span>}
+              {selectedStatuses.length > 0 && <span>Status: {selectedStatuses.length} selecionado(s)</span>}
+              {selectedPriorities.length > 0 && <span>Prioridades: {selectedPriorities.length} selecionada(s)</span>}
             </div>
           )}
           <div className="advanced-filters-grid">
@@ -866,37 +940,39 @@ export default function AdminTicketsPage() {
                       <div className="ticket-card-requester">
                         {ticket.requester_type === 'public' && ticket.requester_name ? (
                           <>
-                            <span className="requester-name">👤 {ticket.requester_name}</span>
+                            <span className="requester-name">{ticket.requester_name}</span>
                             {ticket.requester_email && (
-                              <span className="requester-meta">📧 {ticket.requester_email}</span>
+                              <span className="requester-meta">{ticket.requester_email}</span>
                             )}
                             {(ticket.requester_department || ticket.requester_unit) && (
                               <span className="requester-meta">
-                                {ticket.requester_department && `🏢 ${ticket.requester_department}`}
+                                {ticket.requester_department && `${ticket.requester_department}`}
                                 {ticket.requester_department && ticket.requester_unit && ' • '}
-                                {ticket.requester_unit && `🏛️ ${ticket.requester_unit}`}
+                                {ticket.requester_unit && `${ticket.requester_unit}`}
                               </span>
                             )}
                           </>
                         ) : (
-                          <span className="requester-name">👤 Solicitante interno</span>
+                          <span className="requester-name">Solicitante interno</span>
                         )}
                       </div>
                     </div>
-                    <span className="time-ago">{getTimeAgo(ticket.created_at)} parado</span>
+                    <span className="time-ago">{getTimeAgo(ticket.created_at)}</span>
                   </div>
 
                   <div className="ticket-card-badges">
                     {ticket.department && ticket.department !== 'ti' && (
-                      <span className="badge badge-dept-admin">🏢 Administrativo</span>
+                      <span className="badge badge-dept-admin">Administrativo</span>
                     )}
                     {(!ticket.department || ticket.department === 'ti') && departmentFilter === '' && (
-                      <span className="badge badge-dept-ti">🖥️ TI</span>
+                      <span className="badge badge-dept-ti">TI</span>
                     )}
                     {ticket.category && (
                       <span className="badge badge-category">{ticket.category}</span>
                     )}
-                    <span className="badge badge-type">{ticket.type}</span>
+                    <span className={`badge ${getTypeBadgeClass(ticket.type)}`}>
+                      {getTypeLabel(ticket.type)}
+                    </span>
                     <span className={`badge ${getPriorityBadgeClass(ticket.priority)}`}>
                       {getPriorityLabel(ticket.priority)}
                     </span>
@@ -907,10 +983,10 @@ export default function AdminTicketsPage() {
 
                   <div className="ticket-card-footer">
                     <span className="assigned">
-                      👤 {getUserName(ticket.assigned_to)}
+                      {getUserName(ticket.assigned_to)}
                     </span>
                     <span className={`sla-chip ${isTicketOverdue(ticket) ? 'sla-chip-overdue' : ''}`}>
-                      ⏱️ {getSlaElapsedHours(ticket)}h
+                      {getSlaElapsedHours(ticket)}h
                       {isTicketOverdue(ticket) ? ' • Atrasado' : ''}
                     </span>
                     <div className="footer-actions">
@@ -920,7 +996,7 @@ export default function AdminTicketsPage() {
                           onClick={(e) => handleQuickAssume(ticket.id, e)}
                           title="Assumir atendimento"
                         >
-                          🎯 Assumir
+                          Assumir
                         </button>
                       )}
                       <span className={`badge badge-mini ${getStatusBadgeClass(ticket.status)}`}>
@@ -989,7 +1065,9 @@ export default function AdminTicketsPage() {
                 <span className={`badge ${getPriorityBadgeClass(selectedTicket.priority)}`}>
                   {getPriorityLabel(selectedTicket.priority)}
                 </span>
-                <span className="badge badge-type">{selectedTicket.type}</span>
+                <span className={`badge ${getTypeBadgeClass(selectedTicket.type)}`}>
+                  {getTypeLabel(selectedTicket.type)}
+                </span>
               </div>
 
               <div className="panel-meta">
@@ -1001,7 +1079,7 @@ export default function AdminTicketsPage() {
                   className="btn btn-primary btn-block"
                   onClick={() => navigate(`/admin/chamados/${selectedTicket.id}`)}
                 >
-                  🔧 Ver Detalhes Completos
+                  Ver detalhes completos
                 </button>
                 <button 
                   className="btn btn-warning"
@@ -1009,7 +1087,7 @@ export default function AdminTicketsPage() {
                   disabled={panelActionsBlocked}
                   title={panelActionsBlocked ? 'Assuma o chamado primeiro para realizar esta ação.' : 'Marcar como aguardando resposta do usuário'}
                 >
-                  ⏳ Aguardar
+                  Aguardar
                 </button>
                 <button 
                   className="btn btn-success"
@@ -1017,7 +1095,7 @@ export default function AdminTicketsPage() {
                   disabled={panelActionsBlocked}
                   title={panelActionsBlocked ? 'Assuma o chamado primeiro para realizar esta ação.' : 'Marcar ticket como resolvido'}
                 >
-                  ✅ Resolver
+                  Resolver
                 </button>
               </div>
 
@@ -1094,19 +1172,19 @@ export default function AdminTicketsPage() {
               <p>Selecione um chamado da fila para ver o preview detalhado.</p>
               <div className="empty-panel-metrics">
                 <div className="empty-metric-card">
-                  <span className="empty-metric-value">{sortedTickets.length}</span>
+                  <span className={getMetricValueClass(sortedTickets.length)}>{sortedTickets.length}</span>
                   <span className="empty-metric-label">Na fila</span>
                 </div>
                 <div className="empty-metric-card">
-                  <span className="empty-metric-value">{myTicketsCount}</span>
+                  <span className={getMetricValueClass(myTicketsCount)}>{myTicketsCount}</span>
                   <span className="empty-metric-label">Meus atendimentos</span>
                 </div>
                 <div className="empty-metric-card">
-                  <span className="empty-metric-value">{stats.waitingUser}</span>
+                  <span className={getMetricValueClass(stats.waitingUser)}>{stats.waitingUser}</span>
                   <span className="empty-metric-label">Aguardando usuário</span>
                 </div>
                 <div className="empty-metric-card">
-                  <span className="empty-metric-value">{stats.resolvedToday}</span>
+                  <span className={getMetricValueClass(stats.resolvedToday)}>{stats.resolvedToday}</span>
                   <span className="empty-metric-label">Resolvidos hoje</span>
                 </div>
               </div>

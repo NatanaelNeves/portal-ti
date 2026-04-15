@@ -262,6 +262,22 @@ ticketsRouter.get('/', async (req: Request, res: Response) => {
       const countResult = await database.query(countQuery, params);
       const total = parseInt(countResult.rows[0].count);
 
+      // Stats agregadas sem impacto da paginação
+      const statsQuery = `
+        SELECT
+          COUNT(*) FILTER (WHERE t.status = 'waiting_user') AS waiting_user,
+          COUNT(*) FILTER (WHERE t.status = 'in_progress') AS in_progress,
+          COUNT(*) FILTER (WHERE DATE(t.created_at) = CURRENT_DATE) AS new_today,
+          COUNT(*) FILTER (
+            WHERE t.status IN ('resolved', 'closed')
+              AND DATE(t.updated_at) = CURRENT_DATE
+          ) AS resolved_today
+        FROM tickets t
+        WHERE ${conditions.join(' AND ')}
+      `;
+      const statsResult = await database.query(statsQuery, params);
+      const statsRow = statsResult.rows[0] || {};
+
       // Query para dados paginados
       params.push(limit, offset);
       const dataQuery = `
@@ -284,6 +300,12 @@ ticketsRouter.get('/', async (req: Request, res: Response) => {
           limit,
           total,
           totalPages: Math.ceil(total / limit)
+        },
+        stats: {
+          waitingUser: parseInt(statsRow.waiting_user || '0'),
+          inProgress: parseInt(statsRow.in_progress || '0'),
+          newToday: parseInt(statsRow.new_today || '0'),
+          resolvedToday: parseInt(statsRow.resolved_today || '0')
         }
       });
     }
@@ -375,6 +397,22 @@ ticketsRouter.get('/', async (req: Request, res: Response) => {
         const countResult = await database.query(countQuery, params);
         const total = parseInt(countResult.rows[0].count);
 
+        // Stats agregadas sem impacto da paginação
+        const statsQuery = `
+          SELECT
+            COUNT(*) FILTER (WHERE t.status = 'waiting_user') AS waiting_user,
+            COUNT(*) FILTER (WHERE t.status = 'in_progress') AS in_progress,
+            COUNT(*) FILTER (WHERE DATE(t.created_at) = CURRENT_DATE) AS new_today,
+            COUNT(*) FILTER (
+              WHERE t.status IN ('resolved', 'closed')
+                AND DATE(t.updated_at) = CURRENT_DATE
+            ) AS resolved_today
+          FROM tickets t
+          ${whereClause}
+        `;
+        const statsResult = await database.query(statsQuery, params);
+        const statsRow = statsResult.rows[0] || {};
+
         // Query para dados paginados
         params.push(limit, offset);
         const dataQuery = `
@@ -404,6 +442,12 @@ ticketsRouter.get('/', async (req: Request, res: Response) => {
             limit,
             total,
             totalPages: Math.ceil(total / limit)
+          },
+          stats: {
+            waitingUser: parseInt(statsRow.waiting_user || '0'),
+            inProgress: parseInt(statsRow.in_progress || '0'),
+            newToday: parseInt(statsRow.new_today || '0'),
+            resolvedToday: parseInt(statsRow.resolved_today || '0')
           }
         });
       } catch (err) {
