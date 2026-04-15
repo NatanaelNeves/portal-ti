@@ -246,6 +246,13 @@ export default function AdminTicketsPage() {
       const params = new URLSearchParams();
       const hasAdvancedFilters = selectedStatuses.length > 0 || selectedPriorities.length > 0 || searchText.trim() !== '';
       const activeStatuses = ['open', 'in_progress', 'waiting_user', 'aguardando_confirmacao'];
+      const normalizePriorityValues = (priorities: string[]) => {
+        return Array.from(
+          new Set(
+            priorities.flatMap((priority) => (priority === 'high' ? ['high', 'urgent'] : [priority]))
+          )
+        );
+      };
       const effectiveAssignmentFilter = userRole === 'admin_staff' ? 'mine' : assignmentFilter;
       const effectiveDepartmentFilter = userRole === 'admin_staff'
         ? 'administrativo'
@@ -255,20 +262,14 @@ export default function AdminTicketsPage() {
       
       // Filtros avançados
       if (selectedStatuses.length > 0) {
-        selectedStatuses.forEach(status => params.append('status', status));
+        selectedStatuses.forEach((status) => params.append('status', status));
       }
-      
-      if (selectedPriorities.length > 0) {
-        selectedPriorities.forEach(priority => params.append('priority', priority));
-      }
-      
+
       if (searchText.trim()) {
         params.append('search', searchText.trim());
       }
 
-      if (selectedStatuses.length > 0) {
-        selectedStatuses.forEach((status) => params.append('status', status));
-      } else if (!hasAdvancedFilters) {
+      if (selectedStatuses.length === 0 && !hasAdvancedFilters) {
         if (filterStatus === 'all') {
           activeStatuses.forEach((status) => params.append('status', status));
         } else if (filterStatus !== 'all') {
@@ -288,9 +289,10 @@ export default function AdminTicketsPage() {
       }
 
       if (selectedPriorities.length > 0) {
-        selectedPriorities.forEach((priority) => params.append('priority', priority));
+        normalizePriorityValues(selectedPriorities).forEach((priority) => params.append('priority', priority));
       } else if (!hasAdvancedFilters && filterPriority) {
-        params.append('priority', filterPriority);
+        const quickPriorities = filterPriority === 'high' ? ['high', 'urgent'] : [filterPriority];
+        quickPriorities.forEach((priority) => params.append('priority', priority));
       }
       
       // Paginação
