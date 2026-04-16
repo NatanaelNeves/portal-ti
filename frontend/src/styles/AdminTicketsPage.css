@@ -601,7 +601,7 @@
   border-bottom-color: #2563eb;
 }
 
-.filter-btn.filter-mine.active {
+.assignment-filters:not(.assignment-filters--integrated) .filter-btn.filter-mine.active {
   background: #0f4d2d;
   border-color: #0f4d2d;
 }
