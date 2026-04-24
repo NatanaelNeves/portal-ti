@@ -37,6 +37,7 @@ const DeliverEquipmentPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [generateTerm, setGenerateTerm] = useState(false);
   
   const [formData, setFormData] = useState<DeliveryForm>({
     equipmentId: '',
@@ -154,7 +155,8 @@ const DeliverEquipmentPage: React.FC = () => {
         delivery_reason: formData.deliveryReason,
         delivery_notes: formData.deliveryNotes,
         issued_by_id: user?.id || null,
-        issued_by_name: user?.full_name || user?.name || 'Sistema'
+        issued_by_name: user?.full_name || user?.name || 'Sistema',
+        generate_term: generateTerm
       };
 
       console.log('📤 Enviando requisição:', payload);
@@ -166,7 +168,9 @@ const DeliverEquipmentPage: React.FC = () => {
 
       console.log('✅ Resposta recebida:', response.data);
 
-      setSuccess('Equipamento entregue com sucesso! Termo de responsabilidade gerado.');
+      setSuccess(generateTerm
+        ? 'Equipamento entregue com sucesso! Termo de responsabilidade gerado.'
+        : 'Equipamento entregue com sucesso! Movimentação registrada sem gerar termo.');
       
       // Abrir PDF do termo em nova aba
       const termId = response.data.termId || response.data.term?.id;
@@ -380,6 +384,19 @@ const DeliverEquipmentPage: React.FC = () => {
               placeholder="Informações adicionais sobre a entrega..."
             />
           </div>
+
+          <div className="form-group">
+            <label className="checkbox-item">
+              <input
+                type="checkbox"
+                checked={generateTerm}
+                onChange={(e) => setGenerateTerm(e.target.checked)}
+              />
+              <span className="checkbox-label">
+                <strong>Gerar termo automaticamente</strong> - Desmarcado = apenas registrar movimentação
+              </span>
+            </label>
+          </div>
         </div>
 
         <div className="form-actions">
@@ -387,7 +404,7 @@ const DeliverEquipmentPage: React.FC = () => {
             Cancelar
           </button>
           <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? 'Processando...' : '📄 Gerar Termo e Entregar'}
+            {loading ? 'Processando...' : (generateTerm ? '📄 Gerar Termo e Entregar' : '✅ Registrar Entrega (Sem Termo)')}
           </button>
         </div>
       </form>

@@ -52,6 +52,7 @@ const ReturnEquipmentPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [generateTerm, setGenerateTerm] = useState(false);
   
   const [formData, setFormData] = useState<ReturnForm>({
     equipmentId: '',
@@ -177,7 +178,8 @@ const ReturnEquipmentPage: React.FC = () => {
         return_destination: formData.returnDestination,
         returned_items: returnedItemsList,
         received_by_id: currentUser.id || null,
-        received_by_name: currentUser.name || currentUser.full_name || 'Sistema'
+        received_by_name: currentUser.name || currentUser.full_name || 'Sistema',
+        generate_term: generateTerm
       };
 
       const response = await api.post(
@@ -185,7 +187,9 @@ const ReturnEquipmentPage: React.FC = () => {
         payload
       );
 
-      setSuccess('Equipamento devolvido com sucesso!');
+      setSuccess(generateTerm
+        ? 'Equipamento devolvido com sucesso! Termo de devolução gerado.'
+        : 'Equipamento devolvido com sucesso! Movimentação registrada sem gerar termo.');
       
       // Abrir PDF do termo em nova aba (somente se houver termo)
       const termId = response.data.term_id;
@@ -497,6 +501,19 @@ const ReturnEquipmentPage: React.FC = () => {
               ⚠️ Este equipamento será marcado para descarte. Certifique-se de que esta é a ação correta.
             </div>
           )}
+
+          <div className="form-group" style={{ marginTop: '1rem' }}>
+            <label className="checkbox-item">
+              <input
+                type="checkbox"
+                checked={generateTerm}
+                onChange={(e) => setGenerateTerm(e.target.checked)}
+              />
+              <span className="checkbox-label">
+                <strong>Gerar termo de devolução automaticamente</strong> - Desmarcado = apenas registrar movimentação
+              </span>
+            </label>
+          </div>
         </div>
 
         <div className="form-actions">
@@ -508,7 +525,7 @@ const ReturnEquipmentPage: React.FC = () => {
             className="btn-primary" 
             disabled={loading || !allChecksPassed}
           >
-            {loading ? 'Processando...' : '📄 Gerar Termo de Devolução'}
+            {loading ? 'Processando...' : (generateTerm ? '📄 Gerar Termo de Devolução' : '✅ Registrar Devolução (Sem Termo)')}
           </button>
         </div>
 

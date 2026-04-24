@@ -106,6 +106,7 @@ function App() {
             <Route path="/inventario/equipamento/:equipmentId" element={<InternalProtectedRoute requireITStaff={true}><EquipmentDetailPage /></InternalProtectedRoute>} />
             <Route path="/inventario/equipamento/:equipmentId/movimentar" element={<InternalProtectedRoute requireITStaff={true}><MoveEquipmentPage /></InternalProtectedRoute>} />
             <Route path="/inventario/equipamento/:equipmentId/assinar-termo" element={<InternalProtectedRoute requireITStaff={true}><SignTermPage /></InternalProtectedRoute>} />
+            <Route path="/inventario/equipamento/:equipmentId/termo-de-devolucao" element={<InternalProtectedRoute requireITStaff={true}><ReturnTermPage /></InternalProtectedRoute>} />
             <Route path="/inventario/termo/:termId/devolucao" element={<InternalProtectedRoute requireITStaff={true}><ReturnTermPage /></InternalProtectedRoute>} />
 
             {/* Gestor/Manager Routes */}

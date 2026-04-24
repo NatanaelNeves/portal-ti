@@ -1,8 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import InventoryLayout from '../components/InventoryLayout';
 import '../styles/ReturnTermPage.css';
 import { BACKEND_URL } from '../services/api';
+
+interface EquipmentSummary {
+  internal_code: string;
+  brand: string;
+  model: string;
+  current_responsible_name?: string;
+  current_unit?: string;
+  acquisition_date?: string;
+}
 
 interface ChecklistItem {
   name: string;
@@ -32,8 +41,9 @@ interface ReturnFormData {
 }
 
 export default function ReturnTermPage() {
-  const { termId } = useParams<{ termId: string }>();
+  const { termId, equipmentId } = useParams<{ termId?: string; equipmentId?: string }>();
   const navigate = useNavigate();
+  const retroMode = Boolean(equipmentId) && !termId;
 
   const [formData, setFormData] = useState<ReturnFormData>({
     return_date: new Date().toISOString().split('T')[0],
@@ -60,6 +70,31 @@ export default function ReturnTermPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [step, setStep] = useState(1);
+  const [equipment, setEquipment] = useState<EquipmentSummary | null>(null);
+
+  useEffect(() => {
+    const loadEquipment = async () => {
+      if (!equipmentId || !retroMode) return;
+
+      try {
+        const token = localStorage.getItem('internal_token');
+        const response = await fetch(`${BACKEND_URL}/api/inventory/equipment/${equipmentId}`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (data.equipment) {
+          setEquipment(data.equipment);
+        }
+      } catch {
+        // prefill opcional
+      }
+    };
+
+    void loadEquipment();
+  }, [equipmentId, retroMode]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -144,26 +179,53 @@ export default function ReturnTermPage() {
       setError('');
       const token = localStorage.getItem('internal_token');
 
-      const response = await fetch(`${BACKEND_URL}/api/inventory/terms/${termId}/devolucao`, {
+      const endpoint = retroMode
+        ? `${BACKEND_URL}/api/inventory/terms/retroactive-return`
+        : `${BACKEND_URL}/api/inventory/terms/${termId}/devolucao`;
+
+      const payload = retroMode ? {
+        equipment_id: equipmentId,
+        issued_date: equipment?.acquisition_date || formData.return_date,
+        return_date: formData.return_date,
+        return_reason: formData.return_reason,
+        reason_other: formData.reason_other,
+        received_by: formData.received_by,
+        equipment_condition: formData.equipment_condition,
+        checklist: formData.checklist,
+        damage_description: formData.damage_description,
+        witness_name: formData.witness_name,
+        return_destination: formData.equipment_condition === 'avarias' ? 'maintenance' : 'available',
+        return_problems: formData.damage_description || 'Nenhum problema relatado',
+        return_checklist: formData.checklist,
+        returned_items: []
+      } : {
+        return_date: formData.return_date,
+        return_reason: formData.return_reason,
+        reason_other: formData.reason_other,
+        received_by: formData.received_by,
+        equipment_condition: formData.equipment_condition,
+        checklist: formData.checklist,
+        damage_description: formData.damage_description,
+        witness_name: formData.witness_name,
+      };
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          return_date: formData.return_date,
-          return_reason: formData.return_reason,
-          reason_other: formData.reason_other,
-          received_by: formData.received_by,
-          equipment_condition: formData.equipment_condition,
-          checklist: formData.checklist,
-          damage_description: formData.damage_description,
-          witness_name: formData.witness_name,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
         throw new Error('Erro ao registrar devolução');
+      }
+
+      const data = await response.json();
+      const termIdToOpen = data.termId || data.term_id;
+      if (termIdToOpen) {
+        window.open(`${BACKEND_URL}/api/inventory/terms/${termIdToOpen}/return-pdf?token=${token}`, '_blank');
       }
 
       navigate('/inventario/responsabilidades');
@@ -182,8 +244,8 @@ export default function ReturnTermPage() {
       <div className="return-term-page">
         <div className="page-header">
           <button onClick={() => navigate(-1)} className="btn-back">← Voltar</button>
-          <h1>📥 Devolver Equipamento</h1>
-          <p>Registre a devolução e faça a vistoria do equipamento</p>
+          <h1>{retroMode ? '🗂️ Termo de Devolução Retroativo' : '📥 Devolver Equipamento'}</h1>
+          <p>{retroMode ? 'Gere um termo de devolução sem depender de um termo de entrega anterior' : 'Registre a devolução e faça a vistoria do equipamento'}</p>
         </div>
 
         {error && <div className="alert alert-error">⚠️ {error}</div>}
@@ -202,6 +264,14 @@ export default function ReturnTermPage() {
             {step === 1 && (
               <div className="form-step">
                 <h2>📋 Informações de Devolução</h2>
+
+                {retroMode && equipment && (
+                  <div className="alert alert-info">
+                    <strong>Equipamento:</strong> {equipment.internal_code} - {equipment.brand} {equipment.model}
+                    <br />
+                    <strong>Responsável atual:</strong> {equipment.current_responsible_name || 'Não informado'}
+                  </div>
+                )}
                 
                 <div className="form-group">
                   <label>Data da Devolução *</label>

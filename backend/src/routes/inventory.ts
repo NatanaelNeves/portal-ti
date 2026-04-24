@@ -544,8 +544,11 @@ inventoryRouter.post('/movements/deliver', async (req: Request, res: Response) =
       delivery_reason,
       delivery_notes,
       issued_by_id,
-      issued_by_name
+      issued_by_name,
+      generate_term
     } = req.body;
+
+    const shouldGenerateTerm = generate_term === true || generate_term === 'true' || generate_term === 1 || generate_term === '1';
 
     // Verificar se equipamento existe e está disponível
     const equipment = await database.query(`
@@ -583,19 +586,23 @@ inventoryRouter.post('/movements/deliver', async (req: Request, res: Response) =
       return res.status(400).json({ error: 'Usuário não identificado. Faça login novamente.' });
     }
 
-    // Criar termo de responsabilidade (responsible_id é opcional - pode ser funcionário externo)
-    const term = await database.query(`
-      INSERT INTO responsibility_terms (
+    let term: any = null;
+
+    // Gerar termo é opcional; quando desabilitado, a movimentação ocorre sem vínculo a termo.
+    if (shouldGenerateTerm) {
+      term = await database.query(`
+        INSERT INTO responsibility_terms (
+          equipment_id, responsible_name, responsible_department,
+          responsible_unit, responsible_email, responsible_phone, responsible_cpf,
+          issued_date, delivery_reason, delivery_notes, issued_by_id, issued_by_name, status
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_DATE, $8, $9, $10, $11, 'active')
+        RETURNING *
+      `, [
         equipment_id, responsible_name, responsible_department,
         responsible_unit, responsible_email, responsible_phone, responsible_cpf,
-        issued_date, delivery_reason, delivery_notes, issued_by_id, issued_by_name, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_DATE, $8, $9, $10, $11, 'active')
-      RETURNING *
-    `, [
-      equipment_id, responsible_name, responsible_department,
-      responsible_unit, responsible_email, responsible_phone, responsible_cpf,
-      delivery_reason, delivery_notes, finalIssuedById, finalIssuedByName
-    ]);
+        delivery_reason, delivery_notes, finalIssuedById, finalIssuedByName
+      ]);
+    }
 
     // Criar movimentação
     await database.query(`
@@ -605,7 +612,7 @@ inventoryRouter.post('/movements/deliver', async (req: Request, res: Response) =
         reason, registered_by_id, registered_by_name
       ) VALUES ($1, $2, $3, 'delivery', CURRENT_TIMESTAMP, $4, $5, $6, $7, $8, $9)
     `, [
-      movement_number, equipment_id, term.rows[0].id,
+      movement_number, equipment_id, term ? term.rows[0].id : null,
       responsible_name, responsible_unit, responsible_department,
       delivery_reason, finalIssuedById, finalIssuedByName
     ]);
@@ -627,14 +634,14 @@ inventoryRouter.post('/movements/deliver', async (req: Request, res: Response) =
     ]);
 
     console.log('✅ Equipment delivered successfully:', {
-      termId: term.rows[0].id,
+      termId: term ? term.rows[0].id : null,
       movement_number,
       equipment_id
     });
 
     res.status(201).json({ 
-      termId: term.rows[0].id,
-      term: term.rows[0],
+      termId: term ? term.rows[0].id : null,
+      term: term ? term.rows[0] : null,
       movement_number,
       message: 'Equipment delivered successfully'
     });
@@ -743,8 +750,11 @@ inventoryRouter.post('/movements/return', async (req: Request, res: Response) =>
       return_destination, // 'available', 'maintenance', 'storage', 'disposal'
       returned_items, // Array de itens devolvidos
       received_by_id,
-      received_by_name
+      received_by_name,
+      generate_term
     } = req.body;
+
+    const shouldGenerateTerm = generate_term === true || generate_term === 'true' || generate_term === 1 || generate_term === '1';
 
     console.log('📥 Return equipment request:', { equipment_id, return_condition, returned_items });
 
@@ -761,17 +771,20 @@ inventoryRouter.post('/movements/return', async (req: Request, res: Response) =>
       return res.status(400).json({ error: 'Equipment is not in use' });
     }
 
-    // Buscar termo em aberto (status ativo OU ainda sem data de devolução)
-    // Isso cobre bases antigas/inconsistentes onde o status pode não estar exatamente como 'active'.
-    const activeTerm = await database.query(`
-      SELECT * FROM responsibility_terms
-      WHERE equipment_id = $1
-        AND (status = 'active' OR returned_date IS NULL)
-      ORDER BY issued_date DESC, created_at DESC
-      LIMIT 1
-    `, [equipment_id]);
+    let term: any = null;
+    if (shouldGenerateTerm) {
+      // Buscar termo em aberto (status ativo OU ainda sem data de devolução)
+      // Isso cobre bases antigas/inconsistentes onde o status pode não estar exatamente como 'active'.
+      const activeTerm = await database.query(`
+        SELECT * FROM responsibility_terms
+        WHERE equipment_id = $1
+          AND (status = 'active' OR returned_date IS NULL)
+        ORDER BY issued_date DESC, created_at DESC
+        LIMIT 1
+      `, [equipment_id]);
 
-    const term = activeTerm.rows.length > 0 ? activeTerm.rows[0] : null;
+      term = activeTerm.rows.length > 0 ? activeTerm.rows[0] : null;
+    }
     const movement_number = await generateMovementNumber();
 
     // Mapear destino para status válido do equipamento
@@ -1110,8 +1123,8 @@ inventoryRouter.get('/terms/:termId/return-pdf', async (req: Request, res: Respo
   }
 });
 
-// POST - Criar termo retroativo/manual para equipamentos já cadastrados no banco
-inventoryRouter.post('/terms/retroactive', async (req: Request, res: Response) => {
+// POST - Criar termo retroativo de devolução para equipamentos já cadastrados no banco
+inventoryRouter.post('/terms/retroactive-return', async (req: Request, res: Response) => {
   try {
     const {
       equipment_id,
@@ -1123,8 +1136,13 @@ inventoryRouter.post('/terms/retroactive', async (req: Request, res: Response) =
       responsible_phone,
       responsible_cpf,
       issued_date,
-      delivery_reason,
-      delivery_notes,
+      return_date,
+      return_reason,
+      reason_other,
+      return_condition,
+      return_checklist,
+      return_problems,
+      return_destination,
       issued_by_id,
       issued_by_name
     } = req.body;
@@ -1171,15 +1189,25 @@ inventoryRouter.post('/terms/retroactive', async (req: Request, res: Response) =
       return res.status(400).json({ error: 'Usuário não identificado. Faça login novamente.' });
     }
 
-    const issuedDate = issued_date || new Date().toISOString().split('T')[0];
+    const issuedDate = issued_date || equipment.acquisition_date || return_date || new Date().toISOString().split('T')[0];
+    const finalReturnDate = return_date || new Date().toISOString().split('T')[0];
     const movementNumber = await generateMovementNumber();
+
+    const resolvedReturnReason = return_reason === 'outro' && reason_other
+      ? reason_other
+      : (return_reason || 'Devolução regular');
+
+    const resolvedReturnDestination = return_destination || 'available';
 
     const termResult = await database.query(
       `INSERT INTO responsibility_terms (
         equipment_id, responsible_id, responsible_name, responsible_department,
         responsible_unit, responsible_email, responsible_phone, responsible_cpf,
-        issued_date, delivery_reason, delivery_notes, issued_by_id, issued_by_name, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'active')
+        issued_date, delivery_reason, delivery_notes, issued_by_id, issued_by_name,
+        returned_date, return_condition, return_checklist, return_problems,
+        return_destination, received_by_id, received_by, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+                $14, $15, $16, $17, $18, $19, $20, 'returned')
       RETURNING *`,
       [
         equipment_id,
@@ -1191,61 +1219,29 @@ inventoryRouter.post('/terms/retroactive', async (req: Request, res: Response) =
         responsible_phone || '',
         responsible_cpf || '',
         issuedDate,
-        delivery_reason || 'Termo retroativo',
-        delivery_notes || 'Termo gerado retroativamente para regularização histórica',
+        'Termo de devolução retroativo',
+        `Devolução retroativa do equipamento ${equipment.internal_code}`,
         finalIssuedById,
         finalIssuedByName,
-      ]
-    );
-
-    await database.query(
-      `INSERT INTO equipment_movements (
-        movement_number, equipment_id, term_id, movement_type, movement_date,
-        to_user_id, to_user_name, to_unit, to_department,
-        reason, notes, registered_by_id, registered_by_name
-      ) VALUES ($1, $2, $3, 'delivery', $4::timestamp, $5, $6, $7, $8, $9, $10, $11, $12)`,
-      [
-        movementNumber,
-        equipment_id,
-        termResult.rows[0].id,
-        `${issuedDate} 08:00:00`,
-        responsible_id || null,
-        responsible_name || equipment.current_responsible_name || 'N/A',
-        responsible_unit || equipment.current_unit || '',
-        responsible_department || equipment.current_unit || '',
-        delivery_reason || 'Termo retroativo',
-        delivery_notes || 'Termo gerado retroativamente para regularização histórica',
-        finalIssuedById,
-        finalIssuedByName,
-      ]
-    );
-
-    await database.query(
-      `UPDATE inventory_equipment
-       SET current_status = 'in_use',
-           current_responsible_id = COALESCE($1, current_responsible_id),
-           current_responsible_name = COALESCE($2, current_responsible_name),
-           current_location = COALESCE($3, current_location),
-           current_unit = COALESCE($4, current_unit),
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $5`,
-      [
-        responsible_id || null,
-        responsible_name || equipment.current_responsible_name || null,
-        responsible_department ? `${responsible_department} - ${responsible_unit || equipment.current_unit || ''}` : null,
-        responsible_unit || equipment.current_unit || null,
-        equipment_id,
+        finalReturnDate,
+        return_condition || 'excellent',
+        JSON.stringify(return_checklist || {}),
+        return_problems || resolvedReturnReason,
+        resolvedReturnDestination,
+        issued_by_id || null,
+        issued_by_name || finalIssuedByName,
       ]
     );
 
     return res.status(201).json({
-      message: 'Retroactive term created successfully',
+      message: 'Retroactive return term created successfully',
       termId: termResult.rows[0].id,
       movement_number: movementNumber,
+      return_pdf_url: `/api/inventory/terms/${termResult.rows[0].id}/return-pdf`
     });
   } catch (error: any) {
     console.error('Error creating retroactive term:', error);
-    res.status(500).json({ error: 'Failed to create retroactive term', details: error?.message || String(error) });
+    res.status(500).json({ error: 'Failed to create retroactive return term', details: error?.message || String(error) });
   }
 });
 
