@@ -254,6 +254,9 @@ export default function EquipmentDetailPage() {
                   <button className="btn btn-new-term" onClick={() => navigate(`/inventario/equipamento/${equipmentId}/assinar-termo`)}>
                     <span className="btn-icon">✍️</span> Novo Termo
                   </button>
+                  <button className="btn btn-new-term" onClick={() => navigate(`/inventario/equipamento/${equipmentId}/assinar-termo?retro=1`)}>
+                    <span className="btn-icon">🗂️</span> Termo Retroativo
+                  </button>
                   <button className="btn btn-move" onClick={() => navigate(`/inventario/equipamento/${equipmentId}/movimentar`)}>
                     <span className="btn-icon">↔️</span> Movimentar
                   </button>
@@ -304,7 +307,7 @@ export default function EquipmentDetailPage() {
           {activeTab === 'terms' && (
             <div className="tab-pane">
               {terms.length === 0 ? (
-                <div className="empty-state">📋 Sem termos<button className="btn btn-primary" onClick={() => navigate(`/inventario/equipamento/${equipmentId}/assinar-termo`)}>✍️ Criar Termo</button></div>
+                <div className="empty-state">📋 Sem termos<div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}><button className="btn btn-primary" onClick={() => navigate(`/inventario/equipamento/${equipmentId}/assinar-termo`)}>✍️ Criar Termo</button><button className="btn btn-secondary" onClick={() => navigate(`/inventario/equipamento/${equipmentId}/assinar-termo?retro=1`)}>🗂️ Retroativo</button></div></div>
               ) : (
                 <div className="terms-list">
                   {terms.map(t => (

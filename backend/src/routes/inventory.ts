@@ -1110,6 +1110,145 @@ inventoryRouter.get('/terms/:termId/return-pdf', async (req: Request, res: Respo
   }
 });
 
+// POST - Criar termo retroativo/manual para equipamentos já cadastrados no banco
+inventoryRouter.post('/terms/retroactive', async (req: Request, res: Response) => {
+  try {
+    const {
+      equipment_id,
+      responsible_id,
+      responsible_name,
+      responsible_department,
+      responsible_unit,
+      responsible_email,
+      responsible_phone,
+      responsible_cpf,
+      issued_date,
+      delivery_reason,
+      delivery_notes,
+      issued_by_id,
+      issued_by_name
+    } = req.body;
+
+    if (!equipment_id) {
+      return res.status(400).json({ error: 'equipment_id is required' });
+    }
+
+    const equipmentResult = await database.query(
+      'SELECT * FROM inventory_equipment WHERE id = $1',
+      [equipment_id]
+    );
+
+    if (equipmentResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Equipment not found' });
+    }
+
+    const equipment = equipmentResult.rows[0];
+
+    const existingActiveTerm = await database.query(
+      `SELECT id FROM responsibility_terms WHERE equipment_id = $1 AND status = 'active' ORDER BY issued_date DESC LIMIT 1`,
+      [equipment_id]
+    );
+
+    if (existingActiveTerm.rows.length > 0) {
+      return res.status(409).json({ error: 'Equipment already has an active term' });
+    }
+
+    let finalIssuedById = issued_by_id;
+    let finalIssuedByName = issued_by_name || 'Sistema';
+    if (!finalIssuedById) {
+      const adminUser = await database.query(
+        `SELECT id, full_name FROM internal_users WHERE role IN ('admin', 'ti_staff') ORDER BY created_at LIMIT 1`
+      );
+      if (adminUser.rows.length > 0) {
+        finalIssuedById = adminUser.rows[0].id;
+        if (finalIssuedByName === 'Sistema') {
+          finalIssuedByName = adminUser.rows[0].full_name;
+        }
+      }
+    }
+
+    if (!finalIssuedById) {
+      return res.status(400).json({ error: 'Usuário não identificado. Faça login novamente.' });
+    }
+
+    const issuedDate = issued_date || new Date().toISOString().split('T')[0];
+    const movementNumber = await generateMovementNumber();
+
+    const termResult = await database.query(
+      `INSERT INTO responsibility_terms (
+        equipment_id, responsible_id, responsible_name, responsible_department,
+        responsible_unit, responsible_email, responsible_phone, responsible_cpf,
+        issued_date, delivery_reason, delivery_notes, issued_by_id, issued_by_name, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'active')
+      RETURNING *`,
+      [
+        equipment_id,
+        responsible_id || null,
+        responsible_name || equipment.current_responsible_name || 'N/A',
+        responsible_department || equipment.current_unit || '',
+        responsible_unit || equipment.current_unit || '',
+        responsible_email || '',
+        responsible_phone || '',
+        responsible_cpf || '',
+        issuedDate,
+        delivery_reason || 'Termo retroativo',
+        delivery_notes || 'Termo gerado retroativamente para regularização histórica',
+        finalIssuedById,
+        finalIssuedByName,
+      ]
+    );
+
+    await database.query(
+      `INSERT INTO equipment_movements (
+        movement_number, equipment_id, term_id, movement_type, movement_date,
+        to_user_id, to_user_name, to_unit, to_department,
+        reason, notes, registered_by_id, registered_by_name
+      ) VALUES ($1, $2, $3, 'delivery', $4::timestamp, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      [
+        movementNumber,
+        equipment_id,
+        termResult.rows[0].id,
+        `${issuedDate} 08:00:00`,
+        responsible_id || null,
+        responsible_name || equipment.current_responsible_name || 'N/A',
+        responsible_unit || equipment.current_unit || '',
+        responsible_department || equipment.current_unit || '',
+        delivery_reason || 'Termo retroativo',
+        delivery_notes || 'Termo gerado retroativamente para regularização histórica',
+        finalIssuedById,
+        finalIssuedByName,
+      ]
+    );
+
+    await database.query(
+      `UPDATE inventory_equipment
+       SET current_status = 'in_use',
+           current_responsible_id = COALESCE($1, current_responsible_id),
+           current_responsible_name = COALESCE($2, current_responsible_name),
+           current_location = COALESCE($3, current_location),
+           current_unit = COALESCE($4, current_unit),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $5`,
+      [
+        responsible_id || null,
+        responsible_name || equipment.current_responsible_name || null,
+        responsible_department ? `${responsible_department} - ${responsible_unit || equipment.current_unit || ''}` : null,
+        responsible_unit || equipment.current_unit || null,
+        equipment_id,
+      ]
+    );
+
+    return res.status(201).json({
+      message: 'Retroactive term created successfully',
+      termId: termResult.rows[0].id,
+      movement_number: movementNumber,
+    });
+  } catch (error: any) {
+    console.error('Error creating retroactive term:', error);
+    res.status(500).json({ error: 'Failed to create retroactive term', details: error?.message || String(error) });
+  }
+});
+
 // ===== MOVIMENTAÇÕES - TRANSFERÊNCIA/RELOCAÇÃO =====
 
 // POST - Transferir equipamento (entre colaboradores ou unidades)

@@ -1,9 +1,20 @@
-import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import InventoryLayout from '../components/InventoryLayout';
 import { showToast } from '../utils/toast';
 import '../styles/SignTermPage.css';
 import { BACKEND_URL } from '../services/api';
+
+interface EquipmentData {
+  internal_code: string;
+  brand: string;
+  model: string;
+  serial_number: string;
+  processor?: string;
+  memory_ram?: string;
+  current_responsible_name?: string;
+  current_unit?: string;
+}
 
 interface FormData {
   responsible_name: string;
@@ -31,6 +42,8 @@ interface FormData {
 export default function SignTermPage() {
   const { equipmentId } = useParams<{ equipmentId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const retroMode = new URLSearchParams(location.search).get('retro') === '1';
 
   const [formData, setFormData] = useState<FormData>({
     responsible_name: '',
@@ -53,6 +66,43 @@ export default function SignTermPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [step, setStep] = useState(1);
+  const [equipment, setEquipment] = useState<EquipmentData | null>(null);
+
+  useEffect(() => {
+    const loadEquipment = async () => {
+      if (!equipmentId) return;
+
+      try {
+        const token = localStorage.getItem('internal_token');
+        const response = await fetch(`${BACKEND_URL}/api/inventory/equipment/${equipmentId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const eq = data.equipment;
+        if (eq) {
+          setEquipment(eq);
+          setFormData(prev => ({
+            ...prev,
+            equipment_code: eq.internal_code || prev.equipment_code,
+            equipment_brand: eq.brand || prev.equipment_brand,
+            equipment_model: eq.model || prev.equipment_model,
+            equipment_serial: eq.serial_number || prev.equipment_serial,
+            equipment_processor: eq.processor || prev.equipment_processor,
+            equipment_ram: eq.memory_ram || prev.equipment_ram,
+            responsible_name: retroMode ? (eq.current_responsible_name || prev.responsible_name) : prev.responsible_name,
+            responsible_department: retroMode ? (eq.current_unit || prev.responsible_department) : prev.responsible_department,
+          }));
+        }
+      } catch {
+        // Prefill is optional; keep the form usable even if fetch fails.
+      }
+    };
+
+    void loadEquipment();
+  }, [equipmentId, retroMode]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -131,8 +181,6 @@ export default function SignTermPage() {
       const token = localStorage.getItem('internal_token');
       const currentUser = JSON.parse(localStorage.getItem('internal_user') || '{}');
 
-      // Buscar ID do responsável se existir na base
-      // Por enquanto, vamos usar um ID temporário ou criar usuário externo
       const deliveryData = {
         equipment_id: equipmentId,
         responsible_id: null, // Pode ser null se for usuário externo
@@ -145,10 +193,15 @@ export default function SignTermPage() {
         delivery_reason: `Entrega de equipamento - ${formData.responsible_position}`,
         delivery_notes: `Acessórios: ${Object.entries(formData.accessories).filter(([_, v]) => v).map(([k]) => k).join(', ')}`,
         issued_by_id: currentUser.id,
-        issued_by_name: currentUser.name
+        issued_by_name: currentUser.name,
+        issued_date: formData.signature_date,
       };
 
-      const response = await fetch(`${BACKEND_URL}/api/inventory/movements/deliver`, {
+      const endpoint = retroMode
+        ? `${BACKEND_URL}/api/inventory/terms/retroactive`
+        : `${BACKEND_URL}/api/inventory/movements/deliver`;
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -162,8 +215,16 @@ export default function SignTermPage() {
         throw new Error(errorData.error || 'Erro ao criar termo de responsabilidade');
       }
 
-      await response.json();
-      showToast.success('Termo criado com sucesso!');
+      const responseData = await response.json();
+      const termId = responseData.termId || responseData.term?.id;
+      showToast.success(retroMode ? 'Termo retroativo criado com sucesso!' : 'Termo criado com sucesso!');
+
+      if (termId) {
+        const token = localStorage.getItem('internal_token');
+        const url = `${BACKEND_URL}/api/inventory/terms/${termId}/delivery-pdf?token=${token}`;
+        window.open(url, '_blank');
+      }
+
       navigate(`/inventario/equipamento/${equipmentId}`);
     } catch (err: any) {
       setError(err.message);
@@ -179,8 +240,8 @@ export default function SignTermPage() {
       <div className="sign-term-page">
         <div className="page-header">
           <button onClick={() => navigate(`/inventario/equipamento/${equipmentId}`)} className="btn-back">← Voltar</button>
-          <h1>✍️ Novo Termo de Responsabilidade</h1>
-          <p>Preencha todos os campos para criar um novo termo</p>
+          <h1>{retroMode ? '🗂️ Termo Retroativo' : '✍️ Novo Termo de Responsabilidade'}</h1>
+          <p>{retroMode ? 'Registre um termo histórico para equipamento já cadastrado' : 'Preencha todos os campos para criar um novo termo'}</p>
         </div>
 
         {error && <div className="alert alert-error">⚠️ {error}</div>}
@@ -222,6 +283,11 @@ export default function SignTermPage() {
             {step === 2 && (
               <div className="form-step">
                 <h2>💻 Identificação do Equipamento</h2>
+                {retroMode && equipment && (
+                  <div className="alert alert-info">
+                    <strong>Equipamento carregado:</strong> {equipment.internal_code} - {equipment.brand} {equipment.model}
+                  </div>
+                )}
                 <div className="form-group">
                   <label>Código Patrimonial *</label>
                   <input type="text" name="equipment_code" value={formData.equipment_code} onChange={handleInputChange} placeholder="Ex: TI-2024-001" />
