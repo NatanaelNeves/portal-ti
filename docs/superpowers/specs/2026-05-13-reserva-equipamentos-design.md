@@ -155,6 +155,32 @@ WHERE er.equipment_type_id = $1
 
 **Endpoint de disponibilidade** retorna `{ available: boolean, remaining: number, next_available?: string }` — sem expor `max_quantity`.
 
+### Controle de Concorrência (CRÍTICO)
+
+Duas reservas simultâneas podem passar pela validação ao mesmo tempo e exceder o pool. A criação de reserva deve ocorrer dentro de uma transaction com lock pessimista:
+
+```sql
+BEGIN;
+
+-- Lock nas linhas conflitantes para serializar criações simultâneas
+SELECT COALESCE(SUM(er.quantity), 0) AS reserved_qty
+FROM equipment_reservations er
+JOIN equipment_types et ON et.id = er.equipment_type_id
+WHERE er.equipment_type_id = $1
+  AND er.date = $2
+  AND er.status IN ('approved', 'ready', 'in_use')
+  AND er.start_time < ($4::time + (et.buffer_minutes || ' minutes')::interval)
+  AND er.end_time   > ($3::time - (et.buffer_minutes || ' minutes')::interval)
+FOR UPDATE;  -- <-- serializa leituras concorrentes
+
+-- Se OK: INSERT da reserva
+-- Se não: ROLLBACK e retorna 409
+
+COMMIT;
+```
+
+Alternativa: `SET TRANSACTION ISOLATION LEVEL SERIALIZABLE` se a query de lock for inviável.
+
 ### Geração de Número
 
 Formato `RES-YYYY-NNN` (sequencial por ano), mesmo padrão de `MOV-YEAR-NNNNNN` em `inventory.ts`.
@@ -192,7 +218,7 @@ Formato `RES-YYYY-NNN` (sequencial por ano), mesmo padrão de `MOV-YEAR-NNNNNN` 
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `GET` | `/api/reservations` | Todas reservas (filtros: `date_filter=today\|tomorrow\|week\|month`, `status`, `type_id`) |
+| `GET` | `/api/reservations` | Todas reservas. Filtros: `date_filter`, `status`, `type_id`. Paginação: `page` (default 1), `limit` (default 20), `sort=date_asc\|date_desc` |
 | `GET` | `/api/reservations/active-now` | Equipamentos em uso agora + próxima devolução |
 | `GET` | `/api/reservations/export/csv` | Exporta CSV com mesmos filtros |
 | `PATCH` | `/api/reservations/:id/approve` | Aprovar manualmente |
@@ -259,6 +285,8 @@ Endpoint retorna `Content-Type: text/calendar` com `Content-Disposition: attachm
 Crons adicionados no `schedulerService`:
 - `0 8 * * *` → lembrete 24h
 - `0 * * * *` → lembrete 1h + verificação auto no-show
+
+**Auto-cancelamento (preparado, não ativado na Fase 1):** reservas `approved` sem nenhuma ação operacional até 2h após `end_time` podem ser marcadas `cancelled` automaticamente. Campo `auto_cancel_after` pode ser adicionado futuramente em `equipment_types`. Por ora: job existe comentado no código, ativado por feature flag.
 
 WebSocket: ao aprovar/recusar/marcar-ready manualmente, notifica usuário interno via `websocketService.notifyUser()`.
 
@@ -404,6 +432,16 @@ Card de destaque no painel TI, atualizado em tempo real via WebSocket:
 ```
 
 Endpoint: `GET /api/reservations/active-now` → `{ count: 12, type: 'Notebooks', next_return: { time, location } }`
+
+**Regra Fase 1 (sem check-in físico):** enquanto não existir check-in real (Fase 2), reservas com `status = 'ready'` cujo horário atual esteja entre `start_time` e `end_time` são contadas como "em uso" para fins visuais. Isso evita que o card mostre zero mesmo com equipamentos efetivamente fora.
+
+```sql
+-- "Em uso agora" na Fase 1:
+WHERE status IN ('ready', 'in_use')
+  AND date = CURRENT_DATE
+  AND start_time <= CURRENT_TIME
+  AND end_time > CURRENT_TIME
+```
 
 ### Design System
 
