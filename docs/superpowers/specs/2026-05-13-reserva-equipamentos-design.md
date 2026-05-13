@@ -8,7 +8,7 @@
 
 ## Contexto
 
-O portal TI precisa de um módulo para gerenciar empréstimos de notebooks para aulas, treinamentos e eventos internos. Hoje os conflitos de horário são resolvidos informalmente, causando problemas operacionais. O módulo resolve isso com reservas por horário e validação automática de disponibilidade.
+O portal TI precisa de um módulo para gerenciar empréstimos de notebooks para aulas, treinamentos e eventos internos. Hoje os conflitos de horário são resolvidos informalmente, causando problemas operacionais. O módulo resolve isso com reservas por horário, validação automática de disponibilidade e buffer de tempo entre reservas.
 
 **Restrição principal:** usuários comuns NÃO devem ver quantidade real de equipamentos nem dados do inventário. O módulo opera com um "pool de reserva" configurado pelo admin, independente do inventário físico.
 
@@ -24,6 +24,8 @@ O portal TI precisa de um módulo para gerenciar empréstimos de notebooks para 
 | Fluxo público | E-mail sem login, token UUID de rastreio | Padrão do portal (igual a chamados) |
 | Tipos iniciais | Apenas Notebooks | Único tipo em uso no momento |
 | Arquitetura | Módulo isolado + serviços existentes | Zero risco ao inventário, reutiliza PDF/QR/WS/email |
+| Buffer entre reservas | `buffer_minutes` por tipo (default 30 min) | Tempo de devolução, conferência e transporte |
+| Design | Mobile first | Uso predominante via celular |
 
 ---
 
@@ -44,6 +46,7 @@ CREATE TABLE equipment_types (
   name VARCHAR(100) NOT NULL,           -- "Notebooks"
   description TEXT,
   max_quantity INTEGER NOT NULL,        -- pool disponível para reservas
+  buffer_minutes INTEGER NOT NULL DEFAULT 30,  -- tempo de buffer entre reservas
   icon VARCHAR(50),                     -- emoji ou nome de ícone
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -51,7 +54,7 @@ CREATE TABLE equipment_types (
 );
 ```
 
-Seed inicial: `{ name: 'Notebooks', max_quantity: <admin configura>, icon: '💻' }`
+Seed inicial: `{ name: 'Notebooks', max_quantity: <admin configura>, buffer_minutes: 30, icon: '💻' }`
 
 #### `equipment_reservations`
 Tabela principal de reservas.
@@ -68,7 +71,16 @@ CREATE TABLE equipment_reservations (
   location VARCHAR(200) NOT NULL,
   purpose TEXT NOT NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'approved'
-    CHECK (status IN ('pending','approved','rejected','in_use','returned','cancelled')),
+    CHECK (status IN (
+      'pending', 'approved', 'rejected',
+      'ready',                              -- TI separou os equipamentos
+      'in_use', 'returned',
+      'no_show',                            -- solicitante não apareceu
+      'cancelled'
+    )),
+
+  -- Recorrência (placeholder Fase 2)
+  recurrence_group_id UUID NULL,
 
   -- Usuário público (sem login)
   requester_name VARCHAR(200),
@@ -98,6 +110,8 @@ CREATE INDEX idx_reservations_date ON equipment_reservations(date);
 CREATE INDEX idx_reservations_type_date ON equipment_reservations(equipment_type_id, date);
 CREATE INDEX idx_reservations_token ON equipment_reservations(access_token);
 CREATE INDEX idx_reservations_status ON equipment_reservations(status);
+CREATE INDEX idx_reservations_recurrence ON equipment_reservations(recurrence_group_id)
+  WHERE recurrence_group_id IS NOT NULL;
 ```
 
 #### `reservation_logs`
@@ -107,7 +121,7 @@ Auditoria de todas as ações.
 CREATE TABLE reservation_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   reservation_id UUID NOT NULL REFERENCES equipment_reservations(id),
-  action VARCHAR(50) NOT NULL,          -- created, approved, rejected, cancelled, etc.
+  action VARCHAR(50) NOT NULL,          -- created, approved, rejected, cancelled, no_show, etc.
   performed_by_id UUID REFERENCES internal_users(id),
   performed_by_name VARCHAR(200),
   notes TEXT,
@@ -115,23 +129,26 @@ CREATE TABLE reservation_logs (
 );
 ```
 
-### Lógica de Conflito
+### Lógica de Conflito (com buffer)
 
 Ao criar reserva para tipo X, quantidade Q, data D, horário T1–T2:
 
 ```sql
-SELECT COALESCE(SUM(quantity), 0) AS reserved_qty
-FROM equipment_reservations
-WHERE equipment_type_id = $1
-  AND date = $2
-  AND status IN ('approved', 'in_use')
-  AND start_time < $4   -- end_time da nova reserva
-  AND end_time > $3;    -- start_time da nova reserva
+SELECT COALESCE(SUM(er.quantity), 0) AS reserved_qty
+FROM equipment_reservations er
+JOIN equipment_types et ON et.id = er.equipment_type_id
+WHERE er.equipment_type_id = $1
+  AND er.date = $2
+  AND er.status IN ('approved', 'ready', 'in_use')
+  AND er.start_time < ($4::time + (et.buffer_minutes || ' minutes')::interval)
+  AND er.end_time   > ($3::time - (et.buffer_minutes || ' minutes')::interval);
 ```
 
 - Se `reserved_qty + Q <= max_quantity` → cria com `status = 'approved'`
-- Se exceder → retorna 409 com mensagem: `"Apenas X equipamentos disponíveis para este horário."`
+- Se exceder → retorna 409: `"Apenas X equipamentos disponíveis para este horário (incluindo 30min de buffer)."`
 - Se pool = 0 → `"Sem disponibilidade para este horário."`
+
+**Endpoint de disponibilidade** retorna `{ available: boolean, remaining: number }` — sem expor `max_quantity`.
 
 ### Geração de Número
 
@@ -152,9 +169,10 @@ Formato `RES-YYYY-NNN` (sequencial por ano), mesmo padrão de `MOV-YEAR-NNNNNN` 
 | Método | Rota | Descrição |
 |---|---|---|
 | `GET` | `/api/reservations/types` | Lista tipos ativos (sem `max_quantity`) |
-| `GET` | `/api/reservations/availability` | Verifica disponibilidade `?type_id&date&start_time&end_time` |
+| `GET` | `/api/reservations/availability` | Verifica disponibilidade `?type_id&date&start_time&end_time` → `{ available, remaining }` |
 | `POST` | `/api/reservations` | Cria reserva (público ou interno) |
 | `GET` | `/api/reservations/public/:token` | Acompanha reserva por token |
+| `GET` | `/api/reservations/public/:token/ics` | Exporta `.ics` para Google/Outlook/Apple Calendar |
 
 #### Usuário interno autenticado
 
@@ -162,6 +180,7 @@ Formato `RES-YYYY-NNN` (sequencial por ano), mesmo padrão de `MOV-YEAR-NNNNNN` 
 |---|---|---|
 | `GET` | `/api/reservations/my` | Minhas reservas |
 | `GET` | `/api/reservations/:id` | Detalhe da reserva |
+| `GET` | `/api/reservations/:id/ics` | Exporta `.ics` |
 | `PATCH` | `/api/reservations/:id/cancel` | Cancelar própria reserva |
 
 #### TI / Admin (`it_staff`, `admin`)
@@ -171,6 +190,8 @@ Formato `RES-YYYY-NNN` (sequencial por ano), mesmo padrão de `MOV-YEAR-NNNNNN` 
 | `GET` | `/api/reservations` | Todas reservas (filtros: date, status, type_id) |
 | `PATCH` | `/api/reservations/:id/approve` | Aprovar manualmente |
 | `PATCH` | `/api/reservations/:id/reject` | Recusar com motivo |
+| `PATCH` | `/api/reservations/:id/ready` | Marcar como "equipamentos separados" |
+| `PATCH` | `/api/reservations/:id/no-show` | Marcar no-show |
 
 #### Admin — Tipos de equipamento
 
@@ -178,8 +199,27 @@ Formato `RES-YYYY-NNN` (sequencial por ano), mesmo padrão de `MOV-YEAR-NNNNNN` 
 |---|---|---|
 | `GET` | `/api/reservations/equipment-types` | Listar tipos |
 | `POST` | `/api/reservations/equipment-types` | Criar tipo |
-| `PATCH` | `/api/reservations/equipment-types/:id` | Atualizar (incl. max_quantity) |
+| `PATCH` | `/api/reservations/equipment-types/:id` | Atualizar (incl. `max_quantity`, `buffer_minutes`) |
 | `DELETE` | `/api/reservations/equipment-types/:id` | Desativar tipo |
+
+### Exportação ICS
+
+Gera arquivo `.ics` válido para importar no Google Calendar, Outlook e Apple Calendar.
+
+```
+BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+DTSTART:20260520T080000
+DTEND:20260520T120000
+SUMMARY:Reserva RES-2026-042 — Notebooks × 15
+LOCATION:Lab de Informática — Bloco B
+DESCRIPTION:Aula de informática para turma do 9º ano
+END:VEVENT
+END:VCALENDAR
+```
+
+Endpoint retorna `Content-Type: text/calendar` com `Content-Disposition: attachment; filename="reserva-RES-2026-042.ics"`.
 
 ### Permissões (em `authorization.ts`)
 
@@ -188,11 +228,21 @@ Formato `RES-YYYY-NNN` (sequencial por ano), mesmo padrão de `MOV-YEAR-NNNNNN` 
 'reservations:types:manage': [UserRole.ADMIN],
 ```
 
-### Notificações
+### Notificações Automáticas (via `schedulerService`)
 
-Ao criar reserva: email para `requester_email` com número da reserva e link de acompanhamento (`/reservar/acompanhar/:token` para público, `/reservas/:id` para internos). Via `emailService` existente.
+3 jobs adicionados ao `schedulerService.ts` existente:
 
-WebSocket: ao aprovar/recusar manualmente, notifica usuário interno via `websocketService.notifyUser()`.
+| Job | Quando | Canal | Conteúdo |
+|---|---|---|---|
+| Confirmação | Na criação | Email | Número, horário, local, botão "Acompanhar" |
+| Lembrete 24h | Cron diário 08:00 | Email | "Sua reserva é amanhã" + detalhes |
+| Lembrete 1h | Cron a cada hora | Email | "Sua reserva começa em 1 hora" |
+
+Crons adicionados no `schedulerService`:
+- `0 8 * * *` → busca reservas para amanhã e envia lembrete 24h
+- `0 * * * *` → busca reservas que começam em ~60 min e envia lembrete 1h
+
+WebSocket: ao aprovar/recusar/marcar-ready manualmente, notifica usuário interno via `websocketService.notifyUser()`.
 
 ---
 
@@ -238,65 +288,86 @@ frontend/src/styles/AdminReservationsPage.css
 frontend/src/styles/AdminEquipmentTypesPage.css
 ```
 
-### Formulário Público (`ReservationPublicPage`)
+### Formulário Público (`ReservationPublicPage`) — Mobile First
 
-1. Selector de tipo de equipamento (chips — busca de `/api/reservations/types`)
-2. Campo de quantidade
+Design focado em tela pequena, poucos campos, rápido de preencher.
+
+1. Selector de tipo (chips — busca `/api/reservations/types`)
+2. Campo quantidade
 3. Data + hora início + hora fim
-4. Verificador de disponibilidade em tempo real (debounce 500ms → `/api/reservations/availability`)
-5. Indicador verde/amarelo/vermelho de disponibilidade
+4. Verificador disponibilidade em tempo real (debounce 500ms → `/api/reservations/availability`)
+5. Indicador de capacidade: 🟢 Disponível / 🟡 Parcialmente ocupado / 🔴 Lotado
 6. Local e finalidade
-7. Dados do solicitante: nome, e-mail, telefone (público) OU exibe nome do usuário logado (interno)
-8. Botão "Confirmar Reserva" → POST → mostra número e link de acompanhamento
+7. Dados: nome, e-mail, telefone (público) — ou nome do usuário logado (interno)
+8. Botão "Confirmar Reserva" → mostra número, link de acompanhamento e botão "Adicionar ao Calendário" (ICS)
 
 ### Painel TI (`AdminReservationsPage`)
 
-**Layout:** calendário mensal (esquerda) + mini status cards (topo) + lista do dia (direita/baixo)
+**Layout:** mini status cards (topo) + calendário mensal (centro-esquerda) + lista do dia (direita/baixo)
 
 **Mini status cards:**
 - Em uso agora
 - Reservas hoje
 - Próximos 7 dias
-- Conflitos evitados (reservas rejeitadas por lotação)
+- No-shows acumulados (métrica de desperdício)
 
-**Calendário:**
+**Calendário mensal:**
 - Navegação mês anterior/próximo
 - Hoje destacado
-- Pontos coloridos nos dias com reservas: verde (disponível), amarelo (parcial ≥50%), vermelho (lotado)
-- Clicar no dia → filtra lista de reservas para aquele dia
+- Pontos coloridos nos dias: 🟢 disponível / 🟡 parcial (≥50% do pool ocupado) / 🔴 lotado
+- Hover no dia → tooltip com "X reservas / Y notebooks ocupados"
+- Clicar no dia → filtra lista + abre visão do dia
+
+**Visão diária (ao clicar no dia):**
+- Blocos por horário estilo Google Calendar
+- Cada bloco: solicitante, quantidade, local, status colorido
+- Visualiza gaps e buffer entre blocos
 
 **Lista de reservas:**
-- Card por reserva: horário, tipo, quantidade, local, solicitante, badge de status colorido
-- Ações rápidas: Aprovar / Recusar (inline nos cards pendentes)
+- Card por reserva: horário, tipo, quantidade, local, solicitante, badge status
+- Ações rápidas inline: Aprovar / Recusar / Marcar Pronto / Marcar No-show
+
+### Indicadores de Capacidade (sem expor números)
+
+Regra de cor baseada em `remaining / max_quantity` (calculado no backend, exposto apenas como status):
+- 🟢 **Disponível:** > 50% do pool livre
+- 🟡 **Parcialmente ocupado:** 1–50% livre
+- 🔴 **Lotado:** 0% livre
 
 ### Design System
 
-Seguir padrão existente: CSS variables `--verde-nazareno`, `--laranja-acolhedor`, `--azul-sereno`, `--sombra-card`, `--border-radius`. Um arquivo CSS por página. Sem bibliotecas UI externas.
+Mobile first. CSS variables `--verde-nazareno`, `--laranja-acolhedor`, `--azul-sereno`, `--sombra-card`, `--border-radius`. Um arquivo CSS por página. Sem bibliotecas UI externas.
 
 ---
 
 ## Fluxo de Status
 
 ```
-Criação com pool disponível  → approved  (automático)
-Criação sem pool             → rejeitada na criação (HTTP 409, não salva)
-approved                     → cancelled  (pelo solicitante ou TI)
-approved                     → in_use     (Fase 2: check-in TI)
-in_use                       → returned   (Fase 2: check-out TI)
-TI pode aprovar/recusar      → approved / rejected (ação manual, ex: reservas que ficaram pendentes)
+Criação com pool disponível  → approved   (automático)
+Criação sem pool             → HTTP 409    (não salva)
+approved                     → ready       (TI separou equipamentos fisicamente)
+approved / ready             → cancelled   (solicitante ou TI)
+approved / ready             → no_show     (TI marca: solicitante não apareceu)
+ready                        → in_use      (Fase 2: check-in TI)
+in_use                       → returned    (Fase 2: check-out TI)
+TI pode aprovar/recusar      → approved / rejected (ação manual)
 ```
 
 ---
 
 ## Verificação (como testar)
 
-1. **Migração:** `npm run migrate` no backend — tabelas criadas sem erro
-2. **Seed:** criar tipo "Notebooks" com `max_quantity = 20` via `POST /api/reservations/equipment-types`
-3. **Reserva pública:** acessar `/reservar`, criar reserva de 10 notebooks, verificar e-mail + token
-4. **Conflito:** criar segunda reserva de 15 notebooks no mesmo horário → deve bloquear ("Apenas 10 disponíveis")
-5. **Calendário:** acessar `/admin/reservas`, verificar ponto colorido no dia com reservas
-6. **Clique no dia:** lista deve filtrar para reservas do dia selecionado
-7. **Acompanhamento público:** acessar `/reservar/acompanhar/:token` com token recebido
+1. **Migração:** `npm run migrate` → tabelas criadas sem erro
+2. **Seed:** criar tipo "Notebooks" `max_quantity=20, buffer_minutes=30` via `POST /api/reservations/equipment-types`
+3. **Reserva pública:** `/reservar` → criar 10 notebooks → verificar e-mail + token + botão ICS
+4. **Buffer:** criar reserva 08:00–10:00; tentar criar 10:00–12:00 → deve bloquear (buffer 30min)
+5. **Reserva válida com buffer:** criar 10:30–12:00 → deve aprovar
+6. **Conflito de quantidade:** criar 15 notebooks mesmo horário → "Apenas 10 disponíveis"
+7. **Calendário:** `/admin/reservas` → ponto colorido no dia → clicar → lista filtrada
+8. **Visão diária:** confirmar blocos de horário com buffer visual entre eles
+9. **Lembrete email:** forçar job de 24h via chamada direta → verificar envio
+10. **ICS:** baixar `.ics` → importar no Google Calendar → confirmar evento criado
+11. **No-show:** TI marca → status muda → aparece na métrica de no-shows
 
 ---
 
@@ -306,5 +377,6 @@ TI pode aprovar/recusar      → approved / rejected (ação manual, ex: reserva
 - Geração de PDF de reserva (Fase 2)
 - QR Code de reserva (Fase 2)
 - Assinatura digital (Fase 2)
+- Reserva recorrente — campo `recurrence_group_id` existe mas sem UI (Fase 2)
 - Dashboard analytics avançado (Fase 3)
-- Integração com `inventory_equipment` (decisão: mantida separada indefinidamente)
+- Integração com `inventory_equipment` (mantida separada indefinidamente)
