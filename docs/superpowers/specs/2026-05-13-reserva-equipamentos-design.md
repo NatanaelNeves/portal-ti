@@ -25,6 +25,7 @@ O portal TI precisa de um módulo para gerenciar empréstimos de notebooks para 
 | Tipos iniciais | Apenas Notebooks | Único tipo em uso no momento |
 | Arquitetura | Módulo isolado + serviços existentes | Zero risco ao inventário, reutiliza PDF/QR/WS/email |
 | Buffer entre reservas | `buffer_minutes` por tipo (default 30 min) | Tempo de devolução, conferência e transporte |
+| Antecedência mínima | 30 min antes do início | TI precisa de tempo para separar |
 | Design | Mobile first | Uso predominante via celular |
 
 ---
@@ -145,10 +146,14 @@ WHERE er.equipment_type_id = $1
 ```
 
 - Se `reserved_qty + Q <= max_quantity` → cria com `status = 'approved'`
-- Se exceder → retorna 409: `"Apenas X equipamentos disponíveis para este horário (incluindo 30min de buffer)."`
+- Se exceder → retorna 409 com `{ available: false, reason: 'conflict' | 'buffer', remaining: N, next_available: 'HH:MM' }`
+  - `reason: 'buffer'` → mensagem: `"Indisponível devido ao tempo de preparação/devolução (30min). Próximo horário disponível: 12:30."`
+  - `reason: 'conflict'` → `"Apenas X equipamentos disponíveis para este horário."`
 - Se pool = 0 → `"Sem disponibilidade para este horário."`
 
-**Endpoint de disponibilidade** retorna `{ available: boolean, remaining: number }` — sem expor `max_quantity`.
+**Cálculo de `next_available`:** após encontrar conflito, o backend itera em slots de 15min a partir de `end_time` para encontrar o primeiro horário livre para a quantidade solicitada.
+
+**Endpoint de disponibilidade** retorna `{ available: boolean, remaining: number, next_available?: string }` — sem expor `max_quantity`.
 
 ### Geração de Número
 
@@ -187,7 +192,9 @@ Formato `RES-YYYY-NNN` (sequencial por ano), mesmo padrão de `MOV-YEAR-NNNNNN` 
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `GET` | `/api/reservations` | Todas reservas (filtros: date, status, type_id) |
+| `GET` | `/api/reservations` | Todas reservas (filtros: `date_filter=today\|tomorrow\|week\|month`, `status`, `type_id`) |
+| `GET` | `/api/reservations/active-now` | Equipamentos em uso agora + próxima devolução |
+| `GET` | `/api/reservations/export/csv` | Exporta CSV com mesmos filtros |
 | `PATCH` | `/api/reservations/:id/approve` | Aprovar manualmente |
 | `PATCH` | `/api/reservations/:id/reject` | Recusar com motivo |
 | `PATCH` | `/api/reservations/:id/ready` | Marcar como "equipamentos separados" |
@@ -201,6 +208,16 @@ Formato `RES-YYYY-NNN` (sequencial por ano), mesmo padrão de `MOV-YEAR-NNNNNN` 
 | `POST` | `/api/reservations/equipment-types` | Criar tipo |
 | `PATCH` | `/api/reservations/equipment-types/:id` | Atualizar (incl. `max_quantity`, `buffer_minutes`) |
 | `DELETE` | `/api/reservations/equipment-types/:id` | Desativar tipo |
+
+### Validação de Antecedência Mínima
+
+Backend e frontend validam:
+```
+(date + start_time) >= NOW() + 30 minutos
+```
+Se não atender → retorna 400: `"Reservas devem ser criadas com no mínimo 30 minutos de antecedência."`
+
+Frontend desabilita horários passados e horários dentro dos próximos 30min no seletor de hora.
 
 ### Exportação ICS
 
@@ -230,17 +247,18 @@ Endpoint retorna `Content-Type: text/calendar` com `Content-Disposition: attachm
 
 ### Notificações Automáticas (via `schedulerService`)
 
-3 jobs adicionados ao `schedulerService.ts` existente:
+4 jobs adicionados ao `schedulerService.ts` existente:
 
 | Job | Quando | Canal | Conteúdo |
 |---|---|---|---|
-| Confirmação | Na criação | Email | Número, horário, local, botão "Acompanhar" |
+| Confirmação | Na criação | Email | Número, horário, local, botão "Acompanhar" + link ICS |
 | Lembrete 24h | Cron diário 08:00 | Email | "Sua reserva é amanhã" + detalhes |
 | Lembrete 1h | Cron a cada hora | Email | "Sua reserva começa em 1 hora" |
+| Auto no-show | Cron a cada hora | Sistema | Se `approved` e `start_time + 1h` passou sem virar `ready`/`in_use` → marca `no_show` + notifica TI |
 
 Crons adicionados no `schedulerService`:
-- `0 8 * * *` → busca reservas para amanhã e envia lembrete 24h
-- `0 * * * *` → busca reservas que começam em ~60 min e envia lembrete 1h
+- `0 8 * * *` → lembrete 24h
+- `0 * * * *` → lembrete 1h + verificação auto no-show
 
 WebSocket: ao aprovar/recusar/marcar-ready manualmente, notifica usuário interno via `websocketService.notifyUser()`.
 
@@ -334,6 +352,59 @@ Regra de cor baseada em `remaining / max_quantity` (calculado no backend, expost
 - 🟡 **Parcialmente ocupado:** 1–50% livre
 - 🔴 **Lotado:** 0% livre
 
+### Filtros de Data (Painel TI)
+
+Tabs/pills rápidos no topo da lista:
+`Hoje` | `Amanhã` | `Esta Semana` | `Este Mês` | `Todos`
+
+Mapeia para o parâmetro `date_filter` na API.
+
+### Exportação CSV
+
+Botão "Exportar CSV" no painel TI. Exporta todas as reservas com os filtros ativos. Campos: número, tipo, quantidade, data, horário, local, finalidade, solicitante, e-mail, status, criado em.
+
+Usa `excelExportService.ts` existente (já tem padrão de exportação no projeto).
+
+### Cores de Status Padronizadas
+
+Definidas em CSS variables e reutilizadas em todos os badges/cards:
+
+| Status | Cor | Hex |
+|---|---|---|
+| `pending` | Amarelo | `#F59E0B` |
+| `approved` | Azul | `#4A90E2` |
+| `ready` | Roxo | `#8B5CF6` |
+| `in_use` | Verde | `#007A33` |
+| `returned` | Cinza | `#6B7280` |
+| `cancelled` | Vermelho | `#EF4444` |
+| `no_show` | Laranja | `#F28C38` |
+| `rejected` | Vermelho escuro | `#B91C1C` |
+
+### Definição Operacional de "ready"
+
+Status `ready` significa: **TI separou os notebooks, carregou as baterias, verificou o funcionamento e os equipamentos estão no local informado aguardando retirada.**
+
+Ação TI: clica "Marcar como Pronto" → sistema notifica solicitante: "Seus equipamentos estão prontos para retirada em [local]."
+
+### Animações e UX
+
+- Hover em cards: `transform: translateY(-2px)` + `box-shadow` suave (150ms ease)
+- Fade-in em listas: `opacity 0 → 1` ao carregar (200ms)
+- Skeleton loading nos cards do calendário enquanto carrega
+- Transição suave ao trocar dia no calendário (fade 150ms)
+- Tooltip no indicador de disponibilidade mostrando `next_available` quando bloqueado
+
+### "Em Uso Agora" — Card Operacional
+
+Card de destaque no painel TI, atualizado em tempo real via WebSocket:
+
+```
+💻 12 notebooks em uso agora
+   Próxima devolução: 15:00 (Sala A)
+```
+
+Endpoint: `GET /api/reservations/active-now` → `{ count: 12, type: 'Notebooks', next_return: { time, location } }`
+
 ### Design System
 
 Mobile first. CSS variables `--verde-nazareno`, `--laranja-acolhedor`, `--azul-sereno`, `--sombra-card`, `--border-radius`. Um arquivo CSS por página. Sem bibliotecas UI externas.
@@ -358,16 +429,20 @@ TI pode aprovar/recusar      → approved / rejected (ação manual)
 ## Verificação (como testar)
 
 1. **Migração:** `npm run migrate` → tabelas criadas sem erro
-2. **Seed:** criar tipo "Notebooks" `max_quantity=20, buffer_minutes=30` via `POST /api/reservations/equipment-types`
-3. **Reserva pública:** `/reservar` → criar 10 notebooks → verificar e-mail + token + botão ICS
-4. **Buffer:** criar reserva 08:00–10:00; tentar criar 10:00–12:00 → deve bloquear (buffer 30min)
-5. **Reserva válida com buffer:** criar 10:30–12:00 → deve aprovar
-6. **Conflito de quantidade:** criar 15 notebooks mesmo horário → "Apenas 10 disponíveis"
-7. **Calendário:** `/admin/reservas` → ponto colorido no dia → clicar → lista filtrada
-8. **Visão diária:** confirmar blocos de horário com buffer visual entre eles
-9. **Lembrete email:** forçar job de 24h via chamada direta → verificar envio
-10. **ICS:** baixar `.ics` → importar no Google Calendar → confirmar evento criado
-11. **No-show:** TI marca → status muda → aparece na métrica de no-shows
+2. **Seed:** criar tipo "Notebooks" `max_quantity=20, buffer_minutes=30`
+3. **Antecedência:** tentar criar reserva para daqui a 10min → deve bloquear
+4. **Reserva pública:** `/reservar` → criar 10 notebooks → verificar e-mail + token + botão ICS
+5. **Buffer tooltip:** criar reserva 08:00–10:00; tentar criar 10:00–12:00 → mensagem com `next_available: 10:30`
+6. **Buffer válido:** criar 10:30–12:00 → deve aprovar
+7. **Conflito quantidade:** criar 15 notebooks no mesmo horário válido → "Apenas 10 disponíveis"
+8. **Filtros data:** testar pills Hoje/Amanhã/Semana/Mês no painel TI
+9. **Calendário:** ponto colorido no dia → clicar → lista filtrada + visão diária com blocos
+10. **Em uso agora:** card mostra contagem correta em tempo real
+11. **Lembrete email:** forçar cron → verificar envio de 24h e 1h
+12. **Auto no-show:** simular `start_time + 1h` passado sem check-in → status vira `no_show`
+13. **ICS:** baixar `.ics` → importar no Google Calendar → evento criado
+14. **CSV:** exportar com filtro "Hoje" → verificar colunas e dados
+15. **Cores:** verificar badge de cada status com a cor correta
 
 ---
 
