@@ -145,44 +145,44 @@ export default function RhReportsPage() {
       return { month: label, chamados: count };
     });
 
-  if (loading) return <div className="reports-page"><div className="loading-state">Carregando relatório...</div></div>;
-  if (error) return <div className="reports-page"><div className="error-state">{error}</div></div>;
+  if (loading) return <div className="reports-page"><div className="loading">Carregando relatório...</div></div>;
+  if (error) return <div className="reports-page"><div className="alert alert-error">{error}</div></div>;
 
   return (
     <div className="reports-page">
       <div className="reports-header">
         <div>
-          <h1>Relatórios — Recursos Humanos</h1>
-          <p className="reports-subtitle">Visão geral dos chamados do departamento de RH</p>
+          <h1 className="page-title">Relatórios — Recursos Humanos</h1>
+          <p style={{ margin: 0, color: '#6b7280', fontSize: '0.9rem' }}>Visão geral dos chamados do departamento de RH</p>
         </div>
-        <button className="btn-refresh" onClick={fetchTickets}>↻ Atualizar</button>
+        <button className="export-btn" onClick={fetchTickets} style={{ background: '#7c3aed', color: '#fff', border: 'none' }}>↻ Atualizar</button>
       </div>
 
       {/* KPI Cards */}
-      <div className="stats-overview-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', marginBottom: '2rem' }}>
+      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', marginBottom: '2rem' }}>
         <div className="stat-card">
-          <div className="stat-number">{total}</div>
-          <div className="stat-label">Total de Chamados</div>
+          <div className="stat-value">{total}</div>
+          <div className="stat-detail">Total de Chamados</div>
         </div>
-        <div className="stat-card stat-card-warning">
-          <div className="stat-number">{open}</div>
-          <div className="stat-label">Em Aberto</div>
+        <div className="stat-card" style={{ borderLeftColor: '#f59e0b' }}>
+          <div className="stat-value" style={{ color: '#92400e' }}>{open}</div>
+          <div className="stat-detail">Em Aberto</div>
         </div>
-        <div className="stat-card stat-card-success">
-          <div className="stat-number">{resolved}</div>
-          <div className="stat-label">Resolvidos</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-number">{resolutionRate}%</div>
-          <div className="stat-label">Taxa de Resolução</div>
+        <div className="stat-card" style={{ borderLeftColor: '#10b981' }}>
+          <div className="stat-value" style={{ color: '#065f46' }}>{resolved}</div>
+          <div className="stat-detail">Resolvidos</div>
         </div>
         <div className="stat-card">
-          <div className="stat-number">{newToday}</div>
-          <div className="stat-label">Abertos Hoje</div>
+          <div className="stat-value">{resolutionRate}%</div>
+          <div className="stat-detail">Taxa de Resolução</div>
         </div>
         <div className="stat-card">
-          <div className="stat-number">{avgResolutionHours}h</div>
-          <div className="stat-label">Tempo Médio Resolução</div>
+          <div className="stat-value">{newToday}</div>
+          <div className="stat-detail">Abertos Hoje</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-value">{avgResolutionHours}h</div>
+          <div className="stat-detail">Tempo Médio Resolução</div>
         </div>
       </div>
 
@@ -191,7 +191,7 @@ export default function RhReportsPage() {
         <div className="chart-card">
           <h2>Chamados por Categoria</h2>
           {byCategory.length === 0 ? (
-            <p className="no-data">Sem dados</p>
+            <p className="chart-empty-state">Sem dados</p>
           ) : (
             <ResponsiveContainer width="100%" height={280}>
               <PieChart>
@@ -219,7 +219,7 @@ export default function RhReportsPage() {
         <div className="chart-card">
           <h2>Distribuição por Status</h2>
           {byStatus.length === 0 ? (
-            <p className="no-data">Sem dados</p>
+            <p className="chart-empty-state">Sem dados</p>
           ) : (
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={byStatus} margin={{ top: 10, right: 20, left: 0, bottom: 60 }}>
@@ -241,7 +241,7 @@ export default function RhReportsPage() {
         <div className="chart-card" style={{ gridColumn: '1 / -1' }}>
           <h2>Tendência Mensal (últimos 6 meses)</h2>
           {monthlyTrend.length === 0 ? (
-            <p className="no-data">Sem dados históricos</p>
+            <p className="chart-empty-state">Sem dados históricos</p>
           ) : (
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={monthlyTrend} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>

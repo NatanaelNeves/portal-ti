@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import '../styles/AdminTicketsPage.css';
+import '../styles/RhTicketsPage.css';
 
 interface Ticket {
   id: string;
