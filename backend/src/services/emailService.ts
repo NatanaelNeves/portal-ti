@@ -12,6 +12,13 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+const buildPublicTicketLink = (ticketId: string, publicToken?: string): string => {
+  const baseUrl = `${config.frontend.url}/chamado/${ticketId}`;
+  if (!publicToken) return baseUrl;
+  const separator = baseUrl.includes('?') ? '&' : '?';
+  return `${baseUrl}${separator}token=${encodeURIComponent(publicToken)}`;
+};
+
 const isGraphConfigured = (): boolean => {
   const graph = config.email.graph;
   return Boolean(graph.tenantId && graph.clientId && graph.clientSecret && graph.senderUser);
@@ -311,7 +318,8 @@ export class EmailService {
     requesterName: string,
     oldStatus: string,
     newStatus: string,
-    message?: string
+    message?: string,
+    publicToken?: string
   ): Promise<void> {
     const statusLabels: Record<string, string> = {
       open: 'Aberto',
@@ -331,6 +339,7 @@ export class EmailService {
       closed: '#666',
     };
 
+    const ticketLink = buildPublicTicketLink(ticketId, publicToken);
     const html = `
       <!DOCTYPE html>
       <html>
@@ -367,7 +376,7 @@ export class EmailService {
               ${message ? `<div class="message-box"><strong>Mensagem da equipe:</strong><br>${message}</div>` : ''}
             </div>
 
-            <a href="${config.frontend.url}/chamado/${ticketId}" class="button">
+            <a href="${ticketLink}" class="button">
               Ver Chamado
             </a>
 
@@ -389,7 +398,7 @@ export class EmailService {
       to: requesterEmail,
       subject: `📢 Atualização: ${title} - ${statusLabels[newStatus]}`,
       html,
-      text: `Atualização do Chamado\n\nTítulo: ${title}\nStatus: ${statusLabels[oldStatus]} → ${statusLabels[newStatus]}\n\nAcesse: ${config.frontend.url}/chamado/${ticketId}`,
+      text: `Atualização do Chamado\n\nTítulo: ${title}\nStatus: ${statusLabels[oldStatus]} → ${statusLabels[newStatus]}\n\nAcesse: ${ticketLink}`,
     });
   }
 
@@ -400,8 +409,10 @@ export class EmailService {
     ticketId: string,
     title: string,
     requesterEmail: string,
-    requesterName: string
+    requesterName: string,
+    publicToken?: string
   ): Promise<void> {
+    const ticketLink = buildPublicTicketLink(ticketId, publicToken);
     const html = `
       <!DOCTYPE html>
       <html>
@@ -428,7 +439,7 @@ export class EmailService {
             <div class="alert">
               Seu chamado será encerrado automaticamente em 24h caso não haja resposta.
             </div>
-            <a href="${config.frontend.url}/chamado/${ticketId}" class="button">
+            <a href="${ticketLink}" class="button">
               Confirmar Agora
             </a>
           </div>
@@ -445,7 +456,7 @@ export class EmailService {
       to: requesterEmail,
       subject: `⏰ Seu chamado será encerrado em 24h: ${title}`,
       html,
-      text: `Seu chamado será encerrado automaticamente em 24h caso não haja resposta.\n\nAcesse: ${config.frontend.url}/chamado/${ticketId}`,
+      text: `Seu chamado será encerrado automaticamente em 24h caso não haja resposta.\n\nAcesse: ${ticketLink}`,
     });
   }
 
@@ -458,8 +469,10 @@ export class EmailService {
     recipientEmail: string,
     recipientName: string,
     authorName: string,
-    message: string
+    message: string,
+    publicToken?: string
   ): Promise<void> {
+    const ticketLink = buildPublicTicketLink(ticketId, publicToken);
     const html = `
       <!DOCTYPE html>
       <html>
@@ -488,7 +501,7 @@ export class EmailService {
               <p>${message}</p>
             </div>
 
-            <a href="${config.frontend.url}/chamado/${ticketId}" class="button">
+            <a href="${ticketLink}" class="button">
               Ver Chamado
             </a>
           </div>
@@ -506,7 +519,7 @@ export class EmailService {
       to: recipientEmail,
       subject: `💬 Nova mensagem: ${title}`,
       html,
-      text: `Nova mensagem de ${authorName}\n\nChamado: ${title}\n\n${message}\n\nAcesse: ${config.frontend.url}/chamado/${ticketId}`,
+      text: `Nova mensagem de ${authorName}\n\nChamado: ${title}\n\n${message}\n\nAcesse: ${ticketLink}`,
     });
   }
 }

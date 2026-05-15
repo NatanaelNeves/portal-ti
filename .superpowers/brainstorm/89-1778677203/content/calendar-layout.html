@@ -1,0 +1,112 @@
+<h2>Layout do Painel de Reservas (TI)</h2>
+<p class="subtitle">Qual estilo de calendário/painel faz mais sentido para a equipe TI gerenciar reservas?</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#f8f9fa;border-radius:8px;padding:12px;font-size:11px;">
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <div style="flex:1;background:#007A33;color:white;border-radius:6px;padding:8px;font-size:10px;font-weight:600;">◀ Maio 2026 ▶</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;margin-bottom:6px;">
+          <div style="font-size:9px;color:#888;">D</div><div style="font-size:9px;color:#888;">S</div><div style="font-size:9px;color:#888;">T</div><div style="font-size:9px;color:#888;">Q</div><div style="font-size:9px;color:#888;">Q</div><div style="font-size:9px;color:#888;">S</div><div style="font-size:9px;color:#888;">S</div>
+          <div style="padding:3px;font-size:9px;">1</div><div style="padding:3px;font-size:9px;">2</div><div style="padding:3px;font-size:9px;">3</div><div style="padding:3px;font-size:9px;">4</div><div style="padding:3px;font-size:9px;">5</div><div style="padding:3px;font-size:9px;">6</div><div style="padding:3px;font-size:9px;">7</div>
+          <div style="padding:3px;font-size:9px;">8</div><div style="padding:3px;font-size:9px;">9</div><div style="padding:3px;font-size:9px;">10</div><div style="padding:3px;font-size:9px;">11</div><div style="padding:3px;font-size:9px;">12</div><div style="padding:3px;font-size:9px;background:#007A33;color:white;border-radius:50%;">13</div><div style="padding:3px;font-size:9px;">14</div>
+          <div style="padding:3px;font-size:9px;">15</div><div style="padding:3px;font-size:9px;">16</div><div style="padding:3px;font-size:9px;">17</div><div style="padding:3px;font-size:9px;">18</div><div style="padding:3px;font-size:9px;">19</div><div style="padding:3px;font-size:9px;">20</div><div style="padding:3px;font-size:9px;">21</div>
+        </div>
+        <div style="background:white;border-radius:6px;padding:6px;font-size:9px;">
+          <div style="background:#22c55e;color:white;border-radius:3px;padding:2px 5px;margin-bottom:3px;">08:00 Notebooks × 10</div>
+          <div style="background:#f59e0b;color:white;border-radius:3px;padding:2px 5px;margin-bottom:3px;">14:00 Notebooks × 18</div>
+          <div style="background:#ef4444;color:white;border-radius:3px;padding:2px 5px;">16:00 LOTADO</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Mês + Lista do Dia</h3>
+      <p>Calendário mensal + ao clicar no dia abre lista de reservas. Estilo Google Calendar. Visão macro do mês.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#f8f9fa;border-radius:8px;padding:12px;font-size:11px;">
+        <div style="display:flex;gap:4px;margin-bottom:6px;">
+          <div style="width:40px;font-size:9px;color:#888;padding-top:4px;">Hora</div>
+          <div style="flex:1;text-align:center;font-size:9px;font-weight:600;color:#007A33;">Seg 13</div>
+          <div style="flex:1;text-align:center;font-size:9px;font-weight:600;">Ter 14</div>
+          <div style="flex:1;text-align:center;font-size:9px;font-weight:600;">Qua 15</div>
+          <div style="flex:1;text-align:center;font-size:9px;font-weight:600;">Qui 16</div>
+          <div style="flex:1;text-align:center;font-size:9px;font-weight:600;">Sex 17</div>
+        </div>
+        <div style="display:flex;gap:4px;margin-bottom:2px;">
+          <div style="width:40px;font-size:8px;color:#888;">08:00</div>
+          <div style="flex:1;background:#22c55e;color:white;border-radius:3px;padding:2px;font-size:8px;">NB×10</div>
+          <div style="flex:1;"></div>
+          <div style="flex:1;background:#22c55e;color:white;border-radius:3px;padding:2px;font-size:8px;">NB×5</div>
+          <div style="flex:1;"></div>
+          <div style="flex:1;"></div>
+        </div>
+        <div style="display:flex;gap:4px;margin-bottom:2px;">
+          <div style="width:40px;font-size:8px;color:#888;">10:00</div>
+          <div style="flex:1;"></div>
+          <div style="flex:1;background:#f59e0b;color:white;border-radius:3px;padding:2px;font-size:8px;">NB×18</div>
+          <div style="flex:1;"></div>
+          <div style="flex:1;background:#22c55e;color:white;border-radius:3px;padding:2px;font-size:8px;">NB×8</div>
+          <div style="flex:1;"></div>
+        </div>
+        <div style="display:flex;gap:4px;">
+          <div style="width:40px;font-size:8px;color:#888;">14:00</div>
+          <div style="flex:1;background:#ef4444;color:white;border-radius:3px;padding:2px;font-size:8px;">LOTADO</div>
+          <div style="flex:1;"></div>
+          <div style="flex:1;"></div>
+          <div style="flex:1;background:#22c55e;color:white;border-radius:3px;padding:2px;font-size:8px;">NB×3</div>
+          <div style="flex:1;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Timeline Semanal</h3>
+      <p>Grade de horários por semana. Conflitos e disponibilidade visíveis de relance. Estilo Outlook/Teams.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#f8f9fa;border-radius:8px;padding:12px;font-size:11px;">
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <div style="background:#007A33;color:white;border-radius:6px;padding:4px 8px;font-size:9px;font-weight:600;">Hoje</div>
+          <div style="background:white;border:1px solid #ddd;border-radius:6px;padding:4px 8px;font-size:9px;">Semana</div>
+          <div style="background:white;border:1px solid #ddd;border-radius:6px;padding:4px 8px;font-size:9px;">Mês</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <div style="flex:2;">
+            <div style="background:white;border-radius:6px;padding:6px;margin-bottom:4px;border-left:3px solid #22c55e;">
+              <div style="font-size:9px;font-weight:600;">08:00–10:00</div>
+              <div style="font-size:8px;color:#666;">Notebooks × 10 • Sala A</div>
+            </div>
+            <div style="background:white;border-radius:6px;padding:6px;margin-bottom:4px;border-left:3px solid #f59e0b;">
+              <div style="font-size:9px;font-weight:600;">14:00–16:00</div>
+              <div style="font-size:8px;color:#666;">Notebooks × 18 • Lab Info</div>
+            </div>
+          </div>
+          <div style="flex:1;">
+            <div style="background:white;border-radius:6px;padding:6px;font-size:9px;">
+              <div style="font-weight:600;margin-bottom:4px;color:#007A33;">Status</div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:2px;"><span>Em uso</span><span style="font-weight:600;">3</span></div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:2px;"><span>Hoje</span><span style="font-weight:600;">5</span></div>
+              <div style="display:flex;justify-content:space-between;"><span>Futuras</span><span style="font-weight:600;">12</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Agenda + Mini Dashboard</h3>
+      <p>Lista de reservas do dia/semana com mini cards de status ao lado. Mais limpo, menos clique para operação diária.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px;">Clique para selecionar. Pode combinar dois estilos se quiser (ex: "A + mini status de C").</p>

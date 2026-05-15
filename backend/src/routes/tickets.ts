@@ -904,6 +904,7 @@ ticketsRouter.post('/:id/messages', validate(addMessageSchema), async (req: Requ
           let authorName = '';
           let recipientEmail = '';
           let recipientName = '';
+          let recipientToken: string | undefined;
 
           // Se mensagem veio da TI, notificar o solicitante
           if (authorType === 'it_staff') {
@@ -916,11 +917,12 @@ ticketsRouter.post('/:id/messages', validate(addMessageSchema), async (req: Requ
             // Buscar email do solicitante
             if (ticket.rows[0].requester_type === 'public') {
               const publicUser = await database.query(
-                'SELECT email, name FROM public_users WHERE id = $1',
+                'SELECT email, name, user_token FROM public_users WHERE id = $1',
                 [ticket.rows[0].requester_id]
               );
               recipientEmail = publicUser.rows[0]?.email;
               recipientName = publicUser.rows[0]?.name;
+              recipientToken = publicUser.rows[0]?.user_token;
             }
           }
           // Se mensagem veio do usuário, notificar o técnico atribuído
@@ -946,7 +948,8 @@ ticketsRouter.post('/:id/messages', validate(addMessageSchema), async (req: Requ
               recipientEmail,
               recipientName,
               authorName,
-              message
+              message,
+              recipientToken
             ).catch((emailError) => {
               console.error('Error sending notification email:', emailError);
             });
@@ -1234,7 +1237,7 @@ ticketsRouter.post('/:id/manual-close', authenticate, async (req: Request, res: 
 
     if (ticket.requester_type === 'public') {
       const publicUser = await database.query(
-        'SELECT email, name FROM public_users WHERE id = $1',
+        'SELECT email, name, user_token FROM public_users WHERE id = $1',
         [ticket.requester_id],
       );
 
@@ -1246,6 +1249,8 @@ ticketsRouter.post('/:id/manual-close', authenticate, async (req: Request, res: 
           publicUser.rows[0].name,
           ticket.status,
           'closed',
+          undefined,
+          publicUser.rows[0].user_token,
         ).catch((emailError) => {
           console.error('Error sending notification email:', emailError);
         });
@@ -1525,7 +1530,7 @@ ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (r
       // Se o status mudou, notificar o solicitante
       if (status && ticket.requester_type === 'public') {
         const publicUser = await database.query(
-          'SELECT email, name FROM public_users WHERE id = $1',
+          'SELECT email, name, user_token FROM public_users WHERE id = $1',
           [ticket.requester_id]
         );
 
@@ -1536,7 +1541,9 @@ ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (r
             publicUser.rows[0].email,
             publicUser.rows[0].name,
             oldStatus || 'open',
-            updatedStatus
+            updatedStatus,
+            undefined,
+            publicUser.rows[0].user_token
           ).catch((emailError) => {
             console.error('Error sending notification email:', emailError);
           });

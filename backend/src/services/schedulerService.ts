@@ -13,7 +13,7 @@ async function notifyTicketsNearAutoClose(): Promise<void> {
     console.log('[SCHEDULER] Verificando tickets aguardando confirmação com fechamento em < 24h...');
 
     const result = await database.query(
-      `SELECT t.id, t.title, pu.email AS requester_email, pu.name AS requester_name
+      `SELECT t.id, t.title, pu.email AS requester_email, pu.name AS requester_name, pu.user_token AS requester_token
        FROM tickets t
        JOIN public_users pu ON t.requester_type = 'public' AND pu.id = t.requester_id
        WHERE t.status = 'aguardando_confirmacao'
@@ -29,6 +29,7 @@ async function notifyTicketsNearAutoClose(): Promise<void> {
         row.title,
         row.requester_email,
         row.requester_name || 'Usuário',
+        row.requester_token,
       );
 
       await database.query(
