@@ -1,119 +1,129 @@
+/* ────────────────────────────────────────────
+   Status Timeline — Modern Stepper
+──────────────────────────────────────────── */
 .status-timeline {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: 2rem;
-  background: white;
-  border-radius: 12px;
-  box-shadow: var(--sombra-card);
-  margin-bottom: 2rem;
-  position: relative;
+  padding: 4px 8px 0;
 }
 
+/* Each step takes equal width */
 .timeline-step {
   display: flex;
   flex-direction: column;
   align-items: center;
-  position: relative;
   flex: 1;
-  z-index: 2;
+  position: relative;
+  z-index: 1;
 }
 
-.step-icon {
-  width: 56px;
-  height: 56px;
+/* ── Connector line (right-extending from center) ── */
+.step-connector {
+  position: absolute;
+  top: 15px;           /* half of 30px circle */
+  left: calc(50% + 15px);
+  right: -1px;
+  height: 2px;
+  background: #E2E8F0;
+  z-index: 0;
+  transition: background 0.3s;
+}
+
+.step-connector.connector-done {
+  background: #6366F1;
+}
+
+/* ── Circle wrapper ── */
+.step-circle-wrap {
+  position: relative;
+  z-index: 2;
+  margin-bottom: 8px;
+}
+
+/* ── The circle itself ── */
+.step-circle {
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.5rem;
-  margin-bottom: 0.75rem;
-  transition: all 0.3s ease;
-  position: relative;
-  z-index: 3;
+  border: 2px solid #E2E8F0;
+  background: #FFFFFF;
+  color: #CBD5E1;
+  transition: background 0.25s, border-color 0.25s, color 0.25s, box-shadow 0.25s;
 }
 
-.timeline-step.completed .step-icon {
-  background: var(--verde-nazareno);
+/* Completed: filled indigo, white checkmark */
+.timeline-step.completed .step-circle {
+  background: #4338CA;
+  border-color: #4338CA;
   color: white;
-  box-shadow: 0 4px 12px rgba(0, 122, 51, 0.3);
 }
 
-.timeline-step.current .step-icon {
-  background: var(--laranja-acolhedor);
+/* Current: filled indigo + glow ring */
+.timeline-step.current .step-circle {
+  background: #4338CA;
+  border-color: #4338CA;
   color: white;
-  box-shadow: 0 4px 16px rgba(242, 140, 56, 0.4);
-  animation: pulse 2s infinite;
+  box-shadow: 0 0 0 4px #EEF2FF;
+  animation: stepper-pulse 2.4s ease-in-out infinite;
 }
 
-.timeline-step.pending .step-icon {
-  background: #e9ecef;
-  color: #adb5bd;
+@keyframes stepper-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px #EEF2FF; }
+  50%       { box-shadow: 0 0 0 6px #E0E7FF; }
 }
 
-@keyframes pulse {
-  0%, 100% {
-    box-shadow: 0 4px 16px rgba(242, 140, 56, 0.4);
-  }
-  50% {
-    box-shadow: 0 4px 24px rgba(242, 140, 56, 0.6);
-  }
+/* Pending: ghost */
+.timeline-step.pending .step-circle {
+  background: #F8FAFC;
+  border-color: #E2E8F0;
+  color: #CBD5E1;
 }
 
+.step-number {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ── Labels ── */
 .step-label {
-  font-size: 0.875rem;
-  font-weight: 600;
+  font-size: 0.6875rem;
+  font-weight: 500;
   text-align: center;
-  color: #495057;
-  max-width: 100px;
+  line-height: 1.3;
+  max-width: 72px;
+  transition: color 0.25s;
+  color: #CBD5E1;
 }
 
 .timeline-step.completed .step-label {
-  color: var(--verde-nazareno);
+  color: #4338CA;
+  font-weight: 600;
 }
 
 .timeline-step.current .step-label {
-  color: var(--laranja-acolhedor);
+  color: #3730A3;
   font-weight: 700;
 }
 
-.timeline-step.pending .step-label {
-  color: #adb5bd;
-}
-
-.step-connector {
-  position: absolute;
-  top: 28px;
-  left: 50%;
-  width: 100%;
-  height: 3px;
-  background: #e9ecef;
-  z-index: 1;
-}
-
-.timeline-step.completed .step-connector {
-  background: var(--verde-nazareno);
-}
-
-/* Mobile responsive */
-@media (max-width: 768px) {
+/* ── Mobile ── */
+@media (max-width: 560px) {
   .status-timeline {
-    padding: 1.5rem 1rem;
     overflow-x: auto;
+    padding-bottom: 4px;
+    gap: 0;
   }
 
-  .step-icon {
-    width: 48px;
-    height: 48px;
-    font-size: 1.25rem;
+  .timeline-step {
+    min-width: 72px;
   }
 
   .step-label {
-    font-size: 0.75rem;
-    max-width: 80px;
-  }
-
-  .step-connector {
-    top: 24px;
+    font-size: 0.625rem;
+    max-width: 64px;
   }
 }

@@ -29,7 +29,7 @@ interface TicketDetail {
   requester_email?: string;
   requester_department?: string;
   requester_unit?: string;
-  assigned_to?: string; // UUID do usuário interno
+  assigned_to?: string;
 }
 
 interface Message {
@@ -42,7 +42,7 @@ interface Message {
 }
 
 interface InternalUser {
-  id: string; // UUID
+  id: string;
   name: string;
   email: string;
 }
@@ -82,9 +82,7 @@ export default function AdminTicketDetailPage() {
   const fetchUsers = async () => {
     try {
       const response = await fetch(`${BACKEND_URL}/api/internal-auth/users`, {
-        headers: {
-          'Authorization': `Bearer ${internalToken}`,
-        },
+        headers: { 'Authorization': `Bearer ${internalToken}` },
       });
       if (response.ok) {
         const data = await response.json();
@@ -102,20 +100,10 @@ export default function AdminTicketDetailPage() {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${internalToken}`,
       };
-
       const ticketRes = await fetch(`${BACKEND_URL}/api/tickets/${ticketId}`, { headers });
-
-      if (!ticketRes.ok) {
-        throw new Error('Erro ao carregar chamado');
-      }
-
+      if (!ticketRes.ok) throw new Error('Erro ao carregar chamado');
       const ticketData = await ticketRes.json();
-      
-      // Mapear assigned_to_id do backend para assigned_to no frontend
-      if (ticketData.assigned_to_id) {
-        ticketData.assigned_to = ticketData.assigned_to_id;
-      }
-      
+      if (ticketData.assigned_to_id) ticketData.assigned_to = ticketData.assigned_to_id;
       setTicket(ticketData);
       setMessages(ticketData.messages || []);
     } catch (err: any) {
@@ -127,52 +115,29 @@ export default function AdminTicketDetailPage() {
 
   const handleUpdateTicket = async (updates: Partial<TicketDetail>) => {
     if (!id || !internalToken) return;
-
     try {
       setSubmitting(true);
-      
-      // Converter assigned_to para assigned_to_id e remover campos undefined
       const payload: any = {};
-      
-      if ('status' in updates && updates.status !== undefined && updates.status !== '') {
-        payload.status = updates.status;
-      }
-      
-      if ('priority' in updates && updates.priority !== undefined && updates.priority !== '') {
-        payload.priority = updates.priority;
-      }
-      
+      if ('status' in updates && updates.status !== undefined && updates.status !== '') payload.status = updates.status;
+      if ('priority' in updates && updates.priority !== undefined && updates.priority !== '') payload.priority = updates.priority;
       if ('assigned_to' in updates) {
-        // assigned_to é UUID (string), não número
         const value = updates.assigned_to;
-        if (value === '' || value === null || value === undefined) {
-          payload.assigned_to_id = null;
-        } else {
-          // Enviar UUID diretamente
-          payload.assigned_to_id = value;
-        }
+        payload.assigned_to_id = (value === '' || value === null || value === undefined) ? null : value;
       }
-      
       if (Object.keys(payload).length === 0) {
         setError('Nenhuma alteração para salvar');
         setSubmitting(false);
         return;
       }
-      
       const response = await fetch(`${BACKEND_URL}/api/tickets/${id}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${internalToken}`,
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${internalToken}` },
         body: JSON.stringify(payload),
       });
-
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.message || errorData.error || 'Erro ao atualizar chamado');
       }
-
       await fetchTicket(id);
       setIsEditing(false);
       setError('');
@@ -189,25 +154,14 @@ export default function AdminTicketDetailPage() {
   const handleAddMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !id || !internalToken) return;
-
     try {
       setSubmitting(true);
       const response = await fetch(`${BACKEND_URL}/api/tickets/${id}/messages`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${internalToken}`,
-        },
-        body: JSON.stringify({
-          message: newMessage,
-          is_internal: isInternalNote,
-        }),
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${internalToken}` },
+        body: JSON.stringify({ message: newMessage, is_internal: isInternalNote }),
       });
-
-      if (!response.ok) {
-        throw new Error('Erro ao adicionar mensagem');
-      }
-
+      if (!response.ok) throw new Error('Erro ao adicionar mensagem');
       setNewMessage('');
       setIsInternalNote(false);
       await fetchTicket(id);
@@ -242,74 +196,33 @@ export default function AdminTicketDetailPage() {
     return badges[priority] || { label: priority, className: '' };
   };
 
-  if (loading) {
-    return <div className="admin-ticket-detail loading">Carregando...</div>;
-  }
+  const getInitials = (name?: string) => {
+    if (!name) return '?';
+    return name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
+  };
 
-  if (error && !ticket) {
-    return (
-      <div className="admin-ticket-detail">
-        <div className="alert alert-error">{error}</div>
-        <button onClick={() => navigate(getBackRoute())} className="btn btn-secondary">
-          ← Voltar
-        </button>
-      </div>
-    );
-  }
+  const formatDate = (dateStr: string) =>
+    new Date(dateStr).toLocaleString('pt-BR', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
 
-  if (!ticket) {
-    return (
-      <div className="admin-ticket-detail">
-        <div className="alert alert-error">Chamado não encontrado</div>
-        <button onClick={() => navigate(getBackRoute())} className="btn btn-secondary">
-          ← Voltar
-        </button>
-      </div>
-    );
-  }
-
-  const statusBadge = getStatusBadge(ticket.status);
-  const priorityBadge = getPriorityBadge(ticket.priority);
-  const normalizedRating = ticket.rating !== null && ticket.rating !== undefined
-    ? Number(ticket.rating)
-    : null;
-
-  // Ações rápidas de status
   const handleQuickAction = async (action: 'assume' | 'waiting' | 'resolve' | 'close' | 'resume') => {
-    const statusMap = {
-      assume: 'in_progress',
-      waiting: 'waiting_user',
-      resolve: 'resolved',
-      close: 'closed',
-      resume: 'in_progress'
-    };
-    
+    const statusMap = { assume: 'in_progress', waiting: 'waiting_user', resolve: 'resolved', close: 'closed', resume: 'in_progress' };
     const updates: any = { status: statusMap[action] };
-    
-    // Se assumir, atribuir ao usuário logado
     if (action === 'assume') {
       const userData = localStorage.getItem('internal_user');
-      if (userData) {
-        const user = JSON.parse(userData);
-        updates.assigned_to = user.id;
-      }
+      if (userData) updates.assigned_to = JSON.parse(userData).id;
     }
-    
     await handleUpdateTicket(updates);
   };
 
-  // Handler para atribuir responsável (auto-atribuição)
   const handleAssignToMe = async () => {
     const userData = localStorage.getItem('internal_user');
     if (userData) {
       const user = JSON.parse(userData);
-      console.log('Auto-atribuindo ao usuário logado:', user.name);
       try {
-        // Atribuir E mudar status para em progresso
-        await handleUpdateTicket({ 
-          assigned_to: user.id,
-          status: 'in_progress'
-        });
+        await handleUpdateTicket({ assigned_to: user.id, status: 'in_progress' });
         showToast.success('Chamado atribuído para você e iniciado!');
       } catch (error) {
         console.error('Erro ao auto-atribuir:', error);
@@ -319,251 +232,250 @@ export default function AdminTicketDetailPage() {
     }
   };
 
-  // Handler para desatribuir responsável
   const handleUnassign = async () => {
     try {
-      await handleUpdateTicket({ 
-        assigned_to: undefined,
-        status: 'open'
-      });
+      await handleUpdateTicket({ assigned_to: undefined, status: 'open' });
       showToast.success('Chamado desatribuído e reaberto');
     } catch (error) {
       console.error('Erro ao desatribuir:', error);
     }
   };
 
-  // Pegar nome do usuário logado
   const getLoggedUserName = () => {
     const userData = localStorage.getItem('internal_user');
-    if (userData) {
-      const user = JSON.parse(userData);
-      return user.name;
-    }
-    return null;
+    return userData ? JSON.parse(userData).name : null;
   };
 
-  // Verificar se o chamado está atribuído ao usuário logado
   const isAssignedToMe = () => {
     const userData = localStorage.getItem('internal_user');
     if (userData && ticket?.assigned_to) {
-      const user = JSON.parse(userData);
-      return user.id === ticket.assigned_to;
+      return JSON.parse(userData).id === ticket.assigned_to;
     }
     return false;
   };
 
+  if (loading) {
+    return (
+      <div className="admin-ticket-detail loading">
+        <div className="loading-spinner" />
+        <span>Carregando chamado...</span>
+      </div>
+    );
+  }
+
+  if (error && !ticket) {
+    return (
+      <div className="admin-ticket-detail">
+        <div className="alert alert-error">{error}</div>
+        <button onClick={() => navigate(getBackRoute())} className="btn-back">← Voltar</button>
+      </div>
+    );
+  }
+
+  if (!ticket) {
+    return (
+      <div className="admin-ticket-detail">
+        <div className="alert alert-error">Chamado não encontrado</div>
+        <button onClick={() => navigate(getBackRoute())} className="btn-back">← Voltar</button>
+      </div>
+    );
+  }
+
+  const statusBadge = getStatusBadge(ticket.status);
+  const priorityBadge = getPriorityBadge(ticket.priority);
+  const normalizedRating = ticket.rating !== null && ticket.rating !== undefined ? Number(ticket.rating) : null;
+  const elapsedHours = Math.floor((Date.now() - new Date(ticket.created_at).getTime()) / (1000 * 60 * 60));
+  const assigneeName = isAssignedToMe()
+    ? `${getLoggedUserName()} (Você)`
+    : users.find(u => u.id === ticket.assigned_to)?.name || 'Atribuído';
+
   return (
     <div className="admin-ticket-detail">
-      {/* Header com navegação */}
-      <div className="ticket-header">
-        <button onClick={() => navigate(getBackRoute())} className="btn-back">
-          ← Voltar para Fila
+
+      {/* ── Compact Header ── */}
+      <header className="ticket-header">
+        <button onClick={() => navigate(getBackRoute())} className="btn-back" aria-label="Voltar para fila">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Voltar para Fila
         </button>
-        <div className="ticket-header-info">
-          <h1>Chamado #{ticket.id.substring(0, 8).toUpperCase()}</h1>
-          <span className={`badge ${statusBadge.className}`}>
-            {statusBadge.label}
-          </span>
-          <span className={`badge ${priorityBadge.className}`}>
-            {priorityBadge.label}
-          </span>
+
+        <div className="ticket-header-content">
+          <div className="ticket-header-top">
+            <span className="ticket-id-label">#{ticket.id.substring(0, 8).toUpperCase()}</span>
+            <div className="ticket-header-badges">
+              <span className={`badge ${statusBadge.className}`}>{statusBadge.label}</span>
+              <span className={`badge ${priorityBadge.className}`}>{priorityBadge.label}</span>
+            </div>
+          </div>
+          <h1 className="ticket-title-heading">{ticket.title}</h1>
         </div>
-      </div>
+      </header>
 
       {error && <div className="alert alert-error">{error}</div>}
 
-      <div className="ticket-content">
-        {/* Ações Rápidas */}
-        <QuickActionsCard
-          status={ticket.status as 'open' | 'in_progress' | 'waiting_user' | 'aguardando_confirmacao' | 'resolved' | 'closed'}
-          isSubmitting={submitting}
-          onAssume={() => handleQuickAction('assume')}
-          onWaitingUser={() => handleQuickAction('waiting')}
-          onResolve={() => handleQuickAction('resolve')}
-          onClose={() => handleQuickAction('close')}
-          onResume={() => handleQuickAction('resume')}
-        />
+      {/* ── Two-column layout ── */}
+      <div className="ticket-layout">
 
-        {/* Timeline Visual */}
-        <div className="timeline-card">
-          <h2>📊 Progresso do Chamado</h2>
-          <StatusTimeline currentStatus={ticket.status} />
-        </div>
+        {/* ════ Main Column ════ */}
+        <main className="ticket-main">
 
-        {/* Informações Principais */}
-        <div className="ticket-info-card">
-          <div className="card-header">
-            <h2>📋 Detalhes do Chamado</h2>
-            <button 
-              onClick={() => setIsEditing(!isEditing)} 
-              className="btn-edit"
-            >
-              {isEditing ? '✕ Cancelar' : '✏️ Editar'}
-            </button>
+          {/* Stepper */}
+          <div className="stepper-card">
+            <StatusTimeline currentStatus={ticket.status} />
           </div>
-          
-          <div className="info-grid">
-            <div className="info-item info-item-full">
-              <label>📌 Título:</label>
-              <div className="value value-title">{ticket.title}</div>
+
+          {/* Details Card */}
+          <section className="ticket-info-card">
+            <div className="card-header">
+              <h2 className="card-title">Detalhes do Chamado</h2>
+              <button onClick={() => setIsEditing(!isEditing)} className="btn-edit" aria-pressed={isEditing}>
+                {isEditing ? 'Cancelar' : 'Editar'}
+              </button>
             </div>
 
-            <div className="info-item info-item-full">
-              <label>📝 Descrição:</label>
-              <div className="value value-description">{ticket.description}</div>
+            {/* Title */}
+            <div className="detail-field detail-field-full">
+              <label className="field-label">Título</label>
+              <div className="field-value field-value-title">{ticket.title}</div>
             </div>
 
-            {/* Informações do Solicitante */}
-            {ticket.requester_type === 'public' && (
-              <>
-                <div className="info-item">
-                  <label>👤 Solicitante:</label>
-                  <div className="value">{ticket.requester_name || 'Não informado'}</div>
-                </div>
-
-                <div className="info-item">
-                  <label>📧 Email:</label>
-                  <div className="value">{ticket.requester_email || 'Não informado'}</div>
-                </div>
-
-                <div className="info-item">
-                  <label>🏢 Setor:</label>
-                  <div className="value">{ticket.requester_department || 'Não informado'}</div>
-                </div>
-
-                <div className="info-item">
-                  <label>🏛️ Unidade:</label>
-                  <div className="value">{ticket.requester_unit || 'Não informado'}</div>
-                </div>
-              </>
-            )}
-
-            <div className="info-item">
-              <label>🏷️ Tipo:</label>
-              <div className="value">{ticket.type}</div>
+            {/* Description */}
+            <div className="detail-field detail-field-full">
+              <label className="field-label">Descrição</label>
+              <div className="field-value field-value-description">{ticket.description}</div>
             </div>
 
-            <div className="info-item">
-              <label>⚡ Status:</label>
-              {isEditing ? (
-                <select
-                  value={ticket.status}
-                  onChange={(e) => handleUpdateTicket({ status: e.target.value })}
-                  disabled={submitting}
-                  className="select-input"
-                >
-                  <option value="open">Aberto</option>
-                  <option value="in_progress">Em Progresso</option>
-                  <option value="waiting_user">Aguardando Usuário</option>
-                  <option value="aguardando_confirmacao">Aguardando Confirmação</option>
-                  <option value="resolved">Resolvido</option>
-                  <option value="closed">Fechado</option>
-                </select>
-              ) : (
-                <span className={`badge ${statusBadge.className}`}>
-                  {statusBadge.label}
-                </span>
-              )}
-            </div>
+            {/* Editable fields grid */}
+            <div className="details-grid">
 
-            <div className="info-item">
-              <label>🚨 Prioridade:</label>
-              {isEditing ? (
-                <select
-                  value={ticket.priority}
-                  onChange={(e) => handleUpdateTicket({ priority: e.target.value })}
-                  disabled={submitting}
-                  className="select-input"
-                >
-                  <option value="low">Baixa</option>
-                  <option value="medium">Média</option>
-                  <option value="high">Alta</option>
-                  <option value="urgent">Urgente</option>
-                </select>
-              ) : (
-                <span className={`badge ${priorityBadge.className}`}>
-                  {priorityBadge.label}
-                </span>
-              )}
-            </div>
-
-            <div className="info-item">
-              <label>👤 Responsável:</label>
-              {isEditing ? (
-                <select
-                  value={ticket.assigned_to || ''}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    handleUpdateTicket({ 
-                      assigned_to: value === '' ? undefined : value 
-                    });
-                  }}
-                  disabled={submitting}
-                  className="select-input"
-                >
-                  <option value="">Não atribuído</option>
-                  {users.map(user => (
-                    <option key={user.id} value={user.id}>
-                      {user.name}
-                    </option>
-                  ))}
-                </select>
-              ) : ticket.assigned_to ? (
-                <div className="assign-container">
-                  <div className="value" style={{ flex: 1 }}>
-                    {isAssignedToMe() 
-                      ? `${getLoggedUserName()} (Você)` 
-                      : users.find(u => u.id === ticket.assigned_to)?.name || 'Atribuído'
-                    }
+              {/* Status */}
+              <div className="detail-field">
+                <label className="field-label">Status</label>
+                {isEditing ? (
+                  <select
+                    value={ticket.status}
+                    onChange={(e) => handleUpdateTicket({ status: e.target.value })}
+                    disabled={submitting}
+                    className="select-input"
+                  >
+                    <option value="open">Aberto</option>
+                    <option value="in_progress">Em Progresso</option>
+                    <option value="waiting_user">Aguardando Usuário</option>
+                    <option value="aguardando_confirmacao">Aguardando Confirmação</option>
+                    <option value="resolved">Resolvido</option>
+                    <option value="closed">Fechado</option>
+                  </select>
+                ) : (
+                  <div className="field-value">
+                    <span className={`badge ${statusBadge.className}`}>{statusBadge.label}</span>
                   </div>
-                  {isAssignedToMe() && (
-                    <button
-                      onClick={handleUnassign}
-                      className="btn-unassign"
-                      disabled={submitting}
-                      title="Desatribuir este chamado"
-                    >
-                      ❌ Desatribuir
+                )}
+              </div>
+
+              {/* Priority */}
+              <div className="detail-field">
+                <label className="field-label">Prioridade</label>
+                {isEditing ? (
+                  <select
+                    value={ticket.priority}
+                    onChange={(e) => handleUpdateTicket({ priority: e.target.value })}
+                    disabled={submitting}
+                    className="select-input"
+                  >
+                    <option value="low">Baixa</option>
+                    <option value="medium">Média</option>
+                    <option value="high">Alta</option>
+                    <option value="urgent">Urgente</option>
+                  </select>
+                ) : (
+                  <div className="field-value">
+                    <span className={`badge ${priorityBadge.className}`}>{priorityBadge.label}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Responsible */}
+              <div className="detail-field">
+                <label className="field-label">Responsável</label>
+                {isEditing ? (
+                  <select
+                    value={ticket.assigned_to || ''}
+                    onChange={(e) => handleUpdateTicket({ assigned_to: e.target.value === '' ? undefined : e.target.value })}
+                    disabled={submitting}
+                    className="select-input"
+                  >
+                    <option value="">Não atribuído</option>
+                    {users.map(user => (
+                      <option key={user.id} value={user.id}>{user.name}</option>
+                    ))}
+                  </select>
+                ) : ticket.assigned_to ? (
+                  <div className="field-value assign-container">
+                    <div className="assignee-avatar" aria-hidden="true">
+                      {getInitials(isAssignedToMe() ? getLoggedUserName() : users.find(u => u.id === ticket.assigned_to)?.name)}
+                    </div>
+                    <span className="assignee-name">{assigneeName}</span>
+                    {isAssignedToMe() && (
+                      <button onClick={handleUnassign} className="btn-unassign" disabled={submitting}>
+                        Desatribuir
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="field-value assign-container">
+                    <span className="text-muted">Não atribuído</span>
+                    <button onClick={handleAssignToMe} className="btn-assign-inline" disabled={submitting}>
+                      Atribuir para Mim
                     </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Department */}
+              <div className="detail-field">
+                <label className="field-label">Departamento</label>
+                <div className="field-value">
+                  {ticket.department === 'administrativo' ? 'Administrativo'
+                    : ticket.department === 'rh' ? 'Recursos Humanos'
+                    : 'TI'}
+                </div>
+              </div>
+
+              {/* Category */}
+              {ticket.category && (
+                <div className="detail-field">
+                  <label className="field-label">Categoria</label>
+                  <div className="field-value" style={{ textTransform: 'capitalize' }}>
+                    {ticket.category.replace(/_/g, ' ')}
+                  </div>
+                </div>
+              )}
+
+              {/* Rating */}
+              <div className="detail-field">
+                <label className="field-label">Avaliação</label>
+                <div className="field-value">
+                  {normalizedRating !== null ? (
+                    <span className="rating-stars">
+                      {'★'.repeat(Math.max(0, Math.min(5, normalizedRating)))}
+                      {'☆'.repeat(Math.max(0, 5 - Math.min(5, normalizedRating)))}
+                      <span className="rating-number"> {normalizedRating}/5</span>
+                    </span>
+                  ) : (
+                    <span className="text-muted">Sem avaliação</span>
                   )}
                 </div>
-              ) : (
-                <div className="assign-container">
-                  <div className="value" style={{ flex: 1 }}>
-                    Não atribuído
-                  </div>
-                  <button
-                    onClick={handleAssignToMe}
-                    className="btn-assign-inline"
-                    disabled={submitting}
-                    title="Atribuir este chamado para mim e iniciar atendimento"
-                  >
-                    🎯 Atribuir para Mim
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="info-item">
-              <label>🏢 Departamento:</label>
-              <div className="value">
-                {ticket.department === 'administrativo' ? '🏢 Administrativo' : ticket.department === 'rh' ? '👥 Recursos Humanos' : '🖥️ TI'}
               </div>
+
             </div>
 
-            {ticket.category && (
-            <div className="info-item">
-              <label>📂 Categoria:</label>
-              <div className="value" style={{ textTransform: 'capitalize' }}>
-                {ticket.category.replace(/_/g, ' ')}
-              </div>
-            </div>
-            )}
-
+            {/* RH Metadata */}
             {ticket.department === 'rh' && ticket.metadata && Object.keys(ticket.metadata).length > 0 && (
-              <div className="info-item info-item-full">
-                <label>📋 Detalhes da Solicitação RH:</label>
-                <div className="value" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div className="detail-field detail-field-full rh-metadata-block">
+                <label className="field-label">Detalhes da Solicitação RH</label>
+                <div className="field-value field-value-rh">
                   {ticket.metadata.medicalLeaveDays && (
                     <span><strong>Dias de afastamento:</strong> {ticket.metadata.medicalLeaveDays}</span>
                   )}
@@ -583,156 +495,192 @@ export default function AdminTicketDetailPage() {
               </div>
             )}
 
-            <div className="info-item">
-              <label>📅 Criado em:</label>
-              <div className="value value-date">
-                {new Date(ticket.created_at).toLocaleString('pt-BR', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}
-              </div>
-            </div>
-
-            <div className="info-item">
-              <label>🔄 Atualizado em:</label>
-              <div className="value value-date">
-                {new Date(ticket.updated_at).toLocaleString('pt-BR', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}
-              </div>
-            </div>
-
-            <div className="info-item">
-              <label>⏱️ Tempo decorrido:</label>
-              <div className="value value-time">
-                {Math.floor((Date.now() - new Date(ticket.created_at).getTime()) / (1000 * 60 * 60))}h
-              </div>
-            </div>
-
-            <div className="info-item info-item-full">
-              <label>⭐ Avaliação do Solicitante:</label>
-              <div className="value">
-                {normalizedRating !== null
-                  ? `${'★'.repeat(Math.max(0, Math.min(5, normalizedRating)))} (${normalizedRating}/5)`
-                  : 'Sem avaliação registrada'}
-              </div>
-            </div>
-
-            <div className="info-item info-item-full">
-              <label>💬 Feedback do Solicitante:</label>
-              <div className="value value-description">
-                {ticket.feedback?.trim() ? ticket.feedback : 'Nenhum comentário informado'}
+            {/* Feedback */}
+            <div className="detail-field detail-field-full">
+              <label className="field-label">Feedback do Solicitante</label>
+              <div className="field-value field-value-description">
+                {ticket.feedback?.trim() ? ticket.feedback : (
+                  <span className="text-muted">Nenhum comentário informado</span>
+                )}
               </div>
             </div>
 
             {ticket.rated_at && (
-              <div className="info-item">
-                <label>🕒 Avaliado em:</label>
-                <div className="value value-date">
-                  {new Date(ticket.rated_at).toLocaleString('pt-BR', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
-                </div>
+              <div className="detail-field">
+                <label className="field-label">Avaliado em</label>
+                <div className="field-value field-value-date">{formatDate(ticket.rated_at)}</div>
               </div>
             )}
-          </div>
-        </div>
+          </section>
 
-        {/* Mensagens - Estilo Conversa */}
-        <div className="messages-card">
-          <h2>💬 Histórico de Conversas</h2>
-          
-          <div className="messages-list">
-            {messages.length === 0 ? (
-              <div className="no-messages">
-                <span className="no-messages-icon">💭</span>
-                <p>Nenhuma mensagem ainda. Seja o primeiro a responder!</p>
-              </div>
-            ) : (
-              messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`message ${msg.author_type === 'it_staff' ? 'message-staff' : 'message-user'} ${msg.is_internal ? 'message-internal' : ''}`}
-                >
-                  <div className="message-header">
-                    <span className="message-author">
-                      {msg.author_type === 'it_staff'
-                        ? `👨‍💼 ${msg.author_name || 'Equipe TI'}`
-                        : `👤 ${msg.author_name || ticket?.requester_name || 'Usuário'}`}
-                    </span>
-                    {msg.is_internal && <span className="internal-badge">🔒 Interno</span>}
-                    <span className="message-date">
-                      {new Date(msg.created_at).toLocaleString('pt-BR', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </span>
+          {/* Conversation Card */}
+          <section className="messages-card">
+            <h2 className="card-title">Histórico de Conversas</h2>
+
+            <div className="messages-list" role="log" aria-label="Histórico de mensagens">
+              {messages.length === 0 ? (
+                <div className="no-messages">
+                  <div className="no-messages-icon" aria-hidden="true">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
                   </div>
-                  <div className="message-content">{msg.message}</div>
+                  <p>Nenhuma mensagem ainda. Seja o primeiro a responder!</p>
                 </div>
-              ))
-            )}
-          </div>
-
-          {/* Formulário de Nova Mensagem */}
-          <form onSubmit={handleAddMessage} className="message-form">
-            <div className="form-header">
-              <label>📤 Nova Mensagem</label>
-            </div>
-            <textarea
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder={isInternalNote ? "Digite uma nota interna para a equipe..." : "Digite sua resposta ao usuário..."}
-              rows={4}
-              disabled={submitting}
-              className={`message-input ${isInternalNote ? 'internal-mode' : ''}`}
-            />
-            <div className="internal-toggle-container">
-              <label className="internal-toggle">
-                <input 
-                  type="checkbox" 
-                  checked={isInternalNote}
-                  onChange={(e) => setIsInternalNote(e.target.checked)}
-                />
-                <span className="toggle-slider"></span>
-              </label>
-              <span className={`internal-toggle-label ${isInternalNote ? 'active' : ''}`}>
-                🔒 Nota Interna {isInternalNote && <span className="internal-badge-inline">ATIVO</span>}
-              </span>
-              {isInternalNote && (
-                <span style={{ fontSize: '0.85rem', color: '#78350f', marginLeft: 'auto' }}>
-                  Visível apenas para a equipe interna
-                </span>
+              ) : (
+                messages.map((msg) => {
+                  const isStaff = msg.author_type === 'it_staff';
+                  const authorDisplay = isStaff
+                    ? msg.author_name || 'Equipe TI'
+                    : msg.author_name || ticket?.requester_name || 'Usuário';
+                  return (
+                    <div
+                      key={msg.id}
+                      className={`message ${isStaff ? 'message-staff' : 'message-user'} ${msg.is_internal ? 'message-internal' : ''}`}
+                    >
+                      <div className="message-header">
+                        <div className={`message-avatar ${isStaff ? 'avatar-staff' : 'avatar-user'}`} aria-hidden="true">
+                          {getInitials(authorDisplay)}
+                        </div>
+                        <div className="message-meta">
+                          <span className="message-author">{authorDisplay}</span>
+                          <span className="message-date">
+                            {new Date(msg.created_at).toLocaleString('pt-BR', {
+                              day: '2-digit', month: '2-digit',
+                              hour: '2-digit', minute: '2-digit',
+                            })}
+                          </span>
+                        </div>
+                        {msg.is_internal && (
+                          <span className="internal-badge" role="note">Nota Interna</span>
+                        )}
+                      </div>
+                      <div className="message-content">{msg.message}</div>
+                    </div>
+                  );
+                })
               )}
             </div>
-            <button
-              type="submit"
-              disabled={submitting || !newMessage.trim()}
-              className="btn btn-send"
-            >
-              {submitting ? '⏳ Enviando...' : isInternalNote ? '📝 Adicionar Nota Interna' : '📤 Enviar Resposta ao Usuário'}
-            </button>
-          </form>
-        </div>
 
-        {/* Anexos */}
-        <TicketAttachments 
-          ticketId={ticket.id}
-          authToken={internalToken || ''}
-        />
+            {/* Reply Form */}
+            <form onSubmit={handleAddMessage} className="message-form" aria-label="Formulário de resposta">
+              <div className="message-form-header">
+                <span className="form-title">Nova Mensagem</span>
+                <div className="internal-toggle-container">
+                  <label className="internal-toggle" htmlFor="internal-note-toggle" aria-label="Ativar nota interna">
+                    <input
+                      id="internal-note-toggle"
+                      type="checkbox"
+                      checked={isInternalNote}
+                      onChange={(e) => setIsInternalNote(e.target.checked)}
+                    />
+                    <span className="toggle-slider"></span>
+                  </label>
+                  <span className={`internal-toggle-label ${isInternalNote ? 'active' : ''}`}>
+                    Nota Interna
+                    {isInternalNote && <span className="internal-badge-inline">ATIVO</span>}
+                  </span>
+                  {isInternalNote && (
+                    <span className="internal-notice">Visível apenas para a equipe</span>
+                  )}
+                </div>
+              </div>
+
+              <textarea
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder={isInternalNote ? 'Digite uma nota interna para a equipe...' : 'Digite sua resposta ao usuário...'}
+                rows={4}
+                disabled={submitting}
+                className={`message-input ${isInternalNote ? 'internal-mode' : ''}`}
+                aria-label="Texto da mensagem"
+              />
+
+              <div className="message-form-footer">
+                <button
+                  type="submit"
+                  disabled={submitting || !newMessage.trim()}
+                  className="btn btn-send"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                  </svg>
+                  {submitting ? 'Enviando...' : isInternalNote ? 'Adicionar Nota' : 'Enviar Resposta'}
+                </button>
+              </div>
+            </form>
+          </section>
+
+          {/* Attachments */}
+          <TicketAttachments
+            ticketId={ticket.id}
+            authToken={internalToken || ''}
+          />
+        </main>
+
+        {/* ════ Sidebar ════ */}
+        <aside className="ticket-sidebar">
+
+          {/* Quick Actions */}
+          <QuickActionsCard
+            status={ticket.status as 'open' | 'in_progress' | 'waiting_user' | 'aguardando_confirmacao' | 'resolved' | 'closed'}
+            isSubmitting={submitting}
+            onAssume={() => handleQuickAction('assume')}
+            onWaitingUser={() => handleQuickAction('waiting')}
+            onResolve={() => handleQuickAction('resolve')}
+            onClose={() => handleQuickAction('close')}
+            onResume={() => handleQuickAction('resume')}
+          />
+
+          {/* Requester Info */}
+          {ticket.requester_type === 'public' && (
+            <div className="sidebar-card">
+              <h3 className="sidebar-card-title">Solicitante</h3>
+              <div className="sidebar-meta">
+                <div className="meta-item">
+                  <span className="meta-label">Nome</span>
+                  <span className="meta-value">{ticket.requester_name || '—'}</span>
+                </div>
+                <div className="meta-item">
+                  <span className="meta-label">Email</span>
+                  <span className="meta-value meta-email">{ticket.requester_email || '—'}</span>
+                </div>
+                <div className="meta-item">
+                  <span className="meta-label">Setor</span>
+                  <span className="meta-value">{ticket.requester_department || '—'}</span>
+                </div>
+                <div className="meta-item">
+                  <span className="meta-label">Unidade</span>
+                  <span className="meta-value">{ticket.requester_unit || '—'}</span>
+                </div>
+                <div className="meta-item">
+                  <span className="meta-label">Tipo</span>
+                  <span className="meta-value">{ticket.type}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Timeline Info */}
+          <div className="sidebar-card">
+            <h3 className="sidebar-card-title">Linha do Tempo</h3>
+            <div className="sidebar-meta">
+              <div className="meta-item">
+                <span className="meta-label">Criado em</span>
+                <span className="meta-value meta-date">{formatDate(ticket.created_at)}</span>
+              </div>
+              <div className="meta-item">
+                <span className="meta-label">Atualizado em</span>
+                <span className="meta-value meta-date">{formatDate(ticket.updated_at)}</span>
+              </div>
+              <div className="meta-item">
+                <span className="meta-label">Tempo decorrido</span>
+                <span className="meta-value meta-elapsed">{elapsedHours}h</span>
+              </div>
+            </div>
+          </div>
+
+        </aside>
       </div>
     </div>
   );

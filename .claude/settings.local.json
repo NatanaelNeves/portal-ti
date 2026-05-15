@@ -9,7 +9,8 @@
       "Bash(git commit *)",
       "Bash(npx tsc *)",
       "Bash(git revert *)",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(grep -E \"\\\\.\\(jsx?|tsx?|vue\\)$\")"
     ]
   }
 }
