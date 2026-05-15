@@ -469,7 +469,7 @@ export default function RhReportsPage() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                     <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-                    <Tooltip formatter={(v: unknown, name: string) => [`${v} chamados`, name === 'abertos' ? 'Abertos' : 'Resolvidos']} />
+                    <Tooltip formatter={(v: unknown, name?: string) => [`${v} chamados`, name === 'abertos' ? 'Abertos' : 'Resolvidos']} />
                     <Legend formatter={(val: string) => val === 'abertos' ? 'Abertos' : 'Resolvidos'} />
                     <Area type="monotone" dataKey="abertos"    stroke="#7c3aed" strokeWidth={2} fill="url(#gradAbertos)"    dot={{ r: 4 }} activeDot={{ r: 6 }} />
                     <Area type="monotone" dataKey="resolvidos" stroke="#10b981" strokeWidth={2} fill="url(#gradResolvidos)" dot={{ r: 4 }} activeDot={{ r: 6 }} />
