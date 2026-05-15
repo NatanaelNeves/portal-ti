@@ -129,9 +129,34 @@ export default function TicketDetailPage() {
     return headers;
   };
 
+  const buildAccessErrorMessage = (status: number) => {
+    const hasPublicToken = Boolean(token || userToken);
+
+    if (status === 401) {
+      if (isInternalUser) {
+        return 'Sua sessao expirou. Faca login novamente para acessar o chamado.';
+      }
+      if (!hasPublicToken) {
+        return 'Este link precisa do token de acesso. Abra o chamado pelo link do email ou solicite um novo.';
+      }
+      return 'Token invalido ou expirado. Abra o link mais recente do email ou solicite um novo.';
+    }
+
+    if (status === 403) {
+      return 'Voce nao tem permissao para acessar este chamado.';
+    }
+
+    if (status === 404) {
+      return 'Chamado nao encontrado.';
+    }
+
+    return 'Erro ao carregar chamado.';
+  };
+
   const fetchTicket = async (ticketId: string) => {
     try {
       setLoading(true);
+      setError('');
       const headers = buildHeaders();
 
       const [ticketRes, messagesRes] = await Promise.all([
@@ -140,7 +165,7 @@ export default function TicketDetailPage() {
       ]);
 
       if (!ticketRes.ok) {
-        throw new Error('Erro ao carregar chamado');
+        throw new Error(buildAccessErrorMessage(ticketRes.status));
       }
 
       const ticketData = await ticketRes.json();
