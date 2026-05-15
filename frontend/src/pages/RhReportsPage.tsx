@@ -186,6 +186,46 @@ export default function RhReportsPage() {
       };
     });
 
+  // By team member
+  interface MemberStat {
+    name: string;
+    total: number;
+    resolved: number;
+    open: number;
+    avgHours: string;
+  }
+  const memberMap: Record<string, { total: number; resolved: number; open: number; resHours: number[] }> = {};
+  tickets.forEach(t => {
+    const name = t.assigned_to_name || 'Não atribuído';
+    if (!memberMap[name]) memberMap[name] = { total: 0, resolved: 0, open: 0, resHours: [] };
+    memberMap[name].total++;
+    if (['resolved', 'closed'].includes(t.status)) {
+      memberMap[name].resolved++;
+      if (t.resolved_at) {
+        memberMap[name].resHours.push(
+          (new Date(t.resolved_at).getTime() - new Date(t.created_at).getTime()) / 3600000
+        );
+      }
+    } else {
+      memberMap[name].open++;
+    }
+  });
+  const byMember: MemberStat[] = Object.entries(memberMap)
+    .map(([name, s]) => ({
+      name,
+      total: s.total,
+      resolved: s.resolved,
+      open: s.open,
+      avgHours: s.resHours.length > 0
+        ? (s.resHours.reduce((a, b) => a + b, 0) / s.resHours.length).toFixed(1)
+        : '—',
+    }))
+    .sort((a, b) => b.total - a.total);
+
+  const byMemberChart = byMember
+    .filter(m => m.name !== 'Não atribuído')
+    .map(m => ({ name: m.name.split(' ')[0], total: m.total, resolvidos: m.resolved }));
+
   // --- Exports ---
   const exportCSV = () => {
     const rows = [
@@ -475,6 +515,73 @@ export default function RhReportsPage() {
                     <Area type="monotone" dataKey="resolvidos" stroke="#10b981" strokeWidth={2} fill="url(#gradResolvidos)" dot={{ r: 4 }} activeDot={{ r: 6 }} />
                   </AreaChart>
                 </ResponsiveContainer>
+              )}
+            </div>
+          </div>
+
+          {/* Team performance */}
+          <div className="rhr-charts-grid" style={{ marginBottom: 0 }}>
+            {/* Bar chart: by member */}
+            {byMemberChart.length > 0 && (
+              <div className="rhr-chart-card">
+                <h2 className="rhr-chart-title">Chamados por Atendente</h2>
+                <ResponsiveContainer width="100%" height={Math.max(180, byMemberChart.length * 44)}>
+                  <BarChart
+                    data={byMemberChart}
+                    layout="vertical"
+                    margin={{ top: 4, right: 50, left: 10, bottom: 4 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+                    <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 11 }} />
+                    <Tooltip formatter={(v: unknown, name?: string) => [`${v}`, name === 'total' ? 'Total' : 'Resolvidos']} />
+                    <Legend formatter={(val: string) => val === 'total' ? 'Total' : 'Resolvidos'} />
+                    <Bar dataKey="total"      name="total"     fill="#7c3aed" radius={[0, 4, 4, 0]} label={{ position: 'right', fontSize: 11, fill: '#6b7280' }} />
+                    <Bar dataKey="resolvidos" name="resolvidos" fill="#10b981" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {/* Table: member detail */}
+            <div className="rhr-chart-card" style={{ gridColumn: byMemberChart.length > 0 ? undefined : '1 / -1' }}>
+              <h2 className="rhr-chart-title">Performance Individual da Equipe</h2>
+              {byMember.length === 0 ? (
+                <p className="rhr-chart-empty">Sem dados</p>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr style={{ background: '#f8f9fc' }}>
+                        {['#', 'Atendente', 'Total', 'Resolvidos', 'Em aberto', 'Tempo médio'].map(h => (
+                          <th key={h} style={{ padding: '0.55rem 0.75rem', textAlign: h === '#' || h === 'Total' || h === 'Resolvidos' || h === 'Em aberto' || h === 'Tempo médio' ? 'center' : 'left', fontSize: '0.68rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '2px solid #e5e7eb', whiteSpace: 'nowrap' }}>
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {byMember.map((m, i) => {
+                        const rate = m.total > 0 ? Math.round((m.resolved / m.total) * 100) : 0;
+                        return (
+                          <tr key={m.name} style={{ borderBottom: '1px solid #f3f4f6', background: i % 2 === 1 ? '#fafafe' : '#fff' }}>
+                            <td style={{ padding: '0.65rem 0.75rem', textAlign: 'center', color: '#9ca3af', fontWeight: 600, fontSize: '0.75rem' }}>{i + 1}</td>
+                            <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600, color: '#111827' }}>{m.name}</td>
+                            <td style={{ padding: '0.65rem 0.75rem', textAlign: 'center', fontWeight: 700, color: '#7c3aed' }}>{m.total}</td>
+                            <td style={{ padding: '0.65rem 0.75rem', textAlign: 'center' }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                                <span style={{ fontWeight: 700, color: '#10b981' }}>{m.resolved}</span>
+                                <span style={{ fontSize: '0.7rem', color: '#9ca3af' }}>({rate}%)</span>
+                              </span>
+                            </td>
+                            <td style={{ padding: '0.65rem 0.75rem', textAlign: 'center', fontWeight: 600, color: m.open > 0 ? '#f59e0b' : '#9ca3af' }}>{m.open}</td>
+                            <td style={{ padding: '0.65rem 0.75rem', textAlign: 'center', color: '#6b7280', fontWeight: 500 }}>{m.avgHours}h</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           </div>
