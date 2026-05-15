@@ -53,7 +53,7 @@ export const createTicketSchema = z.object({
   }).default('ti'),
 
   category: z.string().max(100, 'Categoria muito longa').optional(),
-  requestDetails: z.record(z.any()).optional(),
+  requestDetails: z.record(z.string(), z.any()).optional(),
 }).superRefine((data, ctx) => {
   if (data.requestDetails) {
     const raw = JSON.stringify(data.requestDetails ?? {});
