@@ -3,6 +3,7 @@ export enum UserRole {
   FINAL_USER = 'final_user',      // Usuário final
   IT_STAFF = 'it_staff',          // Equipe de TI
   ADMIN_STAFF = 'admin_staff',    // Auxiliar Administrativo
+  RH_STAFF = 'rh_staff',          // Equipe de RH
   MANAGER = 'manager',            // Coordenação/Gestão
   ADMIN = 'admin',                // Administrador do sistema
 }

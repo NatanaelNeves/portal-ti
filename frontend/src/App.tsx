@@ -42,6 +42,11 @@ import DeliverEquipmentPage from './pages/DeliverEquipmentPage';
 import ReturnEquipmentPage from './pages/ReturnEquipmentPage';
 import MoveEquipmentPage from './pages/MoveEquipmentPage';
 
+// RH Module Pages
+import RhDashboardPage from './pages/RhDashboardPage';
+import RhTicketsPage from './pages/RhTicketsPage';
+import RhReportsPage from './pages/RhReportsPage';
+
 // Components
 import Navigation from './components/Navigation';
 import InternalProtectedRoute from './components/InternalProtectedRoute';
@@ -108,6 +113,12 @@ function App() {
             <Route path="/inventario/equipamento/:equipmentId/assinar-termo" element={<InternalProtectedRoute requireITStaff={true}><SignTermPage /></InternalProtectedRoute>} />
             <Route path="/inventario/equipamento/:equipmentId/termo-de-devolucao" element={<InternalProtectedRoute requireITStaff={true}><ReturnTermPage /></InternalProtectedRoute>} />
             <Route path="/inventario/termo/:termId/devolucao" element={<InternalProtectedRoute requireITStaff={true}><ReturnTermPage /></InternalProtectedRoute>} />
+
+            {/* RH Staff Routes */}
+            <Route path="/rh/dashboard" element={<InternalProtectedRoute allowedRoles={['rh_staff', 'admin']}><RhDashboardPage /></InternalProtectedRoute>} />
+            <Route path="/rh/chamados" element={<InternalProtectedRoute allowedRoles={['rh_staff', 'admin']}><RhTicketsPage /></InternalProtectedRoute>} />
+            <Route path="/rh/chamados/:id" element={<InternalProtectedRoute allowedRoles={['rh_staff', 'admin']}><AdminTicketDetailPage /></InternalProtectedRoute>} />
+            <Route path="/rh/relatorios" element={<InternalProtectedRoute allowedRoles={['rh_staff', 'admin']}><RhReportsPage /></InternalProtectedRoute>} />
 
             {/* Gestor/Manager Routes */}
             <Route path="/gestor/dashboard" element={<InternalProtectedRoute allowedRoles={['manager', 'admin']}><GestorDashboardPage /></InternalProtectedRoute>} />

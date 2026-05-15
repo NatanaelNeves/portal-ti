@@ -58,12 +58,14 @@ export default function Navigation() {
   const showKnowledgeLink = userRole === 'admin' || userRole === 'it_staff';
   const showDocumentsLink = userRole === 'admin' || userRole === 'it_staff';
   const showReportsLink = userRole === 'admin' || userRole === 'it_staff' || userRole === 'manager' || userRole === 'gestor';
+  const showRhReportsLink = userRole === 'rh_staff';
 
   // Definir rota do dashboard baseado no papel
   const getDashboardRoute = () => {
     if (!userData) return '/admin/dashboard';
     if (userData.role === 'manager' || userData.role === 'gestor') return '/gestor/dashboard';
     if (userData.role === 'admin_staff') return '/admin/auxiliar/dashboard';
+    if (userData.role === 'rh_staff') return '/rh/dashboard';
     return '/admin/dashboard';
   };
 
@@ -77,9 +79,9 @@ export default function Navigation() {
       badge: unseenCount > 0 ? unseenCount : undefined,
       action: () => {
         clearUnseen();
-        navigate(
-          userRole === 'manager' || userRole === 'gestor' ? '/gestor/solicitacoes' : '/admin/chamados'
-        );
+        if (userRole === 'manager' || userRole === 'gestor') navigate('/gestor/solicitacoes');
+        else if (userRole === 'rh_staff') navigate('/rh/chamados');
+        else navigate('/admin/chamados');
       },
     },
   ];
@@ -98,6 +100,10 @@ export default function Navigation() {
 
   if (showReportsLink) {
     navLinks.push({ label: 'Relatórios', action: () => navigate('/admin/relatorios') });
+  }
+
+  if (showRhReportsLink) {
+    navLinks.push({ label: 'Relatórios', action: () => navigate('/rh/relatorios') });
   }
 
   if (showUsersLink) {

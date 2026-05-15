@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { Request, Response, NextFunction } from 'express';
+import { RH_CATEGORY_SCHEMAS } from '../config/ticketCategories';
 
 /**
  * Middleware genérico para validação de requisições com Zod
@@ -28,6 +29,8 @@ export const validate = (schema: z.ZodSchema) => {
  * Schemas de validação para Tickets
  */
 
+const MAX_METADATA_BYTES = 10 * 1024;
+
 export const createTicketSchema = z.object({
   title: z.string()
     .min(5, 'Título deve ter no mínimo 5 caracteres')
@@ -45,11 +48,39 @@ export const createTicketSchema = z.object({
     message: 'Prioridade inválida'
   }),
 
-  department: z.enum(['ti', 'administrativo'], {
+  department: z.enum(['ti', 'administrativo', 'rh'], {
     message: 'Departamento inválido'
   }).default('ti'),
 
   category: z.string().max(100, 'Categoria muito longa').optional(),
+  requestDetails: z.record(z.any()).optional(),
+}).superRefine((data, ctx) => {
+  if (data.requestDetails) {
+    const raw = JSON.stringify(data.requestDetails ?? {});
+    if (Buffer.byteLength(raw, 'utf8') > MAX_METADATA_BYTES) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['requestDetails'],
+        message: 'Detalhes excedem o limite de 10KB',
+      });
+    }
+  }
+
+  if (data.category && RH_CATEGORY_SCHEMAS[data.category]) {
+    const schema = RH_CATEGORY_SCHEMAS[data.category];
+    const details = data.requestDetails ?? {};
+
+    schema.required.forEach((field) => {
+      const value = (details as Record<string, unknown>)[field];
+      if (value === undefined || value === null || String(value).trim() === '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['requestDetails', field],
+          message: 'Campo obrigatório',
+        });
+      }
+    });
+  }
 });
 
 export const updateTicketSchema = z.object({
@@ -113,7 +144,7 @@ export const registerSchema = z.object({
     .min(6, 'Senha deve ter no mínimo 6 caracteres')
     .max(100, 'Senha muito longa'),
   
-  role: z.enum(['admin', 'it_staff', 'admin_staff', 'manager', 'user']).optional(),
+  role: z.enum(['admin', 'it_staff', 'admin_staff', 'rh_staff', 'manager', 'user']).optional(),
 });
 
 export const publicAccessSchema = z.object({
@@ -204,13 +235,13 @@ export const createUserSchema = z.object({
     .min(6, 'Senha deve ter no mínimo 6 caracteres')
     .max(100, 'Senha muito longa'),
   
-  role: z.enum(['admin', 'it_staff', 'admin_staff', 'manager', 'user']),
+  role: z.enum(['admin', 'it_staff', 'admin_staff', 'rh_staff', 'manager', 'user']),
 });
 
 export const updateUserSchema = z.object({
   email: z.string().email('Email inválido').max(255).optional(),
   name: z.string().min(2).max(255).optional(),
-  role: z.enum(['admin', 'it_staff', 'admin_staff', 'manager', 'user']).optional(),
+  role: z.enum(['admin', 'it_staff', 'admin_staff', 'rh_staff', 'manager', 'user']).optional(),
   password: z.string().min(6).max(100).optional(),
 }).refine((data) => Object.keys(data).length > 0, {
   message: 'Pelo menos um campo deve ser fornecido',

@@ -14,8 +14,9 @@ interface FormData {
   description: string;
   type: string;
   priority: string;
-  ticketDepartment: string; // 'ti' | 'administrativo'
+  ticketDepartment: string; // 'ti' | 'administrativo' | 'rh'
   category: string;
+  requestDetails: Record<string, string>;
 }
 
 interface FieldError {
@@ -46,7 +47,9 @@ export default function OpenTicketPage() {
     priority: 'medium',
     ticketDepartment: '', // Empty - user must choose
     category: '',
+    requestDetails: {},
   });
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [fieldErrors, setFieldErrors] = useState<FieldError>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -144,6 +147,23 @@ export default function OpenTicketPage() {
     { value: 'solicitar_documento', label: 'Solicitar documento', icon: '📄' },
     { value: 'outro', label: 'Outro', icon: '📋' },
   ];
+
+  // RH public categories (confidential excluded from public form)
+  const RH_CATEGORIES = [
+    { value: 'RH_ATESTADO', label: 'Atestado Médico', icon: '🏥' },
+    { value: 'RH_PONTO', label: 'Ajuste de Ponto', icon: '⏰' },
+    { value: 'RH_FOLHA', label: 'Folha de Pagamento', icon: '💰' },
+    { value: 'RH_DECLARACAO', label: 'Declaração', icon: '📜' },
+    { value: 'RH_BENEFICIOS', label: 'Benefícios', icon: '🎁' },
+    { value: 'RH_OUTROS', label: 'Outros RH', icon: '📋' },
+  ];
+
+  const handleRequestDetailChange = (field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      requestDetails: { ...prev.requestDetails, [field]: value },
+    }));
+  };
 
   // Check if current step is valid
   const isStepValid = (step: number): boolean => {
@@ -255,6 +275,7 @@ export default function OpenTicketPage() {
           priority: formData.priority,
           department: formData.ticketDepartment,
           category: formData.category || undefined,
+          requestDetails: Object.keys(formData.requestDetails).length > 0 ? formData.requestDetails : undefined,
         }),
       });
 
@@ -271,12 +292,29 @@ export default function OpenTicketPage() {
       }
 
       const { id } = await ticketResponse.json();
-      
+
       // Store tokens in localStorage for tracking
       localStorage.setItem('user_token', user_token);
       localStorage.setItem(`ticket_token_${id}`, user_token);
       localStorage.setItem(`ticket_email`, formData.email);
-      
+
+      // Upload pending files (best-effort — ticket already created)
+      if (pendingFiles.length > 0) {
+        for (const file of pendingFiles) {
+          try {
+            const fd = new FormData();
+            fd.append('attachment', file);
+            await fetch(`${BACKEND_URL}/api/tickets/${id}/attachments`, {
+              method: 'POST',
+              headers: { 'X-User-Token': user_token },
+              body: fd,
+            });
+          } catch {
+            // ignore individual upload failures
+          }
+        }
+      }
+
       const ticketCode = id.substring(0, 8).toUpperCase();
       const timestamp = new Date();
       const slaHours = getSlaHours(formData.priority);
@@ -333,7 +371,7 @@ export default function OpenTicketPage() {
 
             <div className="form-header">
               <h1>Central de Solicitações</h1>
-              <p>Abra uma solicitação para TI ou para o setor Administrativo</p>
+              <p>Abra uma solicitação para TI, Administrativo ou RH</p>
             </div>
 
             {error && <div className="alert alert-error">{error}</div>}
@@ -351,11 +389,12 @@ export default function OpenTicketPage() {
                         type="button"
                         className={`department-card ${formData.ticketDepartment === 'ti' ? 'active' : ''}`}
                         onClick={() => {
-                          setFormData(prev => ({ 
-                            ...prev, 
-                            ticketDepartment: 'ti', 
+                          setFormData(prev => ({
+                            ...prev,
+                            ticketDepartment: 'ti',
                             type: 'incident',
-                            category: '' 
+                            category: '',
+                            requestDetails: {},
                           }));
                         }}
                         role="radio"
@@ -369,11 +408,12 @@ export default function OpenTicketPage() {
                         type="button"
                         className={`department-card ${formData.ticketDepartment === 'administrativo' ? 'active' : ''}`}
                         onClick={() => {
-                          setFormData(prev => ({ 
-                            ...prev, 
-                            ticketDepartment: 'administrativo', 
+                          setFormData(prev => ({
+                            ...prev,
+                            ticketDepartment: 'administrativo',
                             type: 'request',
-                            category: '' 
+                            category: '',
+                            requestDetails: {},
                           }));
                         }}
                         role="radio"
@@ -382,6 +422,25 @@ export default function OpenTicketPage() {
                         <span className="department-icon">🏢</span>
                         <span className="department-name">Solicitação Administrativa</span>
                         <span className="department-desc">Cópia de chave, apoio em evento, buscar doação, documentos</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`department-card ${formData.ticketDepartment === 'rh' ? 'active' : ''}`}
+                        onClick={() => {
+                          setFormData(prev => ({
+                            ...prev,
+                            ticketDepartment: 'rh',
+                            type: 'request',
+                            category: '',
+                            requestDetails: {},
+                          }));
+                        }}
+                        role="radio"
+                        aria-checked={formData.ticketDepartment === 'rh'}
+                      >
+                        <span className="department-icon">👥</span>
+                        <span className="department-name">Recursos Humanos</span>
+                        <span className="department-desc">Atestado, ponto, folha de pagamento, benefícios, declarações</span>
                       </button>
                     </div>
 
@@ -421,7 +480,31 @@ export default function OpenTicketPage() {
                               key={cat.value}
                               type="button"
                               className={`chip ${formData.category === cat.value ? 'active' : ''}`}
-                              onClick={() => setFormData(prev => ({ ...prev, category: cat.value }))}
+                              onClick={() => setFormData(prev => ({ ...prev, category: cat.value, requestDetails: {} }))}
+                              role="radio"
+                              aria-checked={formData.category === cat.value}
+                            >
+                              <span className="chip-icon">{cat.icon}</span>
+                              <span className="chip-text">{cat.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* RH categories */}
+                    {formData.ticketDepartment === 'rh' && (
+                      <div className="form-group" style={{ marginTop: '1.5rem' }}>
+                        <label>
+                          Categoria <span className="required">*</span>
+                        </label>
+                        <div className="type-chips" role="radiogroup" aria-label="Categoria RH">
+                          {RH_CATEGORIES.map((cat) => (
+                            <button
+                              key={cat.value}
+                              type="button"
+                              className={`chip ${formData.category === cat.value ? 'active' : ''}`}
+                              onClick={() => setFormData(prev => ({ ...prev, category: cat.value, requestDetails: {} }))}
                               role="radio"
                               aria-checked={formData.category === cat.value}
                             >
@@ -615,7 +698,158 @@ export default function OpenTicketPage() {
                       )}
                     </div>
 
-                    {/* Type is auto-set based on department; categories are selected in Step 1 */}
+                    {/* RH extra fields based on category */}
+                    {formData.ticketDepartment === 'rh' && formData.category === 'RH_ATESTADO' && (
+                      <div className="form-group">
+                        <label htmlFor="medicalLeaveDays">
+                          Dias de Afastamento <span className="required">*</span>
+                        </label>
+                        <input
+                          id="medicalLeaveDays"
+                          type="number"
+                          min={1}
+                          value={formData.requestDetails.medicalLeaveDays || ''}
+                          onChange={e => handleRequestDetailChange('medicalLeaveDays', e.target.value)}
+                          placeholder="Ex: 3"
+                        />
+                        <label htmlFor="adjustmentDateAtestado" style={{ marginTop: '0.75rem' }}>Data do Atestado</label>
+                        <input
+                          id="adjustmentDateAtestado"
+                          type="date"
+                          value={formData.requestDetails.adjustmentDate || ''}
+                          onChange={e => handleRequestDetailChange('adjustmentDate', e.target.value)}
+                        />
+                        <label style={{ marginTop: '0.75rem' }}>Observações</label>
+                        <textarea
+                          value={formData.requestDetails.notes || ''}
+                          onChange={e => handleRequestDetailChange('notes', e.target.value)}
+                          placeholder="Informações adicionais..."
+                          rows={2}
+                        />
+                      </div>
+                    )}
+
+                    {formData.ticketDepartment === 'rh' && formData.category === 'RH_PONTO' && (
+                      <div className="form-group">
+                        <label htmlFor="adjustmentDate">
+                          Data do Ajuste <span className="required">*</span>
+                        </label>
+                        <input
+                          id="adjustmentDate"
+                          type="date"
+                          value={formData.requestDetails.adjustmentDate || ''}
+                          onChange={e => handleRequestDetailChange('adjustmentDate', e.target.value)}
+                        />
+                        <label style={{ marginTop: '0.75rem' }}>Horário Correto</label>
+                        <input
+                          type="time"
+                          value={formData.requestDetails.correctedTime || ''}
+                          onChange={e => handleRequestDetailChange('correctedTime', e.target.value)}
+                          placeholder="HH:MM"
+                        />
+                        <label style={{ marginTop: '0.75rem' }}>Observações</label>
+                        <textarea
+                          value={formData.requestDetails.notes || ''}
+                          onChange={e => handleRequestDetailChange('notes', e.target.value)}
+                          placeholder="Justificativa para o ajuste..."
+                          rows={2}
+                        />
+                      </div>
+                    )}
+
+                    {formData.ticketDepartment === 'rh' && formData.category === 'RH_FOLHA' && (
+                      <div className="form-group">
+                        <label htmlFor="payrollMonth">
+                          Mês/Ano de Referência <span className="required">*</span>
+                        </label>
+                        <input
+                          id="payrollMonth"
+                          type="month"
+                          value={formData.requestDetails.payrollMonth || ''}
+                          onChange={e => handleRequestDetailChange('payrollMonth', e.target.value)}
+                        />
+                        <label style={{ marginTop: '0.75rem' }}>Observações</label>
+                        <textarea
+                          value={formData.requestDetails.notes || ''}
+                          onChange={e => handleRequestDetailChange('notes', e.target.value)}
+                          placeholder="Descreva a solicitação..."
+                          rows={2}
+                        />
+                      </div>
+                    )}
+
+                    {formData.ticketDepartment === 'rh' && ['RH_DECLARACAO', 'RH_BENEFICIOS', 'RH_OUTROS'].includes(formData.category) && (
+                      <div className="form-group">
+                        <label>
+                          Detalhes <span className="required">*</span>
+                        </label>
+                        <textarea
+                          value={formData.requestDetails.notes || ''}
+                          onChange={e => handleRequestDetailChange('notes', e.target.value)}
+                          placeholder="Descreva o que você precisa..."
+                          rows={3}
+                        />
+                      </div>
+                    )}
+
+                    {/* Attachments */}
+                    <div className="form-group">
+                      <label>Anexar Arquivos <span className="field-hint" style={{ fontWeight: 'normal' }}>(opcional)</span></label>
+                      <div
+                        className="file-drop-zone"
+                        style={{
+                          border: '2px dashed #ccc',
+                          borderRadius: '8px',
+                          padding: '1.25rem',
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          background: '#fafafa',
+                        }}
+                        onClick={() => document.getElementById('open-ticket-file-input')?.click()}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const dropped = Array.from(e.dataTransfer.files);
+                          setPendingFiles((prev) => [...prev, ...dropped]);
+                        }}
+                      >
+                        <span style={{ fontSize: '1.5rem' }}>📎</span>
+                        <p style={{ margin: '0.25rem 0 0', fontSize: '0.875rem', color: '#555' }}>
+                          Clique ou arraste arquivos aqui
+                        </p>
+                        <p style={{ margin: '0.125rem 0 0', fontSize: '0.75rem', color: '#888' }}>
+                          PDF, DOC, TXT, imagens, ZIP — máx. 10MB por arquivo
+                        </p>
+                        <input
+                          id="open-ticket-file-input"
+                          type="file"
+                          multiple
+                          accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif,.zip,.xls,.xlsx"
+                          style={{ display: 'none' }}
+                          onChange={(e) => {
+                            const selected = Array.from(e.target.files || []);
+                            setPendingFiles((prev) => [...prev, ...selected]);
+                            e.target.value = '';
+                          }}
+                        />
+                      </div>
+                      {pendingFiles.length > 0 && (
+                        <ul style={{ marginTop: '0.5rem', paddingLeft: '1rem', fontSize: '0.85rem' }}>
+                          {pendingFiles.map((f, i) => (
+                            <li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                              📄 {f.name} ({(f.size / 1024).toFixed(0)} KB)
+                              <button
+                                type="button"
+                                onClick={() => setPendingFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#e53e3e', fontWeight: 'bold' }}
+                              >
+                                ✕
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
 
                     {/* Priority as Visual Scale */}
                     <div className="form-group">
@@ -697,15 +931,17 @@ export default function OpenTicketPage() {
                         <div className="summary-item">
                           <span className="summary-label">Tipo de Solicitação:</span>
                           <span className="summary-value">
-                            {formData.ticketDepartment === 'ti' ? '🖥️ Suporte de TI' : '🏢 Solicitação Administrativa'}
+                            {formData.ticketDepartment === 'ti' && '🖥️ Suporte de TI'}
+                            {formData.ticketDepartment === 'administrativo' && '🏢 Solicitação Administrativa'}
+                            {formData.ticketDepartment === 'rh' && '👥 Recursos Humanos'}
                           </span>
                         </div>
                         {formData.category && (
                           <div className="summary-item">
                             <span className="summary-label">Categoria:</span>
                             <span className="summary-value">
-                              {[...TI_CATEGORIES, ...ADMIN_CATEGORIES].find(c => c.value === formData.category)?.icon}{' '}
-                              {[...TI_CATEGORIES, ...ADMIN_CATEGORIES].find(c => c.value === formData.category)?.label}
+                              {[...TI_CATEGORIES, ...ADMIN_CATEGORIES, ...RH_CATEGORIES].find(c => c.value === formData.category)?.icon}{' '}
+                              {[...TI_CATEGORIES, ...ADMIN_CATEGORIES, ...RH_CATEGORIES].find(c => c.value === formData.category)?.label}
                             </span>
                           </div>
                         )}

@@ -10,6 +10,7 @@ interface InternalProtectedRouteProps {
 const getDefaultRouteByRole = (role?: string) => {
   if (role === 'manager') return '/gestor/dashboard';
   if (role === 'admin_staff') return '/admin/auxiliar/dashboard';
+  if (role === 'rh_staff') return '/rh/dashboard';
   return '/admin/dashboard';
 };
 

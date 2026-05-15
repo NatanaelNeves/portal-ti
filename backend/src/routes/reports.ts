@@ -53,7 +53,7 @@ const ensureReportsAccess = (req: Request, res: Response): InternalUserClaims | 
     return null;
   }
 
-  if (![UserRole.ADMIN, UserRole.IT_STAFF, UserRole.ADMIN_STAFF, UserRole.MANAGER].includes(user.role)) {
+  if (![UserRole.ADMIN, UserRole.IT_STAFF, UserRole.ADMIN_STAFF, UserRole.RH_STAFF, UserRole.MANAGER].includes(user.role)) {
     res.status(403).json({ error: 'Acesso negado' });
     return null;
   }

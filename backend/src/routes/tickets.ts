@@ -27,7 +27,7 @@ type TicketAccessRow = {
 const isManagerRole = (role: string) => role === UserRole.MANAGER || role === 'gestor';
 
 const canViewTicketsAsInternalRole = (role: string) => {
-  return [UserRole.IT_STAFF, UserRole.ADMIN_STAFF, UserRole.ADMIN].includes(role as UserRole) || isManagerRole(role);
+  return [UserRole.IT_STAFF, UserRole.ADMIN_STAFF, UserRole.RH_STAFF, UserRole.ADMIN].includes(role as UserRole) || isManagerRole(role);
 };
 
 const canAdminStaffAccessAdministrativeTicket = (ticket: TicketAccessRow, userId: string) => {
@@ -39,11 +39,12 @@ const canAdminStaffAccessAdministrativeTicket = (ticket: TicketAccessRow, userId
 const STATUS_AWAITING_CONFIRMATION = 'aguardando_confirmacao';
 
 const canManuallyCloseRole = (role: string) => {
-  return [UserRole.IT_STAFF, UserRole.ADMIN_STAFF, UserRole.ADMIN, UserRole.MANAGER].includes(role as UserRole) || role === 'gestor';
+  return [UserRole.IT_STAFF, UserRole.ADMIN_STAFF, UserRole.RH_STAFF, UserRole.ADMIN, UserRole.MANAGER].includes(role as UserRole) || role === 'gestor';
 };
 
-const getHistoryInternalActorType = (role: string): 'it_staff' | 'admin_staff' | 'admin' | 'manager' => {
+const getHistoryInternalActorType = (role: string): 'it_staff' | 'admin_staff' | 'rh_staff' | 'admin' | 'manager' => {
   if (role === UserRole.ADMIN_STAFF) return 'admin_staff';
+  if (role === UserRole.RH_STAFF) return 'rh_staff';
   if (role === UserRole.ADMIN) return 'admin';
   if (role === UserRole.MANAGER || role === 'gestor') return 'manager';
   return 'it_staff';
@@ -81,9 +82,12 @@ const notifyResponsibleTeamForReopenedTicket = async (ticket: any): Promise<void
     }
 
     if (recipientEmails.size === 0) {
-      const targetRoles = (ticket.department || 'ti') === 'administrativo'
+      const dept = ticket.department || 'ti';
+      const targetRoles = dept === 'administrativo'
         ? ['admin_staff', 'admin']
-        : ['it_staff', 'admin'];
+        : dept === 'rh'
+          ? ['rh_staff', 'admin']
+          : ['it_staff', 'admin'];
 
       const teamUsers = await database.query(
         `SELECT email FROM internal_users WHERE role = ANY($1) AND is_active = true`,
@@ -146,6 +150,11 @@ ticketsRouter.get('/new-since', pollingLimiter, authenticate, async (req: Reques
     // manager vê apenas o próprio departamento (ajustado conforme implementação existente)
     if (isManagerRole(decoded.role)) {
       conditions.push(`COALESCE(t.department, 'ti') = 'administrativo'`);
+    }
+
+    // RH só recebe notificações de chamados de RH
+    if (decoded.role === UserRole.RH_STAFF) {
+      conditions.push(`COALESCE(t.department, 'ti') = 'rh'`);
     }
 
     const result = await database.query(
@@ -348,6 +357,9 @@ ticketsRouter.get('/', async (req: Request, res: Response) => {
           conditions.push(`(t.assigned_to_id = $${paramCount} OR t.assigned_to_id IS NULL)`);
           params.push(decoded.id);
           paramCount++;
+        } else if (decoded.role === UserRole.RH_STAFF) {
+          // RH só vê chamados do RH por padrão
+          conditions.push(`COALESCE(t.department, 'ti') = 'rh'`);
         }
         // ADMIN e MANAGER veem todos se não filtrarem
 
@@ -544,7 +556,7 @@ ticketsRouter.get('/:id', async (req: Request, res: Response) => {
       try {
         const decoded = jwt.verify(token, config.jwt.secret) as any;
         
-        // TI, Administrativo, Coordenador e Admin podem ver qualquer chamado
+        // TI, Administrativo, RH, Coordenador e Admin podem ver chamados do seu departamento
         if (!canViewTicketsAsInternalRole(decoded.role)) {
           return res.status(403).json({ error: 'Acesso negado' });
         }
@@ -553,6 +565,13 @@ ticketsRouter.get('/:id', async (req: Request, res: Response) => {
           return res.status(403).json({
             error: 'Acesso negado',
             message: 'Auxiliar administrativo pode visualizar chamados administrativos atribuídos a si ou sem responsável.'
+          });
+        }
+
+        if (decoded.role === UserRole.RH_STAFF && (ticket.rows[0].department || 'ti') !== 'rh') {
+          return res.status(403).json({
+            error: 'Acesso negado',
+            message: 'Equipe de RH pode visualizar apenas chamados do setor de RH.'
           });
         }
 
@@ -592,7 +611,7 @@ ticketsRouter.get('/:id', async (req: Request, res: Response) => {
 ticketsRouter.post('/', validate(createTicketSchema), async (req: Request, res: Response) => {
   try {
     const userToken = req.headers['x-user-token'] as string;
-    const { title, description, type, priority, department, category } = req.body;
+    const { title, description, type, priority, department, category, requestDetails } = req.body;
 
     console.log('POST /tickets - Token:', userToken ? 'present' : 'missing');
     console.log('POST /tickets - Body:', { title, description, type, priority, department, category });
@@ -617,11 +636,16 @@ ticketsRouter.post('/', validate(createTicketSchema), async (req: Request, res: 
     // Create ticket
     const ticket = await database.query(
       `INSERT INTO tickets (
-        requester_type, requester_id, title, description, 
-        type, priority, status, department, category
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        requester_type, requester_id, title, description,
+        type, priority, status, department, category, metadata
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *`,
-      ['public', publicUser.rows[0].id, title, description, type || 'support', priority || 'medium', 'open', department || 'ti', category || null]
+      [
+        'public', publicUser.rows[0].id, title, description,
+        type || 'support', priority || 'medium', 'open', department || 'ti',
+        category || null,
+        JSON.stringify(requestDetails || {}),
+      ]
     );
 
     console.log('POST /tickets - Ticket created:', ticket.rows[0].id);
@@ -655,12 +679,12 @@ ticketsRouter.post('/', validate(createTicketSchema), async (req: Request, res: 
       // Direcionar notificação conforme departamento do chamado
       const ticketDept = department || 'ti';
       let targetRoles: string[];
-      
+
       if (ticketDept === 'administrativo') {
-        // Notificar equipe administrativa
         targetRoles = ['admin_staff', 'admin'];
+      } else if (ticketDept === 'rh') {
+        targetRoles = ['rh_staff', 'admin'];
       } else {
-        // Notificar equipe de TI
         targetRoles = ['it_staff', 'admin'];
       }
       
@@ -733,7 +757,7 @@ ticketsRouter.get('/:id/messages', async (req: Request, res: Response) => {
       try {
         const decoded = jwt.verify(token, config.jwt.secret) as any;
         
-        // TI, Administrativo, Coordenador e Admin podem ver mensagens de qualquer chamado
+        // TI, Administrativo, RH, Coordenador e Admin podem ver mensagens de chamados do seu setor
         if (!canViewTicketsAsInternalRole(decoded.role)) {
           return res.status(403).json({ error: 'Acesso negado' });
         }
@@ -742,6 +766,13 @@ ticketsRouter.get('/:id/messages', async (req: Request, res: Response) => {
           return res.status(403).json({
             error: 'Acesso negado',
             message: 'Auxiliar administrativo pode visualizar mensagens apenas de chamados administrativos atribuídos a si ou sem responsável.'
+          });
+        }
+
+        if (decoded.role === UserRole.RH_STAFF && (ticket.rows[0].department || 'ti') !== 'rh') {
+          return res.status(403).json({
+            error: 'Acesso negado',
+            message: 'Equipe de RH pode visualizar mensagens apenas de chamados do setor de RH.'
           });
         }
       } catch (err) {
@@ -1299,11 +1330,11 @@ ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (r
     try {
       const decoded = jwt.verify(token, config.jwt.secret) as any;
       
-      // AUTORIZAÇÃO: TI, Admin e Administrativo podem atualizar
-      if (![UserRole.IT_STAFF, UserRole.ADMIN_STAFF, UserRole.ADMIN].includes(decoded.role)) {
-        return res.status(403).json({ 
+      // AUTORIZAÇÃO: TI, Admin, Administrativo e RH podem atualizar chamados do seu setor
+      if (![UserRole.IT_STAFF, UserRole.ADMIN_STAFF, UserRole.RH_STAFF, UserRole.ADMIN].includes(decoded.role)) {
+        return res.status(403).json({
           error: 'Acesso negado',
-          message: 'Apenas TI, Administrativo e Administradores podem atualizar chamados'
+          message: 'Apenas TI, Administrativo, RH e Administradores podem atualizar chamados'
         });
       }
       
@@ -1338,6 +1369,24 @@ ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (r
         return res.status(403).json({
           error: 'Acesso negado',
           message: 'Auxiliar administrativo só pode atribuir chamado para si mesmo.'
+        });
+      }
+    }
+
+    if (userRole === UserRole.RH_STAFF) {
+      const rhCheck = await database.query(
+        'SELECT department FROM tickets WHERE id = $1',
+        [id]
+      );
+
+      if (!rhCheck.rows.length) {
+        return res.status(404).json({ error: 'Chamado não encontrado' });
+      }
+
+      if ((rhCheck.rows[0].department || 'ti') !== 'rh') {
+        return res.status(403).json({
+          error: 'Acesso negado',
+          message: 'Equipe de RH só pode atualizar chamados do setor de RH.'
         });
       }
     }

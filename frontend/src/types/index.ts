@@ -2,6 +2,7 @@ export enum UserRole {
   FINAL_USER = 'final_user',
   IT_STAFF = 'it_staff',
   ADMIN_STAFF = 'admin_staff',
+  RH_STAFF = 'rh_staff',
   MANAGER = 'manager',
   ADMIN = 'admin',
 }
@@ -19,6 +20,7 @@ export enum TicketStatus {
 export enum TicketDepartment {
   TI = 'ti',
   ADMINISTRATIVO = 'administrativo',
+  RH = 'rh',
 }
 
 export enum TicketType {

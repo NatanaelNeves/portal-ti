@@ -294,6 +294,8 @@ export default function UsersManagementPage() {
         return 'Equipe de TI';
       case 'admin_staff':
         return 'Assistente Administrativo';
+      case 'rh_staff':
+        return 'Equipe de RH';
       case 'manager':
         return 'Gestor';
       default:
@@ -378,6 +380,7 @@ export default function UsersManagementPage() {
                 >
                   <option value="it_staff">Equipe de TI</option>
                   <option value="admin_staff">Auxiliar Administrativo</option>
+                  <option value="rh_staff">Equipe de RH</option>
                   {isAdmin && <option value="manager">Gestor</option>}
                   {isAdmin && <option value="admin">Administrador</option>}
                 </select>
@@ -512,6 +515,7 @@ export default function UsersManagementPage() {
                   >
                     <option value="it_staff">Equipe de TI</option>
                     <option value="admin_staff">Assistente Administrativo</option>
+                    <option value="rh_staff">Equipe de RH</option>
                     <option value="manager">Gestor</option>
                     <option value="admin">Administrador</option>
                   </select>

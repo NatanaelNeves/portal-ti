@@ -95,6 +95,7 @@ export async function initializeDatabase(): Promise<void> {
         status VARCHAR(50) NOT NULL DEFAULT 'open',
         department VARCHAR(50) NOT NULL DEFAULT 'ti',
         category VARCHAR(100),
+        metadata JSONB DEFAULT '{}',
         requester_type VARCHAR(20) NOT NULL DEFAULT 'public',
         requester_id UUID NOT NULL,
         assigned_to_id UUID REFERENCES internal_users(id),
@@ -128,6 +129,9 @@ export async function initializeDatabase(): Promise<void> {
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'tickets' AND column_name = 'category') THEN
           ALTER TABLE tickets ADD COLUMN category VARCHAR(100);
         END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'tickets' AND column_name = 'metadata') THEN
+          ALTER TABLE tickets ADD COLUMN metadata JSONB DEFAULT '{}';
+        END IF;
       END
       $$;
     `);
@@ -150,13 +154,35 @@ export async function initializeDatabase(): Promise<void> {
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         ticket_id UUID NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
         action VARCHAR(50) NOT NULL,
-        changed_by_type VARCHAR(20) NOT NULL CHECK (changed_by_type IN ('public', 'it_staff', 'admin_staff', 'admin', 'manager', 'system')),
+        changed_by_type VARCHAR(20) NOT NULL CHECK (changed_by_type IN ('public', 'it_staff', 'admin_staff', 'rh_staff', 'admin', 'manager', 'system')),
         changed_by_id UUID,
         old_value TEXT,
         new_value TEXT,
         metadata JSONB DEFAULT '{}',
         created_at TIMESTAMP DEFAULT NOW()
       )
+    `);
+
+    await database.query(`
+      DO $$
+      DECLARE
+        constraint_name TEXT;
+      BEGIN
+        SELECT conname INTO constraint_name
+        FROM pg_constraint
+        WHERE conrelid = 'ticket_history'::regclass
+          AND contype = 'c'
+          AND pg_get_constraintdef(oid) LIKE '%changed_by_type%';
+
+        IF constraint_name IS NOT NULL THEN
+          EXECUTE format('ALTER TABLE ticket_history DROP CONSTRAINT %I', constraint_name);
+        END IF;
+
+        ALTER TABLE ticket_history
+          ADD CONSTRAINT ticket_history_changed_by_type_check
+          CHECK (changed_by_type IN ('public', 'it_staff', 'admin_staff', 'rh_staff', 'admin', 'manager', 'system'));
+      END
+      $$;
     `);
 
     await database.query(`
@@ -711,7 +737,7 @@ export async function initializeDatabase(): Promise<void> {
           BEGIN
             ALTER TABLE ticket_history
               ADD CONSTRAINT ticket_history_changed_by_type_check
-              CHECK (changed_by_type IN ('public', 'it_staff', 'admin_staff', 'admin', 'manager', 'system'));
+              CHECK (changed_by_type IN ('public', 'it_staff', 'admin_staff', 'rh_staff', 'admin', 'manager', 'system'));
           EXCEPTION
             WHEN duplicate_object THEN
               NULL;
@@ -1057,6 +1083,28 @@ export async function initializeDatabase(): Promise<void> {
       }
     } catch (e) {
       console.warn('⚠ Could not seed admin user:', e);
+    }
+
+    // ── Seed: RH users ───────────────────────────────────────────────
+    try {
+      const rhPassword = 'Opn@1234!';
+      const rhHash = await bcrypt.hash(rhPassword, 12);
+      const rhUsers = [
+        { email: 'rh@opequenonazareno.org.br',  name: 'Marina Carvalho' },
+        { email: 'rh1@opequenonazareno.org.br', name: 'Ester Silva' },
+        { email: 'rh2@opequenonazareno.org.br', name: 'Natalia Felix' },
+      ];
+      for (const u of rhUsers) {
+        await database.query(
+          `INSERT INTO internal_users (email, name, password_hash, role, is_active)
+           VALUES ($1, $2, $3, 'rh_staff', true)
+           ON CONFLICT (email) DO NOTHING`,
+          [u.email, u.name, rhHash]
+        );
+      }
+      console.log('✓ RH users seeded (rh@, rh1@, rh2@)');
+    } catch (e) {
+      console.warn('⚠ Could not seed RH users:', e);
     }
 
     // ── Seed: information articles ────────────────────────────────────

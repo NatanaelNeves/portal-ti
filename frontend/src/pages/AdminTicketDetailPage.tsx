@@ -16,6 +16,7 @@ interface TicketDetail {
   type: string;
   department?: string;
   category?: string;
+  metadata?: Record<string, any>;
   created_at: string;
   updated_at: string;
   resolved_at?: string;
@@ -60,6 +61,12 @@ export default function AdminTicketDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
 
   const internalToken = localStorage.getItem('internal_token');
+
+  const getBackRoute = () => {
+    const raw = localStorage.getItem('internal_user');
+    const role = raw ? (JSON.parse(raw)?.role ?? '') : '';
+    return role === 'rh_staff' ? '/rh/chamados' : '/admin/chamados';
+  };
 
   useEffect(() => {
     if (!internalToken) {
@@ -243,7 +250,7 @@ export default function AdminTicketDetailPage() {
     return (
       <div className="admin-ticket-detail">
         <div className="alert alert-error">{error}</div>
-        <button onClick={() => navigate('/admin/chamados')} className="btn btn-secondary">
+        <button onClick={() => navigate(getBackRoute())} className="btn btn-secondary">
           ← Voltar
         </button>
       </div>
@@ -254,7 +261,7 @@ export default function AdminTicketDetailPage() {
     return (
       <div className="admin-ticket-detail">
         <div className="alert alert-error">Chamado não encontrado</div>
-        <button onClick={() => navigate('/admin/chamados')} className="btn btn-secondary">
+        <button onClick={() => navigate(getBackRoute())} className="btn btn-secondary">
           ← Voltar
         </button>
       </div>
@@ -349,7 +356,7 @@ export default function AdminTicketDetailPage() {
     <div className="admin-ticket-detail">
       {/* Header com navegação */}
       <div className="ticket-header">
-        <button onClick={() => navigate('/admin/chamados')} className="btn-back">
+        <button onClick={() => navigate(getBackRoute())} className="btn-back">
           ← Voltar para Fila
         </button>
         <div className="ticket-header-info">
@@ -540,7 +547,7 @@ export default function AdminTicketDetailPage() {
             <div className="info-item">
               <label>🏢 Departamento:</label>
               <div className="value">
-                {ticket.department === 'administrativo' ? '🏢 Administrativo' : '🖥️ TI'}
+                {ticket.department === 'administrativo' ? '🏢 Administrativo' : ticket.department === 'rh' ? '👥 Recursos Humanos' : '🖥️ TI'}
               </div>
             </div>
 
@@ -551,6 +558,29 @@ export default function AdminTicketDetailPage() {
                 {ticket.category.replace(/_/g, ' ')}
               </div>
             </div>
+            )}
+
+            {ticket.department === 'rh' && ticket.metadata && Object.keys(ticket.metadata).length > 0 && (
+              <div className="info-item info-item-full">
+                <label>📋 Detalhes da Solicitação RH:</label>
+                <div className="value" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {ticket.metadata.medicalLeaveDays && (
+                    <span><strong>Dias de afastamento:</strong> {ticket.metadata.medicalLeaveDays}</span>
+                  )}
+                  {ticket.metadata.adjustmentDate && (
+                    <span><strong>Data de ajuste:</strong> {ticket.metadata.adjustmentDate}</span>
+                  )}
+                  {ticket.metadata.correctedTime && (
+                    <span><strong>Horário corrigido:</strong> {ticket.metadata.correctedTime}</span>
+                  )}
+                  {ticket.metadata.payrollMonth && (
+                    <span><strong>Competência:</strong> {ticket.metadata.payrollMonth}</span>
+                  )}
+                  {ticket.metadata.notes && (
+                    <span><strong>Observações:</strong> {ticket.metadata.notes}</span>
+                  )}
+                </div>
+              </div>
             )}
 
             <div className="info-item">
@@ -684,7 +714,7 @@ export default function AdminTicketDetailPage() {
               </span>
               {isInternalNote && (
                 <span style={{ fontSize: '0.85rem', color: '#78350f', marginLeft: 'auto' }}>
-                  Visível apenas para a equipe TI
+                  Visível apenas para a equipe interna
                 </span>
               )}
             </div>
