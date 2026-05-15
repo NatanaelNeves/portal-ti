@@ -6,7 +6,8 @@
       "Bash(find \"c:\\\\\\\\Users\\\\\\\\TECNOLOGIA\\\\\\\\portal-ti\\\\\\\\backend\\\\\\\\migrations\" -type f -name \"*.sql\")",
       "Bash(bash \"C:/Users/TECNOLOGIA/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/skills/brainstorming/scripts/start-server.sh\" --project-dir \"C:/Users/TECNOLOGIA/portal-ti\")",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(npx tsc *)"
     ]
   }
 }

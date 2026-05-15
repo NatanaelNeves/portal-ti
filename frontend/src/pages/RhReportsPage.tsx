@@ -202,14 +202,14 @@ export default function RhReportsPage() {
                   cx="50%"
                   cy="50%"
                   outerRadius={100}
-                  label={({ name, percent }) => `${name} (${Math.round(percent * 100)}%)`}
+                  label={({ name, percent }) => `${name} (${((percent || 0) * 100).toFixed(0)}%)`}
                   labelLine={true}
                 >
                   {byCategory.map((_, i) => (
                     <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(val: number) => [`${val} chamados`]} />
+                <Tooltip formatter={(val: unknown) => `${val} chamados`} />
               </PieChart>
             </ResponsiveContainer>
           )}
@@ -226,7 +226,7 @@ export default function RhReportsPage() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" angle={-35} textAnchor="end" interval={0} tick={{ fontSize: 12 }} />
                 <YAxis allowDecimals={false} />
-                <Tooltip formatter={(val: number) => [`${val} chamados`]} />
+                <Tooltip formatter={(val: unknown) => `${val} chamados`} />
                 <Bar dataKey="value" name="Chamados" radius={[4, 4, 0, 0]}>
                   {byStatus.map((entry, i) => (
                     <Cell key={i} fill={entry.color} />
@@ -248,7 +248,7 @@ export default function RhReportsPage() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis allowDecimals={false} />
-                <Tooltip formatter={(val: number) => [`${val} chamados`]} />
+                <Tooltip formatter={(val: unknown) => `${val} chamados`} />
                 <Legend />
                 <Bar dataKey="chamados" name="Chamados" fill="#6366f1" radius={[4, 4, 0, 0]} />
               </BarChart>
