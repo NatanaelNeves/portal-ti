@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import InventoryLayout from '../components/InventoryLayout';
+import StatusBadge from '../components/StatusBadge';
+import ActionButtonGroup, { ActionBtn } from '../components/ActionButtonGroup';
 import '../styles/PeripheralsPage.css';
 import '../styles/InventoryButtons.css';
 import { BACKEND_URL } from '../services/api';
@@ -28,6 +30,72 @@ interface TypeStats {
   maintenance: number;
 }
 
+const IcoPlus = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+  </svg>
+);
+const IcoEye = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+  </svg>
+);
+const IcoDeliver = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+    <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+  </svg>
+);
+const IcoTransfer = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+    <polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+  </svg>
+);
+const IcoReturn = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+    <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+  </svg>
+);
+
+const getTypeIcon = (type: string) => {
+  const t = type.toLowerCase();
+  if (t.includes('mouse')) return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="6" y="3" width="12" height="18" rx="6"/><line x1="12" y1="7" x2="12" y2="11"/>
+    </svg>
+  );
+  if (t.includes('teclado') || t.includes('keyboard')) return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="6" width="20" height="12" rx="2"/>
+      <line x1="6" y1="10" x2="6.01" y2="10"/><line x1="10" y1="10" x2="10.01" y2="10"/>
+      <line x1="14" y1="10" x2="14.01" y2="10"/><line x1="18" y1="10" x2="18.01" y2="10"/>
+      <line x1="6" y1="14" x2="18" y2="14"/>
+    </svg>
+  );
+  if (t.includes('monitor')) return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+    </svg>
+  );
+  if (t.includes('carregador') || t.includes('charger')) return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="13" y1="2" x2="7" y2="14"/><path d="M7 9h10l-4 13"/>
+    </svg>
+  );
+  if (t.includes('fone') || t.includes('headset') || t.includes('webcam')) return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+    </svg>
+  );
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+    </svg>
+  );
+};
+
 export default function PeripheralsPage() {
   const [peripherals, setPeripherals] = useState<Peripheral[]>([]);
   const [byType, setByType] = useState<Record<string, TypeStats>>({});
@@ -46,21 +114,17 @@ export default function PeripheralsPage() {
     try {
       setLoading(true);
       const token = localStorage.getItem('internal_token');
-      
+
       const params = new URLSearchParams();
       if (filterStatus !== 'all') params.append('status', filterStatus);
       if (filterType !== 'all') params.append('type', filterType);
       if (filterUnit !== 'all') params.append('unit', filterUnit);
 
       const response = await fetch(`${BACKEND_URL}/api/inventory/peripherals?${params.toString()}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Authorization': `Bearer ${token}` },
       });
 
-      if (!response.ok) {
-        throw new Error('Erro ao carregar periféricos');
-      }
+      if (!response.ok) throw new Error('Erro ao carregar periféricos');
 
       const data = await response.json();
       setPeripherals(data.peripherals || []);
@@ -72,34 +136,11 @@ export default function PeripheralsPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const badges: any = {
-      available: { icon: '🟢', text: 'Disponível', class: 'status-available' },
-      in_stock: { icon: '🟢', text: 'Em Estoque', class: 'status-available' },
-      in_use: { icon: '🔵', text: 'Em Uso', class: 'status-in-use' },
-      maintenance: { icon: '🟡', text: 'Manutenção', class: 'status-maintenance' },
-      in_maintenance: { icon: '🟡', text: 'Manutenção', class: 'status-maintenance' },
-      retired: { icon: '🔴', text: 'Baixado', class: 'status-retired' }
-    };
-    return badges[status] || { icon: '⚫', text: status, class: 'status-unknown' };
-  };
-
-  const getTypeIcon = (type: string) => {
-    const typeLower = type.toLowerCase();
-    if (typeLower.includes('mouse')) return '🖱️';
-    if (typeLower.includes('teclado') || typeLower.includes('keyboard')) return '⌨️';
-    if (typeLower.includes('monitor')) return '🖥️';
-    if (typeLower.includes('carregador') || typeLower.includes('charger')) return '🔌';
-    if (typeLower.includes('webcam')) return '📷';
-    if (typeLower.includes('fone') || typeLower.includes('headset')) return '🎧';
-    return '📦';
-  };
-
   const stats = {
     total: peripherals.length,
-    available: peripherals.filter(p => p.current_status === 'available').length,
+    available: peripherals.filter(p => p.current_status === 'available' || p.current_status === 'in_stock').length,
     in_use: peripherals.filter(p => p.current_status === 'in_use').length,
-    maintenance: peripherals.filter(p => p.current_status === 'maintenance').length
+    maintenance: peripherals.filter(p => p.current_status === 'maintenance' || p.current_status === 'in_maintenance').length
   };
 
   const uniqueTypes = Array.from(new Set(peripherals.map(p => p.type))).sort();
@@ -108,7 +149,7 @@ export default function PeripheralsPage() {
     return (
       <InventoryLayout>
         <div className="peripherals-page">
-          <div className="loading">Carregando periféricos...</div>
+          <div className="per-loading">Carregando periféricos...</div>
         </div>
       </InventoryLayout>
     );
@@ -117,63 +158,59 @@ export default function PeripheralsPage() {
   return (
     <InventoryLayout>
       <div className="peripherals-page">
-        <div className="page-header">
+        <div className="per-header">
           <div>
-            <h1>🖱️ Periféricos</h1>
-            <p>Mouses, teclados, monitores, carregadores e outros</p>
+            <h1 className="per-title">Periféricos</h1>
+            <p className="per-subtitle">Mouses, teclados, monitores, carregadores e outros</p>
           </div>
-          <div className="header-actions">
+          <div className="per-header-actions">
             <button
-              className="btn btn-outline"
+              className="per-btn per-btn-primary"
               onClick={() => navigate('/inventario/equipamentos/novo')}
               title="Cadastrar novo periférico"
             >
-              <span className="btn-icon">➕</span> Cadastrar Periférico
+              <IcoPlus /> Cadastrar Periférico
             </button>
           </div>
         </div>
 
-        {error && <div className="alert alert-error">{error}</div>}
+        {error && <div className="per-alert-error">{error}</div>}
 
-        {/* Stats Cards */}
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-icon">📊</div>
-            <div className="stat-value">{stats.total}</div>
-            <div className="stat-label">Total</div>
+        {/* Stats */}
+        <div className="per-stats-grid">
+          <div className="per-stat">
+            <div className="per-stat-value">{stats.total}</div>
+            <div className="per-stat-label">Total</div>
           </div>
-          <div className="stat-card stat-available">
-            <div className="stat-icon">🟢</div>
-            <div className="stat-value">{stats.available}</div>
-            <div className="stat-label">Disponíveis</div>
+          <div className="per-stat per-stat-available">
+            <div className="per-stat-value">{stats.available}</div>
+            <div className="per-stat-label">Disponíveis</div>
           </div>
-          <div className="stat-card stat-in-use">
-            <div className="stat-icon">🔵</div>
-            <div className="stat-value">{stats.in_use}</div>
-            <div className="stat-label">Em Uso</div>
+          <div className="per-stat per-stat-inuse">
+            <div className="per-stat-value">{stats.in_use}</div>
+            <div className="per-stat-label">Em Uso</div>
           </div>
-          <div className="stat-card stat-maintenance">
-            <div className="stat-icon">🟡</div>
-            <div className="stat-value">{stats.maintenance}</div>
-            <div className="stat-label">Manutenção</div>
+          <div className="per-stat per-stat-maint">
+            <div className="per-stat-value">{stats.maintenance}</div>
+            <div className="per-stat-label">Manutenção</div>
           </div>
         </div>
 
         {/* Type Summary */}
         {Object.keys(byType).length > 0 && (
-          <div className="type-summary">
-            <h3>Resumo por Tipo</h3>
-            <div className="type-cards">
-              {Object.entries(byType).map(([type, stats]) => (
-                <div key={type} className="type-card">
-                  <div className="type-header">
-                    <span className="type-icon">{getTypeIcon(type)}</span>
-                    <span className="type-name">{type}</span>
+          <div className="per-type-summary">
+            <h3 className="per-section-title">Resumo por Tipo</h3>
+            <div className="per-type-cards">
+              {Object.entries(byType).map(([type, ts]) => (
+                <div key={type} className="per-type-card">
+                  <div className="per-type-header">
+                    <span className="per-type-icon-wrap">{getTypeIcon(type)}</span>
+                    <span className="per-type-name">{type}</span>
                   </div>
-                  <div className="type-stats">
-                    <div>Total: <strong>{stats.total}</strong></div>
-                    <div>Livres: <strong>{stats.available}</strong></div>
-                    <div>Em uso: <strong>{stats.in_use}</strong></div>
+                  <div className="per-type-stats">
+                    <span>Total: <strong>{ts.total}</strong></span>
+                    <span>Livres: <strong>{ts.available}</strong></span>
+                    <span>Em uso: <strong>{ts.in_use}</strong></span>
                   </div>
                 </div>
               ))}
@@ -182,39 +219,28 @@ export default function PeripheralsPage() {
         )}
 
         {/* Filters */}
-        <div className="filters-bar">
-          <div className="filter-group">
+        <div className="per-filters">
+          <div className="per-filter-group">
             <label>Tipo:</label>
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-            >
+            <select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
               <option value="all">Todos</option>
               {uniqueTypes.map(type => (
                 <option key={type} value={type}>{type}</option>
               ))}
             </select>
           </div>
-
-          <div className="filter-group">
+          <div className="per-filter-group">
             <label>Status:</label>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-            >
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
               <option value="all">Todos</option>
               <option value="available">Disponíveis</option>
               <option value="in_use">Em Uso</option>
               <option value="maintenance">Manutenção</option>
             </select>
           </div>
-
-          <div className="filter-group">
+          <div className="per-filter-group">
             <label>Unidade:</label>
-            <select
-              value={filterUnit}
-              onChange={(e) => setFilterUnit(e.target.value)}
-            >
+            <select value={filterUnit} onChange={(e) => setFilterUnit(e.target.value)}>
               <option value="all">Todas</option>
               {INSTITUTION_UNITS.map((unit) => (
                 <option key={unit} value={unit}>{unit}</option>
@@ -223,14 +249,14 @@ export default function PeripheralsPage() {
           </div>
         </div>
 
-        {/* Peripherals Table */}
-        <div className="peripherals-table">
-          <table>
+        {/* Table */}
+        <div className="per-table-wrap">
+          <table className="per-table">
             <thead>
               <tr>
                 <th>Código</th>
                 <th>Tipo</th>
-                <th>Marca/Modelo</th>
+                <th>Marca / Modelo</th>
                 <th>Descrição</th>
                 <th>Status</th>
                 <th>Responsável</th>
@@ -240,87 +266,66 @@ export default function PeripheralsPage() {
             </thead>
             <tbody>
               {peripherals.map((peripheral, index) => {
-                const status = getStatusBadge(peripheral.current_status);
-                const typeIcon = getTypeIcon(peripheral.type);
+                const isAvailable = peripheral.current_status === 'available' || peripheral.current_status === 'in_stock';
+
+                const actions: ActionBtn[] = [
+                  {
+                    label: 'Ver Detalhes',
+                    icon: <IcoEye />,
+                    onClick: () => navigate(`/inventario/equipamento/${peripheral.id}`),
+                    variant: 'primary',
+                  },
+                  ...(isAvailable ? [{
+                    label: 'Entregar',
+                    icon: <IcoDeliver />,
+                    onClick: () => navigate('/inventario/equipamentos/entregar'),
+                    variant: 'success' as const,
+                  }] : []),
+                  ...(peripheral.current_status === 'in_use' ? [
+                    {
+                      label: 'Transferir',
+                      icon: <IcoTransfer />,
+                      onClick: () => navigate(`/inventario/equipamento/${peripheral.id}/movimentar`),
+                      variant: 'warning' as const,
+                    },
+                    {
+                      label: 'Devolver',
+                      icon: <IcoReturn />,
+                      onClick: () => navigate(`/inventario/equipamentos/devolver?equipment=${peripheral.id}`),
+                      variant: 'danger' as const,
+                    },
+                  ] : []),
+                ];
 
                 return (
                   <tr key={`${peripheral.id}-${index}`}>
+                    <td><code className="per-code">{peripheral.internal_code}</code></td>
                     <td>
-                      <strong>{peripheral.internal_code}</strong>
-                    </td>
-                    <td>
-                      <span className="type-badge">
-                        {typeIcon} {peripheral.type}
+                      <span className="per-type-badge">
+                        <span className="per-type-icon">{getTypeIcon(peripheral.type)}</span>
+                        {peripheral.type}
                       </span>
                     </td>
                     <td>
-                      <strong>{peripheral.brand}</strong>
-                      <br />
-                      <small>{peripheral.model}</small>
+                      <span className="per-brand">{peripheral.brand}</span>
+                      <div className="per-model">{peripheral.model}</div>
                     </td>
-                    <td>
-                      <small>{peripheral.description || '-'}</small>
-                    </td>
-                    <td>
-                      <span className={`badge ${status.class}`}>
-                        {status.icon} {status.text}
-                      </span>
-                    </td>
+                    <td className="per-desc">{peripheral.description || '—'}</td>
+                    <td><StatusBadge status={peripheral.current_status} /></td>
                     <td>
                       {peripheral.responsible_name ? (
                         <div>
-                          <strong>{peripheral.responsible_name}</strong>
+                          <span className="per-resp">{peripheral.responsible_name}</span>
                           {peripheral.in_use_since && (
-                            <div>
-                              <small>
-                                Desde {new Date(peripheral.in_use_since).toLocaleDateString('pt-BR')}
-                              </small>
+                            <div className="per-since">
+                              Desde {new Date(peripheral.in_use_since).toLocaleDateString('pt-BR')}
                             </div>
                           )}
                         </div>
-                      ) : (
-                        <span className="text-muted">-</span>
-                      )}
+                      ) : <span className="per-empty">—</span>}
                     </td>
-                    <td>{peripheral.current_unit || '-'}</td>
-                    <td className="actions">
-                      <div className="btn-group">
-                        <button
-                          className="btn btn-sm btn-view"
-                          onClick={() => navigate(`/inventario/equipamento/${peripheral.id}`)}
-                          title="Ver detalhes"
-                        >
-                          <span className="btn-icon">📋</span> Detalhes
-                        </button>
-                        {(peripheral.current_status === 'available' || peripheral.current_status === 'in_stock') && (
-                          <button
-                            className="btn btn-sm btn-deliver"
-                            onClick={() => navigate('/inventario/equipamentos/entregar')}
-                            title="Entregar equipamento"
-                          >
-                            <span className="btn-icon">📤</span> Entregar
-                          </button>
-                        )}
-                        {peripheral.current_status === 'in_use' && (
-                          <>
-                            <button
-                              className="btn btn-sm btn-move"
-                              onClick={() => navigate(`/inventario/equipamento/${peripheral.id}/movimentar`)}
-                              title="Transferir equipamento"
-                            >
-                              <span className="btn-icon">🔄</span> Transferir
-                            </button>
-                            <button
-                              className="btn btn-sm btn-return"
-                              onClick={() => navigate(`/inventario/equipamentos/devolver?equipment=${peripheral.id}`)}
-                              title="Devolver equipamento"
-                            >
-                              <span className="btn-icon">📥</span> Devolver
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
+                    <td className="per-unit">{peripheral.current_unit || '—'}</td>
+                    <td><ActionButtonGroup actions={actions} /></td>
                   </tr>
                 );
               })}
@@ -328,7 +333,7 @@ export default function PeripheralsPage() {
           </table>
 
           {peripherals.length === 0 && (
-            <div className="empty-state">
+            <div className="per-empty-state">
               <p>Nenhum periférico encontrado com os filtros selecionados.</p>
             </div>
           )}

@@ -1,0 +1,19 @@
+.sb-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  border: 1.5px solid transparent;
+}
+
+.sb-green  { background: #DCFCE7; color: #15803D; border-color: #BBF7D0; }
+.sb-blue   { background: #DBEAFE; color: #1D4ED8; border-color: #BFDBFE; }
+.sb-amber  { background: #FEF9C3; color: #A16207; border-color: #FDE68A; }
+.sb-red    { background: #FEE2E2; color: #B91C1C; border-color: #FECACA; }
+.sb-teal   { background: #CCFBF1; color: #0F766E; border-color: #99F6E4; }
+.sb-indigo { background: #EEF2FF; color: #4338CA; border-color: #C7D2FE; }
+.sb-gray   { background: #F3F4F6; color: #6B7280; border-color: #D1D5DB; }

@@ -74,82 +74,30 @@
   letter-spacing: 0.5px;
 }
 
-/* Stat card variants */
-.purchases-page .stat-card.stat-total {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border: none;
-  color: white;
-}
+/* Stat card variants — clean semantic, no gradients */
+.purchases-page .stat-card.stat-total    { border-top: 3px solid #4338CA; }
+.purchases-page .stat-card.stat-total .stat-value { color: #4338CA; }
 
-.purchases-page .stat-card.stat-total .stat-value,
-.purchases-page .stat-card.stat-total .stat-label {
-  color: white;
-}
+.purchases-page .stat-card.stat-value-card { border-top: 3px solid #0F172A; }
+.purchases-page .stat-card.stat-value-card .stat-value { color: #0F172A; }
 
-.purchases-page .stat-card.stat-value {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  border: none;
-  color: white;
-}
+.purchases-page .stat-card.stat-pending { border-top: 3px solid #D97706; }
+.purchases-page .stat-card.stat-pending .stat-value { color: #D97706; }
 
-.purchases-page .stat-card.stat-value .stat-value,
-.purchases-page .stat-card.stat-value .stat-label {
-  color: white;
-}
+.purchases-page .stat-card.stat-approved { border-top: 3px solid #1D4ED8; }
+.purchases-page .stat-card.stat-approved .stat-value { color: #1D4ED8; }
 
-.purchases-page .stat-card.stat-pending {
-  border-color: #fbbf24;
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-}
+.purchases-page .stat-card.stat-purchased { border-top: 3px solid #4338CA; }
+.purchases-page .stat-card.stat-purchased .stat-value { color: #4338CA; }
 
-.purchases-page .stat-card.stat-pending .stat-value {
-  color: #92400e;
-}
+.purchases-page .stat-card.stat-received { border-top: 3px solid #15803D; }
+.purchases-page .stat-card.stat-received .stat-value { color: #15803D; }
 
-.purchases-page .stat-card.stat-approved {
-  border-color: #3b82f6;
-  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
-}
+.purchases-page .stat-card.stat-completed { border-top: 3px solid #15803D; }
+.purchases-page .stat-card.stat-completed .stat-value { color: #15803D; }
 
-.purchases-page .stat-card.stat-approved .stat-value {
-  color: #1e40af;
-}
-
-.purchases-page .stat-card.stat-purchased {
-  border-color: #a855f7;
-  background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
-}
-
-.purchases-page .stat-card.stat-purchased .stat-value {
-  color: #6b21a8;
-}
-
-.purchases-page .stat-card.stat-received {
-  border-color: #22c55e;
-  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-}
-
-.purchases-page .stat-card.stat-received .stat-value {
-  color: #065f46;
-}
-
-.purchases-page .stat-card.stat-completed {
-  border-color: #10b981;
-  background: linear-gradient(135deg, #d1fae5 0%, #6ee7b7 100%);
-}
-
-.purchases-page .stat-card.stat-completed .stat-value {
-  color: #047857;
-}
-
-.purchases-page .stat-card.stat-rejected {
-  border-color: #ef4444;
-  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-}
-
-.purchases-page .stat-card.stat-rejected .stat-value {
-  color: #991b1b;
-}
+.purchases-page .stat-card.stat-rejected { border-top: 3px solid #DC2626; }
+.purchases-page .stat-card.stat-rejected .stat-value { color: #DC2626; }
 
 .filters {
   margin-bottom: 2rem;
@@ -517,48 +465,30 @@
 .btn-success {
   padding: 0.6rem 1.1rem;
   border: none;
-  background: linear-gradient(135deg, #48bb78, #38a169);
+  background: #16A34A;
   color: white;
   border-radius: 0.5rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.15s;
 }
 
-.btn-success:hover {
-  background: linear-gradient(135deg, #38a169, #2f855a);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
-}
-
-.btn-success:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
+.btn-success:hover:not(:disabled) { background: #15803D; }
+.btn-success:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btn-danger {
   padding: 0.6rem 1.1rem;
   border: none;
-  background: linear-gradient(135deg, #f56565, #e53e3e);
+  background: #DC2626;
   color: white;
   border-radius: 0.5rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.15s;
 }
 
-.btn-danger:hover {
-  background: linear-gradient(135deg, #e53e3e, #c53030);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(245, 101, 101, 0.3);
-}
-
-.btn-danger:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
+.btn-danger:hover:not(:disabled) { background: #B91C1C; }
+.btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .form-group {
   margin-bottom: 1.5rem;
@@ -603,6 +533,7 @@
 }
 
 .status-rejected {
-  background: linear-gradient(135deg, #fed7d7, #fc8181);
-  color: #742a2a;
+  background: #FEE2E2;
+  color: #B91C1C;
+  border: 1.5px solid #FECACA;
 }

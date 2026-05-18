@@ -113,7 +113,11 @@ function ModelGroup({ groupKey, notebooks, colorIdx, search, statusFilter, onNav
         onClick={() => setExpanded(e => !e)}
       >
         <div className="nb-group-left">
-          <div className="nb-group-icon" style={{ backgroundColor: color.accent }}>NB</div>
+          <div className="nb-group-icon" style={{ backgroundColor: color.accent }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="2" y1="20" x2="22" y2="20"/>
+                </svg>
+              </div>
           <div>
             <div className="nb-group-title">
               <span className="nb-group-name">{groupKey}</span>
@@ -136,7 +140,12 @@ function ModelGroup({ groupKey, notebooks, colorIdx, search, statusFilter, onNav
           >
             + Adicionar
           </button>
-          <span className="nb-group-chevron">{expanded ? '▲' : '▼'}</span>
+          <span className="nb-group-chevron" aria-hidden="true">
+              {expanded
+                ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+                : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              }
+            </span>
         </div>
       </div>
 
@@ -215,8 +224,11 @@ function ModelGroup({ groupKey, notebooks, colorIdx, search, statusFilter, onNav
                             </button>
                           </>
                         )}
-                        <button className="nb-btn nb-btn-del" onClick={() => onDelete(nb)}>
-                          🗑️
+                        <button className="nb-btn nb-btn-del" onClick={() => onDelete(nb)} title="Excluir" aria-label="Excluir notebook">
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                          </svg>
                         </button>
                       </div>
                     </td>
@@ -381,14 +393,24 @@ export default function NotebooksPage() {
         {/* FILTERS */}
         <div className="nb-filters">
           <div className="nb-search-wrap">
-            <span className="nb-search-icon">🔍</span>
+            <span className="nb-search-icon" aria-hidden="true">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+            </span>
             <input
               className="nb-search"
               placeholder="Buscar por responsável, código, unidade..."
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
-            {search && <button className="nb-search-clear" onClick={() => setSearch('')}>✕</button>}
+            {search && (
+              <button className="nb-search-clear" onClick={() => setSearch('')} aria-label="Limpar busca">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            )}
           </div>
           <select className="nb-select" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
             <option value="all">Todos os status</option>
@@ -418,7 +440,11 @@ export default function NotebooksPage() {
         {/* MODEL GROUPS */}
         {filteredGroups.length === 0 ? (
           <div className="nb-empty">
-            <div className="nb-empty-icon">📭</div>
+            <div className="nb-empty-icon">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="2" y1="20" x2="22" y2="20"/>
+              </svg>
+            </div>
             <h3>Nenhum notebook encontrado</h3>
             <p>Cadastre notebooks ou ajuste os filtros</p>
             <button className="nb-btn-primary" onClick={() => navigate('/inventario/equipamentos/novo')}>

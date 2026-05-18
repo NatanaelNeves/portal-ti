@@ -73,14 +73,14 @@ export default function PurchasesPage() {
 
   const getStatusBadge = (status: string) => {
     const badges: any = {
-      pending: { icon: '⏳', text: 'Pendente', class: 'status-pending' },
-      approved: { icon: '✅', text: 'Aprovado', class: 'status-approved' },
-      purchased: { icon: '🛒', text: 'Comprado', class: 'status-purchased' },
-      received: { icon: '📦', text: 'Recebido', class: 'status-received' },
-      completed: { icon: '✓', text: 'Concluído', class: 'status-completed' },
-      rejected: { icon: '❌', text: 'Rejeitado', class: 'status-rejected' }
+      pending:   { text: 'Pendente',  class: 'status-pending' },
+      approved:  { text: 'Aprovado',  class: 'status-approved' },
+      purchased: { text: 'Comprado',  class: 'status-purchased' },
+      received:  { text: 'Recebido',  class: 'status-received' },
+      completed: { text: 'Concluído', class: 'status-completed' },
+      rejected:  { text: 'Rejeitado', class: 'status-rejected' }
     };
-    return badges[status] || { icon: '⚪', text: status, class: 'status-unknown' };
+    return badges[status] || { text: status, class: 'status-unknown' };
   };
 
   const handleApprove = async () => {
@@ -288,7 +288,7 @@ export default function PurchasesPage() {
       <div className="purchases-page">
         <div className="page-header">
           <div>
-            <h1>🛒 Compras & Solicitações</h1>
+            <h1>Compras & Solicitações</h1>
             <p>Gestão de requisições e pedidos</p>
           </div>
           <div className="header-actions">
@@ -320,14 +320,14 @@ export default function PurchasesPage() {
               disabled={purchases.length === 0}
               title="Exportar lista para Excel"
             >
-              <span className="btn-icon">📊</span> Exportar Excel
+              Exportar Excel
             </button>
             <button
               className="btn btn-primary"
               onClick={() => navigate('/inventario/compras/nova')}
               title="Criar nova solicitação de compra"
             >
-              <span className="btn-icon">➕</span> Nova Solicitação
+              Nova Solicitação
             </button>
           </div>
         </div>
@@ -337,12 +337,10 @@ export default function PurchasesPage() {
         {/* Stats Cards */}
         <div className="stats-grid">
           <div className="stat-card stat-total">
-            <div className="stat-icon">📊</div>
             <div className="stat-value">{stats.total}</div>
             <div className="stat-label">Total de Solicitações</div>
           </div>
-          <div className="stat-card stat-value">
-            <div className="stat-icon">💰</div>
+          <div className="stat-card stat-value-card">
             <div className="stat-value">{formatCurrency(totalValue)}</div>
             <div className="stat-label">Valor Total</div>
           </div>
@@ -350,32 +348,26 @@ export default function PurchasesPage() {
 
         <div className="stats-grid stats-workflow">
           <div className="stat-card stat-pending">
-            <div className="stat-icon">⏳</div>
             <div className="stat-value">{stats.pending}</div>
             <div className="stat-label">Pendentes</div>
           </div>
           <div className="stat-card stat-approved">
-            <div className="stat-icon">✅</div>
             <div className="stat-value">{stats.approved}</div>
             <div className="stat-label">Aprovados</div>
           </div>
           <div className="stat-card stat-purchased">
-            <div className="stat-icon">🛒</div>
             <div className="stat-value">{stats.purchased}</div>
             <div className="stat-label">Comprados</div>
           </div>
           <div className="stat-card stat-received">
-            <div className="stat-icon">📦</div>
             <div className="stat-value">{stats.received}</div>
             <div className="stat-label">Recebidos</div>
           </div>
           <div className="stat-card stat-completed">
-            <div className="stat-icon">✓</div>
             <div className="stat-value">{stats.completed}</div>
             <div className="stat-label">Concluídos</div>
           </div>
           <div className="stat-card stat-rejected">
-            <div className="stat-icon">❌</div>
             <div className="stat-value">{stats.rejected}</div>
             <div className="stat-label">Rejeitados</div>
           </div>
@@ -390,12 +382,12 @@ export default function PurchasesPage() {
               onChange={(e) => setFilterStatus(e.target.value)}
             >
               <option value="all">Todos</option>
-              <option value="pending">⏳ Pendente</option>
-              <option value="approved">✅ Aprovado</option>
-              <option value="purchased">🛒 Comprado</option>
-              <option value="received">📦 Recebido</option>
-              <option value="completed">✓ Concluído</option>
-              <option value="rejected">❌ Rejeitado</option>
+              <option value="pending">Pendente</option>
+              <option value="approved">Aprovado</option>
+              <option value="purchased">Comprado</option>
+              <option value="received">Recebido</option>
+              <option value="completed">Concluído</option>
+              <option value="rejected">Rejeitado</option>
             </select>
           </div>
         </div>
@@ -448,7 +440,7 @@ export default function PurchasesPage() {
                     </td>
                     <td>
                       <span className={`status-badge ${status.class}`}>
-                        {status.icon} {status.text}
+                        {status.text}
                       </span>
                     </td>
                     <td>
@@ -458,7 +450,7 @@ export default function PurchasesPage() {
                           onClick={() => setSelectedPurchase(purchase)}
                           title="Ver detalhes"
                         >
-                          <span className="btn-icon">📋</span> Detalhes
+                          Detalhes
                         </button>
                         {(purchase.status === 'pending' || purchase.status === 'rejected') && (
                           <button
@@ -466,7 +458,7 @@ export default function PurchasesPage() {
                             onClick={() => { setSelectedPurchase(purchase); setDeleteConfirm(true); }}
                             title="Excluir solicitação"
                           >
-                            🗑️
+                            Excluir
                           </button>
                         )}
                       </div>
@@ -480,7 +472,12 @@ export default function PurchasesPage() {
 
         {purchases.length === 0 && (
           <div className="empty-state">
-            <div className="empty-icon">🛒</div>
+            <div className="empty-icon">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+              </svg>
+            </div>
             <h3>Nenhuma compra encontrada</h3>
             <p>Você pode criar uma nova solicitação de compra.</p>
           </div>
@@ -491,8 +488,8 @@ export default function PurchasesPage() {
           <div className="modal-overlay" onClick={() => setSelectedPurchase(null)}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
-                <h2>📋 Detalhes da Solicitação</h2>
-                <button className="modal-close" onClick={() => setSelectedPurchase(null)}>✕</button>
+                <h2>Detalhes da Solicitação</h2>
+                <button className="modal-close" onClick={() => setSelectedPurchase(null)} aria-label="Fechar">×</button>
               </div>
               <div className="modal-body">
                 <div className="detail-section">
@@ -545,26 +542,26 @@ export default function PurchasesPage() {
               <div className="modal-footer">
                 {selectedPurchase.status === 'pending' && (
                   <>
-                    <button 
-                      className="btn btn-success" 
+                    <button
+                      className="btn btn-success"
                       onClick={() => { setActionModal('approve'); setActionData({}); }}
                     >
-                      ✅ Aprovar
+                      Aprovar
                     </button>
-                    <button 
-                      className="btn btn-danger" 
+                    <button
+                      className="btn btn-danger"
                       onClick={() => { setActionModal('reject'); setActionData({}); }}
                     >
-                      ❌ Rejeitar
+                      Rejeitar
                     </button>
-                    <button 
+                    <button
                       className="btn btn-secondary"
                       onClick={() => {
                         setSelectedPurchase(null);
                         navigate(`/inventario/compras/${selectedPurchase.id}/editar`);
                       }}
                     >
-                      ✏️ Editar
+                      Editar
                     </button>
                   </>
                 )}
@@ -574,7 +571,7 @@ export default function PurchasesPage() {
                     onClick={() => setDeleteConfirm(true)}
                     title="Excluir esta solicitação"
                   >
-                    🗑️ Excluir
+                    Excluir
                   </button>
                 )}
                 {selectedPurchase.status === 'approved' && (
@@ -588,18 +585,18 @@ export default function PurchasesPage() {
                       }); 
                     }}
                   >
-                    🛒 Registrar Compra
+                    Registrar Compra
                   </button>
                 )}
                 {selectedPurchase.status === 'purchased' && (
-                  <button 
-                    className="btn btn-primary" 
-                    onClick={() => { 
-                      setActionModal('receive'); 
-                      setActionData({ received_date: new Date().toISOString().split('T')[0] }); 
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => {
+                      setActionModal('receive');
+                      setActionData({ received_date: new Date().toISOString().split('T')[0] });
                     }}
                   >
-                    📦 Confirmar Recebimento
+                    Confirmar Recebimento
                   </button>
                 )}
                 <button className="btn btn-secondary" onClick={() => setSelectedPurchase(null)}>
@@ -615,8 +612,8 @@ export default function PurchasesPage() {
           <div className="modal-overlay" onClick={() => setActionModal(null)}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
-                <h2>✅ Aprovar Solicitação</h2>
-                <button className="modal-close" onClick={() => setActionModal(null)}>✕</button>
+                <h2>Aprovar Solicitação</h2>
+                <button className="modal-close" onClick={() => setActionModal(null)} aria-label="Fechar">×</button>
               </div>
               <div className="modal-body">
                 <p>Você está aprovando a solicitação:</p>
@@ -646,7 +643,7 @@ export default function PurchasesPage() {
                   onClick={handleApprove}
                   disabled={actionLoading}
                 >
-                  {actionLoading ? 'Aprovando...' : '✅ Confirmar Aprovação'}
+                  {actionLoading ? 'Aprovando...' : 'Confirmar Aprovação'}
                 </button>
                 <button 
                   className="btn btn-secondary" 
@@ -665,8 +662,8 @@ export default function PurchasesPage() {
           <div className="modal-overlay" onClick={() => setActionModal(null)}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
-                <h2>❌ Rejeitar Solicitação</h2>
-                <button className="modal-close" onClick={() => setActionModal(null)}>✕</button>
+                <h2>Rejeitar Solicitação</h2>
+                <button className="modal-close" onClick={() => setActionModal(null)} aria-label="Fechar">×</button>
               </div>
               <div className="modal-body">
                 <p>Você está rejeitando a solicitação:</p>
@@ -693,7 +690,7 @@ export default function PurchasesPage() {
                   onClick={handleReject}
                   disabled={actionLoading || !actionData.rejection_reason}
                 >
-                  {actionLoading ? 'Rejeitando...' : '❌ Confirmar Rejeição'}
+                  {actionLoading ? 'Rejeitando...' : 'Confirmar Rejeição'}
                 </button>
                 <button 
                   className="btn btn-secondary" 
@@ -712,8 +709,8 @@ export default function PurchasesPage() {
           <div className="modal-overlay" onClick={() => setActionModal(null)}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
-                <h2>🛒 Registrar Compra</h2>
-                <button className="modal-close" onClick={() => setActionModal(null)}>✕</button>
+                <h2>Registrar Compra</h2>
+                <button className="modal-close" onClick={() => setActionModal(null)} aria-label="Fechar">×</button>
               </div>
               <div className="modal-body">
                 <div className="form-group">
@@ -752,7 +749,7 @@ export default function PurchasesPage() {
                   onClick={handlePurchase}
                   disabled={actionLoading || !actionData.purchase_date || !actionData.actual_value}
                 >
-                  {actionLoading ? 'Salvando...' : '🛒 Confirmar Compra'}
+                  {actionLoading ? 'Salvando...' : 'Confirmar Compra'}
                 </button>
                 <button 
                   className="btn btn-secondary" 
@@ -771,8 +768,8 @@ export default function PurchasesPage() {
           <div className="modal-overlay" onClick={() => setDeleteConfirm(false)}>
             <div className="modal-content" style={{ maxWidth: '480px' }} onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
-                <h2>🗑️ Excluir Solicitação</h2>
-                <button className="modal-close" onClick={() => setDeleteConfirm(false)}>✕</button>
+                <h2>Excluir Solicitação</h2>
+                <button className="modal-close" onClick={() => setDeleteConfirm(false)} aria-label="Fechar">×</button>
               </div>
               <div className="modal-body">
                 <p>Tem certeza que deseja excluir permanentemente esta solicitação?</p>
@@ -798,7 +795,7 @@ export default function PurchasesPage() {
                   onClick={handleDelete}
                   disabled={actionLoading}
                 >
-                  {actionLoading ? 'Excluindo...' : '🗑️ Confirmar Exclusão'}
+                  {actionLoading ? 'Excluindo...' : 'Confirmar Exclusão'}
                 </button>
                 <button
                   className="btn btn-secondary"
@@ -817,8 +814,8 @@ export default function PurchasesPage() {
           <div className="modal-overlay" onClick={() => setActionModal(null)}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
-                <h2>📦 Confirmar Recebimento</h2>
-                <button className="modal-close" onClick={() => setActionModal(null)}>✕</button>
+                <h2>Confirmar Recebimento</h2>
+                <button className="modal-close" onClick={() => setActionModal(null)} aria-label="Fechar">×</button>
               </div>
               <div className="modal-body">
                 <p>Confirme o recebimento dos itens:</p>
@@ -855,7 +852,7 @@ export default function PurchasesPage() {
                   onClick={handleReceive}
                   disabled={actionLoading || !actionData.received_date}
                 >
-                  {actionLoading ? 'Confirmando...' : '📦 Confirmar Recebimento'}
+                  {actionLoading ? 'Confirmando...' : 'Confirmar Recebimento'}
                 </button>
                 <button 
                   className="btn btn-secondary" 

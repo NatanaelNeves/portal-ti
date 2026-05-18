@@ -52,17 +52,16 @@
 
 .nb-btn-primary {
   padding: 0.6rem 1.2rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #4338CA;
   border: none;
   border-radius: 8px;
   font-size: 0.875rem;
   font-weight: 600;
   color: white;
   cursor: pointer;
-  transition: all 0.2s;
-  box-shadow: 0 2px 6px rgba(102,126,234,0.3);
+  transition: background 0.15s;
 }
-.nb-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(102,126,234,0.4); }
+.nb-btn-primary:hover { background: #3730A3; }
 
 /* ALERT */
 .nb-alert {
@@ -143,7 +142,7 @@
   transition: border-color 0.2s;
   box-sizing: border-box;
 }
-.nb-search:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+.nb-search:focus { outline: none; border-color: #4338CA; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
 .nb-search-clear {
   position: absolute;
   right: 8px;
@@ -167,7 +166,7 @@
   cursor: pointer;
   transition: border-color 0.2s;
 }
-.nb-select:focus { outline: none; border-color: #667eea; }
+.nb-select:focus { outline: none; border-color: #4338CA; }
 
 .nb-brand-chips {
   display: flex;
@@ -187,8 +186,8 @@
   color: #374151;
   transition: all 0.2s;
 }
-.nb-chip:hover { border-color: #667eea; color: #667eea; }
-.nb-chip.active { background: #667eea; color: white; border-color: transparent; }
+.nb-chip:hover { border-color: #4338CA; color: #4338CA; }
+.nb-chip.active { background: #4338CA; color: white; border-color: transparent; }
 
 /* MODEL GROUP */
 .nb-group {
@@ -457,8 +456,8 @@
 .nb-btn-add-group {
   padding: 4px 10px;
   background: #fff;
-  border: 1.5px solid #667eea;
-  color: #667eea;
+  border: 1.5px solid #4338CA;
+  color: #4338CA;
   border-radius: 6px;
   font-size: 0.75rem;
   font-weight: 600;
@@ -468,6 +467,6 @@
   transition: background 0.15s, color 0.15s;
 }
 .nb-btn-add-group:hover {
-  background: #667eea;
+  background: #4338CA;
   color: #fff;
 }

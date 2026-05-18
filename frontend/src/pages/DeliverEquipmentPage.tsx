@@ -206,10 +206,34 @@ const DeliverEquipmentPage: React.FC = () => {
   return (
     <div className="deliver-equipment-page">
       <div className="page-header">
-        <h1>📦 Entregar Equipamento</h1>
+        <div>
+          <h1>Entregar Equipamento</h1>
+          <p>Registre a entrega e gere o termo de responsabilidade</p>
+        </div>
         <button className="btn-back" onClick={() => navigate('/inventario')}>
-          ← Voltar
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:'6px'}}>
+            <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+          </svg>
+          Voltar
         </button>
+      </div>
+
+      {/* Step indicator */}
+      <div className="deliver-steps">
+        <div className="deliver-step deliver-step-active">
+          <span className="deliver-step-num">1</span>
+          <span className="deliver-step-label">Equipamento</span>
+        </div>
+        <div className="deliver-step-connector" />
+        <div className="deliver-step deliver-step-active">
+          <span className="deliver-step-num">2</span>
+          <span className="deliver-step-label">Responsável</span>
+        </div>
+        <div className="deliver-step-connector" />
+        <div className="deliver-step">
+          <span className="deliver-step-num">3</span>
+          <span className="deliver-step-label">Entrega</span>
+        </div>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
@@ -217,7 +241,7 @@ const DeliverEquipmentPage: React.FC = () => {
 
       <form onSubmit={handleSubmit} className="delivery-form">
         <div className="form-section">
-          <h2>1. Selecionar Equipamento</h2>
+          <h2 data-step="1">Selecionar Equipamento</h2>
           <div className="form-group">
             <label htmlFor="equipmentId">Equipamento *</label>
             <select
@@ -261,7 +285,7 @@ const DeliverEquipmentPage: React.FC = () => {
         </div>
 
         <div className="form-section">
-          <h2>2. Dados do Responsável</h2>
+          <h2 data-step="2">Dados do Responsável</h2>
           <div className="form-row">
             <div className="form-group">
               <label htmlFor="responsibleName">Nome Completo *</label>
@@ -356,7 +380,7 @@ const DeliverEquipmentPage: React.FC = () => {
         </div>
 
         <div className="form-section">
-          <h2>3. Informações da Entrega</h2>
+          <h2 data-step="3">Informações da Entrega</h2>
           <div className="form-group">
             <label htmlFor="deliveryReason">Motivo da Entrega *</label>
             <select
@@ -404,7 +428,7 @@ const DeliverEquipmentPage: React.FC = () => {
             Cancelar
           </button>
           <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? 'Processando...' : (generateTerm ? '📄 Gerar Termo e Entregar' : '✅ Registrar Entrega (Sem Termo)')}
+            {loading ? 'Processando...' : (generateTerm ? 'Gerar Termo e Entregar' : 'Registrar Entrega (Sem Termo)')}
           </button>
         </div>
       </form>

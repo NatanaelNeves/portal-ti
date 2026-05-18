@@ -105,6 +105,149 @@ const normalizeDashboardData = (payload: Partial<DashboardData>): DashboardData 
   };
 };
 
+/* ── SVG icon helpers (Tabler-style, stroke-based) ── */
+const SvgUsers = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/>
+    <path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0-3-3.85"/>
+  </svg>
+);
+
+const SvgHeadset = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 14v-3a8 8 0 1 1 16 0v3"/>
+    <path d="M18 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"/>
+    <path d="M4 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2h-3z"/>
+  </svg>
+);
+
+const SvgClock = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>
+  </svg>
+);
+
+/* KPI icon map — id → SVG element */
+const KPI_ICONS: Record<string, JSX.Element> = {
+  'open-tickets': (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 6m0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-12a2 2 0 0 1-2-2z"/>
+      <path d="M4 13h3l3 3h4l3-3h3"/>
+    </svg>
+  ),
+  'in-progress-tickets': (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 14v-3a8 8 0 1 1 16 0v3"/>
+      <path d="M18 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"/>
+      <path d="M4 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2h-3z"/>
+    </svg>
+  ),
+  'resolved-today': (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9"/>
+      <path d="M9 12l2 2 4-4"/>
+    </svg>
+  ),
+  'total-tickets': (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="12" width="4" height="8" rx="1"/>
+      <rect x="9.5" y="7" width="4" height="13" rx="1"/>
+      <rect x="16" y="3" width="4" height="17" rx="1"/>
+    </svg>
+  ),
+  'assets-in-stock': (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3l9 5v8l-9 5-9-5v-8z"/>
+      <path d="M12 12l9-5M12 12v10M12 12l-9-5"/>
+    </svg>
+  ),
+  'assets-assigned': (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 19h18"/>
+      <rect x="5" y="6" width="14" height="10" rx="1.5"/>
+    </svg>
+  ),
+  'assets-maintenance': (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M7 10h3v3l-1.5 1.5a6 6 0 1 0 3 0l-1.5-1.5v-3h3a6 6 0 0 0-6-3z"/>
+    </svg>
+  ),
+  'total-assets': (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <ellipse cx="12" cy="6" rx="8" ry="3"/>
+      <path d="M4 6v6c0 1.657 3.582 3 8 3s8-1.343 8-3v-6"/>
+      <path d="M4 12v6c0 1.657 3.582 3 8 3s8-1.343 8-3v-6"/>
+    </svg>
+  ),
+};
+
+/* Activity icon map */
+const ACTIVITY_ICONS: Record<string, JSX.Element> = {
+  ticket_created: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+  ),
+  ticket_resolved: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 13l4 4L19 7"/>
+    </svg>
+  ),
+  asset_assigned: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3l9 5v8l-9 5-9-5v-8z"/>
+    </svg>
+  ),
+  asset_returned: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/>
+    </svg>
+  ),
+  asset_maintenance: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+    </svg>
+  ),
+};
+
+const ACTIVITY_ICON_STYLE: Record<string, string> = {
+  ticket_created: 'icon-circle-info',
+  ticket_resolved: 'icon-circle-success',
+  asset_assigned: 'icon-circle-warning',
+  asset_returned: 'icon-circle-neutral',
+  asset_maintenance: 'icon-circle-danger',
+};
+
+/* Quick action icons */
+const QA_ICONS = {
+  chamados: (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
+      <rect x="9" y="3" width="6" height="4" rx="2"/>
+      <path d="M9 12h6M9 16h4"/>
+    </svg>
+  ),
+  ativos: (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3l9 5v8l-9 5-9-5v-8z"/>
+      <path d="M12 12l9-5M12 12v10M12 12l-9-5"/>
+    </svg>
+  ),
+  conhecimento: (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+    </svg>
+  ),
+  relatorios: (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="12" width="4" height="8" rx="1"/>
+      <rect x="9.5" y="7" width="4" height="13" rx="1"/>
+      <rect x="16" y="3" width="4" height="17" rx="1"/>
+    </svg>
+  ),
+};
+
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
   const [data, setData] = useState<DashboardData>(EMPTY_DASHBOARD_DATA);
@@ -154,59 +297,34 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const getStatusLabel = (status: string) => {
-    const labels: Record<string, { label: string; icon: string }> = {
-      open: { label: 'Aberto', icon: '🔵' },
-      in_progress: { label: 'Em Atendimento', icon: '🔧' },
-      waiting_user: { label: 'Aguardando Usuário', icon: '⏳' },
-      resolved: { label: 'Resolvido', icon: '✅' },
-      closed: { label: 'Fechado', icon: '🔒' },
-    };
-    const item = labels[status] || { label: status, icon: '📌' };
-    return `${item.icon} ${item.label}`;
+  const STATUS_LABELS: Record<string, string> = {
+    open: 'Aberto',
+    in_progress: 'Em Atendimento',
+    waiting_user: 'Aguardando Usuário',
+    aguardando_confirmacao: 'Aguardando Confirmação',
+    resolved: 'Resolvido',
+    closed: 'Fechado',
   };
 
-  const getPriorityLabel = (priority: string) => {
-    const labels: Record<string, { label: string; icon: string }> = {
-      low: { label: 'Baixa', icon: '🟢' },
-      medium: { label: 'Média', icon: '🟡' },
-      high: { label: 'Alta', icon: '🟠' },
-    };
-    const item = labels[priority] || { label: priority, icon: '📌' };
-    return `${item.icon} ${item.label}`;
+  const getStatusLabel = (status: string) => STATUS_LABELS[status] ?? status;
+
+  const PRIORITY_LABELS: Record<string, string> = {
+    low: 'Baixa',
+    medium: 'Média',
+    high: 'Alta',
+    urgent: 'Urgente',
   };
 
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case 'ticket_created':
-        return '🆕';
-      case 'ticket_resolved':
-        return '✅';
-      case 'asset_assigned':
-        return '📤';
-      case 'asset_returned':
-        return '📥';
-      case 'asset_maintenance':
-        return '🛠️';
-      default:
-        return '📌';
-    }
-  };
+  const getPriorityLabel = (priority: string) => PRIORITY_LABELS[priority] ?? priority;
 
   const getActivityLabel = (type: string) => {
     switch (type) {
-      case 'ticket_created':
-        return 'Chamado criado';
-      case 'ticket_resolved':
-        return 'Chamado resolvido';
-      case 'asset_assigned':
-        return 'Ativo atribuído';
-      case 'asset_returned':
-        return 'Ativo devolvido';
-      case 'asset_maintenance':
-        return 'Ativo em manutenção';
-      default:
-        return 'Atualização operacional';
+      case 'ticket_created':    return 'Chamado criado';
+      case 'ticket_resolved':   return 'Chamado resolvido';
+      case 'asset_assigned':    return 'Ativo atribuído';
+      case 'asset_returned':    return 'Ativo devolvido';
+      case 'asset_maintenance': return 'Ativo em manutenção';
+      default:                  return 'Atualização operacional';
     }
   };
 
@@ -228,19 +346,15 @@ export default function AdminDashboardPage() {
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return '☀️ Bom dia';
-    if (hour < 18) return '🌤️ Boa tarde';
-    return '🌙 Boa noite';
+    if (hour < 12) return 'Bom dia';
+    if (hour < 18) return 'Boa tarde';
+    return 'Boa noite';
   };
 
   const slaTrend = useMemo(() => {
     const previous = data.previousAverageSLA;
     const current = data.averageSLA;
-
-    if (previous <= 0 || current <= 0) {
-      return { trendLabel: '0%', isPositive: true };
-    }
-
+    if (previous <= 0 || current <= 0) return { trendLabel: '0%', isPositive: true };
     const changePercent = ((previous - current) / previous) * 100;
     return {
       trendLabel: `${Math.abs(changePercent).toFixed(0)}%`,
@@ -248,63 +362,41 @@ export default function AdminDashboardPage() {
     };
   }, [data.averageSLA, data.previousAverageSLA]);
 
-  const operationsToday = useMemo(() => {
-    return (
-      data.ticketIndicators.totalCreatedToday +
-      data.resolvedTickets +
-      data.assets.assignedToday +
-      data.assets.returnedToday +
-      data.assets.maintenanceToday
-    );
-  }, [data]);
+  const operationsToday = useMemo(() => (
+    data.ticketIndicators.totalCreatedToday +
+    data.resolvedTickets +
+    data.assets.assignedToday +
+    data.assets.returnedToday +
+    data.assets.maintenanceToday
+  ), [data]);
 
-  const statusEntries = useMemo(() => {
-    return Object.entries(data.ticketsByStatus).sort((a, b) => b[1] - a[1]);
-  }, [data.ticketsByStatus]);
+  const statusEntries = useMemo(
+    () => Object.entries(data.ticketsByStatus).sort((a, b) => b[1] - a[1]),
+    [data.ticketsByStatus],
+  );
 
-  const priorityEntries = useMemo(() => {
-    return Object.entries(data.ticketsByPriority).sort((a, b) => b[1] - a[1]);
-  }, [data.ticketsByPriority]);
+  const priorityEntries = useMemo(
+    () => Object.entries(data.ticketsByPriority).sort((a, b) => b[1] - a[1]),
+    [data.ticketsByPriority],
+  );
 
   const assetStatusEntries = useMemo(() => {
-    const statusEntries = [
-      {
-        key: 'in-stock',
-        label: 'Em estoque',
-        count: data.assets.inStock,
-        fillClass: 'asset-in-stock',
-      },
-      {
-        key: 'in-use',
-        label: 'Em uso',
-        count: data.assets.assigned,
-        fillClass: 'asset-in-use',
-      },
-      {
-        key: 'in-maintenance',
-        label: 'Em manutenção',
-        count: data.assets.inMaintenance,
-        fillClass: 'asset-in-maintenance',
-      },
+    const entries = [
+      { key: 'in-stock',       label: 'Em estoque',     count: data.assets.inStock,       fillClass: 'asset-in-stock' },
+      { key: 'in-use',         label: 'Em uso',         count: data.assets.assigned,      fillClass: 'asset-in-use' },
+      { key: 'in-maintenance', label: 'Em manutenção',  count: data.assets.inMaintenance, fillClass: 'asset-in-maintenance' },
     ];
-
-    const total = statusEntries.reduce((sum, item) => sum + item.count, 0);
-
-    return statusEntries.map((item) => ({
-      ...item,
-      percent: total > 0 ? Math.round((item.count / total) * 100) : 0,
-    }));
+    const total = entries.reduce((sum, item) => sum + item.count, 0);
+    return entries.map(item => ({ ...item, percent: total > 0 ? Math.round((item.count / total) * 100) : 0 }));
   }, [data.assets.assigned, data.assets.inMaintenance, data.assets.inStock]);
 
   const totalAssetsForChart = useMemo(() => {
-    const derivedTotal = data.assets.inStock + data.assets.assigned + data.assets.inMaintenance;
-    return data.assets.total > 0 ? data.assets.total : derivedTotal;
+    const derived = data.assets.inStock + data.assets.assigned + data.assets.inMaintenance;
+    return data.assets.total > 0 ? data.assets.total : derived;
   }, [data.assets.assigned, data.assets.inMaintenance, data.assets.inStock, data.assets.total]);
 
   const internalToken = localStorage.getItem('internal_token');
-  if (!internalToken) {
-    return null;
-  }
+  if (!internalToken) return null;
 
   let userName = 'Equipe';
   let canManageUsers = false;
@@ -324,7 +416,6 @@ export default function AdminDashboardPage() {
   const kpiCards = [
     {
       id: 'open-tickets',
-      icon: '🎫',
       title: 'Chamados Abertos',
       value: data.openTickets,
       secondary: `+${data.ticketIndicators.openToday} hoje`,
@@ -334,7 +425,6 @@ export default function AdminDashboardPage() {
     },
     {
       id: 'in-progress-tickets',
-      icon: '🧰',
       title: 'Em Atendimento',
       value: data.inProgressTickets,
       secondary: `+${data.ticketIndicators.inProgressToday} atualizados hoje`,
@@ -344,7 +434,6 @@ export default function AdminDashboardPage() {
     },
     {
       id: 'resolved-today',
-      icon: '✅',
       title: 'Resolvidos Hoje',
       value: data.resolvedTickets,
       secondary: `${data.ticketIndicators.resolvedChangePercent >= 0 ? '↑' : '↓'} ${Math.abs(data.ticketIndicators.resolvedChangePercent)}%`,
@@ -354,7 +443,6 @@ export default function AdminDashboardPage() {
     },
     {
       id: 'total-tickets',
-      icon: '📊',
       title: 'Total de Chamados',
       value: data.totalTickets,
       secondary: `+${data.ticketIndicators.totalCreatedToday} criados hoje`,
@@ -364,7 +452,6 @@ export default function AdminDashboardPage() {
     },
     {
       id: 'assets-in-stock',
-      icon: '📦',
       title: 'Ativos em Estoque',
       value: data.assets.inStock,
       secondary: `+${data.assets.addedThisMonth} no mês`,
@@ -374,7 +461,6 @@ export default function AdminDashboardPage() {
     },
     {
       id: 'assets-assigned',
-      icon: '👤',
       title: 'Ativos em Uso',
       value: data.assets.assigned,
       secondary: `+${data.assets.assignedToday} atribuições hoje`,
@@ -384,7 +470,6 @@ export default function AdminDashboardPage() {
     },
     {
       id: 'assets-maintenance',
-      icon: '🛠️',
       title: 'Em Manutenção',
       value: data.assets.inMaintenance,
       secondary: `+${data.assets.maintenanceToday} enviados hoje`,
@@ -394,7 +479,6 @@ export default function AdminDashboardPage() {
     },
     {
       id: 'total-assets',
-      icon: '🗂️',
       title: 'Total de Ativos',
       value: data.assets.total,
       secondary: `${data.assets.returnedToday} devoluções hoje`,
@@ -404,8 +488,8 @@ export default function AdminDashboardPage() {
     },
   ] as const;
 
-  const ticketKpiCards = kpiCards.filter((card) => card.category === 'Chamados');
-  const assetKpiCards = kpiCards.filter((card) => card.category === 'Ativos');
+  const ticketKpiCards = kpiCards.filter(c => c.category === 'Chamados');
+  const assetKpiCards  = kpiCards.filter(c => c.category === 'Ativos');
 
   const renderKpiCard = (card: (typeof kpiCards)[number]) => (
     <button
@@ -416,7 +500,7 @@ export default function AdminDashboardPage() {
       aria-label={`${card.title}: ${card.value}`}
     >
       <div className="kpi-header-row">
-        <span className="kpi-icon">{card.icon}</span>
+        <span className="kpi-icon">{KPI_ICONS[card.id]}</span>
         <span className="kpi-category-tag">{card.category}</span>
       </div>
       <span className="kpi-number">{card.value}</span>
@@ -425,12 +509,40 @@ export default function AdminDashboardPage() {
     </button>
   );
 
+  const renderBarItem = (label: string, count: number, total: number, fillClass: string) => {
+    const percent = total > 0 ? Math.round((count / total) * 100) : 0;
+    return (
+      <div key={label} className="bar-item">
+        <div className="bar-label-row">
+          <span className="bar-label">{label}</span>
+          <span className="bar-right-group">
+            <span className="bar-count">{count}</span>
+            <span className="bar-percent">{percent}%</span>
+          </span>
+        </div>
+        <div className="bar-track">
+          <div
+            className={`bar-fill ${fillClass}`}
+            style={{ width: `${percent}%` }}
+            role="progressbar"
+            aria-valuenow={percent}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`${label}: ${count}`}
+          />
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="admin-dashboard-page">
+
+      {/* ── Clean header ── */}
       <header className="ops-dashboard-header">
         <div className="ops-header-content">
-          <h1>{getGreeting()}, {userName}!</h1>
-          <p>Painel operacional da TI com chamados, ativos e movimentações recentes.</p>
+          <h1 className="ops-greeting">{getGreeting()}, {userName} 👋</h1>
+          <p className="ops-subtitle">Painel operacional da TI com chamados, ativos e movimentações recentes.</p>
         </div>
         <nav className="ops-header-actions">
           {canManageUsers && (
@@ -440,7 +552,7 @@ export default function AdminDashboardPage() {
               onClick={() => navigate('/admin/usuarios')}
               aria-label="Gerenciar equipe"
             >
-              👥 Gerenciar Equipe
+              <SvgUsers /> Gerenciar Equipe
             </button>
           )}
           <button
@@ -449,7 +561,7 @@ export default function AdminDashboardPage() {
             onClick={() => navigate('/admin/chamados')}
             aria-label="Atender chamados"
           >
-            🚀 Atender Chamados
+            <SvgHeadset /> Atender Chamados
           </button>
         </nav>
       </header>
@@ -462,39 +574,43 @@ export default function AdminDashboardPage() {
 
       {loading ? (
         <div className="loading-container">
-          <div className="spinner"></div>
+          <div className="spinner" />
           <p>Carregando painel operacional...</p>
         </div>
       ) : (
         <main className="ops-dashboard-content">
+
+          {/* ── KPI metrics ── */}
           <section className="kpi-metrics-section">
             <div className="ops-section-label">Indicadores Operacionais</div>
 
             <div className="kpi-group">
               <h3 className="kpi-group-title">Chamados</h3>
-              <div className="kpi-grid">
-                {ticketKpiCards.map(renderKpiCard)}
-              </div>
+              <div className="kpi-grid">{ticketKpiCards.map(renderKpiCard)}</div>
             </div>
 
             <div className="kpi-group">
               <h3 className="kpi-group-title">Ativos e Inventário</h3>
-              <div className="kpi-grid">
-                {assetKpiCards.map(renderKpiCard)}
-              </div>
+              <div className="kpi-grid">{assetKpiCards.map(renderKpiCard)}</div>
             </div>
           </section>
 
+          {/* ── SLA / Performance ── */}
           <section className="performance-metrics-section">
             <div className="ops-section-label">Desempenho</div>
             <div className="performance-card">
               <div className="performance-header">
-                <div>
-                  <h3 className="performance-title">⚡ SLA Médio Operacional</h3>
+                <div className="performance-header-left">
+                  <div className="performance-title-row">
+                    <SvgClock />
+                    <h3 className="performance-title">SLA Médio Operacional</h3>
+                  </div>
                   <p className="performance-subtitle">Baseado nos chamados resolvidos recentemente</p>
                 </div>
                 <div className={`performance-trend ${slaTrend.isPositive ? 'positive' : 'negative'}`}>
-                  <span className="trend-value">{slaTrend.isPositive ? '↓' : '↑'} {slaTrend.trendLabel}</span>
+                  <span className="trend-value">
+                    {slaTrend.isPositive ? '↓' : '↑'} {slaTrend.trendLabel}
+                  </span>
                   <span className="trend-label">vs período anterior</span>
                 </div>
               </div>
@@ -525,41 +641,23 @@ export default function AdminDashboardPage() {
             </div>
           </section>
 
+          {/* ── Assets overview ── */}
           <section className="asset-overview-section">
             <div className="ops-section-label">Visão de Ativos</div>
             <div className="asset-overview-grid">
               <div className="ops-card ops-chart-card">
                 <div className="ops-card-header">
-                  <h3 className="ops-card-title">🖥️ Distribuição de Ativos por Status</h3>
+                  <h3 className="ops-card-title">Distribuição de Ativos por Status</h3>
                   <span className="ops-card-meta">{totalAssetsForChart} ativos</span>
                 </div>
-
                 <div className="chart-container">
                   {totalAssetsForChart === 0 ? (
-                    <div className="empty-state">
-                      <p>Nenhum dado disponível</p>
-                    </div>
+                    <div className="empty-state"><p>Nenhum dado disponível</p></div>
                   ) : (
                     <div className="chart-bars">
-                      {assetStatusEntries.map((assetStatus) => {
-                        return (
-                          <div key={assetStatus.key} className="bar-item">
-                            <div className="bar-label-row">
-                              <span className="bar-label">{assetStatus.label}</span>
-                              <span className="bar-count">{assetStatus.count}</span>
-                            </div>
-                            <div className="bar-track">
-                              <div
-                                className={`bar-fill ${assetStatus.fillClass}`}
-                                style={{ width: `${assetStatus.percent}%` }}
-                                role="progressbar"
-                                aria-label={`${assetStatus.label}: ${assetStatus.count} ativos`}
-                              />
-                            </div>
-                            <span className="bar-percent">{assetStatus.percent}%</span>
-                          </div>
-                        );
-                      })}
+                      {assetStatusEntries.map(s =>
+                        renderBarItem(s.label, s.count, totalAssetsForChart, s.fillClass)
+                      )}
                     </div>
                   )}
                 </div>
@@ -567,69 +665,43 @@ export default function AdminDashboardPage() {
 
               <div className="ops-card ops-chart-card">
                 <div className="ops-card-header">
-                  <h3 className="ops-card-title">🔁 Movimentação de Ativos Hoje</h3>
+                  <h3 className="ops-card-title">Movimentação de Ativos Hoje</h3>
                   <span className="ops-card-meta">Operação diária</span>
                 </div>
-
                 <div className="asset-flow-list">
-                  <div className="asset-flow-item">
-                    <span>Entregues</span>
-                    <strong>{data.assets.assignedToday}</strong>
-                  </div>
-                  <div className="asset-flow-item">
-                    <span>Devolvidos</span>
-                    <strong>{data.assets.returnedToday}</strong>
-                  </div>
-                  <div className="asset-flow-item">
-                    <span>Enviados para manutenção</span>
-                    <strong>{data.assets.maintenanceToday}</strong>
-                  </div>
-                  <div className="asset-flow-item">
-                    <span>Novos no mês</span>
-                    <strong>{data.assets.addedThisMonth}</strong>
-                  </div>
+                  {[
+                    { label: 'Entregues',              value: data.assets.assignedToday },
+                    { label: 'Devolvidos',             value: data.assets.returnedToday },
+                    { label: 'Enviados para manutenção', value: data.assets.maintenanceToday },
+                    { label: 'Novos no mês',           value: data.assets.addedThisMonth },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="asset-flow-item">
+                      <span>{label}</span>
+                      <strong>{value}</strong>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
           </section>
 
+          {/* ── Tickets overview ── */}
           <section className="ticket-overview-section">
             <div className="ops-section-label">Visão de Chamados</div>
             <div className="ticket-charts-grid">
               <div className="ops-card ops-chart-card">
                 <div className="ops-card-header">
-                  <h3 className="ops-card-title">📋 Distribuição de Chamados por Status</h3>
+                  <h3 className="ops-card-title">Distribuição de Chamados por Status</h3>
                   <span className="ops-card-meta">{data.totalTickets} chamados</span>
                 </div>
-
                 <div className="chart-container">
                   {data.totalTickets === 0 ? (
-                    <div className="empty-state">
-                      <p>Nenhum dado disponível</p>
-                    </div>
+                    <div className="empty-state"><p>Nenhum dado disponível</p></div>
                   ) : (
                     <div className="chart-bars">
-                      {statusEntries.map(([status, count]) => {
-                        const percent = data.totalTickets > 0 ? Math.round((count / data.totalTickets) * 100) : 0;
-
-                        return (
-                          <div key={status} className="bar-item">
-                            <div className="bar-label-row">
-                              <span className="bar-label">{getStatusLabel(status)}</span>
-                              <span className="bar-count">{count}</span>
-                            </div>
-                            <div className="bar-track">
-                              <div
-                                className={`bar-fill status-${status}`}
-                                style={{ width: `${percent}%` }}
-                                role="progressbar"
-                                aria-label={`${status}: ${count} chamados`}
-                              />
-                            </div>
-                            <span className="bar-percent">{percent}%</span>
-                          </div>
-                        );
-                      })}
+                      {statusEntries.map(([status, count]) =>
+                        renderBarItem(getStatusLabel(status), count, data.totalTickets, `status-${status}`)
+                      )}
                     </div>
                   )}
                 </div>
@@ -637,38 +709,17 @@ export default function AdminDashboardPage() {
 
               <div className="ops-card ops-chart-card">
                 <div className="ops-card-header">
-                  <h3 className="ops-card-title">🎯 Distribuição de Chamados por Prioridade</h3>
+                  <h3 className="ops-card-title">Distribuição de Chamados por Prioridade</h3>
                   <span className="ops-card-meta">{data.totalTickets} chamados</span>
                 </div>
-
                 <div className="chart-container">
                   {data.totalTickets === 0 ? (
-                    <div className="empty-state">
-                      <p>Nenhum dado disponível</p>
-                    </div>
+                    <div className="empty-state"><p>Nenhum dado disponível</p></div>
                   ) : (
                     <div className="chart-bars">
-                      {priorityEntries.map(([priority, count]) => {
-                        const percent = data.totalTickets > 0 ? Math.round((count / data.totalTickets) * 100) : 0;
-
-                        return (
-                          <div key={priority} className="bar-item">
-                            <div className="bar-label-row">
-                              <span className="bar-label">{getPriorityLabel(priority)}</span>
-                              <span className="bar-count">{count}</span>
-                            </div>
-                            <div className="bar-track">
-                              <div
-                                className={`bar-fill priority-${priority}`}
-                                style={{ width: `${percent}%` }}
-                                role="progressbar"
-                                aria-label={`${priority}: ${count} chamados`}
-                              />
-                            </div>
-                            <span className="bar-percent">{percent}%</span>
-                          </div>
-                        );
-                      })}
+                      {priorityEntries.map(([priority, count]) =>
+                        renderBarItem(getPriorityLabel(priority), count, data.totalTickets, `priority-${priority}`)
+                      )}
                     </div>
                   )}
                 </div>
@@ -676,6 +727,7 @@ export default function AdminDashboardPage() {
             </div>
           </section>
 
+          {/* ── Recent activity ── */}
           <section className="recent-activity-section">
             <div className="ops-section-label">Atividade Recente</div>
             <div className="ops-card recent-activity-card">
@@ -684,95 +736,77 @@ export default function AdminDashboardPage() {
                   <p>Sem eventos operacionais recentes.</p>
                 </div>
               ) : (
-                <ul className="activity-list">
-                  {data.recentActivity.slice(0, 10).map((activity) => (
-                    <li key={activity.id}>
+                <>
+                  <ul className="activity-list">
+                    {data.recentActivity.slice(0, 10).map((activity) => (
+                      <li key={activity.id}>
+                        <button
+                          type="button"
+                          className="activity-item"
+                          onClick={() => navigate(activity.route || '/admin/chamados')}
+                        >
+                          <div className="activity-main">
+                            <span className={`activity-icon-circle ${ACTIVITY_ICON_STYLE[activity.type] ?? 'icon-circle-neutral'}`}>
+                              {ACTIVITY_ICONS[activity.type] ?? ACTIVITY_ICONS.ticket_created}
+                            </span>
+                            <div className="activity-texts">
+                              <span className="activity-event">{getActivityLabel(activity.type)}</span>
+                              <p className="activity-title">{activity.title}</p>
+                              <p className="activity-detail">{activity.detail}</p>
+                            </div>
+                          </div>
+                          <div className="activity-meta">
+                            <time dateTime={activity.timestamp}>{formatRelativeTime(activity.timestamp)}</time>
+                            <span className="activity-arrow" aria-hidden="true">→</span>
+                          </div>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  {data.recentActivity.length > 10 && (
+                    <div className="activity-footer">
                       <button
                         type="button"
-                        className="activity-item"
-                        onClick={() => navigate(activity.route || '/admin/chamados')}
+                        className="activity-see-all"
+                        onClick={() => navigate('/admin/chamados')}
                       >
-                        <div className="activity-main">
-                          <span className="activity-icon">{getActivityIcon(activity.type)}</span>
-                          <div className="activity-texts">
-                            <p className="activity-event">{getActivityLabel(activity.type)}</p>
-                            <p className="activity-title">{activity.title}</p>
-                            <p className="activity-detail">{activity.detail}</p>
-                          </div>
-                        </div>
-
-                        <div className="activity-meta">
-                          <time dateTime={activity.timestamp}>{formatRelativeTime(activity.timestamp)}</time>
-                          <span className="activity-arrow">→</span>
-                        </div>
+                        Ver toda a atividade →
                       </button>
-                    </li>
-                  ))}
-                </ul>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </section>
 
+          {/* ── Quick actions ── */}
           <section className="quick-actions-section">
             <div className="ops-section-label">Ações Rápidas</div>
             <div className="actions-grid">
-              <button
-                type="button"
-                className="action-button"
-                onClick={() => navigate('/admin/chamados')}
-                aria-label="Central de atendimento de chamados"
-              >
-                <div className="action-icon">📋</div>
-                <div className="action-content">
-                  <h4>Central de Chamados</h4>
-                  <p>Gerenciar chamados em fila</p>
-                </div>
-                <div className="action-arrow">→</div>
-              </button>
-
-              <button
-                type="button"
-                className="action-button"
-                onClick={() => navigate('/admin/estoque')}
-                aria-label="Gestão de ativos e equipamentos"
-              >
-                <div className="action-icon">📦</div>
-                <div className="action-content">
-                  <h4>Gestão de Ativos</h4>
-                  <p>Inventário e movimentações</p>
-                </div>
-                <div className="action-arrow">→</div>
-              </button>
-
-              <button
-                type="button"
-                className="action-button"
-                onClick={() => navigate('/admin/documentos')}
-                aria-label="Base de conhecimento e documentação"
-              >
-                <div className="action-icon">📚</div>
-                <div className="action-content">
-                  <h4>Base de Conhecimento</h4>
-                  <p>Documentos e playbooks</p>
-                </div>
-                <div className="action-arrow">→</div>
-              </button>
-
-              <button
-                type="button"
-                className="action-button"
-                onClick={() => navigate('/admin/relatorios')}
-                aria-label="Relatórios e análises"
-              >
-                <div className="action-icon">📊</div>
-                <div className="action-content">
-                  <h4>Relatórios</h4>
-                  <p>Indicadores e tendências</p>
-                </div>
-                <div className="action-arrow">→</div>
-              </button>
+              {[
+                { icon: QA_ICONS.chamados,     title: 'Central de Chamados',    desc: 'Gerenciar chamados em fila',      route: '/admin/chamados',    label: 'Central de atendimento de chamados' },
+                { icon: QA_ICONS.ativos,       title: 'Gestão de Ativos',       desc: 'Inventário e movimentações',     route: '/admin/estoque',      label: 'Gestão de ativos e equipamentos' },
+                { icon: QA_ICONS.conhecimento, title: 'Base de Conhecimento',   desc: 'Documentos e playbooks',         route: '/admin/documentos',   label: 'Base de conhecimento e documentação' },
+                { icon: QA_ICONS.relatorios,   title: 'Relatórios',             desc: 'Indicadores e tendências',       route: '/admin/relatorios',   label: 'Relatórios e análises' },
+              ].map(({ icon, title, desc, route, label }) => (
+                <button
+                  key={route}
+                  type="button"
+                  className="action-button"
+                  onClick={() => navigate(route)}
+                  aria-label={label}
+                >
+                  <div className="action-icon">{icon}</div>
+                  <div className="action-content">
+                    <h4>{title}</h4>
+                    <p>{desc}</p>
+                  </div>
+                  <div className="action-arrow" aria-hidden="true">→</div>
+                </button>
+              ))}
             </div>
           </section>
+
         </main>
       )}
     </div>

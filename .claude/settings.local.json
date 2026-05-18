@@ -10,7 +10,10 @@
       "Bash(npx tsc *)",
       "Bash(git revert *)",
       "Bash(npm install *)",
-      "Bash(grep -E \"\\\\.\\(jsx?|tsx?|vue\\)$\")"
+      "Bash(grep -E \"\\\\.\\(jsx?|tsx?|vue\\)$\")",
+      "Skill(frontend-design:frontend-design)",
+      "Skill(frontend-design:frontend-design:*)",
+      "Bash(node -e ' *)"
     ]
   }
 }

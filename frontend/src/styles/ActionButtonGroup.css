@@ -1,0 +1,40 @@
+.abg-wrap {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.abg-btn {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid #E2E8F0;
+  background: white;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  color: #64748B;
+  flex-shrink: 0;
+}
+
+.abg-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
+}
+
+.abg-default:hover { background: #F1F5F9; border-color: #CBD5E1; }
+
+.abg-primary       { color: #4338CA; border-color: #C7D2FE; }
+.abg-primary:hover { background: #EEF2FF; border-color: #818CF8; }
+
+.abg-success       { color: #15803D; border-color: #BBF7D0; }
+.abg-success:hover { background: #DCFCE7; border-color: #86EFAC; }
+
+.abg-warning       { color: #A16207; border-color: #FDE68A; }
+.abg-warning:hover { background: #FEF9C3; border-color: #FDE047; }
+
+.abg-danger        { color: #94A3B8; }
+.abg-danger:hover  { background: #FEF2F2; border-color: #FECACA; color: #DC2626; }
