@@ -20,7 +20,7 @@ export default function Navigation() {
   // Navegação para usuários públicos (não autenticados)
   if (!isInternalUser) {
     return (
-      <nav className="navbar">
+      <nav className="navbar navbar-public">
         <div className="navbar-brand" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
           <h1>Portal de Serviços Internos</h1>
           <small style={{ fontSize: '0.75rem', opacity: 0.9 }}>Cuidando de quem transforma vidas</small>
