@@ -500,12 +500,15 @@ export default function AdminDashboardPage() {
       aria-label={`${card.title}: ${card.value}`}
     >
       <div className="kpi-header-row">
-        <span className="kpi-icon">{KPI_ICONS[card.id]}</span>
+        <span className="kpi-icon-container">
+          <span className="kpi-icon">{KPI_ICONS[card.id]}</span>
+        </span>
         <span className="kpi-category-tag">{card.category}</span>
       </div>
       <span className="kpi-number">{card.value}</span>
       <span className="kpi-title">{card.title}</span>
       <span className="kpi-secondary">{card.secondary}</span>
+      <div className="kpi-bottom-bar" />
     </button>
   );
 
@@ -541,8 +544,12 @@ export default function AdminDashboardPage() {
       {/* ── Clean header ── */}
       <header className="ops-dashboard-header">
         <div className="ops-header-content">
-          <h1 className="ops-greeting">{getGreeting()}, {userName} 👋</h1>
-          <p className="ops-subtitle">Painel operacional da TI com chamados, ativos e movimentações recentes.</p>
+          <h1 className="ops-greeting">{getGreeting()}, <span className="ops-greeting-accent">{userName}</span></h1>
+          <p className="ops-subtitle">Painel operacional da TI — chamados, ativos e movimentações.</p>
+          <div className="ops-live-badge">
+            <span className="ops-live-dot" />
+            Ao vivo
+          </div>
         </div>
         <nav className="ops-header-actions">
           {canManageUsers && (

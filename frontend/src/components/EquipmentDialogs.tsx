@@ -141,12 +141,12 @@ export function EditEquipmentDialog({ equipment, open, onClose, onSaved }: EditD
     <div className="eq-dialog-overlay" onClick={onClose}>
       <div className="eq-dialog eq-dialog-edit" onClick={e => e.stopPropagation()}>
         <div className="eq-dialog-header">
-          <h2>✏️ Editar {isNotebook ? 'Notebook' : 'Periférico'}</h2>
+          <h2><i className="ti ti-pencil" /> Editar {isNotebook ? 'Notebook' : 'Periférico'}</h2>
           <span className="eq-dialog-code">{equipment.internal_code}</span>
-          <button className="eq-dialog-close" onClick={onClose}>✕</button>
+          <button className="eq-dialog-close" onClick={onClose}><i className="ti ti-x" /></button>
         </div>
 
-        {error && <div className="eq-dialog-error">⚠️ {error}</div>}
+        {error && <div className="eq-dialog-error"><i className="ti ti-alert-circle" /> {error}</div>}
 
         <div className="eq-dialog-body">
           {/* Informações Básicas */}
@@ -268,7 +268,7 @@ export function EditEquipmentDialog({ equipment, open, onClose, onSaved }: EditD
         <div className="eq-dialog-footer">
           <button className="eq-btn-cancel" onClick={onClose} disabled={saving}>Cancelar</button>
           <button className="eq-btn-save" onClick={handleSave} disabled={saving}>
-            {saving ? 'Salvando...' : '💾 Salvar Alterações'}
+            {saving ? 'Salvando...' : 'Salvar Alterações'}
           </button>
         </div>
       </div>
@@ -332,15 +332,15 @@ export function DeleteEquipmentDialog({ equipment, open, onClose, onDeleted }: D
     <div className="eq-dialog-overlay" onClick={onClose}>
       <div className="eq-dialog eq-dialog-delete" onClick={e => e.stopPropagation()}>
         <div className="eq-dialog-header eq-dialog-header-danger">
-          <h2>🗑️ Excluir Equipamento</h2>
-          <button className="eq-dialog-close" onClick={onClose}>✕</button>
+          <h2><i className="ti ti-trash" /> Excluir Equipamento</h2>
+          <button className="eq-dialog-close" onClick={onClose}><i className="ti ti-x" /></button>
         </div>
 
-        {error && <div className="eq-dialog-error">⚠️ {error}</div>}
+        {error && <div className="eq-dialog-error"><i className="ti ti-alert-circle" /> {error}</div>}
 
         <div className="eq-dialog-body">
           <div className="eq-delete-warning">
-            <div className="eq-delete-icon">⚠️</div>
+            <div className="eq-delete-icon"><i className="ti ti-alert-triangle" /></div>
             <p>
               Você está prestes a excluir permanentemente o equipamento:
             </p>
@@ -373,7 +373,7 @@ export function DeleteEquipmentDialog({ equipment, open, onClose, onDeleted }: D
             onClick={handleDelete}
             disabled={!canDelete || deleting}
           >
-            {deleting ? 'Excluindo...' : '🗑️ Excluir Permanentemente'}
+            {deleting ? 'Excluindo...' : 'Excluir Permanentemente'}
           </button>
         </div>
       </div>

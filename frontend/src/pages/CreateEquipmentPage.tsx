@@ -241,14 +241,14 @@ export default function CreateEquipmentPage() {
               className="btn-back"
               onClick={() => navigate(-1)}
             >
-              ← Voltar
+              <i className="ti ti-arrow-left" /> Voltar
             </button>
-            <h1>➕ Novo Equipamento</h1>
+            <h1><i className="ti ti-plus" /> Novo Equipamento</h1>
             <p>Adicione um novo equipamento ao inventário</p>
           </header>
 
-          {error && <div className="error-message">⚠️ {error}</div>}
-          {success && <div className="success-message">✅ Equipamento criado com sucesso!</div>}
+          {error && <div className="error-message">{error}</div>}
+          {success && <div className="success-message">Equipamento criado com sucesso!</div>}
 
           {/* SELETOR DE CATEGORIA */}
           <div className="category-selector">
@@ -257,7 +257,7 @@ export default function CreateEquipmentPage() {
               className={`category-btn ${category === 'NOTEBOOK' ? 'active' : ''}`}
               onClick={() => handleCategoryChange('NOTEBOOK')}
             >
-              <span className="category-icon">💻</span>
+              <span className="category-icon"><i className="ti ti-laptop" /></span>
               <span className="category-label">Notebook</span>
               <span className="category-desc">Especificações técnicas detalhadas</span>
             </button>
@@ -266,7 +266,7 @@ export default function CreateEquipmentPage() {
               className={`category-btn ${category === 'PERIPHERAL' ? 'active' : ''}`}
               onClick={() => handleCategoryChange('PERIPHERAL')}
             >
-              <span className="category-icon">🖱️</span>
+              <span className="category-icon"><i className="ti ti-mouse" /></span>
               <span className="category-label">Periférico/Equipamento</span>
               <span className="category-desc">Mouse, teclado, impressora, monitor, toner, etc</span>
             </button>
@@ -291,7 +291,7 @@ export default function CreateEquipmentPage() {
                         className="group-picker-item"
                         onClick={() => selectGroup(g)}
                       >
-                        <span className="group-picker-icon">💻</span>
+                        <span className="group-picker-icon"><i className="ti ti-laptop" /></span>
                         <span className="group-picker-name">{g.brand} {g.model}</span>
                         <span className="group-picker-count">{g.count} unidade{g.count !== 1 ? 's' : ''}</span>
                         <span className="group-picker-arrow">→</span>
@@ -302,7 +302,7 @@ export default function CreateEquipmentPage() {
                       className="group-picker-item group-picker-new"
                       onClick={() => { setFormData(prev => ({ ...prev, brand: '', model: '' })); setStep(2); }}
                     >
-                      <span className="group-picker-icon">＋</span>
+                      <span className="group-picker-icon"><i className="ti ti-plus" /></span>
                       <span className="group-picker-name">Criar novo modelo</span>
                       <span className="group-picker-count">Preencher marca e modelo manualmente</span>
                       <span className="group-picker-arrow">→</span>
@@ -408,7 +408,7 @@ export default function CreateEquipmentPage() {
               {/* CAMPOS ESPECÍFICOS DE NOTEBOOK */}
               {category === 'NOTEBOOK' && (
                 <>
-                  <div className="section-title">💻 Especificações Técnicas</div>
+                  <div className="section-title"><i className="ti ti-cpu" /> Especificações Técnicas</div>
                   
                   <div className="form-row">
                     <div className="form-group">
@@ -485,7 +485,7 @@ export default function CreateEquipmentPage() {
               )}
 
               {/* LOCALIZAÇÃO E STATUS */}
-              <div className="section-title">📍 Localização e Estado</div>
+              <div className="section-title"><i className="ti ti-map-pin" /> Localização e Estado</div>
               
               <div className="form-row">
                 <div className="form-group">
@@ -519,7 +519,7 @@ export default function CreateEquipmentPage() {
               </div>
 
               {/* AQUISIÇÃO */}
-              <div className="section-title">💰 Informações de Compra</div>
+              <div className="section-title"><i className="ti ti-credit-card" /> Informações de Compra</div>
               
               <div className="form-row">
                 <div className="form-group">
@@ -565,7 +565,7 @@ export default function CreateEquipmentPage() {
                   disabled={loading}
                   className="btn-submit"
                 >
-                  {loading ? '⏳ Criando...' : '✅ Criar Equipamento'}
+                  {loading ? 'Criando...' : 'Criar Equipamento'}
                 </button>
                 <button
                   type="button"
@@ -573,7 +573,7 @@ export default function CreateEquipmentPage() {
                   className="btn-cancel"
                   disabled={loading}
                 >
-                  ❌ Cancelar
+                  Cancelar
                 </button>
               </div>
             </form>

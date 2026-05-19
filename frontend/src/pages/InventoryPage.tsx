@@ -158,23 +158,20 @@ export default function InventoryPage() {
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
       'available': '\u2713 Disponível',
-      'in_stock': '📦 Em Estoque',
-      'in_use': '👤 Em Uso',
-      'in_maintenance': '🔧 Manutenção',
-      'maintenance': '🔧 Manutenção',
-      'lowered': '🗑️ Baixado'
+      'in_stock': 'Em Estoque',
+      'in_use': 'Em Uso',
+      'in_maintenance': 'Manutenção',
+      'maintenance': 'Manutenção',
+      'lowered': 'Baixado'
     };
     return labels[status] || status;
   };
 
-  const getConditionIcon = (condition: string) => {
-    const icons: Record<string, string> = {
-      'new': '⭐',
-      'good': '✓',
-      'regular': '~',
-      'bad': '✗'
+  const getConditionLabel = (condition: string) => {
+    const labels: Record<string, string> = {
+      new: "Novo", good: "Bom", regular: "Regular", bad: "Com defeito"
     };
-    return icons[condition] || '';
+    return labels[condition] || condition;
   };
 
   return (
@@ -185,14 +182,14 @@ export default function InventoryPage() {
         <div className="page-header-inventory">
           <div className="header-top">
             <div>
-              <h1>📦 Inventário de Equipamentos</h1>
+              <h1><i className="ti ti-box" /> Inventário de Equipamentos</h1>
               <p>Gerenciar notebooks, periféricos e equipamentos</p>
             </div>
             <button 
               className="btn-add-equipment"
               onClick={() => navigate('/inventario/equipamentos/novo')}
             >
-              ➕ Novo Equipamento
+              <i className="ti ti-plus" /> Novo Equipamento
             </button>
           </div>
 
@@ -207,7 +204,7 @@ export default function InventoryPage() {
                 setUnitFilter('all');
               }}
             >
-              <span className="tab-icon">💻</span>
+              <span className="tab-icon"><i className="ti ti-laptop" /></span>
               <span className="tab-label">Notebooks</span>
               <span className="tab-count">{notebooks.length}</span>
             </button>
@@ -220,19 +217,19 @@ export default function InventoryPage() {
                 setUnitFilter('all');
               }}
             >
-              <span className="tab-icon">🖱️</span>
+              <span className="tab-icon"><i className="ti ti-mouse" /></span>
               <span className="tab-label">Periféricos</span>
               <span className="tab-count">{peripherals.length}</span>
             </button>
           </div>
         </div>
 
-        {error && <div className="alert-error">⚠️ {error}</div>}
+        {error && <div className="alert-error"><i className="ti ti-alert-circle" /> {error}</div>}
 
         {/* FILTROS */}
         <div className="filters-bar">
           <div className="search-box">
-            <span className="search-icon">🔍</span>
+            <span className="search-icon"><i className="ti ti-search" /></span>
             <input
               type="text"
               placeholder={activeTab === 'notebooks' ? 'Buscar por marca, modelo, código...' : 'Buscar por tipo, marca, modelo...'}
@@ -240,7 +237,7 @@ export default function InventoryPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
             {searchQuery && (
-              <button className="clear-search" onClick={() => setSearchQuery('')}>✕</button>
+              <button className="clear-search" onClick={() => setSearchQuery('')}>×</button>
             )}
           </div>
 
@@ -272,7 +269,7 @@ export default function InventoryPage() {
             setStatusFilter('all');
             setUnitFilter('all');
           }}>
-            🔄 Limpar Filtros
+            <i className="ti ti-refresh" /> Limpar Filtros
           </button>
         </div>
 
@@ -287,11 +284,11 @@ export default function InventoryPage() {
           <div className="notebooks-section">
             {filteredNotebooks.length === 0 ? (
               <div className="empty-state">
-                <div className="empty-icon">📭</div>
+                <div className="empty-icon"><i className="ti ti-inbox" /></div>
                 <h3>Nenhum notebook encontrado</h3>
                 <p>Adicione notebooks ao inventário ou ajuste os filtros</p>
                 <button className="btn-primary" onClick={() => navigate('/inventario/equipamentos/novo')}>
-                  ➕ Adicionar Notebook
+                  <i className="ti ti-plus" /> Adicionar Notebook
                 </button>
               </div>
             ) : (
@@ -322,10 +319,10 @@ export default function InventoryPage() {
                         </td>
                         <td>
                           <div className="specs">
-                            {notebook.processor && <span className="spec-badge">🔹 {notebook.processor}</span>}
-                            {notebook.ram && <span className="spec-badge">💾 {notebook.ram}</span>}
-                            {notebook.storage && <span className="spec-badge">💿 {notebook.storage}</span>}
-                            {notebook.screen_size && <span className="spec-badge">📺 {notebook.screen_size}</span>}
+                            {notebook.processor && <span className="spec-badge"><i className="ti ti-cpu" /> {notebook.processor}</span>}
+                            {notebook.ram && <span className="spec-badge"><i className="ti ti-database" /> {notebook.ram}</span>}
+                            {notebook.storage && <span className="spec-badge"><i className="ti ti-device-floppy" /> {notebook.storage}</span>}
+                            {notebook.screen_size && <span className="spec-badge"><i className="ti ti-device-tv" /> {notebook.screen_size}</span>}
                           </div>
                         </td>
                         <td>
@@ -338,7 +335,7 @@ export default function InventoryPage() {
                         </td>
                         <td>
                           {notebook.responsible_name ? (
-                            <span className="responsible-name">👤 {notebook.responsible_name}</span>
+                            <span className="responsible-name"><i className="ti ti-user" /> {notebook.responsible_name}</span>
                           ) : (
                             <span className="no-responsible">—</span>
                           )}
@@ -349,19 +346,19 @@ export default function InventoryPage() {
                               className="btn-table-action"
                               onClick={() => navigate(`/inventario/equipamento/${notebook.id}`)}
                             >
-                              📄 Ver
+                              <i className="ti ti-file-text" /> Ver
                             </button>
                             <button 
                               className="btn-table-edit"
                               onClick={() => handleEdit(notebook.id)}
                             >
-                              ✏️ Editar
+                              <i className="ti ti-pencil" /> Editar
                             </button>
                             <button 
                               className="btn-table-delete"
                               onClick={() => handleDelete(notebook)}
                             >
-                              🗑️
+                              <i className="ti ti-trash" />
                             </button>
                           </div>
                         </td>
@@ -377,11 +374,11 @@ export default function InventoryPage() {
           <div className="peripherals-section">
             {filteredPeripherals.length === 0 ? (
               <div className="empty-state">
-                <div className="empty-icon">📭</div>
+                <div className="empty-icon"><i className="ti ti-inbox" /></div>
                 <h3>Nenhum periférico encontrado</h3>
                 <p>Adicione periféricos ao inventário ou ajuste os filtros</p>
                 <button className="btn-primary" onClick={() => navigate('/inventario/equipamentos/novo')}>
-                  ➕ Adicionar Periférico
+                  <i className="ti ti-plus" /> Adicionar Periférico
                 </button>
               </div>
             ) : (
@@ -394,7 +391,7 @@ export default function InventoryPage() {
                   >
                     <div className="card-header-peripheral">
                       <div className="card-type">
-                        <span className="type-icon">🖱️</span>
+                        <span className="type-icon"><i className="ti ti-mouse" /></span>
                         <span className="type-label">{peripheral.type}</span>
                       </div>
                       <span className={`status-badge-card ${getStatusClass(peripheral.current_status)}`}>
@@ -416,7 +413,7 @@ export default function InventoryPage() {
                         {peripheral.physical_condition && (
                           <div className="detail-row">
                             <span className="detail-label">Condição:</span>
-                            <span>{getConditionIcon(peripheral.physical_condition)} {peripheral.physical_condition}</span>
+                            <span>{getConditionLabel(peripheral.physical_condition)}</span>
                           </div>
                         )}
                       </div>
@@ -429,19 +426,19 @@ export default function InventoryPage() {
                           style={{ flex: 1 }}
                           onClick={() => navigate(`/inventario/equipamento/${peripheral.id}`)}
                         >
-                          📄 Ver
+                          <i className="ti ti-file-text" /> Ver
                         </button>
                         <button 
                           className="btn-card-edit"
                           onClick={() => handleEdit(peripheral.id)}
                         >
-                          ✏️ Editar
+                          <i className="ti ti-pencil" /> Editar
                         </button>
                         <button 
                           className="btn-card-delete"
                           onClick={() => handleDelete(peripheral)}
                         >
-                          🗑️
+                          <i className="ti ti-trash" />
                         </button>
                       </div>
                     </div>

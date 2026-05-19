@@ -219,9 +219,9 @@ const ReturnEquipmentPage: React.FC = () => {
   return (
     <div className="return-equipment-page">
       <div className="page-header">
-        <h1>↩️ Devolver Equipamento</h1>
+        <h1><i className="ti ti-arrow-back-up" /> Devolver Equipamento</h1>
         <button className="btn-back" onClick={() => navigate('/inventario')}>
-          ← Voltar
+          <i className="ti ti-arrow-left" /> Voltar
         </button>
       </div>
 
@@ -337,7 +337,7 @@ const ReturnEquipmentPage: React.FC = () => {
 
           {allChecksPassed && (
             <div className="checklist-success">
-              ✓ Todos os itens do checklist foram verificados
+              <i className="ti ti-check" /> Todos os itens do checklist foram verificados
             </div>
           )}
         </div>
@@ -492,13 +492,13 @@ const ReturnEquipmentPage: React.FC = () => {
 
           {formData.returnDestination === 'maintenance' && (
             <div className="alert alert-warning">
-              ⚠️ Este equipamento será marcado como "Em Manutenção" e não ficará disponível para novas entregas.
+              Este equipamento será marcado como "Em Manutenção" e não ficará disponível para novas entregas.
             </div>
           )}
 
           {formData.returnDestination === 'disposal' && (
             <div className="alert alert-warning">
-              ⚠️ Este equipamento será marcado para descarte. Certifique-se de que esta é a ação correta.
+              Este equipamento será marcado para descarte. Certifique-se de que esta é a ação correta.
             </div>
           )}
 
@@ -525,13 +525,13 @@ const ReturnEquipmentPage: React.FC = () => {
             className="btn-primary" 
             disabled={loading || !allChecksPassed}
           >
-            {loading ? 'Processando...' : (generateTerm ? '📄 Gerar Termo de Devolução' : '✅ Registrar Devolução (Sem Termo)')}
+            {loading ? 'Processando...' : (generateTerm ? 'Gerar Termo de Devolução' : 'Registrar Devolução')}
           </button>
         </div>
 
         {!allChecksPassed && (
           <p className="form-warning">
-            ⚠️ Complete o checklist de inspeção antes de processar a devolução.
+            Complete o checklist de inspeção antes de processar a devolução.
           </p>
         )}
       </form>
