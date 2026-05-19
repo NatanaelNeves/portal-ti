@@ -621,19 +621,19 @@ export default function AdminTicketsPage() {
             className={`dept-tab ${departmentFilter === '' ? 'active' : ''}`}
             onClick={() => { setDepartmentFilter(''); setCurrentPage(1); }}
           >
-            📊 Todos
+            <i className="ti ti-layout-grid" /> Todos
           </button>
           <button
             className={`dept-tab ${departmentFilter === 'ti' ? 'active' : ''}`}
             onClick={() => { setDepartmentFilter('ti'); setCurrentPage(1); }}
           >
-            🖥️ TI
+            <i className="ti ti-device-desktop" /> TI
           </button>
           <button
             className={`dept-tab ${departmentFilter === 'administrativo' ? 'active' : ''}`}
             onClick={() => { setDepartmentFilter('administrativo'); setCurrentPage(1); }}
           >
-            🏢 Administrativo
+            <i className="ti ti-building" /> Administrativo
           </button>
         </div>
       )}
@@ -642,7 +642,7 @@ export default function AdminTicketsPage() {
 
       {hasAdvancedFilters && (
         <div className="filters-warning">
-          ℹ️ <strong>Filtros avançados ativos.</strong> Os filtros rápidos abaixo estão desabilitados.
+          <i className="ti ti-info-circle" /> <strong>Filtros avançados ativos.</strong> Os filtros rápidos abaixo estão desabilitados.
         </div>
       )}
 
@@ -698,7 +698,7 @@ export default function AdminTicketsPage() {
         <div className="active-filter-banner">
           <div className="active-filter-info">
             <span className="active-filter-icon" aria-hidden="true">
-              {filterPriority === 'high' ? '🟠' : filterPriority === 'medium' ? '🟡' : '🟢'}
+              <i className="ti ti-circle-filled" />
             </span>
             <span>
               Filtro ativo: Prioridade {getPriorityLabel(filterPriority)}
@@ -709,7 +709,7 @@ export default function AdminTicketsPage() {
             className="btn btn-secondary btn-sm"
             onClick={() => setFilterPriority(null)}
           >
-            ✕ Limpar Filtro
+            <i className="ti ti-x" /> Limpar Filtro
           </button>
         </div>
       )}
@@ -755,7 +755,7 @@ export default function AdminTicketsPage() {
                     }}
                     aria-label="Limpar busca"
                   >
-                    ✕
+                    <i className="ti ti-x" />
                   </button>
                 )}
               </div>
@@ -910,7 +910,7 @@ export default function AdminTicketsPage() {
               <div className="loading">Carregando...</div>
             ) : sortedTickets.length === 0 ? (
               <div className="empty-queue">
-                <span className="empty-icon">✨</span>
+                <span className="empty-icon"><i className="ti ti-inbox-off" /></span>
                 <p>Nenhum chamado na fila!</p>
                 <small>Voce esta em dia com o atendimento</small>
               </div>
@@ -1067,7 +1067,7 @@ export default function AdminTicketsPage() {
                 onClick={() => setSelectedTicket(null)}
                 aria-label="Fechar preview"
               >
-                ✕
+                <i className="ti ti-x" />
               </button>
             </div>
 
@@ -1144,7 +1144,7 @@ export default function AdminTicketsPage() {
                   <div className="info-row">
                     <span className="info-label">Departamento:</span>
                     <span className="info-value">
-                      {selectedTicket.department === 'administrativo' ? '🏢 Administrativo' : '🖥️ TI'}
+                      {selectedTicket.department === 'administrativo' ? 'Administrativo' : 'TI'}
                     </span>
                   </div>
                   {selectedTicket.category && (
@@ -1181,7 +1181,7 @@ export default function AdminTicketsPage() {
         ) : (
           <aside className="ticket-panel empty card">
             <div className="empty-panel">
-              <span className="empty-icon-large">📊</span>
+              <span className="empty-icon-large"><i className="ti ti-chart-bar" /></span>
               <h3>Resumo Operacional</h3>
               <p>Selecione um chamado da fila para ver o preview detalhado.</p>
               <div className="empty-panel-metrics">
