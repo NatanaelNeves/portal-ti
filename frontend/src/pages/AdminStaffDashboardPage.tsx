@@ -59,24 +59,14 @@ export default function AdminStaffDashboardPage() {
   useEffect(() => {
     const token = localStorage.getItem('internal_token');
     const userRaw = localStorage.getItem('internal_user');
-
-    if (!token || !userRaw) {
-      navigate('/admin/login');
-      return;
-    }
-
+    if (!token || !userRaw) { navigate('/admin/login'); return; }
     try {
       const user = JSON.parse(userRaw) as { role?: string; name?: string };
-      if (user.role !== 'admin_staff') {
-        navigate('/admin/dashboard');
-        return;
-      }
+      if (user.role !== 'admin_staff') { navigate('/admin/dashboard'); return; }
       setCurrentUserName(user.name || 'Assistente Administrativo');
     } catch {
-      navigate('/admin/login');
-      return;
+      navigate('/admin/login'); return;
     }
-
     void fetchDashboard();
   }, [navigate]);
 
@@ -93,285 +83,146 @@ export default function AdminStaffDashboardPage() {
     }
   };
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'open':
-        return 'Aberto';
-      case 'in_progress':
-        return 'Em Atendimento';
-      case 'waiting_user':
-        return 'Aguardando Usuário';
-      case 'resolved':
-        return 'Resolvido';
-      case 'closed':
-        return 'Fechado';
-      default:
-        return status;
-    }
+  const getStatusLabel = (s: string) => ({ open: 'Aberto', in_progress: 'Em Atendimento', waiting_user: 'Aguardando', resolved: 'Resolvido', closed: 'Fechado' }[s] ?? s);
+  const getPriorityLabel = (p: string) => ({ urgent: 'Urgente', critical: 'Crítica', high: 'Alta', medium: 'Média', low: 'Baixa' }[p] ?? p ?? 'Sem prioridade');
+
+  const getStatusClass = (s: string) => {
+    const map: Record<string, string> = { open: 'asd-badge-open', in_progress: 'asd-badge-progress', waiting_user: 'asd-badge-waiting', resolved: 'asd-badge-resolved', closed: 'asd-badge-resolved' };
+    return `asd-badge ${map[s] ?? ''}`;
   };
 
-  const getStatusClass = (status: string) => {
-    switch (status) {
-      case 'open':
-        return 'asd-badge asd-badge-open';
-      case 'in_progress':
-        return 'asd-badge asd-badge-progress';
-      case 'waiting_user':
-        return 'asd-badge asd-badge-waiting';
-      case 'resolved':
-      case 'closed':
-        return 'asd-badge asd-badge-resolved';
-      default:
-        return 'asd-badge';
-    }
-  };
-
-  const getPriorityLabel = (priority: string) => {
-    switch (priority) {
-      case 'urgent':
-        return 'Urgente';
-      case 'critical':
-        return 'Crítica';
-      case 'high':
-        return 'Alta';
-      case 'medium':
-        return 'Média';
-      case 'low':
-        return 'Baixa';
-      default:
-        return priority || 'Sem prioridade';
-    }
-  };
-
-  const getPriorityClass = (priority: string) => {
-    switch (priority) {
-      case 'urgent':
-      case 'critical':
-        return 'asd-badge asd-badge-critical';
-      case 'high':
-        return 'asd-badge asd-badge-high';
-      case 'medium':
-        return 'asd-badge asd-badge-medium';
-      case 'low':
-        return 'asd-badge asd-badge-low';
-      default:
-        return 'asd-badge';
-    }
+  const getPriorityClass = (p: string) => {
+    const map: Record<string, string> = { urgent: 'asd-badge-critical', critical: 'asd-badge-critical', high: 'asd-badge-high', medium: 'asd-badge-medium', low: 'asd-badge-low' };
+    return `asd-badge ${map[p] ?? ''}`;
   };
 
   const formatElapsedTime = (dateString: string) => {
-    const now = new Date();
-    const date = new Date(dateString);
-    const diffMs = now.getTime() - date.getTime();
-    const diffMinutes = Math.floor(diffMs / (1000 * 60));
-
-    if (diffMinutes < 60) return `${Math.max(diffMinutes, 1)} min`;
-
-    const diffHours = Math.floor(diffMinutes / 60);
-    if (diffHours < 24) return `${diffHours}h`;
-
-    const diffDays = Math.floor(diffHours / 24);
-    return `${diffDays}d`;
+    const diffMs = Date.now() - new Date(dateString).getTime();
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 60) return `${Math.max(mins, 1)}min`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h`;
+    return `${Math.floor(hrs / 24)}d`;
   };
 
-  if (!localStorage.getItem('internal_token')) {
-    return null;
-  }
+  if (!localStorage.getItem('internal_token')) return null;
 
   const pendingMine = data.myOpenTickets + data.myInProgressTickets + data.myWaitingTickets;
+
   const topKpis = [
-    {
-      key: 'pendingMine',
-      title: 'Chamados Pendentes',
-      value: pendingMine,
-      subtitle: 'Abertos, em atendimento e aguardando usuário',
-      icon: '📦',
-      tone: 'pending',
-    },
-    {
-      key: 'myResolvedToday',
-      title: 'Chamados Resolvidos Hoje',
-      value: data.myResolvedToday,
-      subtitle: 'Chamados finalizados no dia atual',
-      icon: '🎯',
-      tone: 'resolved',
-    },
-    {
-      key: 'myTicketsTotal',
-      title: 'Chamados Atribuídos a Mim',
-      value: data.myTicketsTotal,
-      subtitle: 'Total sob minha responsabilidade',
-      icon: '🧑‍💼',
-      tone: 'assigned',
-    },
-    {
-      key: 'unassignedAdministrativeTickets',
-      title: 'Chamados Sem Responsável',
-      value: data.unassignedAdministrativeTickets,
-      subtitle: 'Fila administrativa sem atribuição',
-      icon: '🚨',
-      tone: 'unassigned',
-    },
+    { key: 'pending',    icon: 'ti-inbox',          title: 'Pendentes',           value: pendingMine,                         sub: 'Abertos + em atend. + aguardando',   tone: 'warning' },
+    { key: 'resolved',   icon: 'ti-circle-check',   title: 'Resolvidos Hoje',     value: data.myResolvedToday,                sub: 'Chamados finalizados no dia atual',   tone: 'success' },
+    { key: 'assigned',   icon: 'ti-user-check',     title: 'Atribuídos a Mim',    value: data.myTicketsTotal,                 sub: 'Total sob minha responsabilidade',   tone: 'info'    },
+    { key: 'unassigned', icon: 'ti-alert-triangle', title: 'Sem Responsável',     value: data.unassignedAdministrativeTickets, sub: 'Fila sem atribuição — ação urgente', tone: 'danger'  },
   ];
 
   const secondaryKpis = [
-    {
-      key: 'myOpenTickets',
-      title: 'Abertos',
-      value: data.myOpenTickets,
-      subtitle: 'Aguardando primeiro atendimento',
-      icon: '📬',
-      tone: 'open',
-    },
-    {
-      key: 'myInProgressTickets',
-      title: 'Em atendimento',
-      value: data.myInProgressTickets,
-      subtitle: 'Já em tratativa',
-      icon: '🔵',
-      tone: 'in-progress',
-    },
-    {
-      key: 'myWaitingTickets',
-      title: 'Aguardando usuário',
-      value: data.myWaitingTickets,
-      subtitle: 'Dependem de retorno do solicitante',
-      icon: '⏳',
-      tone: 'waiting',
-    },
-    {
-      key: 'myAverageResolutionHours',
-      title: 'SLA médio',
-      value: data.myAverageResolutionHours,
-      subtitle: 'Tempo médio para concluir',
-      suffix: 'h',
-      icon: '📈',
-      tone: 'sla',
-    },
+    { key: 'open',       icon: 'ti-mail-opened',  title: 'Abertos',          value: data.myOpenTickets,             sub: 'Aguardando atendimento',            accent: '#F59E0B' },
+    { key: 'progress',   icon: 'ti-loader',       title: 'Em Atendimento',   value: data.myInProgressTickets,       sub: 'Em tratativa agora',               accent: '#3B82F6' },
+    { key: 'waiting',    icon: 'ti-clock',        title: 'Aguard. Usuário',  value: data.myWaitingTickets,          sub: 'Dependem do solicitante',          accent: '#EAB308' },
+    { key: 'sla',        icon: 'ti-chart-line',   title: 'SLA Médio',        value: data.myAverageResolutionHours,  sub: 'Horas para resolução',             accent: '#14B8A6', suffix: 'h' },
   ];
 
   const priorityData = [
-    { key: 'urgent', label: 'Urgente', value: data.myTicketsByPriority?.urgent ?? 0, colorClass: 'asd-priority-urgent' },
-    { key: 'critical', label: 'Crítica', value: data.myTicketsByPriority?.critical ?? 0, colorClass: 'asd-priority-critical' },
-    { key: 'high', label: 'Alta', value: data.myTicketsByPriority?.high ?? 0, colorClass: 'asd-priority-high' },
-    { key: 'medium', label: 'Média', value: data.myTicketsByPriority?.medium ?? 0, colorClass: 'asd-priority-medium' },
-    { key: 'low', label: 'Baixa', value: data.myTicketsByPriority?.low ?? 0, colorClass: 'asd-priority-low' },
+    { key: 'urgent',   label: 'Urgente',  value: data.myTicketsByPriority?.urgent   ?? 0, color: '#EF4444' },
+    { key: 'critical', label: 'Crítica',  value: data.myTicketsByPriority?.critical ?? 0, color: '#F97316' },
+    { key: 'high',     label: 'Alta',     value: data.myTicketsByPriority?.high     ?? 0, color: '#EAB308' },
+    { key: 'medium',   label: 'Média',    value: data.myTicketsByPriority?.medium   ?? 0, color: '#60A5FA' },
+    { key: 'low',      label: 'Baixa',    value: data.myTicketsByPriority?.low      ?? 0, color: '#22C55E' },
   ];
 
-  const quickActions = [
-    {
-      key: 'queue',
-      icon: '📋',
-      label: 'Ver fila',
-      description: 'Visualizar chamados e priorizar atendimentos',
-      action: () => navigate('/admin/chamados'),
-      tone: 'queue',
-    },
-    {
-      key: 'pending',
-      icon: '⚡',
-      label: 'Atender pendentes',
-      description: 'Assumir e tratar os chamados em aberto',
-      action: () => navigate('/admin/chamados'),
-      tone: 'pending',
-    },
-    {
-      key: 'refresh',
-      icon: '🔄',
-      label: 'Atualizar painel',
-      description: 'Recarregar indicadores e últimos chamados',
-      action: () => void fetchDashboard(),
-      tone: 'refresh',
-    },
-  ];
-
-  const maxPriorityValue = Math.max(1, ...priorityData.map((item) => item.value));
-  const totalPriorityTickets = priorityData.reduce((sum, item) => sum + item.value, 0);
-
-  const formatCardValue = (value: number, suffix?: string) => `${value}${suffix || ''}`;
+  const maxPriorityValue = Math.max(1, ...priorityData.map((i) => i.value));
+  const totalPriorityTickets = priorityData.reduce((s, i) => s + i.value, 0);
 
   return (
-    <div className="admin-staff-dashboard-page">
+    <div className="asd-page">
       <div className="asd-shell">
+
+        {/* ── Header ── */}
         <header className="asd-header">
           <div className="asd-header-left">
-            <h1>Painel Operacional — Assistente Administrativo</h1>
-            <p>Olá, {currentUserName}. Acompanhe prioridades, desempenho e próximos atendimentos em tempo real.</p>
+            <div className="asd-header-eyebrow">
+              <i className="ti ti-layout-dashboard" />
+              <span>Painel Operacional</span>
+            </div>
+            <h1 className="asd-header-title">Assistente Administrativo</h1>
+            <p className="asd-header-sub">Olá, <strong>{currentUserName}</strong>. Acompanhe prioridades e atendimentos em tempo real.</p>
           </div>
           <div className="asd-header-actions">
-            <button className="asd-btn-refresh" onClick={() => void fetchDashboard()}>
-              🔄 Atualizar
+            <button className="asd-btn-ghost" onClick={() => void fetchDashboard()}>
+              <i className="ti ti-refresh" /> Atualizar
             </button>
-            <button className="asd-btn-chamados" onClick={() => navigate('/admin/chamados')}>
-              📋 Ver chamados
+            <button className="asd-btn-primary" onClick={() => navigate('/admin/chamados')}>
+              <i className="ti ti-clipboard-list" /> Ver chamados
             </button>
           </div>
         </header>
 
-        {error && <div className="alert alert-error">{error}</div>}
+        {error && (
+          <div className="asd-error">
+            <i className="ti ti-alert-circle" /> {error}
+          </div>
+        )}
 
         {loading ? (
-          <div className="asd-loading">Carregando dados...</div>
+          <div className="asd-loading">
+            <div className="asd-spinner" />
+            <span>Carregando dados...</span>
+          </div>
         ) : (
           <>
-            <section className="asd-kpis-main-grid">
-              {topKpis.map((item) => (
-                <article key={item.key} className={`asd-kpi-main-card asd-kpi-main-${item.tone}`}>
-                  <div className="asd-kpi-main-top">
-                    <span className="asd-kpi-main-icon" aria-hidden="true">{item.icon}</span>
-                    <span className="asd-kpi-main-title">{item.title}</span>
+            {/* ── KPIs principais ── */}
+            <section className="asd-kpis-main">
+              {topKpis.map((kpi) => (
+                <article key={kpi.key} className={`asd-kpi-card asd-kpi-${kpi.tone}`}>
+                  <div className="asd-kpi-head">
+                    <div className={`asd-kpi-icon-wrap asd-kpi-icon-${kpi.tone}`}>
+                      <i className={`ti ${kpi.icon}`} />
+                    </div>
+                    <span className="asd-kpi-label">{kpi.title}</span>
                   </div>
-                  <strong className="asd-kpi-main-value">{formatCardValue(item.value)}</strong>
-                  <small className="asd-kpi-main-desc">{item.subtitle}</small>
+                  <strong className="asd-kpi-value">{kpi.value}</strong>
+                  <p className="asd-kpi-sub">{kpi.sub}</p>
                 </article>
               ))}
             </section>
 
-            <section className="asd-kpis-secondary-grid">
-              {secondaryKpis.map((item) => (
-                <article key={item.key} className={`asd-kpi-secondary-card asd-kpi-secondary-${item.tone}`}>
-                  <div className="asd-kpi-secondary-head">
-                    <span className="asd-kpi-secondary-icon" aria-hidden="true">{item.icon}</span>
-                    <span className="asd-kpi-secondary-title">{item.title}</span>
+            {/* ── KPIs secundários ── */}
+            <section className="asd-kpis-secondary">
+              {secondaryKpis.map((kpi) => (
+                <article key={kpi.key} className="asd-kpi-sec-card" style={{ '--accent': kpi.accent } as React.CSSProperties}>
+                  <div className="asd-kpi-sec-head">
+                    <i className={`ti ${kpi.icon} asd-kpi-sec-icon`} />
+                    <span className="asd-kpi-sec-label">{kpi.title}</span>
                   </div>
-                  <strong className="asd-kpi-secondary-value">{formatCardValue(item.value, item.suffix)}</strong>
-                  <small className="asd-kpi-secondary-desc">{item.subtitle}</small>
+                  <strong className="asd-kpi-sec-value">{kpi.value}{kpi.suffix ?? ''}</strong>
+                  <p className="asd-kpi-sec-sub">{kpi.sub}</p>
                 </article>
               ))}
             </section>
 
-            <section className="asd-operational-grid">
-              <article className="asd-panel asd-panel-priority">
-                <div className="asd-panel-header">
-                  <h2>Distribuição por prioridade</h2>
-                  <span>{totalPriorityTickets} chamados</span>
+            {/* ── Operacional ── */}
+            <section className="asd-ops-grid">
+              {/* Prioridades */}
+              <article className="asd-panel">
+                <div className="asd-panel-hd">
+                  <h2><i className="ti ti-chart-bar" /> Distribuição por Prioridade</h2>
+                  <span className="asd-panel-badge">{totalPriorityTickets} chamados</span>
                 </div>
                 <div className="asd-priority-list">
                   {priorityData.map((item) => {
-                    const percent = totalPriorityTickets > 0
-                      ? Math.round((item.value / totalPriorityTickets) * 100)
-                      : 0;
-                    const width = item.value > 0
-                      ? Math.max(8, (item.value / maxPriorityValue) * 100)
-                      : 0;
-
+                    const pct = totalPriorityTickets > 0 ? Math.round((item.value / totalPriorityTickets) * 100) : 0;
+                    const w   = item.value > 0 ? Math.max(6, (item.value / maxPriorityValue) * 100) : 0;
                     return (
-                      <div key={item.key} className="asd-priority-item">
-                        <div className="asd-priority-label-row">
-                          <div className="asd-priority-label-left">
-                            <span className={`asd-priority-dot ${item.colorClass}`} />
-                            <span>{item.label}</span>
-                          </div>
-                          <div className="asd-priority-values">
-                            <strong>{item.value}</strong>
-                            <small>{percent}%</small>
-                          </div>
+                      <div key={item.key} className="asd-priority-row">
+                        <div className="asd-priority-meta">
+                          <span className="asd-priority-dot" style={{ background: item.color }} />
+                          <span className="asd-priority-name">{item.label}</span>
+                          <span className="asd-priority-count">{item.value}</span>
+                          <span className="asd-priority-pct">{pct}%</span>
                         </div>
-                        <div className="asd-priority-bar">
-                          <div
-                            className={`asd-priority-fill ${item.colorClass}`}
-                            style={{ width: `${width}%` }}
-                          />
+                        <div className="asd-bar-track">
+                          <div className="asd-bar-fill" style={{ width: `${w}%`, background: item.color }} />
                         </div>
                       </div>
                     );
@@ -379,61 +230,78 @@ export default function AdminStaffDashboardPage() {
                 </div>
               </article>
 
-              <article className="asd-panel asd-panel-actions">
-                <div className="asd-panel-header">
-                  <h2>Ações rápidas</h2>
-                  <span>Execução imediata</span>
+              {/* Ações rápidas */}
+              <article className="asd-panel">
+                <div className="asd-panel-hd">
+                  <h2><i className="ti ti-bolt" /> Ações Rápidas</h2>
+                  <span className="asd-panel-badge">Execução imediata</span>
                 </div>
-                <div className="asd-actions-stack">
-                  {quickActions.map((action) => (
-                    <button
-                      key={action.key}
-                      className={`asd-action-cta asd-action-${action.tone}`}
-                      onClick={action.action}
-                    >
-                      <span className="asd-action-icon" aria-hidden="true">{action.icon}</span>
-                      <span className="asd-action-content">
-                        <strong>{action.label}</strong>
-                        <small>{action.description}</small>
-                      </span>
-                    </button>
-                  ))}
+                <div className="asd-actions-list">
+                  <button className="asd-action-item asd-action-primary" onClick={() => navigate('/admin/chamados')}>
+                    <div className="asd-action-icon-wrap">
+                      <i className="ti ti-clipboard-list" />
+                    </div>
+                    <div className="asd-action-txt">
+                      <strong>Ver fila de chamados</strong>
+                      <span>Visualizar e priorizar atendimentos</span>
+                    </div>
+                    <i className="ti ti-chevron-right asd-action-arrow" />
+                  </button>
+                  <button className="asd-action-item asd-action-warning" onClick={() => navigate('/admin/chamados')}>
+                    <div className="asd-action-icon-wrap">
+                      <i className="ti ti-player-play" />
+                    </div>
+                    <div className="asd-action-txt">
+                      <strong>Atender pendentes</strong>
+                      <span>Assumir chamados em aberto</span>
+                    </div>
+                    <i className="ti ti-chevron-right asd-action-arrow" />
+                  </button>
+                  <button className="asd-action-item asd-action-neutral" onClick={() => void fetchDashboard()}>
+                    <div className="asd-action-icon-wrap">
+                      <i className="ti ti-refresh" />
+                    </div>
+                    <div className="asd-action-txt">
+                      <strong>Atualizar painel</strong>
+                      <span>Recarregar indicadores</span>
+                    </div>
+                    <i className="ti ti-chevron-right asd-action-arrow" />
+                  </button>
                 </div>
               </article>
             </section>
 
-            <section className="asd-recent-panel">
-              <div className="asd-recent-header">
-                <h2>Últimos chamados atribuídos</h2>
-                <span>{data.recentTickets.length} itens</span>
+            {/* ── Últimos chamados ── */}
+            <section className="asd-table-panel">
+              <div className="asd-panel-hd">
+                <h2><i className="ti ti-list-details" /> Últimos Chamados Atribuídos</h2>
+                <span className="asd-panel-badge">{data.recentTickets.length} itens</span>
               </div>
-
               {data.recentTickets.length === 0 ? (
-                <p className="asd-empty">Nenhum chamado atribuído no momento.</p>
+                <div className="asd-empty">
+                  <i className="ti ti-inbox-off" />
+                  <p>Nenhum chamado atribuído no momento.</p>
+                </div>
               ) : (
-                <div className="asd-recent-table-wrap">
-                  <table>
+                <div className="asd-table-wrap">
+                  <table className="asd-table">
                     <thead>
                       <tr>
                         <th>Título</th>
                         <th>Solicitante</th>
                         <th>Status</th>
                         <th>Prioridade</th>
-                        <th>Atualizado há</th>
+                        <th>Atualizado</th>
                       </tr>
                     </thead>
                     <tbody>
                       {data.recentTickets.map((ticket) => (
                         <tr key={ticket.id} onClick={() => navigate(`/admin/chamados/${ticket.id}`)}>
-                          <td>{ticket.title}</td>
-                          <td>{ticket.requester_name || 'Solicitante'}</td>
-                          <td>
-                            <span className={getStatusClass(ticket.status)}>{getStatusLabel(ticket.status)}</span>
-                          </td>
-                          <td>
-                            <span className={getPriorityClass(ticket.priority)}>{getPriorityLabel(ticket.priority)}</span>
-                          </td>
-                          <td>{formatElapsedTime(ticket.updated_at)}</td>
+                          <td className="asd-td-title">{ticket.title}</td>
+                          <td className="asd-td-muted">{ticket.requester_name || '—'}</td>
+                          <td><span className={getStatusClass(ticket.status)}>{getStatusLabel(ticket.status)}</span></td>
+                          <td><span className={getPriorityClass(ticket.priority)}>{getPriorityLabel(ticket.priority)}</span></td>
+                          <td className="asd-td-muted">{formatElapsedTime(ticket.updated_at)}</td>
                         </tr>
                       ))}
                     </tbody>

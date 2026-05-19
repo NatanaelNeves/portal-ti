@@ -13,7 +13,9 @@
       "Bash(grep -E \"\\\\.\\(jsx?|tsx?|vue\\)$\")",
       "Skill(frontend-design:frontend-design)",
       "Skill(frontend-design:frontend-design:*)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Skill(frontend-design)",
+      "Skill(frontend-design:*)"
     ]
   }
 }
