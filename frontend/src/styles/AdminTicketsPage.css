@@ -1177,6 +1177,20 @@
   box-shadow: 0 2px 8px rgba(5,150,105,.35);
 }
 
+/* Assumir — direct child of footer-actions, same compact scale */
+.footer-actions > .btn-assume {
+  padding: 3px 10px;
+  font-size: 0.71rem;
+  border-radius: 5px;
+  box-shadow: 0 1px 5px rgba(67,56,202,.3), inset 0 1px 0 rgba(255,255,255,.12);
+  transform: none !important;
+}
+
+.footer-actions > .btn-assume:hover {
+  box-shadow: 0 2px 9px rgba(67,56,202,.42);
+  filter: brightness(1.08);
+}
+
 .btn-assume {
   background: linear-gradient(135deg, #4338CA 0%, #6366F1 100%);
   border-color: #3730A3;
