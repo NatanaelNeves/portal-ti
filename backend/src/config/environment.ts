@@ -86,6 +86,10 @@ export const config = {
     },
   },
   frontend: {
-    url: process.env.FRONTEND_URL || 'http://localhost:5173',
+    url: process.env.FRONTEND_URL
+      || (process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',')[0].trim() : 'http://localhost:5173'),
+  },
+  api: {
+    url: process.env.API_URL || 'https://portal-ti-backend.azurewebsites.net',
   },
 };

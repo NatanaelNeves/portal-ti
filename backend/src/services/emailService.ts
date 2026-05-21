@@ -538,6 +538,7 @@ export class EmailService {
     location: string,
     purpose: string,
     trackingUrl: string,
+    icsUrl?: string,
   ): Promise<void> {
     const dateFormatted = new Date(date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
     const html = `
@@ -566,7 +567,7 @@ export class EmailService {
             <p>Você receberá lembretes por e-mail 24h e 1h antes do início.</p>
             <div style="text-align:center;margin:24px 0;">
               <a href="${trackingUrl}" class="btn">Acompanhar Reserva</a>
-              <a href="${config.frontend.url}/api/reservations/${reservationId}/ics" class="btn" style="background:#4A90E2;">📅 Adicionar ao Calendário</a>
+              ${icsUrl ? `<a href="${icsUrl}" class="btn" style="background:#4A90E2;">📅 Adicionar ao Calendário</a>` : ''}
             </div>
           </div>
           <div class="footer">Portal de Serviços Internos — Setor de TI</div>

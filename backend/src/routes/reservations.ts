@@ -622,9 +622,15 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         : null);
 
       if (recipientEmail) {
+        const { config } = require('../config/environment');
+        const frontendUrl = config.frontend.url;
+        const apiUrl = config.api.url;
         const trackingUrl = accessToken
-          ? `${process.env.FRONTEND_URL || ''}/reservar/acompanhar/${accessToken}`
-          : `${process.env.FRONTEND_URL || ''}/reservas`;
+          ? `${frontendUrl}/reservar/acompanhar/${accessToken}`
+          : `${frontendUrl}/reservas`;
+        const icsUrl = accessToken
+          ? `${apiUrl}/api/reservations/public/${accessToken}/ics`
+          : `${apiUrl}/api/reservations/${reservation.id}/ics`;
         await EmailService.sendReservationConfirmation(
           reservation.id,
           reservationNumber,
@@ -638,6 +644,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
           location,
           purpose,
           trackingUrl,
+          icsUrl,
         );
       }
 
