@@ -93,7 +93,78 @@ async function logAction(
   ).catch(() => undefined);
 }
 
-// Returns first active type, or null if table doesn't exist or is empty
+// Creates reservation tables if they don't exist (fallback when migration file wasn't found)
+async function ensureReservationSchema(): Promise<void> {
+  await database.query(`
+    CREATE TABLE IF NOT EXISTS equipment_types (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      name VARCHAR(100) NOT NULL,
+      description TEXT,
+      max_quantity INTEGER NOT NULL,
+      buffer_minutes INTEGER NOT NULL DEFAULT 30,
+      icon VARCHAR(50),
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await database.query(`
+    CREATE TABLE IF NOT EXISTS equipment_reservations (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      reservation_number VARCHAR(20) UNIQUE NOT NULL,
+      equipment_type_id UUID NOT NULL REFERENCES equipment_types(id),
+      quantity INTEGER NOT NULL CHECK (quantity > 0),
+      date DATE NOT NULL,
+      start_time TIME NOT NULL,
+      end_time TIME NOT NULL,
+      location VARCHAR(200) NOT NULL,
+      purpose TEXT NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'approved'
+        CHECK (status IN ('pending','approved','rejected','ready','in_use','returned','no_show','cancelled')),
+      recurrence_group_id UUID NULL,
+      requester_name VARCHAR(200),
+      requester_email VARCHAR(200),
+      requester_phone VARCHAR(50),
+      access_token UUID UNIQUE,
+      internal_user_id UUID REFERENCES internal_users(id),
+      approved_by_id UUID REFERENCES internal_users(id),
+      approved_at TIMESTAMP,
+      rejection_reason TEXT,
+      notes TEXT,
+      reminder_24h_sent_at TIMESTAMP,
+      reminder_1h_sent_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT chk_res_end_after_start CHECK (end_time > start_time),
+      CONSTRAINT chk_res_requester CHECK (
+        requester_email IS NOT NULL OR internal_user_id IS NOT NULL
+      )
+    )
+  `);
+  await database.query(`
+    CREATE TABLE IF NOT EXISTS reservation_logs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      reservation_id UUID NOT NULL REFERENCES equipment_reservations(id),
+      action VARCHAR(50) NOT NULL,
+      performed_by_id UUID REFERENCES internal_users(id),
+      performed_by_name VARCHAR(200),
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await database.query(`CREATE INDEX IF NOT EXISTS idx_reservations_date ON equipment_reservations(date)`).catch(() => {});
+  await database.query(`CREATE INDEX IF NOT EXISTS idx_reservations_type_date ON equipment_reservations(equipment_type_id, date)`).catch(() => {});
+  await database.query(`CREATE INDEX IF NOT EXISTS idx_reservations_token ON equipment_reservations(access_token)`).catch(() => {});
+  await database.query(`CREATE INDEX IF NOT EXISTS idx_reservations_status ON equipment_reservations(status)`).catch(() => {});
+  // Seed default Notebooks type
+  await database.query(`
+    INSERT INTO equipment_types (name, description, max_quantity, buffer_minutes, icon, is_active)
+    SELECT 'Notebooks', 'Notebooks para empréstimo em aulas, treinamentos e eventos', 20, 30, '💻', true
+    WHERE NOT EXISTS (SELECT 1 FROM equipment_types WHERE name = 'Notebooks')
+  `);
+}
+
+// Returns first active type; creates schema automatically if tables don't exist yet
 async function getDefaultType(): Promise<{ id: string; name: string; max_quantity: number; buffer_minutes: number } | null> {
   try {
     const r = await database.query(
@@ -101,7 +172,13 @@ async function getDefaultType(): Promise<{ id: string; name: string; max_quantit
     );
     return r.rows[0] || null;
   } catch (err: any) {
-    if (err.code === '42P01') return null; // table doesn't exist yet
+    if (err.code === '42P01') {
+      await ensureReservationSchema();
+      const r = await database.query(
+        'SELECT id, name, max_quantity, buffer_minutes FROM equipment_types WHERE is_active = true ORDER BY name LIMIT 1',
+      );
+      return r.rows[0] || null;
+    }
     throw err;
   }
 }
@@ -117,7 +194,14 @@ router.get('/types', async (_req: Request, res: Response): Promise<void> => {
     );
     res.json(result.rows);
   } catch (err: any) {
-    if (err.code === '42P01') { res.json([]); return; } // table not yet migrated
+    if (err.code === '42P01') {
+      await ensureReservationSchema();
+      const result = await database.query(
+        `SELECT id, name, description, buffer_minutes, icon FROM equipment_types WHERE is_active = true ORDER BY name`,
+      );
+      res.json(result.rows);
+      return;
+    }
     res.status(500).json({ error: 'Erro ao buscar tipos de equipamento' });
   }
 });
