@@ -38,6 +38,9 @@ export default function Navigation() {
           <button onClick={() => navigate('/central')} className="nav-link">
             Central de Dúvidas
           </button>
+          <button onClick={() => navigate('/reservar')} className="nav-link">
+            Reservar Equipamentos
+          </button>
         </div>
         <div className="navbar-user">
           <button onClick={() => navigate('/admin/login')} className="btn-login">
@@ -54,6 +57,8 @@ export default function Navigation() {
   const userRole = userData?.role;
   
   const showAssetsLink = userRole === 'admin' || userRole === 'it_staff';
+  const showReservationsLink = true; // todos os usuários internos
+  const showAdminReservationsLink = userRole === 'admin' || userRole === 'it_staff';
   const showUsersLink = userRole === 'admin' || userRole === 'it_staff';
   const showKnowledgeLink = userRole === 'admin' || userRole === 'it_staff';
   const showDocumentsLink = userRole === 'admin' || userRole === 'it_staff';
@@ -88,6 +93,10 @@ export default function Navigation() {
 
   if (showKnowledgeLink) {
     navLinks.push({ label: 'Central de Dúvidas', action: () => navigate('/admin/conhecimento') });
+  }
+
+  if (showReservationsLink) {
+    navLinks.push({ label: 'Reservas', action: () => navigate(showAdminReservationsLink ? '/admin/reservas' : '/reservas') });
   }
 
   if (showAssetsLink) {

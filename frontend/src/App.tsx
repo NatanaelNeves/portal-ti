@@ -42,6 +42,15 @@ import DeliverEquipmentPage from './pages/DeliverEquipmentPage';
 import ReturnEquipmentPage from './pages/ReturnEquipmentPage';
 import MoveEquipmentPage from './pages/MoveEquipmentPage';
 
+// Reservation Module Pages
+import ReservationPublicPage from './pages/ReservationPublicPage';
+import ReservationTrackingPage from './pages/ReservationTrackingPage';
+import MyReservationsPage from './pages/MyReservationsPage';
+import CreateReservationPage from './pages/CreateReservationPage';
+import AdminReservationsPage from './pages/AdminReservationsPage';
+import AdminReservationDetailPage from './pages/AdminReservationDetailPage';
+import AdminEquipmentTypesPage from './pages/AdminEquipmentTypesPage';
+
 // RH Module Pages
 import RhDashboardPage from './pages/RhDashboardPage';
 import RhTicketsPage from './pages/RhTicketsPage';
@@ -81,6 +90,9 @@ function App() {
             <Route path="/meus-chamados" element={<MyTicketsPage />} />
             <Route path="/chamado/:id" element={<TicketDetailPage />} />
             <Route path="/central" element={<InformationCenterPage />} />
+            <Route path="/reservar" element={<ReservationPublicPage />} />
+            <Route path="/reservar/acompanhar/:token" element={<ReservationTrackingPage />} />
+
    {/* Internal Login */}
             <Route path="/admin/login" element={<InternalLoginPage />} />
 
@@ -113,6 +125,13 @@ function App() {
             <Route path="/inventario/equipamento/:equipmentId/assinar-termo" element={<InternalProtectedRoute requireITStaff={true}><SignTermPage /></InternalProtectedRoute>} />
             <Route path="/inventario/equipamento/:equipmentId/termo-de-devolucao" element={<InternalProtectedRoute requireITStaff={true}><ReturnTermPage /></InternalProtectedRoute>} />
             <Route path="/inventario/termo/:termId/devolucao" element={<InternalProtectedRoute requireITStaff={true}><ReturnTermPage /></InternalProtectedRoute>} />
+
+            {/* Reservation Module Routes */}
+            <Route path="/reservas" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff', 'admin_staff', 'manager', 'rh_staff']}><MyReservationsPage /></InternalProtectedRoute>} />
+            <Route path="/reservas/nova" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff', 'admin_staff', 'manager', 'rh_staff']}><CreateReservationPage /></InternalProtectedRoute>} />
+            <Route path="/admin/reservas" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff']}><AdminReservationsPage /></InternalProtectedRoute>} />
+            <Route path="/admin/reservas/tipos" element={<InternalProtectedRoute allowedRoles={['admin']}><AdminEquipmentTypesPage /></InternalProtectedRoute>} />
+            <Route path="/admin/reservas/:id" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff']}><AdminReservationDetailPage /></InternalProtectedRoute>} />
 
             {/* RH Staff Routes */}
             <Route path="/rh/dashboard" element={<InternalProtectedRoute allowedRoles={['rh_staff', 'admin']}><RhDashboardPage /></InternalProtectedRoute>} />

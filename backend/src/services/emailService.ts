@@ -522,4 +522,136 @@ export class EmailService {
       text: `Nova mensagem de ${authorName}\n\nChamado: ${title}\n\n${message}\n\nAcesse: ${ticketLink}`,
     });
   }
+
+  // ─── Reservas de Equipamentos ─────────────────────────────────────────────
+
+  static async sendReservationConfirmation(
+    reservationId: string,
+    reservationNumber: string,
+    recipientEmail: string,
+    recipientName: string,
+    typeName: string,
+    quantity: number,
+    date: string,
+    startTime: string,
+    endTime: string,
+    location: string,
+    purpose: string,
+    trackingUrl: string,
+  ): Promise<void> {
+    const dateFormatted = new Date(date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+    const html = `
+      <!DOCTYPE html><html><head><style>
+        body { font-family: Arial, sans-serif; color: #333; }
+        .header { background: #007A33; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+        .content { background: #f9f9f9; padding: 30px; border: 1px solid #ddd; }
+        .info-box { background: white; padding: 20px; margin: 16px 0; border-left: 4px solid #007A33; border-radius: 4px; }
+        .btn { display: inline-block; background: #007A33; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin: 8px 4px; }
+        .footer { text-align: center; color: #999; font-size: 12px; padding: 16px; }
+        .number { font-size: 1.4rem; font-weight: bold; color: #007A33; }
+      </style></head><body>
+        <div style="max-width:600px;margin:0 auto;">
+          <div class="header"><h2>✅ Reserva Confirmada</h2><p>Portal de Serviços Internos</p></div>
+          <div class="content">
+            <p>Olá, <strong>${recipientName}</strong>!</p>
+            <p>Sua reserva foi confirmada com sucesso.</p>
+            <div class="info-box">
+              <p class="number">${reservationNumber}</p>
+              <p><strong>Equipamento:</strong> 💻 ${quantity}× ${typeName}</p>
+              <p><strong>Data:</strong> ${dateFormatted}</p>
+              <p><strong>Horário:</strong> ${startTime} – ${endTime}</p>
+              <p><strong>Local:</strong> ${location}</p>
+              <p><strong>Finalidade:</strong> ${purpose}</p>
+            </div>
+            <p>Você receberá lembretes por e-mail 24h e 1h antes do início.</p>
+            <div style="text-align:center;margin:24px 0;">
+              <a href="${trackingUrl}" class="btn">Acompanhar Reserva</a>
+              <a href="${config.frontend.url}/api/reservations/${reservationId}/ics" class="btn" style="background:#4A90E2;">📅 Adicionar ao Calendário</a>
+            </div>
+          </div>
+          <div class="footer">Portal de Serviços Internos — Setor de TI</div>
+        </div>
+      </body></html>
+    `;
+    await this.sendEmail({ to: recipientEmail, subject: `✅ Reserva confirmada: ${reservationNumber}`, html });
+  }
+
+  static async sendReservationReminder(
+    recipientEmail: string,
+    recipientName: string,
+    reservationNumber: string,
+    typeName: string,
+    quantity: number,
+    date: string,
+    startTime: string,
+    endTime: string,
+    location: string,
+    hoursAhead: number,
+  ): Promise<void> {
+    const dateFormatted = new Date(date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
+    const label = hoursAhead === 24 ? 'amanhã' : `em ${hoursAhead} hora(s)`;
+    const html = `
+      <!DOCTYPE html><html><head><style>
+        body { font-family: Arial, sans-serif; color: #333; }
+        .header { background: #F28C38; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+        .content { background: #f9f9f9; padding: 30px; border: 1px solid #ddd; }
+        .info-box { background: white; padding: 20px; margin: 16px 0; border-left: 4px solid #F28C38; border-radius: 4px; }
+        .footer { text-align: center; color: #999; font-size: 12px; padding: 16px; }
+      </style></head><body>
+        <div style="max-width:600px;margin:0 auto;">
+          <div class="header"><h2>⏰ Lembrete de Reserva</h2></div>
+          <div class="content">
+            <p>Olá, <strong>${recipientName}</strong>!</p>
+            <p>Sua reserva começa <strong>${label}</strong>.</p>
+            <div class="info-box">
+              <p><strong>${reservationNumber}</strong></p>
+              <p><strong>Equipamento:</strong> ${quantity}× ${typeName}</p>
+              <p><strong>Data:</strong> ${dateFormatted}</p>
+              <p><strong>Horário:</strong> ${startTime} – ${endTime}</p>
+              <p><strong>Local:</strong> ${location}</p>
+            </div>
+            <p>Os equipamentos estarão disponíveis no local indicado. Em caso de desistência, cancele com antecedência.</p>
+          </div>
+          <div class="footer">Portal de Serviços Internos — Setor de TI</div>
+        </div>
+      </body></html>
+    `;
+    await this.sendEmail({ to: recipientEmail, subject: `⏰ Lembrete: reserva ${reservationNumber} começa ${label}`, html });
+  }
+
+  static async sendReservationReady(
+    recipientEmail: string,
+    recipientName: string,
+    reservationNumber: string,
+    typeName: string,
+    quantity: number,
+    location: string,
+    startTime: string,
+  ): Promise<void> {
+    const html = `
+      <!DOCTYPE html><html><head><style>
+        body { font-family: Arial, sans-serif; color: #333; }
+        .header { background: #8B5CF6; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+        .content { background: #f9f9f9; padding: 30px; border: 1px solid #ddd; }
+        .info-box { background: white; padding: 20px; margin: 16px 0; border-left: 4px solid #8B5CF6; border-radius: 4px; }
+        .footer { text-align: center; color: #999; font-size: 12px; padding: 16px; }
+      </style></head><body>
+        <div style="max-width:600px;margin:0 auto;">
+          <div class="header"><h2>📦 Equipamentos Prontos</h2></div>
+          <div class="content">
+            <p>Olá, <strong>${recipientName}</strong>!</p>
+            <p>Os equipamentos da sua reserva <strong>${reservationNumber}</strong> foram separados, carregados e estão prontos para retirada.</p>
+            <div class="info-box">
+              <p><strong>Equipamento:</strong> ${quantity}× ${typeName}</p>
+              <p><strong>Local de retirada:</strong> ${location}</p>
+              <p><strong>Início:</strong> ${startTime}</p>
+            </div>
+            <p>Dirija-se ao local indicado para retirar os equipamentos.</p>
+          </div>
+          <div class="footer">Portal de Serviços Internos — Setor de TI</div>
+        </div>
+      </body></html>
+    `;
+    await this.sendEmail({ to: recipientEmail, subject: `📦 Equipamentos prontos — ${reservationNumber}`, html });
+  }
 }

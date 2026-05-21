@@ -112,15 +112,117 @@ async function autoCloseAwaitingConfirmationTickets(): Promise<void> {
   }
 }
 
+// ─── Job: Lembrete 24h para reservas do dia seguinte ─────────────────────────
+async function sendReservation24hReminders(): Promise<void> {
+  try {
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+    const result = await database.query(
+      `SELECT er.*, et.name AS type_name,
+              COALESCE(er.requester_email, iu.email) AS email,
+              COALESCE(er.requester_name, iu.name) AS name
+       FROM equipment_reservations er
+       JOIN equipment_types et ON et.id = er.equipment_type_id
+       LEFT JOIN internal_users iu ON iu.id = er.internal_user_id
+       WHERE er.date = $1
+         AND er.status IN ('approved', 'ready')
+         AND er.reminder_24h_sent_at IS NULL`,
+      [tomorrow],
+    );
+    for (const r of result.rows) {
+      if (!r.email) continue;
+      await EmailService.sendReservationReminder(
+        r.email, r.name, r.reservation_number, r.type_name,
+        r.quantity, r.date, r.start_time, r.end_time, r.location, 24,
+      );
+      await database.query(
+        'UPDATE equipment_reservations SET reminder_24h_sent_at = NOW() WHERE id = $1',
+        [r.id],
+      );
+    }
+    console.log(`[SCHEDULER] Lembretes 24h de reservas enviados: ${result.rows.length}`);
+  } catch (err) {
+    console.error('[SCHEDULER] Erro ao enviar lembretes 24h de reservas:', err);
+  }
+}
+
+// ─── Job: Lembrete 1h + auto no-show ─────────────────────────────────────────
+async function sendReservation1hRemindersAndAutoNoShow(): Promise<void> {
+  try {
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+
+    // Lembrete 1h
+    const in1h = new Date(now.getTime() + 60 * 60 * 1000);
+    const h1 = `${String(in1h.getHours()).padStart(2, '0')}:${String(in1h.getMinutes()).padStart(2, '0')}`;
+    const remResult = await database.query(
+      `SELECT er.*, et.name AS type_name,
+              COALESCE(er.requester_email, iu.email) AS email,
+              COALESCE(er.requester_name, iu.name) AS name
+       FROM equipment_reservations er
+       JOIN equipment_types et ON et.id = er.equipment_type_id
+       LEFT JOIN internal_users iu ON iu.id = er.internal_user_id
+       WHERE er.date = $1
+         AND er.start_time BETWEEN $2::time AND ($2::time + interval '15 minutes')
+         AND er.status IN ('approved', 'ready')
+         AND er.reminder_1h_sent_at IS NULL`,
+      [today, h1],
+    );
+    for (const r of remResult.rows) {
+      if (!r.email) continue;
+      await EmailService.sendReservationReminder(
+        r.email, r.name, r.reservation_number, r.type_name,
+        r.quantity, r.date, r.start_time, r.end_time, r.location, 1,
+      );
+      await database.query(
+        'UPDATE equipment_reservations SET reminder_1h_sent_at = NOW() WHERE id = $1',
+        [r.id],
+      );
+    }
+
+    // Auto no-show: approved/ready com start_time + 1h no passado sem virar ready/in_use
+    const noShowResult = await database.query(
+      `UPDATE equipment_reservations
+       SET status = 'no_show', updated_at = NOW()
+       WHERE date = $1
+         AND status = 'approved'
+         AND (start_time + interval '1 hour') < $2::time
+       RETURNING id, reservation_number`,
+      [today, `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`],
+    );
+    if (noShowResult.rows.length > 0) {
+      console.log(`[SCHEDULER] Auto no-show: ${noShowResult.rows.length} reserva(s) marcadas`);
+      for (const r of noShowResult.rows) {
+        await database.query(
+          `INSERT INTO reservation_logs (reservation_id, action, performed_by_name)
+           VALUES ($1, 'auto_no_show', 'Sistema')`,
+          [r.id],
+        ).catch(() => undefined);
+      }
+    }
+  } catch (err) {
+    console.error('[SCHEDULER] Erro no job de reservas horário:', err);
+  }
+}
+
 // ─── Registrar jobs ──────────────────────────────────────────────────────────
 export function initializeScheduler(): void {
-  // Roda todo dia às 03:00 (horário do servidor / UTC)
+  // Tickets: todo dia às 03:00 UTC
   cron.schedule('0 3 * * *', () => {
     notifyTicketsNearAutoClose();
     autoCloseAwaitingConfirmationTickets();
   });
 
+  // Reservas: lembrete 24h todo dia às 08:00 UTC
+  cron.schedule('0 8 * * *', () => {
+    sendReservation24hReminders();
+  });
+
+  // Reservas: lembrete 1h + auto no-show a cada hora
+  cron.schedule('0 * * * *', () => {
+    sendReservation1hRemindersAndAutoNoShow();
+  });
+
   console.log(
-    `✓ Scheduler iniciado: tickets em aguardando_confirmacao recebem aviso em 24h e são fechados após ${DAYS_TO_AUTO_CLOSE} dias (job diário às 03:00 UTC)`,
+    `✓ Scheduler iniciado: tickets (03:00), lembretes reserva 24h (08:00), lembretes 1h + auto-noshow (horário)`,
   );
 }

@@ -48,6 +48,10 @@ export const PERMISSIONS = {
   'dashboard:ti': [UserRole.IT_STAFF, UserRole.ADMIN],
   'dashboard:administrativo': [UserRole.ADMIN_STAFF, UserRole.ADMIN],
   'dashboard:coordenador': [UserRole.MANAGER, UserRole.ADMIN],
+
+  // Reservas de equipamentos
+  'reservations:manage': [UserRole.IT_STAFF, UserRole.ADMIN],
+  'reservations:types:manage': [UserRole.ADMIN],
 } as Record<string, UserRole[]>;
 
 /**

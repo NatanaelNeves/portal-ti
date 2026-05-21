@@ -17,7 +17,13 @@
       "Skill(frontend-design)",
       "Skill(frontend-design:*)",
       "Bash(xargs grep -l \"form\\\\|<input\\\\|<select\")",
-      "Bash(xargs basename -a)"
+      "Bash(xargs basename -a)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Opn_Natan\\\\Desktop\\\\projetos\\\\portal-ti\" -Force)",
+      "Bash(Select-Object Name, PSIsContainer)",
+      "Bash(Format-Table -AutoSize)",
+      "Bash(Get-Content \"c:\\\\Users\\\\Opn_Natan\\\\Desktop\\\\projetos\\\\portal-ti\\\\backend\\\\src\\\\services\\\\emailService.ts\")",
+      "Bash(Measure-Object -Line)",
+      "Bash(node_modules/.bin/tsc --noEmit)"
     ]
   }
 }
