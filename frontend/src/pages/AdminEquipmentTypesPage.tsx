@@ -75,12 +75,14 @@ export default function AdminEquipmentTypesPage() {
   return (
     <div className="eq-types-page">
       <div className="eq-types-header">
-        <div>
-          <button className="btn-res-ghost btn-res-sm" onClick={() => navigate('/admin/reservas')}>← Voltar</button>
-          <h1>Tipos de Equipamento</h1>
-          <p>Configure o pool de reservas por tipo</p>
+        <div className="eq-types-header-main">
+          <h1>⚙️ Pool de Equipamentos</h1>
+          <p>Configure capacidade e buffer de cada tipo</p>
         </div>
-        <button className="btn-res-primary" onClick={openCreate}>+ Novo Tipo</button>
+        <div className="eq-types-header-actions">
+          <button className="btn-res-ghost btn-res-sm" onClick={() => navigate('/admin/reservas')}>← Reservas</button>
+          <button className="btn-res-primary btn-res-sm" onClick={openCreate}>+ Novo Tipo</button>
+        </div>
       </div>
 
       {error && <div className="res-alert res-alert-error">{error}</div>}
@@ -92,7 +94,7 @@ export default function AdminEquipmentTypesPage() {
           {types.map((t) => (
             <div key={t.id} className={`eq-type-card ${!t.is_active ? 'eq-type-inactive' : ''}`}>
               <div className="eq-type-card-header">
-                <span className="eq-type-icon">{t.icon}</span>
+                <span className="eq-type-icon">{t.icon ?? '💻'}</span>
                 <div className="eq-type-info">
                   <h3>{t.name}</h3>
                   {t.description && <p className="eq-type-desc">{t.description}</p>}
@@ -102,21 +104,21 @@ export default function AdminEquipmentTypesPage() {
 
               <div className="eq-type-stats">
                 <div className="eq-type-stat">
-                  <span className="eq-type-stat-label">Pool</span>
+                  <span className="eq-type-stat-label">Pool máximo</span>
                   <span className="eq-type-stat-value">{t.max_quantity}</span>
                 </div>
                 <div className="eq-type-stat">
                   <span className="eq-type-stat-label">Buffer</span>
-                  <span className="eq-type-stat-value">{t.buffer_minutes}min</span>
+                  <span className="eq-type-stat-value">{t.buffer_minutes}<small style={{fontSize:'0.7em',fontWeight:500,color:'#6B7A8D'}}> min</small></span>
                 </div>
                 <div className="eq-type-stat">
                   <span className="eq-type-stat-label">Reservas ativas</span>
-                  <span className="eq-type-stat-value">{t.active_reservations}</span>
+                  <span className="eq-type-stat-value" style={{color: t.active_reservations > 0 ? '#007A33' : '#1A2233'}}>{t.active_reservations}</span>
                 </div>
               </div>
 
               <div className="eq-type-actions">
-                <button className="btn-res-ghost btn-res-sm" onClick={() => openEdit(t)}>Editar</button>
+                <button className="btn-res-ghost btn-res-sm" onClick={() => openEdit(t)}>✏️ Editar</button>
                 <button
                   className={`btn-res-sm ${t.is_active ? 'btn-res-danger' : 'btn-res-success'}`}
                   onClick={() => handleToggleActive(t)}

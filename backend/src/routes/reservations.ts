@@ -258,6 +258,33 @@ router.get('/availability', async (req: Request, res: Response): Promise<void> =
   }
 });
 
+// GET /api/reservations/public/by-email?email=xxx — público
+router.get('/public/by-email', async (req: Request, res: Response): Promise<void> => {
+  const { email } = req.query as { email?: string };
+  if (!email || !email.includes('@')) {
+    res.status(400).json({ error: 'E-mail inválido' });
+    return;
+  }
+  try {
+    const result = await database.query(
+      `SELECT er.id, er.reservation_number, er.access_token,
+              er.quantity, er.date, er.start_time, er.end_time,
+              er.location, er.purpose, er.status, er.requester_name,
+              er.rejection_reason, er.created_at,
+              et.name AS type_name, et.icon AS type_icon
+       FROM equipment_reservations er
+       JOIN equipment_types et ON et.id = er.equipment_type_id
+       WHERE LOWER(er.requester_email) = LOWER($1)
+       ORDER BY er.date DESC, er.start_time DESC
+       LIMIT 50`,
+      [email.trim()],
+    );
+    res.json(result.rows);
+  } catch {
+    res.status(500).json({ error: 'Erro ao buscar reservas' });
+  }
+});
+
 // GET /api/reservations/public/:token — público
 router.get('/public/:token', async (req: Request, res: Response): Promise<void> => {
   try {
@@ -621,10 +648,11 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         ? (await database.query('SELECT email FROM internal_users WHERE id = $1', [internalUserId])).rows[0]?.email
         : null);
 
+      const { config } = require('../config/environment');
+      const frontendUrl = config.frontend.url;
+      const apiUrl = config.api.url;
+
       if (recipientEmail) {
-        const { config } = require('../config/environment');
-        const frontendUrl = config.frontend.url;
-        const apiUrl = config.api.url;
         const trackingUrl = accessToken
           ? `${frontendUrl}/reservar/acompanhar/${accessToken}`
           : `${frontendUrl}/reservas`;
@@ -646,6 +674,35 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
           trackingUrl,
           icsUrl,
         );
+      }
+
+      // Notify TI staff only for public reservations (no internal user)
+      if (!internalUserId) {
+        try {
+          const adminResult = await database.query(
+            `SELECT email FROM internal_users WHERE is_active = true AND role IN ('admin', 'it_staff') ORDER BY name`,
+          );
+          const adminEmails: string[] = adminResult.rows.map((r: any) => r.email).filter(Boolean);
+          if (adminEmails.length) {
+            const adminUrl = `${frontendUrl}/admin/reservas`;
+            await EmailService.sendReservationAdminNotification(
+              adminEmails,
+              reservationNumber,
+              reservation.requester_name ?? 'Solicitante',
+              requester_email ?? '',
+              typeName,
+              qty,
+              date,
+              start_time,
+              end_time,
+              location,
+              purpose,
+              adminUrl,
+            );
+          }
+        } catch (err) {
+          console.error('[RESERVATIONS] Failed to send admin notification:', err);
+        }
       }
 
       const ws = getWebSocketService();

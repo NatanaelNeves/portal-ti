@@ -34,7 +34,7 @@ export default function AdminReservationsPage() {
   const [loading, setLoading] = useState(true);
   const [activeNow, setActiveNow] = useState<ActiveNowResult | null>(null);
 
-  const [dateFilter, setDateFilter] = useState<DateFilter>('today');
+  const [dateFilter, setDateFilter] = useState<DateFilter>('week');
   const [statusFilter, setStatusFilter] = useState('');
   const [sort, setSort] = useState<'date_asc' | 'date_desc'>('date_asc');
 
@@ -110,14 +110,14 @@ export default function AdminReservationsPage() {
     <div className="admin-res-page">
       {/* Header */}
       <div className="admin-res-header">
-        <div>
-          <h1>Reservas de Equipamentos</h1>
+        <div className="admin-res-header-main">
+          <h1>💻 Reservas de Equipamentos</h1>
           <p>{total} reserva(s) encontrada(s)</p>
         </div>
         <div className="admin-res-header-actions">
           <button className="btn-res-ghost btn-res-sm" onClick={exportCSV}>Exportar CSV</button>
           <button className="btn-res-ghost btn-res-sm" onClick={() => navigate('/admin/reservas/tipos')}>
-            Gerenciar Tipos
+            ⚙️ Gerenciar Pool
           </button>
         </div>
       </div>

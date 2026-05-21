@@ -91,6 +91,7 @@ function App() {
             <Route path="/chamado/:id" element={<TicketDetailPage />} />
             <Route path="/central" element={<InformationCenterPage />} />
             <Route path="/reservar" element={<ReservationPublicPage />} />
+            <Route path="/reservar/acompanhar" element={<ReservationTrackingPage />} />
             <Route path="/reservar/acompanhar/:token" element={<ReservationTrackingPage />} />
 
    {/* Internal Login */}

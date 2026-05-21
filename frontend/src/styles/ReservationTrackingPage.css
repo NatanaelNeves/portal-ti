@@ -10,6 +10,10 @@
   animation: fadeIn 200ms ease;
 }
 
+.tracking-container-wide {
+  max-width: 680px;
+}
+
 .tracking-header {
   text-align: center;
   margin-bottom: 28px;
@@ -246,6 +250,186 @@
   box-shadow: var(--sombra-card, 0 2px 8px rgba(0,0,0,0.08));
 }
 .tracking-error-icon { font-size: 2.5rem; display: block; margin-bottom: 12px; }
+
+/* ── Hero (busca por e-mail) ── */
+.tracking-hero-icon {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.tracking-hero-sub {
+  color: #6B7280;
+  margin: 6px 0 0;
+  font-size: 0.95rem;
+}
+
+.tracking-back-link {
+  display: inline-block;
+  font-size: 0.85rem;
+  color: #6B7280;
+  text-decoration: none;
+  margin-bottom: 12px;
+  transition: color 150ms ease;
+}
+.tracking-back-link:hover { color: var(--verde-nazareno, #007A33); }
+
+/* ── Email search form ── */
+.tracking-email-form {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.tracking-email-input {
+  flex: 1;
+  min-width: 200px;
+  padding: 12px 16px;
+  border: 1.5px solid var(--cinza-medio, #E9ECEF);
+  border-radius: var(--border-radius-small, 8px);
+  font-size: 1rem;
+  color: var(--texto-principal, #2C3E50);
+  background: #fff;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.tracking-email-input:focus {
+  outline: none;
+  border-color: var(--verde-nazareno, #007A33);
+  box-shadow: 0 0 0 3px rgba(0,122,51,.12);
+}
+
+.tracking-search-btn {
+  white-space: nowrap;
+  padding: 12px 24px;
+}
+
+/* ── Alert ── */
+.tracking-alert {
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  color: #B91C1C;
+  padding: 12px 16px;
+  border-radius: var(--border-radius-small, 8px);
+  font-size: 0.875rem;
+  margin-bottom: 16px;
+}
+
+/* ── Results ── */
+.tracking-results {
+  animation: fadeIn 200ms ease;
+}
+
+.tracking-results-label {
+  font-size: 0.82rem;
+  color: #6B7280;
+  margin: 0 0 12px;
+}
+
+.tracking-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6B7280;
+  background: #fff;
+  border-radius: var(--border-radius, 12px);
+  box-shadow: var(--sombra-card, 0 2px 8px rgba(0,0,0,.08));
+}
+.tracking-empty span { font-size: 2.5rem; display: block; margin-bottom: 10px; }
+.tracking-empty p { margin: 0; }
+
+/* ── Reservation list cards ── */
+.tracking-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tracking-res-card {
+  background: #fff;
+  border-radius: var(--border-radius, 12px);
+  box-shadow: var(--sombra-card, 0 2px 8px rgba(0,0,0,.08));
+  overflow: hidden;
+  transition: box-shadow 150ms ease, transform 150ms ease;
+  border-left: 4px solid var(--verde-nazareno, #007A33);
+}
+
+.tracking-res-card:hover {
+  box-shadow: var(--sombra-hover, 0 4px 12px rgba(0,0,0,.12));
+  transform: translateY(-2px);
+}
+
+.tracking-res-card--past {
+  border-left-color: var(--cinza-medio, #E9ECEF);
+  opacity: 0.75;
+}
+
+.tracking-res-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px 10px;
+}
+
+.tracking-res-card-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tracking-res-number {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--texto-principal, #2C3E50);
+  font-family: monospace;
+}
+
+.tracking-res-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border: 1px solid;
+}
+
+.tracking-res-link {
+  font-size: 0.82rem;
+  color: var(--verde-nazareno, #007A33);
+  text-decoration: none;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.tracking-res-link:hover { text-decoration: underline; }
+
+.tracking-res-card-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+  font-size: 0.84rem;
+  color: #495057;
+  padding: 0 18px 12px;
+}
+
+.tracking-res-purpose {
+  font-size: 0.82rem;
+  color: #6B7280;
+  font-style: italic;
+  padding: 0 18px 12px;
+  margin: 0;
+}
+
+.tracking-res-rejection {
+  font-size: 0.82rem;
+  color: #991B1B;
+  background: #FEF2F2;
+  padding: 8px 18px;
+  margin: 0;
+}
 
 @keyframes shimmer { 0% { background-position: -200% 0 } 100% { background-position: 200% 0 } }
 @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }

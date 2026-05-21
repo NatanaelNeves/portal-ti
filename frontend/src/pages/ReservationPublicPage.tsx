@@ -107,16 +107,19 @@ export default function ReservationPublicPage() {
 
             <div className="rp-success-btns">
               <a href={trackingUrl} className="rp-btn-primary">
-                Acompanhar reserva
+                Acompanhar esta reserva
               </a>
-              <a
-                href={`${import.meta.env.VITE_API_URL || ''}/api/reservations/public/${success.token}/ics`}
-                className="rp-btn-outline"
-                download
-              >
-                📅 Adicionar ao Calendário
+              <a href="/reservar/acompanhar" className="rp-btn-outline">
+                Ver todas as minhas reservas
               </a>
             </div>
+            <a
+              href={`${import.meta.env.VITE_API_URL || ''}/api/reservations/public/${success.token}/ics`}
+              className="rp-link-btn"
+              download
+            >
+              📅 Adicionar ao Calendário
+            </a>
             <button className="rp-link-btn" onClick={() => {
               setSuccess(null); setQuantity(1); setDate(''); setStartTime('');
               setEndTime(''); setLocation(''); setPurpose('');

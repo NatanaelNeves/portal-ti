@@ -64,6 +64,10 @@ const sendViaGraph = async (options: EmailOptions): Promise<void> => {
     .filter(Boolean)
     .map((address) => ({ emailAddress: { address } }));
 
+  const ccRecipients = options.cc
+    ? options.cc.split(',').map((a) => a.trim()).filter(Boolean).map((address) => ({ emailAddress: { address } }))
+    : [];
+
   const payload = {
     message: {
       subject: options.subject,
@@ -72,6 +76,7 @@ const sendViaGraph = async (options: EmailOptions): Promise<void> => {
         content: options.html,
       },
       toRecipients: recipients,
+      ...(ccRecipients.length ? { ccRecipients } : {}),
       from: {
         emailAddress: {
           address: config.email.fromEmail,
@@ -112,6 +117,7 @@ interface EmailOptions {
   subject: string;
   html: string;
   text?: string;
+  cc?: string;
 }
 
 export class EmailService {
@@ -136,6 +142,7 @@ export class EmailService {
         await transporter.sendMail({
           from: `"${config.email.fromName}" <${config.email.fromEmail}>`,
           to: options.to,
+          ...(options.cc ? { cc: options.cc } : {}),
           subject: options.subject,
           text: options.text,
           html: options.html,
@@ -654,5 +661,64 @@ export class EmailService {
       </body></html>
     `;
     await this.sendEmail({ to: recipientEmail, subject: `📦 Equipamentos prontos — ${reservationNumber}`, html });
+  }
+
+  static async sendReservationAdminNotification(
+    adminEmails: string[],
+    reservationNumber: string,
+    requesterName: string,
+    requesterEmail: string,
+    typeName: string,
+    quantity: number,
+    date: string,
+    startTime: string,
+    endTime: string,
+    location: string,
+    purpose: string,
+    adminUrl: string,
+  ): Promise<void> {
+    if (!adminEmails.length) return;
+    const dateFormatted = new Date(date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+    const html = `
+      <!DOCTYPE html><html><head><style>
+        body { font-family: Arial, sans-serif; color: #333; }
+        .header { background: #1A2233; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+        .content { background: #f9f9f9; padding: 30px; border: 1px solid #ddd; }
+        .info-box { background: white; padding: 20px; margin: 16px 0; border-left: 4px solid #007A33; border-radius: 4px; }
+        .btn { display: inline-block; background: #007A33; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin: 8px 4px; }
+        .footer { text-align: center; color: #999; font-size: 12px; padding: 16px; }
+        .number { font-size: 1.2rem; font-weight: bold; color: #007A33; }
+        .badge { display:inline-block; background:#FEF9C3; color:#92400E; padding:3px 10px; border-radius:999px; font-size:0.85rem; font-weight:600; }
+      </style></head><body>
+        <div style="max-width:600px;margin:0 auto;">
+          <div class="header">
+            <h2>📋 Nova Reserva Pública</h2>
+            <p>Uma solicitação aguarda sua atenção</p>
+          </div>
+          <div class="content">
+            <p>Uma nova reserva foi criada pelo portal público e foi <strong>aprovada automaticamente</strong>.</p>
+            <div class="info-box">
+              <p class="number">${reservationNumber}</p>
+              <p><strong>Solicitante:</strong> ${requesterName} (${requesterEmail})</p>
+              <p><strong>Equipamento:</strong> 💻 ${quantity}× ${typeName}</p>
+              <p><strong>Data:</strong> ${dateFormatted}</p>
+              <p><strong>Horário:</strong> ${startTime} – ${endTime}</p>
+              <p><strong>Local:</strong> ${location}</p>
+              <p><strong>Finalidade:</strong> ${purpose}</p>
+            </div>
+            <div style="text-align:center;margin:24px 0;">
+              <a href="${adminUrl}" class="btn">Ver no Painel de Reservas</a>
+            </div>
+          </div>
+          <div class="footer">Portal de Serviços Internos — Setor de TI</div>
+        </div>
+      </body></html>
+    `;
+    await this.sendEmail({
+      to: adminEmails[0],
+      ...(adminEmails.length > 1 ? { cc: adminEmails.slice(1).join(',') } : {}),
+      subject: `📋 Nova reserva: ${reservationNumber} — ${requesterName}`,
+      html,
+    });
   }
 }

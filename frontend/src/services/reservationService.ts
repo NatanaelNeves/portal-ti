@@ -138,6 +138,11 @@ export const reservationService = {
     return res.data;
   },
 
+  getByEmail: async (email: string): Promise<Reservation[]> => {
+    const res = await axios.get(`${API_BASE}/api/reservations/public/by-email`, { params: { email } });
+    return res.data;
+  },
+
   getICSUrlByToken: (token: string) => `${API_BASE}/api/reservations/public/${token}/ics`,
 
   // Autenticado
