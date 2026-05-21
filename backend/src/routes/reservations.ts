@@ -19,8 +19,7 @@ async function generateReservationNumber(): Promise<string> {
   return `RES-${year}-${String(next).padStart(3, '0')}`;
 }
 
-function buildConflictQuery(withLock = false): string {
-  const lockClause = withLock ? ' FOR UPDATE' : '';
+function buildConflictQuery(): string {
   return `
     SELECT COALESCE(SUM(er.quantity), 0) AS reserved_qty
     FROM equipment_reservations er
@@ -30,7 +29,6 @@ function buildConflictQuery(withLock = false): string {
       AND er.status IN ('approved', 'ready', 'in_use')
       AND er.start_time < ($4::time + (et.buffer_minutes || ' minutes')::interval)
       AND er.end_time   > ($3::time - (et.buffer_minutes || ' minutes')::interval)
-    ${lockClause}
   `;
 }
 
@@ -570,7 +568,9 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 
     await database.query('BEGIN');
     try {
-      const conflictResult = await database.query(buildConflictQuery(true), [
+      // Lock the equipment type row to serialize concurrent reservation inserts for the same type
+      await database.query('SELECT id FROM equipment_types WHERE id = $1 FOR UPDATE', [effectiveTypeId]);
+      const conflictResult = await database.query(buildConflictQuery(), [
         effectiveTypeId, date, start_time, end_time,
       ]);
       const reserved = parseInt(conflictResult.rows[0].reserved_qty, 10);

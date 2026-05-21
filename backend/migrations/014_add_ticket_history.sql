@@ -13,8 +13,8 @@ CREATE TABLE IF NOT EXISTS ticket_history (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX idx_ticket_history_ticket_id ON ticket_history(ticket_id);
-CREATE INDEX idx_ticket_history_created_at ON ticket_history(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ticket_history_ticket_id ON ticket_history(ticket_id);
+CREATE INDEX IF NOT EXISTS idx_ticket_history_created_at ON ticket_history(created_at DESC);
 
 -- Common actions:
 -- 'created', 'status_changed', 'priority_changed', 'assigned', 'unassigned',
