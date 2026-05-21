@@ -23,7 +23,9 @@
       "Bash(Format-Table -AutoSize)",
       "Bash(Get-Content \"c:\\\\Users\\\\Opn_Natan\\\\Desktop\\\\projetos\\\\portal-ti\\\\backend\\\\src\\\\services\\\\emailService.ts\")",
       "Bash(Measure-Object -Line)",
-      "Bash(node_modules/.bin/tsc --noEmit)"
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(npm run *)",
+      "PowerShell(Set-Location \"c:\\\\Users\\\\Opn_Natan\\\\Desktop\\\\projetos\\\\portal-ti\\\\frontend\"; $tsc = \".\\\\node_modules\\\\.bin\\\\tsc.cmd\"; if \\(Test-Path $tsc\\) { & $tsc --noEmit 2>&1 | Select-Object -First 30 } else { \"tsc not found\" })"
     ]
   }
 }
