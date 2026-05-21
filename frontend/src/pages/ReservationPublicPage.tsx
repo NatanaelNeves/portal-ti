@@ -86,6 +86,7 @@ export default function ReservationPublicPage() {
 
   // ── Sucesso ───────────────────────────────────────────────────────
   if (success) {
+    const trackingUrl = `/reservar/acompanhar/${success.token}`;
     return (
       <div className="rp-page">
         <div className="rp-hero">
@@ -93,13 +94,19 @@ export default function ReservationPublicPage() {
           <h1>Reservar Notebooks</h1>
         </div>
         <div className="rp-container" style={{ paddingTop: 32 }}>
-          <div className="rp-success-card">
+          <div className="rp-success">
             <div className="rp-success-check">✅</div>
             <h2>Reserva Confirmada!</h2>
             <div className="rp-success-number">{success.number}</div>
-            <p>Você receberá a confirmação no e-mail com todos os detalhes.</p>
+            <p>Enviamos a confirmação com o link de acompanhamento para o seu e-mail.</p>
+
+            <div className="rp-success-link-box">
+              <span className="rp-success-link-label">Seu link de acompanhamento:</span>
+              <a href={trackingUrl} className="rp-success-link">{window.location.origin}{trackingUrl}</a>
+            </div>
+
             <div className="rp-success-btns">
-              <a href={`/reservar/acompanhar/${success.token}`} className="rp-btn-primary">
+              <a href={trackingUrl} className="rp-btn-primary">
                 Acompanhar reserva
               </a>
               <a

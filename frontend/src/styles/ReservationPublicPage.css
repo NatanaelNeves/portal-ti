@@ -548,6 +548,31 @@
   margin-bottom: 16px;
 }
 
+.rp-success-link-box {
+  background: #F0F8F3;
+  border: 1.5px solid #bde8cc;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin: 0 0 20px;
+  text-align: left;
+}
+
+.rp-success-link-label {
+  display: block;
+  font-size: 0.78rem;
+  color: #6B7280;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.rp-success-link {
+  font-size: 0.82rem;
+  color: #007A33;
+  font-weight: 600;
+  word-break: break-all;
+  text-decoration: underline;
+}
+
 /* ── Shared pieces reused by other pages ── */
 
 /* Status badge */
