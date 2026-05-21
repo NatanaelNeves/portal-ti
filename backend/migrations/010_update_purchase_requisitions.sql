@@ -2,7 +2,15 @@
 
 -- Adicionar coluna request_number
 ALTER TABLE purchase_requisitions ADD COLUMN IF NOT EXISTS request_number VARCHAR(50);
-UPDATE purchase_requisitions SET request_number = 'PED-2026-' || LPAD(ROW_NUMBER() OVER (ORDER BY id)::TEXT, 3, '0') WHERE request_number IS NULL;
+WITH numbered AS (
+  SELECT id, ROW_NUMBER() OVER (ORDER BY id) AS rn
+  FROM purchase_requisitions
+  WHERE request_number IS NULL
+)
+UPDATE purchase_requisitions
+SET request_number = 'PED-2026-' || LPAD(numbered.rn::TEXT, 3, '0')
+FROM numbered
+WHERE purchase_requisitions.id = numbered.id;
 ALTER TABLE purchase_requisitions ALTER COLUMN request_number SET NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_purchase_requisitions_request_number ON purchase_requisitions(request_number);
 
