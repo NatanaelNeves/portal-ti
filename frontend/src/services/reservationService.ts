@@ -181,7 +181,6 @@ export const reservationService = {
   },
 
   exportCSV: (params: { date_filter?: string; status?: string; type_id?: string }) => {
-    const token = localStorage.getItem('internal_token');
     const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]).toString();
     return `${API_BASE}/api/reservations/export/csv?${qs}`;
   },

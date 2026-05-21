@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { reservationService, EquipmentType, AvailabilityResult, STATUS_COLORS } from '../services/reservationService';
+import { reservationService, EquipmentType, AvailabilityResult } from '../services/reservationService';
 import '../styles/ReservationPublicPage.css';
 
 type Step = 'form' | 'success';
