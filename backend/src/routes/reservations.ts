@@ -93,6 +93,19 @@ async function logAction(
   ).catch(() => undefined);
 }
 
+// Returns first active type, or null if table doesn't exist or is empty
+async function getDefaultType(): Promise<{ id: string; name: string; max_quantity: number; buffer_minutes: number } | null> {
+  try {
+    const r = await database.query(
+      'SELECT id, name, max_quantity, buffer_minutes FROM equipment_types WHERE is_active = true ORDER BY name LIMIT 1',
+    );
+    return r.rows[0] || null;
+  } catch (err: any) {
+    if (err.code === '42P01') return null; // table doesn't exist yet
+    throw err;
+  }
+}
+
 // ─── Rotas estáticas devem vir ANTES de /:id ─────────────────────────────────
 
 // GET /api/reservations/types — público
@@ -103,7 +116,8 @@ router.get('/types', async (_req: Request, res: Response): Promise<void> => {
        FROM equipment_types WHERE is_active = true ORDER BY name`,
     );
     res.json(result.rows);
-  } catch {
+  } catch (err: any) {
+    if (err.code === '42P01') { res.json([]); return; } // table not yet migrated
     res.status(500).json({ error: 'Erro ao buscar tipos de equipamento' });
   }
 });
@@ -112,23 +126,38 @@ router.get('/types', async (_req: Request, res: Response): Promise<void> => {
 router.get('/availability', async (req: Request, res: Response): Promise<void> => {
   try {
     const { type_id, date, start_time, end_time, quantity } = req.query as Record<string, string>;
-    if (!type_id || !date || !start_time || !end_time) {
-      res.status(400).json({ error: 'Parâmetros obrigatórios: type_id, date, start_time, end_time' });
+    if (!date || !start_time || !end_time) {
+      res.status(400).json({ error: 'Parâmetros obrigatórios: date, start_time, end_time' });
       return;
     }
     const qty = parseInt(quantity || '1', 10);
 
-    const typeResult = await database.query(
-      'SELECT max_quantity, buffer_minutes FROM equipment_types WHERE id = $1 AND is_active = true',
-      [type_id],
-    );
-    if (!typeResult.rows[0]) {
-      res.status(404).json({ error: 'Tipo não encontrado' });
-      return;
-    }
-    const { max_quantity, buffer_minutes } = typeResult.rows[0];
+    let effectiveTypeId: string;
+    let max_quantity: number;
+    let buffer_minutes: number;
 
-    const conflictResult = await database.query(buildConflictQuery(), [type_id, date, start_time, end_time]);
+    if (type_id) {
+      const typeResult = await database.query(
+        'SELECT id, max_quantity, buffer_minutes FROM equipment_types WHERE id = $1 AND is_active = true',
+        [type_id],
+      );
+      if (!typeResult.rows[0]) { res.status(404).json({ error: 'Tipo não encontrado' }); return; }
+      effectiveTypeId = type_id;
+      max_quantity = typeResult.rows[0].max_quantity;
+      buffer_minutes = typeResult.rows[0].buffer_minutes;
+    } else {
+      const def = await getDefaultType();
+      if (!def) {
+        // Table doesn't exist or no types configured — return optimistic response
+        res.json({ available: true, remaining: 20, capacity_status: 'available' });
+        return;
+      }
+      effectiveTypeId = def.id;
+      max_quantity = def.max_quantity;
+      buffer_minutes = def.buffer_minutes;
+    }
+
+    const conflictResult = await database.query(buildConflictQuery(), [effectiveTypeId, date, start_time, end_time]);
     const reserved = parseInt(conflictResult.rows[0].reserved_qty, 10);
     const remaining = max_quantity - reserved;
     const available = remaining >= qty;
@@ -139,7 +168,7 @@ router.get('/availability', async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    const next_available = await findNextAvailable(type_id, date, end_time, qty, max_quantity);
+    const next_available = await findNextAvailable(effectiveTypeId, date, end_time, qty, max_quantity);
     const reason = reserved < max_quantity ? 'buffer' : 'conflict';
     res.json({ available: false, remaining: Math.max(0, remaining), reason, next_available, buffer_minutes });
   } catch {
@@ -396,7 +425,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     requester_name, requester_email, requester_phone,
   } = req.body;
 
-  if (!equipment_type_id || !quantity || !date || !start_time || !end_time || !location || !purpose) {
+  if (!quantity || !date || !start_time || !end_time || !location || !purpose) {
     res.status(400).json({ error: 'Campos obrigatórios faltando' });
     return;
   }
@@ -434,27 +463,38 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   }
 
   try {
-    const typeResult = await database.query(
-      'SELECT id, name, max_quantity, buffer_minutes FROM equipment_types WHERE id = $1 AND is_active = true',
-      [equipment_type_id],
-    );
-    if (!typeResult.rows[0]) {
-      res.status(404).json({ error: 'Tipo de equipamento não encontrado' });
-      return;
+    let effectiveTypeId: string;
+    let max_quantity: number;
+    let typeName: string;
+
+    if (equipment_type_id) {
+      const typeResult = await database.query(
+        'SELECT id, name, max_quantity FROM equipment_types WHERE id = $1 AND is_active = true',
+        [equipment_type_id],
+      );
+      if (!typeResult.rows[0]) { res.status(404).json({ error: 'Tipo de equipamento não encontrado' }); return; }
+      effectiveTypeId = equipment_type_id;
+      max_quantity = typeResult.rows[0].max_quantity;
+      typeName = typeResult.rows[0].name;
+    } else {
+      const def = await getDefaultType();
+      if (!def) { res.status(503).json({ error: 'Nenhum equipamento disponível para reserva no momento.' }); return; }
+      effectiveTypeId = def.id;
+      max_quantity = def.max_quantity;
+      typeName = def.name;
     }
-    const { max_quantity, name: typeName } = typeResult.rows[0];
 
     await database.query('BEGIN');
     try {
       const conflictResult = await database.query(buildConflictQuery(true), [
-        equipment_type_id, date, start_time, end_time,
+        effectiveTypeId, date, start_time, end_time,
       ]);
       const reserved = parseInt(conflictResult.rows[0].reserved_qty, 10);
       const remaining = max_quantity - reserved;
 
       if (reserved + qty > max_quantity) {
         await database.query('ROLLBACK');
-        const next_available = await findNextAvailable(equipment_type_id, date, end_time, qty, max_quantity);
+        const next_available = await findNextAvailable(effectiveTypeId, date, end_time, qty, max_quantity);
         const reason = remaining > 0 ? 'buffer' : 'conflict';
         res.status(409).json({
           available: false,
@@ -481,7 +521,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'approved',$9,$10,$11,$12,$13,NOW())
         RETURNING *`,
         [
-          reservationNumber, equipment_type_id, qty, date, start_time, end_time,
+          reservationNumber, effectiveTypeId, qty, date, start_time, end_time,
           location, purpose,
           requester_name ?? internalUserName, requester_email ?? null, requester_phone ?? null,
           accessToken, internalUserId,

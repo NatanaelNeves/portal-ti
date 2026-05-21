@@ -116,19 +116,19 @@ export const reservationService = {
   },
 
   checkAvailability: async (
-    typeId: string,
+    typeId: string | null,
     date: string,
     startTime: string,
     endTime: string,
     quantity: number,
   ): Promise<AvailabilityResult> => {
-    const res = await axios.get(`${API_BASE}/api/reservations/availability`, {
-      params: { type_id: typeId, date, start_time: startTime, end_time: endTime, quantity },
-    });
+    const params: Record<string, any> = { date, start_time: startTime, end_time: endTime, quantity };
+    if (typeId) params.type_id = typeId;
+    const res = await axios.get(`${API_BASE}/api/reservations/availability`, { params });
     return res.data;
   },
 
-  createPublic: async (payload: CreateReservationPayload): Promise<{ id: string; reservation_number: string; access_token: string; tracking_url: string }> => {
+  createPublic: async (payload: Omit<CreateReservationPayload, 'equipment_type_id'> & { equipment_type_id?: string }): Promise<{ id: string; reservation_number: string; access_token: string; tracking_url: string }> => {
     const res = await axios.post(`${API_BASE}/api/reservations`, payload);
     return res.data;
   },

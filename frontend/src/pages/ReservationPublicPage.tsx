@@ -18,10 +18,6 @@ function getMinTime(date: string): string {
 }
 
 export default function ReservationPublicPage() {
-  const [typeId, setTypeId] = useState<string | null>(null);
-  const [serviceError, setServiceError] = useState(false);
-  const [loadingType, setLoadingType] = useState(true);
-
   const [quantity, setQuantity] = useState(1);
   const [date, setDate] = useState('');
   const [startTime, setStartTime] = useState('');
@@ -38,33 +34,18 @@ export default function ReservationPublicPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState<{ number: string; token: string } | null>(null);
 
-  // Carrega o tipo "Notebooks" silenciosamente no background
-  const loadType = () => {
-    setLoadingType(true);
-    setServiceError(false);
-    reservationService.getTypes()
-      .then((types) => {
-        if (types.length === 0) { setServiceError(true); return; }
-        setTypeId(types[0].id);
-      })
-      .catch(() => setServiceError(true))
-      .finally(() => setLoadingType(false));
-  };
-
-  useEffect(() => { loadType(); }, []);
-
   const checkAvailability = useCallback(async () => {
-    if (!typeId || !date || !startTime || !endTime || startTime >= endTime) return;
+    if (!date || !startTime || !endTime || startTime >= endTime) return;
     setChecking(true);
     try {
-      const r = await reservationService.checkAvailability(typeId, date, startTime, endTime, quantity);
+      const r = await reservationService.checkAvailability(null, date, startTime, endTime, quantity);
       setAvailability(r);
     } catch {
       setAvailability(null);
     } finally {
       setChecking(false);
     }
-  }, [typeId, date, startTime, endTime, quantity]);
+  }, [date, startTime, endTime, quantity]);
 
   useEffect(() => {
     const t = setTimeout(checkAvailability, 500);
@@ -73,13 +54,11 @@ export default function ReservationPublicPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!typeId) { setError('Serviço temporariamente indisponível. Tente novamente.'); return; }
     if (availability && !availability.available) { setError('Horário indisponível.'); return; }
     setSubmitting(true);
     setError('');
     try {
       const r = await reservationService.createPublic({
-        equipment_type_id: typeId,
         quantity,
         date,
         start_time: startTime,
@@ -104,26 +83,6 @@ export default function ReservationPublicPage() {
     : !availability.available ? 'unavailable'
     : availability.capacity_status === 'partial' ? 'partial'
     : 'ok';
-
-  // ── Serviço indisponível ──────────────────────────────────────────
-  if (!loadingType && serviceError) {
-    return (
-      <div className="rp-page">
-        <div className="rp-hero">
-          <div className="rp-hero-icon">💻</div>
-          <h1>Reservar Notebooks</h1>
-        </div>
-        <div className="rp-container" style={{ paddingTop: 32 }}>
-          <div className="rp-service-error">
-            <span>⚠️</span>
-            <h3>Serviço temporariamente indisponível</h3>
-            <p>Não foi possível conectar ao sistema de reservas. Aguarde alguns instantes.</p>
-            <button className="rp-btn-primary" onClick={loadType}>Tentar novamente</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // ── Sucesso ───────────────────────────────────────────────────────
   if (success) {
@@ -288,7 +247,7 @@ export default function ReservationPublicPage() {
           <button
             type="submit"
             className="rp-btn-submit"
-            disabled={submitting || loadingType || avail === 'unavailable' || avail === 'checking'}
+            disabled={submitting || avail === 'unavailable' || avail === 'checking'}
           >
             {submitting ? <><span className="rp-spinner" /> Processando...</> : 'Confirmar Reserva'}
           </button>
