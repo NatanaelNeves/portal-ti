@@ -216,6 +216,14 @@ export const reservationService = {
     await api.patch(`/reservations/${id}/ready`);
   },
 
+  markInUse: async (id: string): Promise<void> => {
+    await api.patch(`/reservations/${id}/in-use`);
+  },
+
+  markReturned: async (id: string): Promise<void> => {
+    await api.patch(`/reservations/${id}/return`);
+  },
+
   markNoShow: async (id: string): Promise<void> => {
     await api.patch(`/reservations/${id}/no-show`);
   },

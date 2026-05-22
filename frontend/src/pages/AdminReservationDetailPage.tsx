@@ -1,16 +1,76 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { reservationService, Reservation, STATUS_LABELS, STATUS_COLORS } from '../services/reservationService';
-import '../styles/AdminReservationsPage.css';
+import '../styles/AdminReservationDetailPage.css';
 
 function formatDate(dateStr: string): string {
-  const d = new Date(dateStr + 'T12:00:00');
+  const s = String(dateStr).substring(0, 10);
+  const d = new Date(s + 'T12:00:00');
+  if (isNaN(d.getTime())) return dateStr;
   return d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
 }
 
 function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString('pt-BR');
 }
+
+function fmtTime(t: string) { return String(t).substring(0, 5); }
+
+// ── Workflow timeline ─────────────────────────────────────────────────────────
+
+const FLOW_STEPS = [
+  { key: 'approved', label: 'Confirmada' },
+  { key: 'ready',    label: 'Pronta' },
+  { key: 'in_use',   label: 'Em uso' },
+  { key: 'returned', label: 'Devolvida' },
+];
+
+const FLOW_INDEX: Record<string, number> = {
+  approved: 0, ready: 1, in_use: 2, returned: 3,
+};
+
+function StatusTimeline({ status }: { status: string }) {
+  const isTerminal = ['rejected', 'cancelled', 'no_show'].includes(status);
+  const terminalLabels: Record<string, string> = {
+    rejected:  'Recusada',
+    cancelled: 'Cancelada',
+    no_show:   'Não compareceu',
+  };
+
+  if (isTerminal) {
+    return (
+      <div className="ard-timeline ard-timeline--terminal">
+        <span className="ard-terminal-badge">{terminalLabels[status] ?? status}</span>
+      </div>
+    );
+  }
+
+  const cur = FLOW_INDEX[status] ?? -1;
+  return (
+    <div className="ard-timeline">
+      {FLOW_STEPS.map((s, i) => {
+        const done   = i < cur;
+        const active = i === cur;
+        return (
+          <div key={s.key} className="ard-tl-step">
+            <div className={`ard-tl-dot ${done ? 'done' : active ? 'active' : ''}`}>
+              {done && (
+                <svg viewBox="0 0 12 12" fill="none">
+                  <polyline points="2,6 5,9 10,3" stroke="#fff" strokeWidth="2"
+                    strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+            </div>
+            <span className={`ard-tl-label ${done ? 'done' : active ? 'active' : ''}`}>{s.label}</span>
+            {i < FLOW_STEPS.length - 1 && <div className={`ard-tl-line ${done ? 'done' : active ? 'half' : ''}`} />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function AdminReservationDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -26,141 +86,208 @@ export default function AdminReservationDetailPage() {
   const load = () => {
     if (!id) return;
     setLoading(true);
-    reservationService.getById(id).then(setReservation).catch(() => setError('Reserva não encontrada')).finally(() => setLoading(false));
+    reservationService.getById(id)
+      .then(setReservation)
+      .catch(() => setError('Reserva não encontrada'))
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, [id]);
 
-  const doAction = async (action: () => Promise<void>) => {
+  const doAction = async (action: () => Promise<void>, label: string) => {
+    if (!confirm(`Confirmar: ${label}?`)) return;
     setActionLoading(true);
     setError('');
-    try {
-      await action();
-      load();
-    } catch {
-      setError('Erro ao executar ação');
-    } finally {
-      setActionLoading(false);
-    }
+    try { await action(); load(); }
+    catch { setError('Erro ao executar ação. Tente novamente.'); }
+    finally { setActionLoading(false); }
   };
 
   const handleReject = async () => {
-    if (!id) return;
-    await doAction(() => reservationService.reject(id, rejectReason));
-    setShowReject(false);
-    setRejectReason('');
+    if (!id || !rejectReason.trim()) return;
+    setActionLoading(true);
+    try {
+      await reservationService.reject(id, rejectReason);
+      setShowReject(false);
+      setRejectReason('');
+      load();
+    } catch { setError('Erro ao recusar reserva.'); }
+    finally { setActionLoading(false); }
   };
 
-  if (loading) return <div className="admin-res-page"><div className="admin-res-skeleton" /></div>;
-
-  if (!reservation || error) {
+  if (loading) {
     return (
-      <div className="admin-res-page">
-        <p>{error || 'Reserva não encontrada'}</p>
-        <button className="btn-res-ghost" onClick={() => navigate('/admin/reservas')}>← Voltar</button>
+      <div className="ard-page">
+        <div className="ard-hero"><div className="ard-hero-inner"><div className="ard-skeleton-title" /></div></div>
+        <div className="ard-body"><div className="ard-skeleton-grid"><div /><div /><div /><div /></div></div>
       </div>
     );
   }
 
-  const color = STATUS_COLORS[reservation.status] || '#6B7280';
-  const label = STATUS_LABELS[reservation.status] || reservation.status;
+  if (!reservation || error) {
+    return (
+      <div className="ard-page">
+        <div className="ard-body" style={{ paddingTop: 40 }}>
+          <p style={{ color: '#B91C1C', marginBottom: 16 }}>{error || 'Reserva não encontrada'}</p>
+          <button className="ard-btn-ghost" onClick={() => navigate('/admin/reservas')}>← Voltar</button>
+        </div>
+      </div>
+    );
+  }
+
+  const r = reservation;
+  const statusColor = STATUS_COLORS[r.status] ?? '#6B7280';
+  const statusLabel = STATUS_LABELS[r.status] ?? r.status;
+  const requester = r.requester_name ?? r.internal_user_name ?? '—';
 
   return (
-    <div className="admin-res-page">
-      <div className="admin-res-detail-header">
-        <button className="btn-res-ghost btn-res-sm" onClick={() => navigate('/admin/reservas')}>← Voltar</button>
-        <h1>{reservation.reservation_number}</h1>
-        <span className="res-status-badge" style={{ background: color + '20', color, borderColor: color, fontSize: '1rem' }}>
-          {label}
-        </span>
-      </div>
-
-      {error && <div className="res-alert res-alert-error">{error}</div>}
-
-      <div className="admin-res-detail-grid">
-        <div className="admin-res-detail-card">
-          <h3>Equipamento</h3>
-          <p><strong>Tipo:</strong> {reservation.type_icon} {reservation.type_name}</p>
-          <p><strong>Quantidade:</strong> {reservation.quantity}</p>
+    <div className="ard-page">
+      {/* Hero */}
+      <div className="ard-hero">
+        <div className="ard-hero-inner">
+          <div className="ard-hero-left">
+            <button className="ard-back-btn" onClick={() => navigate('/admin/reservas')}>← Voltar</button>
+            <div>
+              <p className="ard-hero-sub">Detalhe da Reserva</p>
+              <h1 className="ard-hero-title">{r.reservation_number}</h1>
+            </div>
+          </div>
+          <span className="ard-hero-badge" style={{ color: statusColor, background: statusColor + '22', borderColor: statusColor + '55' }}>
+            {statusLabel}
+          </span>
         </div>
 
-        <div className="admin-res-detail-card">
-          <h3>Agendamento</h3>
-          <p><strong>Data:</strong> {formatDate(reservation.date)}</p>
-          <p><strong>Início:</strong> {reservation.start_time.substring(0, 5)}</p>
-          <p><strong>Término:</strong> {reservation.end_time.substring(0, 5)}</p>
-          <p><strong>Local:</strong> {reservation.location}</p>
-        </div>
-
-        <div className="admin-res-detail-card">
-          <h3>Solicitante</h3>
-          <p><strong>Nome:</strong> {reservation.requester_name ?? reservation.internal_user_name ?? '—'}</p>
-          <p><strong>E-mail:</strong> {reservation.requester_email ?? '—'}</p>
-          {reservation.requester_phone && <p><strong>Telefone:</strong> {reservation.requester_phone}</p>}
-        </div>
-
-        <div className="admin-res-detail-card">
-          <h3>Informações</h3>
-          <p><strong>Finalidade:</strong> {reservation.purpose}</p>
-          {reservation.notes && <p><strong>Notas:</strong> {reservation.notes}</p>}
-          {reservation.approved_by_name && <p><strong>Aprovado por:</strong> {reservation.approved_by_name}</p>}
-          {reservation.rejection_reason && <p><strong>Motivo recusa:</strong> {reservation.rejection_reason}</p>}
-          <p><strong>Criado em:</strong> {formatDateTime(reservation.created_at)}</p>
-          <p><strong>Atualizado:</strong> {formatDateTime(reservation.updated_at)}</p>
+        <div className="ard-timeline-wrap">
+          <StatusTimeline status={r.status} />
         </div>
       </div>
 
-      {/* Ações */}
-      <div className="admin-res-detail-actions">
-        {reservation.status === 'pending' && (
-          <>
-            <button className="btn-res-success" disabled={actionLoading} onClick={() => doAction(() => reservationService.approve(id!))}>
-              Aprovar
-            </button>
-            <button className="btn-res-danger" disabled={actionLoading} onClick={() => setShowReject(true)}>
-              Recusar
-            </button>
-          </>
-        )}
-        {reservation.status === 'approved' && (
-          <>
-            <button className="btn-res-purple" disabled={actionLoading} onClick={() => doAction(() => reservationService.markReady(id!))}>
-              Marcar como Pronto
-            </button>
-            <button className="btn-res-warning" disabled={actionLoading} onClick={() => doAction(() => reservationService.markNoShow(id!))}>
-              Marcar No-show
-            </button>
-          </>
-        )}
-        {reservation.status === 'ready' && (
-          <button className="btn-res-warning" disabled={actionLoading} onClick={() => doAction(() => reservationService.markNoShow(id!))}>
-            Marcar No-show
-          </button>
-        )}
-        <a
-          href={reservationService.getICSUrl(id!)}
-          className="btn-res-ghost"
-          download
-        >
-          📅 Exportar ICS
-        </a>
+      <div className="ard-body">
+        {error && <div className="ard-alert-error">{error}</div>}
+
+        {/* Info grid */}
+        <div className="ard-grid">
+
+          <div className="ard-card">
+            <h3 className="ard-card-title">📅 Agendamento</h3>
+            <div className="ard-card-rows">
+              <div className="ard-row"><span className="ard-dl">Data</span><span className="ard-dv">{formatDate(r.date)}</span></div>
+              <div className="ard-row">
+                <span className="ard-dl">Horário</span>
+                <span className="ard-dv">{fmtTime(r.start_time)} → {fmtTime(r.end_time)}</span>
+              </div>
+              <div className="ard-row"><span className="ard-dl">Local</span><span className="ard-dv">{r.location}</span></div>
+            </div>
+          </div>
+
+          <div className="ard-card">
+            <h3 className="ard-card-title">💻 Equipamento</h3>
+            <div className="ard-card-rows">
+              <div className="ard-row"><span className="ard-dl">Tipo</span><span className="ard-dv">{r.type_icon ?? '💻'} {r.type_name}</span></div>
+              <div className="ard-row">
+                <span className="ard-dl">Quantidade</span>
+                <span className="ard-dv ard-dv--big">{r.quantity} notebook{r.quantity !== 1 ? 's' : ''}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="ard-card">
+            <h3 className="ard-card-title">👤 Solicitante</h3>
+            <div className="ard-card-rows">
+              <div className="ard-row"><span className="ard-dl">Nome</span><span className="ard-dv">{requester}</span></div>
+              <div className="ard-row"><span className="ard-dl">E-mail</span><span className="ard-dv">{r.requester_email ?? '—'}</span></div>
+              {r.requester_phone && <div className="ard-row"><span className="ard-dl">Telefone</span><span className="ard-dv">{r.requester_phone}</span></div>}
+            </div>
+          </div>
+
+          <div className="ard-card">
+            <h3 className="ard-card-title">📋 Informações</h3>
+            <div className="ard-card-rows">
+              <div className="ard-row"><span className="ard-dl">Finalidade</span><span className="ard-dv">{r.purpose}</span></div>
+              {r.approved_by_name && <div className="ard-row"><span className="ard-dl">Confirmado por</span><span className="ard-dv">{r.approved_by_name}</span></div>}
+              {r.rejection_reason && <div className="ard-row"><span className="ard-dl">Motivo da recusa</span><span className="ard-dv ard-dv--danger">{r.rejection_reason}</span></div>}
+              <div className="ard-row"><span className="ard-dl">Criada em</span><span className="ard-dv">{formatDateTime(r.created_at)}</span></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Ações */}
+        <div className="ard-actions-section">
+          <p className="ard-actions-label">Ações</p>
+          <div className="ard-actions-row">
+
+            {r.status === 'pending' && (
+              <>
+                <button className="ard-btn ard-btn--green" disabled={actionLoading}
+                  onClick={() => doAction(() => reservationService.approve(id!), 'Aprovar reserva')}>
+                  ✓ Aprovar
+                </button>
+                <button className="ard-btn ard-btn--danger" disabled={actionLoading}
+                  onClick={() => setShowReject(true)}>
+                  ✗ Recusar
+                </button>
+              </>
+            )}
+
+            {r.status === 'approved' && (
+              <>
+                <button className="ard-btn ard-btn--purple" disabled={actionLoading}
+                  onClick={() => doAction(() => reservationService.markReady(id!), 'Marcar notebooks como prontos para retirada')}>
+                  📦 Pronto para Retirada
+                </button>
+                <button className="ard-btn ard-btn--ghost" disabled={actionLoading}
+                  onClick={() => doAction(() => reservationService.markNoShow(id!), 'Registrar não comparecimento')}>
+                  Não Compareceu
+                </button>
+              </>
+            )}
+
+            {r.status === 'ready' && (
+              <>
+                <button className="ard-btn ard-btn--blue" disabled={actionLoading}
+                  onClick={() => doAction(() => reservationService.markInUse(id!), 'Registrar retirada — equipamentos em uso')}>
+                  ▶ Registrar Retirada
+                </button>
+                <button className="ard-btn ard-btn--ghost" disabled={actionLoading}
+                  onClick={() => doAction(() => reservationService.markNoShow(id!), 'Registrar não comparecimento')}>
+                  Não Compareceu
+                </button>
+              </>
+            )}
+
+            {r.status === 'in_use' && (
+              <button className="ard-btn ard-btn--green" disabled={actionLoading}
+                onClick={() => doAction(() => reservationService.markReturned(id!), 'Registrar devolução dos equipamentos')}>
+                ✓ Registrar Devolução
+              </button>
+            )}
+
+            {['returned', 'cancelled', 'rejected', 'no_show'].includes(r.status) && (
+              <p className="ard-actions-done">Reserva encerrada — nenhuma ação disponível.</p>
+            )}
+
+            <a href={reservationService.getICSUrl(id!)} className="ard-btn ard-btn--ghost" download
+              style={{ marginLeft: 'auto' }}>
+              📅 Exportar Calendário
+            </a>
+          </div>
+        </div>
       </div>
 
+      {/* Modal recusa */}
       {showReject && (
-        <div className="res-modal-overlay" onClick={() => setShowReject(false)}>
-          <div className="res-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Recusar Reserva</h3>
-            <label className="res-label">Motivo da recusa</label>
-            <textarea
-              className="res-input res-textarea"
-              rows={3}
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="Informe o motivo para o solicitante"
-            />
-            <div className="res-modal-actions">
-              <button className="btn-res-ghost" onClick={() => setShowReject(false)}>Cancelar</button>
-              <button className="btn-res-danger" onClick={handleReject} disabled={!rejectReason.trim() || actionLoading}>
+        <div className="ard-overlay" onClick={() => setShowReject(false)}>
+          <div className="ard-modal" onClick={e => e.stopPropagation()}>
+            <h3 className="ard-modal-title">Recusar Reserva</h3>
+            <p className="ard-modal-sub">O motivo será enviado ao solicitante por e-mail.</p>
+            <label className="ard-modal-label">Motivo</label>
+            <textarea className="ard-modal-textarea" rows={4}
+              value={rejectReason} onChange={e => setRejectReason(e.target.value)}
+              placeholder="Descreva o motivo da recusa..." />
+            <div className="ard-modal-actions">
+              <button className="ard-btn ard-btn--ghost" onClick={() => setShowReject(false)}>Cancelar</button>
+              <button className="ard-btn ard-btn--danger" onClick={handleReject}
+                disabled={!rejectReason.trim() || actionLoading}>
                 Confirmar Recusa
               </button>
             </div>

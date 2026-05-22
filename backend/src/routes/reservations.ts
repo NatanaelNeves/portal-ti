@@ -984,6 +984,46 @@ router.patch('/:id/ready', authenticate, authorize('reservations:manage'), async
   }
 });
 
+// PATCH /api/reservations/:id/in-use — TI/Admin: registra retirada
+router.patch('/:id/in-use', authenticate, authorize('reservations:manage'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await database.query(
+      `UPDATE equipment_reservations SET status = 'in_use', updated_at = NOW()
+       WHERE id = $1 AND status = 'ready'
+       RETURNING *`,
+      [req.params.id],
+    );
+    if (!result.rows[0]) {
+      res.status(404).json({ error: 'Reserva não encontrada ou não está pronta para retirada' });
+      return;
+    }
+    await logAction(req.params.id, 'in_use', req.user!.id, req.user!.name, 'Equipamentos retirados');
+    res.json({ message: 'Retirada registrada' });
+  } catch {
+    res.status(500).json({ error: 'Erro ao registrar retirada' });
+  }
+});
+
+// PATCH /api/reservations/:id/return — TI/Admin: registra devolução
+router.patch('/:id/return', authenticate, authorize('reservations:manage'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await database.query(
+      `UPDATE equipment_reservations SET status = 'returned', updated_at = NOW()
+       WHERE id = $1 AND status = 'in_use'
+       RETURNING *`,
+      [req.params.id],
+    );
+    if (!result.rows[0]) {
+      res.status(404).json({ error: 'Reserva não encontrada ou não está em uso' });
+      return;
+    }
+    await logAction(req.params.id, 'returned', req.user!.id, req.user!.name, 'Equipamentos devolvidos');
+    res.json({ message: 'Devolução registrada' });
+  } catch {
+    res.status(500).json({ error: 'Erro ao registrar devolução' });
+  }
+});
+
 // PATCH /api/reservations/:id/no-show — TI/Admin
 router.patch('/:id/no-show', authenticate, authorize('reservations:manage'), async (req: Request, res: Response): Promise<void> => {
   try {
