@@ -57,8 +57,8 @@ export default function Navigation() {
   const userRole = userData?.role;
   
   const showAssetsLink = userRole === 'admin' || userRole === 'it_staff';
-  const showReservationsLink = true; // todos os usuários internos
-  const showAdminReservationsLink = userRole === 'admin' || userRole === 'it_staff';
+  const showReservationsLink = userRole === 'admin' || userRole === 'it_staff';
+  const showAdminReservationsLink = showReservationsLink;
   const showUsersLink = userRole === 'admin' || userRole === 'it_staff';
   const showKnowledgeLink = userRole === 'admin' || userRole === 'it_staff';
   const showDocumentsLink = userRole === 'admin' || userRole === 'it_staff';
