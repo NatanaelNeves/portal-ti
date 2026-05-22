@@ -369,7 +369,7 @@ function ReservationCard({ reservation: r, past, onCancel, cancelling }: {
             <div><span className="rp-res-dl">Data</span><span className="rp-res-dv">{fmtDate(r.date)}</span></div>
             <div><span className="rp-res-dl">Horário</span><span className="rp-res-dv">{fmtTime(r.start_time)} – {fmtTime(r.end_time)}</span></div>
             <div><span className="rp-res-dl">Local</span><span className="rp-res-dv">{r.location}</span></div>
-            <div><span className="rp-res-dl">Finalidade</span><span className="rp-res-dv">{r.purpose}</span></div>
+            <div><span className="rp-res-dl">Para que foi usado</span><span className="rp-res-dv">{r.purpose}</span></div>
             {r.status === 'rejected' && r.rejection_reason && (
               <div style={{ gridColumn: '1/-1' }}>
                 <span className="rp-res-dl">Motivo da recusa</span>
@@ -505,7 +505,7 @@ export default function ReservationPublicPage() {
             <div className="rp-hero-stats">
               <div className="rp-hero-stat">
                 <span className="rp-hero-stat-val">{stats.pool_size}</span>
-                <span className="rp-hero-stat-lbl">no pool</span>
+                <span className="rp-hero-stat-lbl">no acervo</span>
               </div>
               <div className="rp-hero-stat-div" />
               <div className="rp-hero-stat">
@@ -582,9 +582,9 @@ export default function ReservationPublicPage() {
                         <div className="rp-pool-bar-track">
                           <div className="rp-pool-bar-fill" style={{ width: `${(quantity / poolSize) * 100}%` }} />
                         </div>
-                        <span className="rp-pool-bar-label">{quantity} de {poolSize} do pool</span>
+                        <span className="rp-pool-bar-label">Você pediu {quantity} de {poolSize} notebooks disponíveis</span>
                       </div>
-                      <p className="rp-hint">A disponibilidade exata é confirmada no próximo passo.</p>
+                      <p className="rp-hint">A disponibilidade será verificada quando você escolher o horário.</p>
                     </div>
                   </div>
                 )}
@@ -650,20 +650,20 @@ export default function ReservationPublicPage() {
                 {step === 3 && (
                   <div className="rp-card rp-card--anim">
                     <div className="rp-card-body">
-                      <h2 className="rp-card-title">Onde e para quê?</h2>
+                      <h2 className="rp-card-title">Onde vai usar e para quê?</h2>
                       <div className="rp-field">
                         <label className="rp-label">Local de uso</label>
                         <input type="text" className="rp-input" placeholder="Ex: Sala 12 — Bloco B"
                           value={location} onChange={e => setLocation(e.target.value)} required />
                       </div>
                       <div className="rp-field" style={{ marginTop: 16 }}>
-                        <label className="rp-label">Finalidade</label>
+                        <label className="rp-label">Para que vai usar?</label>
                         <textarea className="rp-input rp-textarea" rows={2}
                           placeholder="Ex: Aula de informática para turma do 9º ano"
                           value={purpose} onChange={e => setPurpose(e.target.value)} required />
                       </div>
 
-                      <div className="rp-divider"><span>Dados do solicitante</span></div>
+                      <div className="rp-divider"><span>Seus dados de contato</span></div>
 
                       <div className="rp-field">
                         <label className="rp-label">Nome completo</label>
@@ -693,11 +693,11 @@ export default function ReservationPublicPage() {
                       <h2 className="rp-card-title">Revise e confirme</h2>
                       <div className="rp-review">
                         {[
-                          { icon: '💻', label: 'Equipamento', val: `${quantity} notebook${quantity !== 1 ? 's' : ''}`, editStep: 1 },
+                          { icon: '💻', label: 'Notebooks', val: `${quantity} notebook${quantity !== 1 ? 's' : ''}`, editStep: 1 },
                           { icon: '📅', label: 'Data e Horário', val: `${fmtDateShort(date)} · ${startTime.substring(0,5)}–${endTime.substring(0,5)}`, editStep: 2 },
                           { icon: '📍', label: 'Local', val: location, editStep: 3 },
-                          { icon: '🎯', label: 'Finalidade', val: purpose, editStep: 3 },
-                          { icon: '👤', label: 'Solicitante', val: `${name} · ${email}`, editStep: 3 },
+                          { icon: '🎯', label: 'Para que vai usar', val: purpose, editStep: 3 },
+                          { icon: '👤', label: 'Quem está pedindo', val: `${name} · ${email}`, editStep: 3 },
                         ].map(({ icon, label, val, editStep }) => (
                           <div key={label} className="rp-review-row">
                             <span className="rp-review-icon">{icon}</span>
