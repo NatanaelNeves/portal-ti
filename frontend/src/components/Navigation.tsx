@@ -39,10 +39,7 @@ export default function Navigation() {
             Central de Dúvidas
           </button>
           <button onClick={() => navigate('/reservar')} className="nav-link">
-            Reservar Notebooks
-          </button>
-          <button onClick={() => navigate('/reservar/acompanhar')} className="nav-link">
-            Minhas Reservas
+            Reservas de Notebooks
           </button>
         </div>
         <div className="navbar-user">

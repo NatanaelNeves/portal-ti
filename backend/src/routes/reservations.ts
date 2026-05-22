@@ -258,6 +258,74 @@ router.get('/availability', async (req: Request, res: Response): Promise<void> =
   }
 });
 
+// GET /api/reservations/stats — público: pool + uso atual + total hoje
+router.get('/stats', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const def = await getDefaultType();
+    if (!def) {
+      res.json({ pool_size: 20, type_name: 'Notebooks', type_icon: '💻', active_now: 0, today_total: 0 });
+      return;
+    }
+    const today = new Date().toISOString().split('T')[0];
+    const nowTime = new Date().toTimeString().substring(0, 5);
+    const [activeRes, todayRes] = await Promise.all([
+      database.query(
+        `SELECT COALESCE(SUM(quantity), 0) AS active_now
+         FROM equipment_reservations
+         WHERE equipment_type_id = $1 AND date = $2
+           AND status IN ('in_use', 'ready')
+           AND start_time <= $3::time AND end_time > $3::time`,
+        [def.id, today, nowTime],
+      ),
+      database.query(
+        `SELECT COUNT(*) AS today_total
+         FROM equipment_reservations
+         WHERE equipment_type_id = $1 AND date = $2
+           AND status NOT IN ('cancelled', 'rejected')`,
+        [def.id, today],
+      ),
+    ]);
+    res.json({
+      pool_size: def.max_quantity,
+      type_name: def.name,
+      type_icon: '💻',
+      active_now: parseInt(activeRes.rows[0].active_now, 10),
+      today_total: parseInt(todayRes.rows[0].today_total, 10),
+    });
+  } catch {
+    res.json({ pool_size: 20, type_name: 'Notebooks', type_icon: '💻', active_now: 0, today_total: 0 });
+  }
+});
+
+// GET /api/reservations/schedule?date=YYYY-MM-DD — público: blocos ocupados no dia
+router.get('/schedule', async (req: Request, res: Response): Promise<void> => {
+  const { date } = req.query as { date?: string };
+  if (!date) { res.status(400).json({ error: 'date required' }); return; }
+  try {
+    const def = await getDefaultType();
+    if (!def) { res.json({ slots: [], pool_size: 20 }); return; }
+    const result = await database.query(
+      `SELECT start_time, end_time, SUM(quantity) AS quantity
+       FROM equipment_reservations
+       WHERE equipment_type_id = $1 AND date = $2
+         AND status IN ('approved', 'ready', 'in_use')
+       GROUP BY start_time, end_time
+       ORDER BY start_time`,
+      [def.id, date],
+    );
+    res.json({
+      slots: result.rows.map((r: any) => ({
+        start: String(r.start_time).substring(0, 5),
+        end: String(r.end_time).substring(0, 5),
+        quantity: parseInt(r.quantity, 10),
+      })),
+      pool_size: def.max_quantity,
+    });
+  } catch {
+    res.json({ slots: [], pool_size: 20 });
+  }
+});
+
 // GET /api/reservations/public/by-email?email=xxx — público
 router.get('/public/by-email', async (req: Request, res: Response): Promise<void> => {
   const { email } = req.query as { email?: string };
@@ -342,6 +410,28 @@ router.get('/public/:token/ics', async (req: Request, res: Response): Promise<vo
     res.send(ics);
   } catch {
     res.status(500).json({ error: 'Erro ao gerar ICS' });
+  }
+});
+
+// PATCH /api/reservations/public/:token/cancel — público (cancela por token)
+router.patch('/public/:token/cancel', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await database.query(
+      `UPDATE equipment_reservations
+       SET status = 'cancelled', updated_at = NOW()
+       WHERE access_token = $1
+         AND status IN ('approved', 'ready')
+       RETURNING id, reservation_number`,
+      [req.params.token],
+    );
+    if (!result.rows[0]) {
+      res.status(404).json({ error: 'Reserva não encontrada ou não pode ser cancelada' });
+      return;
+    }
+    await logAction(result.rows[0].id, 'cancelled', null, null, 'Cancelado pelo solicitante via link');
+    res.json({ message: 'Reserva cancelada com sucesso' });
+  } catch {
+    res.status(500).json({ error: 'Erro ao cancelar reserva' });
   }
 });
 

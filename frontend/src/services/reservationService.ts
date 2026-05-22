@@ -138,12 +138,26 @@ export const reservationService = {
     return res.data;
   },
 
+  getStats: async (): Promise<{ pool_size: number; type_name: string; type_icon: string; active_now: number; today_total: number }> => {
+    const res = await axios.get(`${API_BASE}/api/reservations/stats`);
+    return res.data;
+  },
+
+  getSchedule: async (date: string): Promise<{ slots: { start: string; end: string; quantity: number }[]; pool_size: number }> => {
+    const res = await axios.get(`${API_BASE}/api/reservations/schedule`, { params: { date } });
+    return res.data;
+  },
+
   getByEmail: async (email: string): Promise<Reservation[]> => {
     const res = await axios.get(`${API_BASE}/api/reservations/public/by-email`, { params: { email } });
     return res.data;
   },
 
   getICSUrlByToken: (token: string) => `${API_BASE}/api/reservations/public/${token}/ics`,
+
+  cancelByToken: async (token: string): Promise<void> => {
+    await axios.patch(`${API_BASE}/api/reservations/public/${token}/cancel`);
+  },
 
   // Autenticado
   create: async (payload: CreateReservationPayload): Promise<{ id: string; reservation_number: string }> => {

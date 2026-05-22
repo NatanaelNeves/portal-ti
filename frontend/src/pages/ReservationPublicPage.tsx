@@ -1,23 +1,415 @@
 import { useState, useEffect, useCallback } from 'react';
-import { reservationService, AvailabilityResult } from '../services/reservationService';
+import { reservationService, AvailabilityResult, Reservation } from '../services/reservationService';
 import '../styles/ReservationPublicPage.css';
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function getMinDate(): string {
   return new Date(Date.now() + 30 * 60 * 1000).toISOString().split('T')[0];
 }
 
 function getMinTime(date: string): string {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const selected = new Date(date + 'T00:00:00');
-  if (selected.getTime() === today.getTime()) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const sel = new Date(date + 'T00:00:00');
+  if (sel.getTime() === today.getTime()) {
     const m = new Date(Date.now() + 30 * 60 * 1000);
     return `${String(m.getHours()).padStart(2, '0')}:${String(m.getMinutes()).padStart(2, '0')}`;
   }
   return '00:00';
 }
 
+function fmtDateShort(d: string): string {
+  if (!d) return '—';
+  return new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' });
+}
+
+function fmtDate(d: string | Date): string {
+  const s = d instanceof Date ? d.toISOString().split('T')[0] : String(d).split('T')[0];
+  return new Date(s + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
+}
+
+function fmtTime(t: string): string {
+  return String(t).substring(0, 5);
+}
+
+function isPast(date: string | Date, endTime: string): boolean {
+  const ds = date instanceof Date ? date.toISOString().split('T')[0] : String(date).split('T')[0];
+  const dt = new Date(`${ds}T${fmtTime(endTime)}:00`);
+  return dt < new Date();
+}
+
+// ── Sub-components: Wizard ────────────────────────────────────────────────────
+
+const STEPS = ['Quantidade', 'Horário', 'Detalhes', 'Confirmar'];
+
+function StepIndicator({ current }: { current: number }) {
+  return (
+    <div className="rp-steps">
+      {STEPS.map((label, i) => {
+        const n = i + 1;
+        const done = n < current;
+        const active = n === current;
+        return (
+          <div key={n} className={`rp-step ${done ? 'done' : active ? 'active' : ''}`}>
+            <div className="rp-step-circle">{done ? '✓' : n}</div>
+            <span className="rp-step-label">{label}</span>
+            {i < STEPS.length - 1 && <div className="rp-step-line" />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+interface ScheduleSlot { start: string; end: string; quantity: number }
+
+function DayTimeline({ slots, poolSize, selStart, selEnd }: {
+  slots: ScheduleSlot[]; poolSize: number; selStart: string; selEnd: string;
+}) {
+  const S = 7, E = 21, R = E - S;
+  const pct = (t: string) => {
+    if (!t) return 0;
+    const [h, m] = t.split(':').map(Number);
+    return Math.max(0, Math.min(100, ((h + m / 60 - S) / R) * 100));
+  };
+  return (
+    <div className="rp-timeline">
+      <div className="rp-timeline-track">
+        {slots.map((s, i) => {
+          const l = pct(s.start), w = pct(s.end) - l;
+          if (w <= 0) return null;
+          return (
+            <div key={i} className="rp-tl-block"
+              style={{ left: `${l}%`, width: `${w}%`, opacity: 0.35 + Math.min(0.55, s.quantity / poolSize) }}
+              title={`${s.start}–${s.end}: ${s.quantity} reservado(s)`}
+            />
+          );
+        })}
+        {selStart && selEnd && pct(selEnd) > pct(selStart) && (
+          <div className="rp-tl-sel" style={{ left: `${pct(selStart)}%`, width: `${pct(selEnd) - pct(selStart)}%` }} />
+        )}
+      </div>
+      <div className="rp-timeline-hours">
+        {[8, 10, 12, 14, 16, 18, 20].map(h => (
+          <span key={h} style={{ left: `${((h - S) / R) * 100}%` }}>{h}h</span>
+        ))}
+      </div>
+      <div className="rp-timeline-legend">
+        <span className="rp-tl-dot rp-tl-dot--occ" /> <span>Ocupado</span>
+        {selStart && selEnd && <><span className="rp-tl-dot rp-tl-dot--sel" /> <span>Seu horário</span></>}
+      </div>
+    </div>
+  );
+}
+
+function CapacityBar({ remaining, total }: { remaining: number; total: number }) {
+  if (!total) return null;
+  const usedPct = Math.round(((total - remaining) / total) * 100);
+  const status = remaining === 0 ? 'full' : remaining <= Math.ceil(total * 0.3) ? 'low' : 'ok';
+  return (
+    <div className="rp-capbar">
+      <div className="rp-capbar-track">
+        <div className="rp-capbar-fill" data-s={status} style={{ width: `${usedPct}%` }} />
+      </div>
+      <span className="rp-capbar-label" data-s={status}>
+        {remaining === total ? `${total} disponíveis`
+          : remaining === 0 ? 'Sem disponibilidade'
+          : `${remaining} de ${total} disponíveis`}
+      </span>
+    </div>
+  );
+}
+
+interface SidebarProps {
+  quantity: number; date: string; startTime: string; endTime: string;
+  location: string; name: string; avail: string;
+  onSubmit: () => void; submitting: boolean; canSubmit: boolean;
+}
+function SummarySidebar({ quantity, date, startTime, endTime, location, name, avail, onSubmit, submitting, canSubmit }: SidebarProps) {
+  const hasTime = date && startTime && endTime;
+  return (
+    <aside className="rp-sidebar">
+      <h3 className="rp-sidebar-title">Resumo</h3>
+      <div className="rp-sidebar-rows">
+        <div className="rp-sb-row">
+          <span className="rp-sb-icon">💻</span>
+          <span className="rp-sb-val">{quantity} notebook{quantity !== 1 ? 's' : ''}</span>
+        </div>
+        <div className={`rp-sb-row ${!date ? 'rp-sb-row--empty' : ''}`}>
+          <span className="rp-sb-icon">📅</span>
+          <span className="rp-sb-val">{date ? fmtDateShort(date) : '—'}</span>
+        </div>
+        <div className={`rp-sb-row ${!hasTime ? 'rp-sb-row--empty' : ''}`}>
+          <span className="rp-sb-icon">🕐</span>
+          <span className="rp-sb-val">{hasTime ? `${startTime.substring(0,5)} → ${endTime.substring(0,5)}` : '—'}</span>
+        </div>
+        <div className={`rp-sb-row ${!location ? 'rp-sb-row--empty' : ''}`}>
+          <span className="rp-sb-icon">📍</span>
+          <span className="rp-sb-val rp-sb-val--sm">{location || '—'}</span>
+        </div>
+        {name && (
+          <div className="rp-sb-row">
+            <span className="rp-sb-icon">👤</span>
+            <span className="rp-sb-val rp-sb-val--sm">{name}</span>
+          </div>
+        )}
+      </div>
+      {avail === 'unavailable' && <p className="rp-sb-warn">⚠ Horário indisponível</p>}
+      <button className="rp-btn-submit" onClick={onSubmit}
+        disabled={!canSubmit || submitting || avail === 'unavailable' || avail === 'checking'}>
+        {submitting ? <><span className="rp-spinner" /> Processando...</> : 'Confirmar Reserva'}
+      </button>
+      <p className="rp-submit-note">Confirmação por e-mail imediata</p>
+    </aside>
+  );
+}
+
+// ── Sub-component: Minhas Reservas ────────────────────────────────────────────
+
+const PROGRESS_STEPS: Array<{ key: string; label: string }> = [
+  { key: 'approved', label: 'Confirmada' },
+  { key: 'ready',    label: 'Pronta' },
+  { key: 'in_use',   label: 'Em uso' },
+  { key: 'returned', label: 'Devolvida' },
+];
+
+const PROGRESS_STATUS_INDEX: Record<string, number> = {
+  approved: 0, ready: 1, in_use: 2, returned: 3,
+};
+
+const TERMINAL_STATUSES = ['rejected', 'cancelled', 'no_show'];
+
+function ReservationMiniTimeline({ status }: { status: string }) {
+  if (TERMINAL_STATUSES.includes(status)) {
+    const labels: Record<string, string> = {
+      rejected: 'Recusada', cancelled: 'Cancelada', no_show: 'Não compareceu',
+    };
+    const colors: Record<string, string> = {
+      rejected: '#B91C1C', cancelled: '#6B7280', no_show: '#F28C38',
+    };
+    return (
+      <div className="rp-mini-tl rp-mini-tl--terminal">
+        <span className="rp-mini-tl-badge" style={{ background: colors[status] }}>
+          {labels[status] ?? status}
+        </span>
+      </div>
+    );
+  }
+
+  const currentIdx = PROGRESS_STATUS_INDEX[status] ?? -1;
+
+  return (
+    <div className="rp-mini-tl">
+      {PROGRESS_STEPS.map((s, i) => {
+        const done = i < currentIdx;
+        const active = i === currentIdx;
+        return (
+          <div key={s.key} className="rp-mini-tl-step">
+            <div className={`rp-mini-tl-dot ${done ? 'done' : active ? 'active' : ''}`} />
+            <span className={`rp-mini-tl-lbl ${active ? 'active' : done ? 'done' : ''}`}>{s.label}</span>
+            {i < PROGRESS_STEPS.length - 1 && (
+              <div className={`rp-mini-tl-line ${done ? 'done' : ''}`} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+interface MyReservationsTabProps {
+  prefillEmail?: string;
+  successNumber?: string;
+  onClearSuccess: () => void;
+}
+
+function MyReservationsTab({ prefillEmail, successNumber, onClearSuccess }: MyReservationsTabProps) {
+  const [email, setEmail] = useState(prefillEmail ?? '');
+  const [searched, setSearched] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [error, setError] = useState('');
+  const [cancellingToken, setCancellingToken] = useState<string | null>(null);
+
+  const search = useCallback(async () => {
+    if (!email.trim() || !email.includes('@')) { setError('Informe um e-mail válido.'); return; }
+    setLoading(true); setError('');
+    try {
+      const data = await reservationService.getByEmail(email.trim());
+      setReservations(data);
+      setSearched(true);
+    } catch {
+      setError('Erro ao buscar reservas. Tente novamente.');
+    } finally { setLoading(false); }
+  }, [email]);
+
+  // Auto-search when we have a prefill email (after form submit)
+  useEffect(() => {
+    if (prefillEmail && prefillEmail.includes('@')) {
+      search();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleCancel = async (token: string) => {
+    if (!confirm('Cancelar esta reserva?')) return;
+    setCancellingToken(token);
+    try {
+      await reservationService.cancelByToken(token);
+      setReservations(prev => prev.map(r =>
+        r.access_token === token ? { ...r, status: 'cancelled' } : r
+      ));
+    } catch {
+      alert('Não foi possível cancelar. Tente novamente.');
+    } finally { setCancellingToken(null); }
+  };
+
+  const active = reservations.filter(r => !isPast(r.date, r.end_time) && !TERMINAL_STATUSES.includes(r.status));
+  const past   = reservations.filter(r => isPast(r.date, r.end_time) || TERMINAL_STATUSES.includes(r.status));
+
+  return (
+    <div className="rp-my-tab">
+      {successNumber && (
+        <div className="rp-success-banner">
+          <span>✅</span>
+          <div>
+            <strong>Reserva {successNumber} confirmada!</strong>
+            <span> Veja abaixo ou aguarde o e-mail de confirmação.</span>
+          </div>
+          <button className="rp-success-banner-close" onClick={onClearSuccess}>×</button>
+        </div>
+      )}
+
+      <div className="rp-my-search-card">
+        <h2 className="rp-my-search-title">Minhas Reservas</h2>
+        <p className="rp-my-search-sub">Informe seu e-mail para ver todas as suas reservas.</p>
+        <form className="rp-my-search-form" onSubmit={e => { e.preventDefault(); search(); }}>
+          <input
+            type="email"
+            className="rp-input"
+            placeholder="seu@email.com"
+            value={email}
+            onChange={e => { setEmail(e.target.value); setSearched(false); onClearSuccess(); }}
+            required
+          />
+          <button type="submit" className="rp-btn-search" disabled={loading}>
+            {loading ? <span className="rp-spinner rp-spinner--dark" /> : 'Buscar'}
+          </button>
+        </form>
+        {error && <p className="rp-my-error">{error}</p>}
+      </div>
+
+      {searched && (
+        <div className="rp-my-results">
+          {reservations.length === 0 ? (
+            <div className="rp-my-empty">
+              <div className="rp-my-empty-icon">📭</div>
+              <p>Nenhuma reserva encontrada para <strong>{email}</strong></p>
+            </div>
+          ) : (
+            <>
+              {active.length > 0 && (
+                <>
+                  <p className="rp-my-section-label">Ativas / Futuras</p>
+                  {active.map(r => (
+                    <ReservationCard key={r.id} reservation={r}
+                      onCancel={['approved','ready'].includes(r.status) ? handleCancel : undefined}
+                      cancelling={cancellingToken === r.access_token} />
+                  ))}
+                </>
+              )}
+              {past.length > 0 && (
+                <>
+                  <p className="rp-my-section-label rp-my-section-label--past">Histórico</p>
+                  {past.map(r => (
+                    <ReservationCard key={r.id} reservation={r} past />
+                  ))}
+                </>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReservationCard({ reservation: r, past, onCancel, cancelling }: {
+  reservation: Reservation;
+  past?: boolean;
+  onCancel?: (token: string) => void;
+  cancelling?: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const dateStr = String(r.date).split('T')[0];
+  const token = r.access_token ?? '';
+
+  return (
+    <div className={`rp-res-card ${past ? 'rp-res-card--past' : ''}`}>
+      <div className="rp-res-card-top" onClick={() => setExpanded(v => !v)}>
+        <div className="rp-res-card-left">
+          <span className="rp-res-card-icon">💻</span>
+          <div>
+            <div className="rp-res-card-number">{r.reservation_number}</div>
+            <div className="rp-res-card-meta">
+              {r.quantity} notebook{r.quantity !== 1 ? 's' : ''} · {fmtDateShort(dateStr)} · {fmtTime(r.start_time)}–{fmtTime(r.end_time)}
+            </div>
+          </div>
+        </div>
+        <span className="rp-res-card-chevron">{expanded ? '▲' : '▼'}</span>
+      </div>
+
+      <div className="rp-res-card-tl">
+        <ReservationMiniTimeline status={r.status} />
+      </div>
+
+      {expanded && (
+        <div className="rp-res-card-body">
+          <div className="rp-res-card-detail-grid">
+            <div><span className="rp-res-dl">Data</span><span className="rp-res-dv">{fmtDate(r.date)}</span></div>
+            <div><span className="rp-res-dl">Horário</span><span className="rp-res-dv">{fmtTime(r.start_time)} – {fmtTime(r.end_time)}</span></div>
+            <div><span className="rp-res-dl">Local</span><span className="rp-res-dv">{r.location}</span></div>
+            <div><span className="rp-res-dl">Finalidade</span><span className="rp-res-dv">{r.purpose}</span></div>
+            {r.status === 'rejected' && r.rejection_reason && (
+              <div style={{ gridColumn: '1/-1' }}>
+                <span className="rp-res-dl">Motivo da recusa</span>
+                <span className="rp-res-dv" style={{ color: '#B91C1C' }}>{r.rejection_reason}</span>
+              </div>
+            )}
+          </div>
+          <div className="rp-res-card-actions">
+            {token && (
+              <a href={`/reservar/acompanhar/${token}`}
+                className="rp-res-action-link" target="_blank" rel="noreferrer">
+                Ver detalhes →
+              </a>
+            )}
+            {token && (
+              <a href={reservationService.getICSUrlByToken(token)}
+                className="rp-res-action-link rp-res-action-link--muted" download>
+                📅 Calendário
+              </a>
+            )}
+            {onCancel && token && (
+              <button className="rp-res-cancel-btn"
+                onClick={() => onCancel(token)} disabled={cancelling}>
+                {cancelling ? 'Cancelando…' : 'Cancelar reserva'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+
 export default function ReservationPublicPage() {
+  const [activeTab, setActiveTab] = useState<'new' | 'my'>('new');
+
+  // Form state
+  const [step, setStep] = useState(1);
   const [quantity, setQuantity] = useState(1);
   const [date, setDate] = useState('');
   const [startTime, setStartTime] = useState('');
@@ -32,7 +424,20 @@ export default function ReservationPublicPage() {
   const [checking, setChecking] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState<{ number: string; token: string } | null>(null);
+
+  // After success: switch to "my" tab and show banner
+  const [successBanner, setSuccessBanner] = useState<{ number: string; forEmail: string } | null>(null);
+
+  const [stats, setStats] = useState<{ pool_size: number; active_now: number; today_total: number } | null>(null);
+  const [schedule, setSchedule] = useState<{ slots: ScheduleSlot[]; pool_size: number } | null>(null);
+
+  useEffect(() => { reservationService.getStats().then(setStats).catch(() => {}); }, []);
+
+  useEffect(() => {
+    if (!date) return;
+    setSchedule(null);
+    reservationService.getSchedule(date).then(setSchedule).catch(() => {});
+  }, [date]);
 
   const checkAvailability = useCallback(async () => {
     if (!date || !startTime || !endTime || startTime >= endTime) return;
@@ -40,42 +445,14 @@ export default function ReservationPublicPage() {
     try {
       const r = await reservationService.checkAvailability(null, date, startTime, endTime, quantity);
       setAvailability(r);
-    } catch {
-      setAvailability(null);
-    } finally {
-      setChecking(false);
-    }
+    } catch { setAvailability(null); }
+    finally { setChecking(false); }
   }, [date, startTime, endTime, quantity]);
 
   useEffect(() => {
     const t = setTimeout(checkAvailability, 500);
     return () => clearTimeout(t);
   }, [checkAvailability]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (availability && !availability.available) { setError('Horário indisponível.'); return; }
-    setSubmitting(true);
-    setError('');
-    try {
-      const r = await reservationService.createPublic({
-        quantity,
-        date,
-        start_time: startTime,
-        end_time: endTime,
-        location,
-        purpose,
-        requester_name: name,
-        requester_email: email,
-        requester_phone: phone,
-      });
-      setSuccess({ number: r.reservation_number, token: r.access_token });
-    } catch (err: any) {
-      setError(err?.response?.data?.message || err?.response?.data?.error || 'Erro ao criar reserva. Tente novamente.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const avail: 'idle' | 'checking' | 'ok' | 'partial' | 'unavailable' =
     checking ? 'checking'
@@ -84,186 +461,316 @@ export default function ReservationPublicPage() {
     : availability.capacity_status === 'partial' ? 'partial'
     : 'ok';
 
-  // ── Sucesso ───────────────────────────────────────────────────────
-  if (success) {
-    const trackingUrl = `/reservar/acompanhar/${success.token}`;
-    return (
-      <div className="rp-page">
-        <div className="rp-hero">
-          <div className="rp-hero-icon">💻</div>
-          <h1>Reservar Notebooks</h1>
+  const poolSize = stats?.pool_size ?? schedule?.pool_size ?? 20;
+
+  const step2Valid = !!date && !!startTime && !!endTime && startTime < endTime
+    && avail !== 'unavailable' && avail !== 'checking';
+  const step3Valid = !!location.trim() && !!purpose.trim() && !!name.trim()
+    && !!email.trim() && email.includes('@');
+  const allValid = step2Valid && step3Valid;
+
+  const canGoNext = step === 1 || (step === 2 && step2Valid) || (step === 3 && step3Valid);
+
+  const handleSubmit = async () => {
+    if (avail === 'unavailable') { setError('Horário indisponível.'); return; }
+    setSubmitting(true); setError('');
+    try {
+      const r = await reservationService.createPublic({
+        quantity, date, start_time: startTime, end_time: endTime,
+        location, purpose, requester_name: name, requester_email: email, requester_phone: phone,
+      });
+      // Switch to "Minhas Reservas" tab and show success banner
+      setSuccessBanner({ number: r.reservation_number, forEmail: email });
+      setActiveTab('my');
+      // Reset form
+      setStep(1); setQuantity(1); setDate(''); setStartTime(''); setEndTime('');
+      setLocation(''); setPurpose(''); setName(''); setPhone('');
+      setAvailability(null); setError('');
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.response?.data?.error || 'Erro ao criar reserva.');
+    } finally { setSubmitting(false); }
+  };
+
+  return (
+    <div className="rp-page">
+      {/* Hero */}
+      <div className="rp-hero">
+        <div className="rp-hero-inner">
+          <div className="rp-hero-text">
+            <div className="rp-hero-icon">💻</div>
+            <h1>Reservas de Notebooks</h1>
+            <p>Para aulas, treinamentos e eventos internos</p>
+          </div>
+          {stats && (
+            <div className="rp-hero-stats">
+              <div className="rp-hero-stat">
+                <span className="rp-hero-stat-val">{stats.pool_size}</span>
+                <span className="rp-hero-stat-lbl">no pool</span>
+              </div>
+              <div className="rp-hero-stat-div" />
+              <div className="rp-hero-stat">
+                <span className="rp-hero-stat-val">{stats.active_now}</span>
+                <span className="rp-hero-stat-lbl">em uso agora</span>
+              </div>
+              <div className="rp-hero-stat-div" />
+              <div className="rp-hero-stat">
+                <span className="rp-hero-stat-val">{stats.today_total}</span>
+                <span className="rp-hero-stat-lbl">reservas hoje</span>
+              </div>
+            </div>
+          )}
         </div>
-        <div className="rp-container" style={{ paddingTop: 32 }}>
-          <div className="rp-success">
-            <div className="rp-success-check">✅</div>
-            <h2>Reserva Confirmada!</h2>
-            <div className="rp-success-number">{success.number}</div>
-            <p>Enviamos a confirmação com o link de acompanhamento para o seu e-mail.</p>
 
-            <div className="rp-success-link-box">
-              <span className="rp-success-link-label">Seu link de acompanhamento:</span>
-              <a href={trackingUrl} className="rp-success-link">{window.location.origin}{trackingUrl}</a>
-            </div>
-
-            <div className="rp-success-btns">
-              <a href={trackingUrl} className="rp-btn-primary">
-                Acompanhar esta reserva
-              </a>
-              <a href="/reservar/acompanhar" className="rp-btn-outline">
-                Ver todas as minhas reservas
-              </a>
-            </div>
-            <a
-              href={`${import.meta.env.VITE_API_URL || ''}/api/reservations/public/${success.token}/ics`}
-              className="rp-link-btn"
-              download
+        {/* Tab bar inside hero */}
+        <div className="rp-tabs">
+          <div className="rp-tabs-inner">
+            <button
+              className={`rp-tab ${activeTab === 'new' ? 'active' : ''}`}
+              onClick={() => setActiveTab('new')}
             >
-              📅 Adicionar ao Calendário
-            </a>
-            <button className="rp-link-btn" onClick={() => {
-              setSuccess(null); setQuantity(1); setDate(''); setStartTime('');
-              setEndTime(''); setLocation(''); setPurpose('');
-              setName(''); setEmail(''); setPhone(''); setAvailability(null);
-            }}>
-              Fazer outra reserva
+              Nova Reserva
+            </button>
+            <button
+              className={`rp-tab ${activeTab === 'my' ? 'active' : ''}`}
+              onClick={() => setActiveTab('my')}
+            >
+              Minhas Reservas
             </button>
           </div>
         </div>
       </div>
-    );
-  }
-
-  // ── Formulário ────────────────────────────────────────────────────
-  return (
-    <div className="rp-page">
-      <div className="rp-hero">
-        <div className="rp-hero-icon">💻</div>
-        <h1>Reservar Notebooks</h1>
-        <p>Para aulas, treinamentos e eventos internos</p>
-      </div>
 
       <div className="rp-container">
-        <form className="rp-form" onSubmit={handleSubmit} noValidate>
 
-          {/* Quantidade */}
-          <div className="rp-card">
-            <div className="rp-card-body">
-              <h2 className="rp-card-title">Quantos notebooks?</h2>
-              <div className="rp-stepper">
-                <button type="button" className="rp-stepper-btn"
-                  onClick={() => { setQuantity(q => Math.max(1, q - 1)); setAvailability(null); }}>−</button>
-                <span className="rp-stepper-value">{quantity}</span>
-                <button type="button" className="rp-stepper-btn"
-                  onClick={() => { setQuantity(q => q + 1); setAvailability(null); }}>+</button>
+        {/* ── Tab: Nova Reserva ── */}
+        {activeTab === 'new' && (
+          <>
+            <StepIndicator current={step} />
+
+            <div className="rp-layout">
+              <div className="rp-main">
+
+                {/* Step 1 — Quantidade */}
+                {step === 1 && (
+                  <div className="rp-card rp-card--anim">
+                    <div className="rp-card-body">
+                      <h2 className="rp-card-title">Quantos notebooks você precisa?</h2>
+                      <div className="rp-qty">
+                        <button type="button" className="rp-qty-btn"
+                          onClick={() => { setQuantity(q => Math.max(1, q - 1)); setAvailability(null); }}
+                          disabled={quantity <= 1}>−</button>
+                        <div className="rp-qty-display">
+                          <span className="rp-qty-num">{quantity}</span>
+                          <span className="rp-qty-unit">notebook{quantity !== 1 ? 's' : ''}</span>
+                        </div>
+                        <button type="button" className="rp-qty-btn"
+                          onClick={() => { setQuantity(q => Math.min(poolSize, q + 1)); setAvailability(null); }}
+                          disabled={quantity >= poolSize}>+</button>
+                      </div>
+
+                      <div className="rp-qty-presets">
+                        {[5, 10, 15, 20, 25, 30].filter(n => n <= poolSize).slice(0, 5).map(n => (
+                          <button key={n} type="button"
+                            className={`rp-qty-preset ${quantity === n ? 'active' : ''}`}
+                            onClick={() => { setQuantity(n); setAvailability(null); }}>
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="rp-pool-bar">
+                        <div className="rp-pool-bar-track">
+                          <div className="rp-pool-bar-fill" style={{ width: `${(quantity / poolSize) * 100}%` }} />
+                        </div>
+                        <span className="rp-pool-bar-label">{quantity} de {poolSize} do pool</span>
+                      </div>
+                      <p className="rp-hint">A disponibilidade exata é confirmada no próximo passo.</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 2 — Horário */}
+                {step === 2 && (
+                  <div className="rp-card rp-card--anim">
+                    <div className="rp-card-body">
+                      <h2 className="rp-card-title">Quando você precisa?</h2>
+                      <div className="rp-datetime-grid">
+                        <div className="rp-field">
+                          <label className="rp-label">Data</label>
+                          <input type="date" className="rp-input" min={getMinDate()} value={date}
+                            onChange={e => { setDate(e.target.value); setAvailability(null); }} required />
+                        </div>
+                        <div className="rp-field">
+                          <label className="rp-label">Início</label>
+                          <input type="time" className="rp-input"
+                            min={date ? getMinTime(date) : undefined} value={startTime}
+                            onChange={e => { setStartTime(e.target.value); setAvailability(null); }} required />
+                        </div>
+                        <div className="rp-field">
+                          <label className="rp-label">Término</label>
+                          <input type="time" className="rp-input"
+                            min={startTime || undefined} value={endTime}
+                            onChange={e => { setEndTime(e.target.value); setAvailability(null); }} required />
+                        </div>
+                      </div>
+
+                      {avail !== 'idle' && (
+                        <div className={`rp-avail rp-avail--${avail}`}>
+                          <span className="rp-avail-dot" />
+                          <div className="rp-avail-body">
+                            <span className="rp-avail-text">
+                              {avail === 'checking' && 'Verificando disponibilidade…'}
+                              {avail === 'ok' && `✓ Disponível — ${availability?.remaining} notebooks livres neste período`}
+                              {avail === 'partial' && `⚠ Restam apenas ${availability?.remaining} notebook${(availability?.remaining ?? 0) !== 1 ? 's' : ''} neste horário`}
+                              {avail === 'unavailable' && (
+                                <>✗ Sem disponibilidade para {quantity} notebook{quantity !== 1 ? 's' : ''} neste horário
+                                  {availability?.next_available && <> · Próximo: <strong>{availability.next_available}</strong></>}
+                                </>
+                              )}
+                            </span>
+                            {(avail === 'ok' || avail === 'partial') && availability && (
+                              <CapacityBar remaining={availability.remaining} total={poolSize} />
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {date && schedule && schedule.slots.length > 0 && (
+                        <div className="rp-timeline-wrap">
+                          <p className="rp-timeline-title">Ocupação do dia</p>
+                          <DayTimeline slots={schedule.slots} poolSize={schedule.pool_size}
+                            selStart={startTime} selEnd={endTime} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 3 — Detalhes */}
+                {step === 3 && (
+                  <div className="rp-card rp-card--anim">
+                    <div className="rp-card-body">
+                      <h2 className="rp-card-title">Onde e para quê?</h2>
+                      <div className="rp-field">
+                        <label className="rp-label">Local de uso</label>
+                        <input type="text" className="rp-input" placeholder="Ex: Sala 12 — Bloco B"
+                          value={location} onChange={e => setLocation(e.target.value)} required />
+                      </div>
+                      <div className="rp-field" style={{ marginTop: 16 }}>
+                        <label className="rp-label">Finalidade</label>
+                        <textarea className="rp-input rp-textarea" rows={2}
+                          placeholder="Ex: Aula de informática para turma do 9º ano"
+                          value={purpose} onChange={e => setPurpose(e.target.value)} required />
+                      </div>
+
+                      <div className="rp-divider"><span>Dados do solicitante</span></div>
+
+                      <div className="rp-field">
+                        <label className="rp-label">Nome completo</label>
+                        <input type="text" className="rp-input" placeholder="Seu nome"
+                          value={name} onChange={e => setName(e.target.value)} required />
+                      </div>
+                      <div className="rp-two-col" style={{ marginTop: 14 }}>
+                        <div className="rp-field">
+                          <label className="rp-label">E-mail</label>
+                          <input type="email" className="rp-input" placeholder="seu@email.com"
+                            value={email} onChange={e => setEmail(e.target.value)} required />
+                        </div>
+                        <div className="rp-field">
+                          <label className="rp-label">Telefone <span className="rp-optional">(opcional)</span></label>
+                          <input type="tel" className="rp-input" placeholder="(00) 00000-0000"
+                            value={phone} onChange={e => setPhone(e.target.value)} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 4 — Confirmar */}
+                {step === 4 && (
+                  <div className="rp-card rp-card--anim">
+                    <div className="rp-card-body">
+                      <h2 className="rp-card-title">Revise e confirme</h2>
+                      <div className="rp-review">
+                        {[
+                          { icon: '💻', label: 'Equipamento', val: `${quantity} notebook${quantity !== 1 ? 's' : ''}`, editStep: 1 },
+                          { icon: '📅', label: 'Data e Horário', val: `${fmtDateShort(date)} · ${startTime.substring(0,5)}–${endTime.substring(0,5)}`, editStep: 2 },
+                          { icon: '📍', label: 'Local', val: location, editStep: 3 },
+                          { icon: '🎯', label: 'Finalidade', val: purpose, editStep: 3 },
+                          { icon: '👤', label: 'Solicitante', val: `${name} · ${email}`, editStep: 3 },
+                        ].map(({ icon, label, val, editStep }) => (
+                          <div key={label} className="rp-review-row">
+                            <span className="rp-review-icon">{icon}</span>
+                            <div className="rp-review-text">
+                              <span className="rp-review-label">{label}</span>
+                              <span className="rp-review-val">{val}</span>
+                            </div>
+                            {editStep && (
+                              <button className="rp-review-edit" onClick={() => setStep(editStep)}>Editar</button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {avail !== 'idle' && (
+                        <div className={`rp-avail rp-avail--${avail}`} style={{ marginTop: 16 }}>
+                          <span className="rp-avail-dot" />
+                          <span className="rp-avail-text">
+                            {avail === 'ok' && `✓ ${availability?.remaining} notebooks disponíveis`}
+                            {avail === 'partial' && `⚠ Restam ${availability?.remaining} notebooks`}
+                            {avail === 'checking' && 'Verificando…'}
+                            {avail === 'unavailable' && '✗ Horário indisponível'}
+                          </span>
+                        </div>
+                      )}
+
+                      {error && <div className="rp-error-banner"><span>⚠️</span> {error}</div>}
+
+                      <div className="rp-mobile-submit">
+                        <button type="button" className="rp-btn-submit" onClick={handleSubmit}
+                          disabled={submitting || avail === 'unavailable' || avail === 'checking'}>
+                          {submitting ? <><span className="rp-spinner" /> Processando…</> : 'Confirmar Reserva'}
+                        </button>
+                        <p className="rp-submit-note">Confirmação por e-mail imediata</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step navigation */}
+                <div className="rp-step-nav">
+                  {step > 1 && (
+                    <button type="button" className="rp-nav-back" onClick={() => setStep(s => s - 1)}>
+                      ← Anterior
+                    </button>
+                  )}
+                  {step < 4 && (
+                    <button type="button" className="rp-nav-next" onClick={() => setStep(s => s + 1)}
+                      disabled={!canGoNext}>
+                      Próximo →
+                    </button>
+                  )}
+                </div>
               </div>
-              <p className="rp-stepper-label">{quantity === 1 ? '1 notebook' : `${quantity} notebooks`}</p>
+
+              <SummarySidebar
+                quantity={quantity} date={date} startTime={startTime} endTime={endTime}
+                location={location} name={name} avail={avail}
+                onSubmit={handleSubmit} submitting={submitting}
+                canSubmit={allValid}
+              />
             </div>
-          </div>
+          </>
+        )}
 
-          {/* Data e Horário */}
-          <div className="rp-card">
-            <div className="rp-card-body">
-              <h2 className="rp-card-title">Quando?</h2>
-              <div className="rp-datetime-grid">
-                <div className="rp-field">
-                  <label className="rp-label">Data</label>
-                  <input type="date" className="rp-input" min={getMinDate()} value={date}
-                    onChange={e => { setDate(e.target.value); setAvailability(null); }} required />
-                </div>
-                <div className="rp-field">
-                  <label className="rp-label">Início</label>
-                  <input type="time" className="rp-input"
-                    min={date ? getMinTime(date) : undefined}
-                    value={startTime}
-                    onChange={e => { setStartTime(e.target.value); setAvailability(null); }} required />
-                </div>
-                <div className="rp-field">
-                  <label className="rp-label">Término</label>
-                  <input type="time" className="rp-input"
-                    min={startTime || undefined}
-                    value={endTime}
-                    onChange={e => { setEndTime(e.target.value); setAvailability(null); }} required />
-                </div>
-              </div>
-
-              {avail !== 'idle' && (
-                <div className={`rp-avail rp-avail--${avail}`}>
-                  <span className="rp-avail-dot" />
-                  <span className="rp-avail-text">
-                    {avail === 'checking' && 'Verificando disponibilidade...'}
-                    {avail === 'ok' && 'Horário disponível ✓'}
-                    {avail === 'partial' && 'Disponível — poucas vagas'}
-                    {avail === 'unavailable' && (
-                      <>
-                        Horário indisponível
-                        {availability?.next_available && (
-                          <> · Próximo disponível: <strong>{availability.next_available}</strong></>
-                        )}
-                      </>
-                    )}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Local e Finalidade */}
-          <div className="rp-card">
-            <div className="rp-card-body">
-              <h2 className="rp-card-title">Onde e para quê?</h2>
-              <div className="rp-field">
-                <label className="rp-label">Local de uso</label>
-                <input type="text" className="rp-input"
-                  placeholder="Ex: Sala 12 — Bloco B"
-                  value={location} onChange={e => setLocation(e.target.value)} required />
-              </div>
-              <div className="rp-field" style={{ marginTop: 14 }}>
-                <label className="rp-label">Finalidade</label>
-                <textarea className="rp-input rp-textarea" rows={2}
-                  placeholder="Ex: Aula de informática para turma do 9º ano"
-                  value={purpose} onChange={e => setPurpose(e.target.value)} required />
-              </div>
-            </div>
-          </div>
-
-          {/* Dados do solicitante */}
-          <div className="rp-card">
-            <div className="rp-card-body">
-              <h2 className="rp-card-title">Seus dados</h2>
-              <div className="rp-field">
-                <label className="rp-label">Nome completo</label>
-                <input type="text" className="rp-input" placeholder="Seu nome"
-                  value={name} onChange={e => setName(e.target.value)} required />
-              </div>
-              <div className="rp-two-col" style={{ marginTop: 14 }}>
-                <div className="rp-field">
-                  <label className="rp-label">E-mail</label>
-                  <input type="email" className="rp-input" placeholder="seu@email.com"
-                    value={email} onChange={e => setEmail(e.target.value)} required />
-                </div>
-                <div className="rp-field">
-                  <label className="rp-label">Telefone <span className="rp-optional">(opcional)</span></label>
-                  <input type="tel" className="rp-input" placeholder="(00) 00000-0000"
-                    value={phone} onChange={e => setPhone(e.target.value)} />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {error && (
-            <div className="rp-error-banner"><span>⚠️</span> {error}</div>
-          )}
-
-          <button
-            type="submit"
-            className="rp-btn-submit"
-            disabled={submitting || avail === 'unavailable' || avail === 'checking'}
-          >
-            {submitting ? <><span className="rp-spinner" /> Processando...</> : 'Confirmar Reserva'}
-          </button>
-          <p className="rp-submit-note">Você receberá a confirmação por e-mail imediatamente.</p>
-
-        </form>
+        {/* ── Tab: Minhas Reservas ── */}
+        {activeTab === 'my' && (
+          <MyReservationsTab
+            prefillEmail={successBanner?.forEmail ?? email}
+            successNumber={successBanner?.number}
+            onClearSuccess={() => setSuccessBanner(null)}
+          />
+        )}
       </div>
     </div>
   );
