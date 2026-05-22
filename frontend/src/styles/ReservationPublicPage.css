@@ -1299,3 +1299,79 @@
   .rp-mini-tl-lbl.active { color: var(--verde-nazareno, #007A33); font-weight: 700; }
   .rp-mini-tl-lbl.done   { color: #6B7280; }
 }
+
+/* ═══════════════════════════════════════════════
+   CANCEL CONFIRM MODAL
+═══════════════════════════════════════════════ */
+.rp-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.5);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.rp-modal {
+  background: #fff;
+  border-radius: 14px;
+  padding: 28px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.25);
+  animation: rpModalIn 180ms ease;
+}
+
+@keyframes rpModalIn {
+  from { opacity: 0; transform: scale(.95) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.rp-modal-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0 0 8px;
+  color: #1A2233;
+}
+
+.rp-modal-sub {
+  font-size: 0.875rem;
+  color: #6B7A8D;
+  margin: 0 0 22px;
+  line-height: 1.5;
+}
+
+.rp-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.rp-modal-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms ease;
+  border: 1.5px solid transparent;
+  font-family: inherit;
+}
+
+.rp-modal-btn--ghost {
+  background: #fff;
+  color: #4B5563;
+  border-color: #DDE3EC;
+}
+.rp-modal-btn--ghost:hover { border-color: #B0BAC8; color: #1A2233; }
+
+.rp-modal-btn--danger {
+  background: #B91C1C;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(185,28,28,.25);
+}
+.rp-modal-btn--danger:hover { background: #991b1b; }

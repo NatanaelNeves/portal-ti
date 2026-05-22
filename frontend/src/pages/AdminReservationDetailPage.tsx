@@ -82,6 +82,12 @@ export default function AdminReservationDetailPage() {
   const [rejectReason, setRejectReason] = useState('');
   const [showReject, setShowReject] = useState(false);
   const [error, setError] = useState('');
+  const [pending, setPending] = useState<{
+    fn: () => Promise<void>;
+    title: string;
+    desc: string;
+    variant: 'green' | 'blue' | 'purple' | 'danger';
+  } | null>(null);
 
   const load = () => {
     if (!id) return;
@@ -94,11 +100,20 @@ export default function AdminReservationDetailPage() {
 
   useEffect(() => { load(); }, [id]);
 
-  const doAction = async (action: () => Promise<void>, label: string) => {
-    if (!confirm(`Confirmar: ${label}?`)) return;
+  const request = (
+    fn: () => Promise<void>,
+    title: string,
+    desc: string,
+    variant: 'green' | 'blue' | 'purple' | 'danger' = 'green',
+  ) => setPending({ fn, title, desc, variant });
+
+  const confirm = async () => {
+    if (!pending) return;
+    const fn = pending.fn;
+    setPending(null);
     setActionLoading(true);
     setError('');
-    try { await action(); load(); }
+    try { await fn(); load(); }
     catch { setError('Erro ao executar ação. Tente novamente.'); }
     finally { setActionLoading(false); }
   };
@@ -219,7 +234,12 @@ export default function AdminReservationDetailPage() {
             {r.status === 'pending' && (
               <>
                 <button className="ard-btn ard-btn--green" disabled={actionLoading}
-                  onClick={() => doAction(() => reservationService.approve(id!), 'Aprovar reserva')}>
+                  onClick={() => request(
+                    () => reservationService.approve(id!),
+                    'Confirmar aprovação',
+                    `Aprovar a reserva ${r.reservation_number}? O solicitante será notificado por e-mail.`,
+                    'green',
+                  )}>
                   ✓ Aprovar
                 </button>
                 <button className="ard-btn ard-btn--danger" disabled={actionLoading}
@@ -232,11 +252,21 @@ export default function AdminReservationDetailPage() {
             {r.status === 'approved' && (
               <>
                 <button className="ard-btn ard-btn--purple" disabled={actionLoading}
-                  onClick={() => doAction(() => reservationService.markReady(id!), 'Marcar notebooks como prontos para retirada')}>
+                  onClick={() => request(
+                    () => reservationService.markReady(id!),
+                    'Marcar como pronto',
+                    'Os notebooks estão separados e prontos para retirada pelo solicitante?',
+                    'purple',
+                  )}>
                   📦 Pronto para Retirada
                 </button>
                 <button className="ard-btn ard-btn--ghost" disabled={actionLoading}
-                  onClick={() => doAction(() => reservationService.markNoShow(id!), 'Registrar não comparecimento')}>
+                  onClick={() => request(
+                    () => reservationService.markNoShow(id!),
+                    'Registrar não comparecimento',
+                    'O solicitante não compareceu para retirar os equipamentos? Esta ação encerrará a reserva.',
+                    'danger',
+                  )}>
                   Não Compareceu
                 </button>
               </>
@@ -245,11 +275,21 @@ export default function AdminReservationDetailPage() {
             {r.status === 'ready' && (
               <>
                 <button className="ard-btn ard-btn--blue" disabled={actionLoading}
-                  onClick={() => doAction(() => reservationService.markInUse(id!), 'Registrar retirada — equipamentos em uso')}>
+                  onClick={() => request(
+                    () => reservationService.markInUse(id!),
+                    'Registrar retirada',
+                    'Confirmar que o solicitante retirou os equipamentos e está em uso?',
+                    'blue',
+                  )}>
                   ▶ Registrar Retirada
                 </button>
                 <button className="ard-btn ard-btn--ghost" disabled={actionLoading}
-                  onClick={() => doAction(() => reservationService.markNoShow(id!), 'Registrar não comparecimento')}>
+                  onClick={() => request(
+                    () => reservationService.markNoShow(id!),
+                    'Registrar não comparecimento',
+                    'O solicitante não compareceu para retirar os equipamentos? Esta ação encerrará a reserva.',
+                    'danger',
+                  )}>
                   Não Compareceu
                 </button>
               </>
@@ -257,7 +297,12 @@ export default function AdminReservationDetailPage() {
 
             {r.status === 'in_use' && (
               <button className="ard-btn ard-btn--green" disabled={actionLoading}
-                onClick={() => doAction(() => reservationService.markReturned(id!), 'Registrar devolução dos equipamentos')}>
+                onClick={() => request(
+                  () => reservationService.markReturned(id!),
+                  'Registrar devolução',
+                  'Confirmar que os equipamentos foram devolvidos e estão de volta ao acervo?',
+                  'green',
+                )}>
                 ✓ Registrar Devolução
               </button>
             )}
@@ -273,6 +318,28 @@ export default function AdminReservationDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal confirmação de ação */}
+      {pending && (
+        <div className="ard-overlay" onClick={() => setPending(null)}>
+          <div className="ard-modal" onClick={e => e.stopPropagation()}>
+            <h3 className="ard-modal-title">{pending.title}</h3>
+            <p className="ard-modal-sub">{pending.desc}</p>
+            <div className="ard-modal-actions">
+              <button className="ard-btn ard-btn--ghost" onClick={() => setPending(null)} disabled={actionLoading}>
+                Cancelar
+              </button>
+              <button
+                className={`ard-btn ard-btn--${pending.variant}`}
+                onClick={confirm}
+                disabled={actionLoading}
+              >
+                {actionLoading ? 'Aguarde...' : 'Confirmar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal recusa */}
       {showReject && (

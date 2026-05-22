@@ -265,6 +265,8 @@ function MyReservationsTab({ prefillEmail, successNumber, onClearSuccess }: MyRe
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [error, setError] = useState('');
   const [cancellingToken, setCancellingToken] = useState<string | null>(null);
+  const [cancelConfirmToken, setCancelConfirmToken] = useState<string | null>(null);
+  const [cancelError, setCancelError] = useState('');
 
   const search = useCallback(async () => {
     if (!email.trim() || !email.includes('@')) { setError('Informe um e-mail válido.'); return; }
@@ -286,16 +288,19 @@ function MyReservationsTab({ prefillEmail, successNumber, onClearSuccess }: MyRe
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleCancel = async (token: string) => {
-    if (!confirm('Cancelar esta reserva?')) return;
+  const handleCancel = async () => {
+    if (!cancelConfirmToken) return;
+    const token = cancelConfirmToken;
+    setCancelConfirmToken(null);
     setCancellingToken(token);
+    setCancelError('');
     try {
       await reservationService.cancelByToken(token);
       setReservations(prev => prev.map(r =>
         r.access_token === token ? { ...r, status: 'cancelled' } : r
       ));
     } catch {
-      alert('Não foi possível cancelar. Tente novamente.');
+      setCancelError('Não foi possível cancelar. Tente novamente.');
     } finally { setCancellingToken(null); }
   };
 
@@ -341,6 +346,25 @@ function MyReservationsTab({ prefillEmail, successNumber, onClearSuccess }: MyRe
         </div>
       )}
 
+      {cancelError && <p className="rp-my-error">{cancelError}</p>}
+
+      {cancelConfirmToken && (
+        <div className="rp-overlay" onClick={() => setCancelConfirmToken(null)}>
+          <div className="rp-modal" onClick={e => e.stopPropagation()}>
+            <h3 className="rp-modal-title">Cancelar reserva?</h3>
+            <p className="rp-modal-sub">Esta ação não pode ser desfeita. Sua reserva será cancelada e os equipamentos liberados para outros solicitantes.</p>
+            <div className="rp-modal-actions">
+              <button className="rp-modal-btn rp-modal-btn--ghost" onClick={() => setCancelConfirmToken(null)}>
+                Manter reserva
+              </button>
+              <button className="rp-modal-btn rp-modal-btn--danger" onClick={handleCancel}>
+                Sim, cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {searched && !loading && (
         <div className="rp-my-results">
           {reservations.length === 0 ? (
@@ -365,7 +389,7 @@ function MyReservationsTab({ prefillEmail, successNumber, onClearSuccess }: MyRe
                   <p className="rp-my-section-label">Próximas</p>
                   {upcoming.map(r => (
                     <ReservationCard key={r.id} reservation={r}
-                      onCancel={['approved','ready'].includes(r.status) ? handleCancel : undefined}
+                      onCancel={['approved','ready'].includes(r.status) ? (token) => setCancelConfirmToken(token) : undefined}
                       cancelling={cancellingToken === r.access_token} />
                   ))}
                 </>
