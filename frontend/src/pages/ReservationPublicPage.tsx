@@ -18,23 +18,26 @@ function getMinTime(date: string): string {
   return '00:00';
 }
 
-function fmtDateShort(d: string): string {
-  if (!d) return '—';
-  return new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' });
+function toDateOnly(d: string | Date): string {
+  if (d instanceof Date) return d.toISOString().substring(0, 10);
+  return String(d).substring(0, 10);
 }
 
-function fmtDate(d: string | Date): string {
-  const s = d instanceof Date ? d.toISOString().split('T')[0] : String(d).split('T')[0];
-  return new Date(s + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
+function fmtDateShort(d: string | Date): string {
+  if (!d) return '—';
+  const s = toDateOnly(d);
+  const dt = new Date(s + 'T12:00:00');
+  if (isNaN(dt.getTime())) return s;
+  return dt.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' });
 }
+
 
 function fmtTime(t: string): string {
   return String(t).substring(0, 5);
 }
 
 function isPast(date: string | Date, endTime: string): boolean {
-  const ds = date instanceof Date ? date.toISOString().split('T')[0] : String(date).split('T')[0];
-  const dt = new Date(`${ds}T${fmtTime(endTime)}:00`);
+  const dt = new Date(`${toDateOnly(date)}T${fmtTime(endTime)}:00`);
   return dt < new Date();
 }
 
@@ -179,37 +182,69 @@ const PROGRESS_STATUS_INDEX: Record<string, number> = {
 
 const TERMINAL_STATUSES = ['rejected', 'cancelled', 'no_show'];
 
-function ReservationMiniTimeline({ status }: { status: string }) {
-  if (TERMINAL_STATUSES.includes(status)) {
-    const labels: Record<string, string> = {
-      rejected: 'Recusada', cancelled: 'Cancelada', no_show: 'Não compareceu',
-    };
-    const colors: Record<string, string> = {
-      rejected: '#B91C1C', cancelled: '#6B7280', no_show: '#F28C38',
-    };
-    return (
-      <div className="rp-mini-tl rp-mini-tl--terminal">
-        <span className="rp-mini-tl-badge" style={{ background: colors[status] }}>
-          {labels[status] ?? status}
-        </span>
-      </div>
-    );
+const STATUS_BADGE: Record<string, { label: string; color: string; bg: string }> = {
+  approved: { label: 'Confirmada',        color: '#007A33', bg: '#f0fdf4' },
+  ready:    { label: 'Pronta p/ retirar', color: '#7C3AED', bg: '#f5f3ff' },
+  in_use:   { label: 'Em uso agora',      color: '#0369A1', bg: '#eff6ff' },
+  returned: { label: 'Finalizada',        color: '#6B7280', bg: '#f9fafb' },
+  cancelled:{ label: 'Cancelada',         color: '#6B7280', bg: '#f9fafb' },
+  rejected: { label: 'Recusada',          color: '#B91C1C', bg: '#fef2f2' },
+  no_show:  { label: 'Não compareceu',    color: '#EA580C', bg: '#fff7ed' },
+  pending:  { label: 'Pendente',          color: '#D97706', bg: '#fffbeb' },
+};
+
+function relativeTime(date: string | Date, startTime: string, endTime: string): string {
+  const ds = toDateOnly(date);
+  const now = new Date();
+  const start = new Date(`${ds}T${fmtTime(startTime)}:00`);
+  const end   = new Date(`${ds}T${fmtTime(endTime)}:00`);
+
+  if (now >= start && now < end) return 'acontecendo agora';
+
+  if (now < start) {
+    const diffMs = start.getTime() - now.getTime();
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 60) return `em ${mins} min`;
+    const hours = Math.floor(diffMs / 3600000);
+    const todayMid = new Date(); todayMid.setHours(0, 0, 0, 0);
+    const startDay = new Date(ds + 'T00:00:00'); startDay.setHours(0, 0, 0, 0);
+    if (startDay.getTime() === todayMid.getTime()) return `hoje às ${fmtTime(startTime)}`;
+    if (startDay.getTime() === todayMid.getTime() + 86400000) return `amanhã às ${fmtTime(startTime)}`;
+    if (hours < 24) return `em ${hours}h`;
+    const days = Math.floor(diffMs / 86400000);
+    return `em ${days} dias`;
   }
 
-  const currentIdx = PROGRESS_STATUS_INDEX[status] ?? -1;
+  const diffMs = now.getTime() - end.getTime();
+  const hours = Math.floor(diffMs / 3600000);
+  if (hours < 1) return 'terminou agora';
+  if (hours < 24) return `terminou há ${hours}h`;
+  const days = Math.floor(diffMs / 86400000);
+  if (days === 1) return 'ontem';
+  return `há ${days} dias`;
+}
 
+function isActiveNow(date: string | Date, startTime: string, endTime: string): boolean {
+  const ds = toDateOnly(date);
+  const now = new Date();
+  return now >= new Date(`${ds}T${fmtTime(startTime)}:00`) && now < new Date(`${ds}T${fmtTime(endTime)}:00`);
+}
+
+function ReservationMiniTimeline({ status }: { status: string }) {
+  if (TERMINAL_STATUSES.includes(status)) return null;
+  const currentIdx = PROGRESS_STATUS_INDEX[status] ?? -1;
   return (
     <div className="rp-mini-tl">
       {PROGRESS_STEPS.map((s, i) => {
-        const done = i < currentIdx;
+        const done   = i < currentIdx;
         const active = i === currentIdx;
         return (
           <div key={s.key} className="rp-mini-tl-step">
-            <div className={`rp-mini-tl-dot ${done ? 'done' : active ? 'active' : ''}`} />
+            <div className={`rp-mini-tl-dot ${done ? 'done' : active ? 'active' : ''}`}>
+              {done && <svg viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+            </div>
             <span className={`rp-mini-tl-lbl ${active ? 'active' : done ? 'done' : ''}`}>{s.label}</span>
-            {i < PROGRESS_STEPS.length - 1 && (
-              <div className={`rp-mini-tl-line ${done ? 'done' : ''}`} />
-            )}
+            {i < PROGRESS_STEPS.length - 1 && <div className={`rp-mini-tl-line ${done ? 'done' : active ? 'half' : ''}`} />}
           </div>
         );
       })}
@@ -264,8 +299,9 @@ function MyReservationsTab({ prefillEmail, successNumber, onClearSuccess }: MyRe
     } finally { setCancellingToken(null); }
   };
 
-  const active = reservations.filter(r => !isPast(r.date, r.end_time) && !TERMINAL_STATUSES.includes(r.status));
-  const past   = reservations.filter(r => isPast(r.date, r.end_time) || TERMINAL_STATUSES.includes(r.status));
+  const nowActive = reservations.filter(r => isActiveNow(r.date, r.start_time, r.end_time));
+  const upcoming  = reservations.filter(r => !isPast(r.date, r.end_time) && !TERMINAL_STATUSES.includes(r.status) && !isActiveNow(r.date, r.start_time, r.end_time));
+  const past      = reservations.filter(r => isPast(r.date, r.end_time) || TERMINAL_STATUSES.includes(r.status));
 
   return (
     <div className="rp-my-tab">
@@ -299,7 +335,13 @@ function MyReservationsTab({ prefillEmail, successNumber, onClearSuccess }: MyRe
         {error && <p className="rp-my-error">{error}</p>}
       </div>
 
-      {searched && (
+      {loading && (
+        <div className="rp-my-results">
+          {[1,2].map(i => <div key={i} className="rp-res-skeleton" />)}
+        </div>
+      )}
+
+      {searched && !loading && (
         <div className="rp-my-results">
           {reservations.length === 0 ? (
             <div className="rp-my-empty">
@@ -308,10 +350,20 @@ function MyReservationsTab({ prefillEmail, successNumber, onClearSuccess }: MyRe
             </div>
           ) : (
             <>
-              {active.length > 0 && (
+              {nowActive.length > 0 && (
                 <>
-                  <p className="rp-my-section-label">Ativas / Futuras</p>
-                  {active.map(r => (
+                  <p className="rp-my-section-label rp-my-section-label--now">🔴 Em andamento agora</p>
+                  {nowActive.map(r => (
+                    <ReservationCard key={r.id} reservation={r} highlightNow
+                      onCancel={undefined}
+                      cancelling={false} />
+                  ))}
+                </>
+              )}
+              {upcoming.length > 0 && (
+                <>
+                  <p className="rp-my-section-label">Próximas</p>
+                  {upcoming.map(r => (
                     <ReservationCard key={r.id} reservation={r}
                       onCancel={['approved','ready'].includes(r.status) ? handleCancel : undefined}
                       cancelling={cancellingToken === r.access_token} />
@@ -322,7 +374,8 @@ function MyReservationsTab({ prefillEmail, successNumber, onClearSuccess }: MyRe
                 <>
                   <p className="rp-my-section-label rp-my-section-label--past">Histórico</p>
                   {past.map(r => (
-                    <ReservationCard key={r.id} reservation={r} past />
+                    <ReservationCard key={r.id} reservation={r} past
+                      onCancel={undefined} cancelling={false} />
                   ))}
                 </>
               )}
@@ -334,64 +387,76 @@ function MyReservationsTab({ prefillEmail, successNumber, onClearSuccess }: MyRe
   );
 }
 
-function ReservationCard({ reservation: r, past, onCancel, cancelling }: {
+function ReservationCard({ reservation: r, past, highlightNow, onCancel, cancelling }: {
   reservation: Reservation;
   past?: boolean;
+  highlightNow?: boolean;
   onCancel?: (token: string) => void;
   cancelling?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const dateStr = String(r.date).split('T')[0];
+  const ds    = toDateOnly(r.date);
   const token = r.access_token ?? '';
+  const badge = STATUS_BADGE[r.status] ?? { label: r.status, color: '#6B7280', bg: '#f9fafb' };
+  const rel   = relativeTime(r.date, r.start_time, r.end_time);
+  const isNow = highlightNow || isActiveNow(r.date, r.start_time, r.end_time);
 
   return (
-    <div className={`rp-res-card ${past ? 'rp-res-card--past' : ''}`}>
-      <div className="rp-res-card-top" onClick={() => setExpanded(v => !v)}>
-        <div className="rp-res-card-left">
-          <span className="rp-res-card-icon">💻</span>
-          <div>
-            <div className="rp-res-card-number">{r.reservation_number}</div>
-            <div className="rp-res-card-meta">
-              {r.quantity} notebook{r.quantity !== 1 ? 's' : ''} · {fmtDateShort(dateStr)} · {fmtTime(r.start_time)}–{fmtTime(r.end_time)}
-            </div>
-          </div>
+    <div className={[
+      'rp-res-card',
+      past        ? 'rp-res-card--past'   : '',
+      isNow       ? 'rp-res-card--now'    : '',
+    ].filter(Boolean).join(' ')}>
+
+      {/* Always-visible summary */}
+      <div className="rp-res-card-summary" onClick={() => setExpanded(v => !v)}>
+        <div className="rp-res-card-row1">
+          <span className="rp-res-card-number">💻 {r.reservation_number}</span>
+          <span className="rp-res-status-pill"
+            style={{ color: badge.color, background: badge.bg, borderColor: badge.color + '40' }}>
+            {badge.label}
+          </span>
         </div>
-        <span className="rp-res-card-chevron">{expanded ? '▲' : '▼'}</span>
+
+        <div className="rp-res-card-row2">
+          <span>📅 {fmtDateShort(ds)}</span>
+          <span>⏰ {fmtTime(r.start_time)}–{fmtTime(r.end_time)}</span>
+          <span>📍 {r.location}</span>
+          {r.quantity > 1 && <span>×{r.quantity}</span>}
+        </div>
+
+        <div className="rp-res-card-row3">
+          <ReservationMiniTimeline status={r.status} />
+          <span className={`rp-res-reltime ${isNow ? 'rp-res-reltime--now' : ''}`}>{rel}</span>
+        </div>
       </div>
 
-      <div className="rp-res-card-tl">
-        <ReservationMiniTimeline status={r.status} />
-      </div>
+      {/* Expand toggle */}
+      <button className="rp-res-expand-btn" onClick={() => setExpanded(v => !v)}>
+        {expanded ? '▲ Menos' : '▼ Detalhes e ações'}
+      </button>
 
+      {/* Expanded details */}
       {expanded && (
         <div className="rp-res-card-body">
-          <div className="rp-res-card-detail-grid">
-            <div><span className="rp-res-dl">Data</span><span className="rp-res-dv">{fmtDate(r.date)}</span></div>
-            <div><span className="rp-res-dl">Horário</span><span className="rp-res-dv">{fmtTime(r.start_time)} – {fmtTime(r.end_time)}</span></div>
-            <div><span className="rp-res-dl">Local</span><span className="rp-res-dv">{r.location}</span></div>
-            <div><span className="rp-res-dl">Para que foi usado</span><span className="rp-res-dv">{r.purpose}</span></div>
-            {r.status === 'rejected' && r.rejection_reason && (
-              <div style={{ gridColumn: '1/-1' }}>
-                <span className="rp-res-dl">Motivo da recusa</span>
-                <span className="rp-res-dv" style={{ color: '#B91C1C' }}>{r.rejection_reason}</span>
-              </div>
-            )}
-          </div>
+          <p className="rp-res-purpose">
+            <span className="rp-res-dl">Para que vai usar</span>
+            {r.purpose}
+          </p>
+          {r.status === 'rejected' && r.rejection_reason && (
+            <p className="rp-res-rejection">
+              <strong>Motivo da recusa:</strong> {r.rejection_reason}
+            </p>
+          )}
           <div className="rp-res-card-actions">
             {token && (
-              <a href={`/reservar/acompanhar/${token}`}
-                className="rp-res-action-link" target="_blank" rel="noreferrer">
-                Ver detalhes →
-              </a>
-            )}
-            {token && (
               <a href={reservationService.getICSUrlByToken(token)}
-                className="rp-res-action-link rp-res-action-link--muted" download>
-                📅 Calendário
+                className="rp-res-action-link" download>
+                📅 Adicionar ao calendário
               </a>
             )}
             {onCancel && token && (
-              <button className="rp-res-cancel-btn"
+              <button className="rp-res-cancel-link"
                 onClick={() => onCancel(token)} disabled={cancelling}>
                 {cancelling ? 'Cancelando…' : 'Cancelar reserva'}
               </button>

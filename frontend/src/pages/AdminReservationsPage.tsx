@@ -21,8 +21,9 @@ const DATE_FILTER_LABELS: Record<DateFilter, string> = {
 };
 
 function formatDate(dateStr: string): string {
-  const d = new Date(dateStr + 'T12:00:00');
-  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const s = String(dateStr).substring(0, 10);
+  const d = new Date(s + 'T12:00:00');
+  return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 export default function AdminReservationsPage() {
@@ -117,7 +118,7 @@ export default function AdminReservationsPage() {
         <div className="admin-res-header-actions">
           <button className="btn-res-ghost btn-res-sm" onClick={exportCSV}>Exportar CSV</button>
           <button className="btn-res-ghost btn-res-sm" onClick={() => navigate('/admin/reservas/tipos')}>
-            ⚙️ Gerenciar Pool
+            ⚙️ Gerenciar Acervo
           </button>
         </div>
       </div>
@@ -259,7 +260,7 @@ export default function AdminReservationsPage() {
                         disabled={actionLoading === r.id}
                         onClick={() => doAction(() => reservationService.markNoShow(r.id), r.id)}
                       >
-                        No-show
+                        Não Compareceu
                       </button>
                     </>
                   )}
@@ -269,7 +270,7 @@ export default function AdminReservationsPage() {
                       disabled={actionLoading === r.id}
                       onClick={() => doAction(() => reservationService.markNoShow(r.id), r.id)}
                     >
-                      No-show
+                      Não Compareceu
                     </button>
                   )}
                 </div>
