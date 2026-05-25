@@ -32,33 +32,40 @@ export default function HomePage() {
         <div className="hero-content">
           <h1>Central de Apoio O Pequeno Nazareno</h1>
           <p>Cuidando de quem transforma vidas através da educação e do acolhimento</p>
+          <button className="hero-cta" onClick={handleOpenTicket}>
+            Solicitar Apoio <span>→</span>
+          </button>
         </div>
       </section>
 
       {/* Main Actions */}
       <section className="main-actions">
         <div className="actions-container">
-          <button className="action-card" onClick={handleOpenTicket}>
+          <button className="action-card primary" onClick={handleOpenTicket}>
+            <span className="action-badge">Principal</span>
             <div className="action-icon">🤝</div>
             <h3>Solicitar Apoio</h3>
             <p>Relate um problema ou solicite suporte para seu trabalho</p>
+            <span className="action-arrow">→</span>
           </button>
 
           <button className="action-card" onClick={handleTrackTicket}>
             <div className="action-icon">📋</div>
             <h3>Minhas Solicitações</h3>
             <p>Acompanhe o andamento das suas solicitações de apoio</p>
+            <span className="action-arrow">→</span>
           </button>
 
           <button className="action-card" onClick={handleKnowledge}>
             <div className="action-icon">💡</div>
             <h3>Central de Dúvidas</h3>
             <p>Tutoriais, FAQs e documentação institucional</p>
+            <span className="action-arrow">→</span>
           </button>
         </div>
       </section>
 
-      {/* Info Section */}
+      {/* Info Strip */}
       <section className="info-section">
         <div className="info-container">
           <div className="info-item">
