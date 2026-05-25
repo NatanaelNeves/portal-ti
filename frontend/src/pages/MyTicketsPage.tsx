@@ -394,10 +394,11 @@ export default function MyTicketsPage() {
           <div className="loading">Buscando suas solicitações...</div>
         ) : !showEmailForm && tickets.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">📋</div>
-            <p>Você ainda não tem nenhuma solicitação de apoio</p>
+            <span className="empty-icon">📋</span>
+            <h3>Nenhuma solicitação encontrada</h3>
+            <p>Você ainda não abriu nenhuma solicitação de apoio. Clique no botão abaixo para começar.</p>
             <a href="/abrir-chamado" className="btn btn-primary">
-              Solicitar Apoio
+              Abrir Solicitação
             </a>
           </div>
         ) : !showEmailForm && (

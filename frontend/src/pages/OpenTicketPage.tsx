@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { showToast } from '../utils/toast';
 import '../styles/OpenTicketPage.css';
@@ -54,6 +54,49 @@ export default function OpenTicketPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successData, setSuccessData] = useState<SuccessData | null>(null);
+
+  // Automatic priority calculation — applies only to TI tickets
+  const calculatePriority = (department: string, category: string, title: string, description: string): string => {
+    if (department !== 'ti') return 'medium';
+
+    const basePriority: Record<string, string> = {
+      internet: 'high',
+      sistema: 'high',
+      computador: 'medium',
+      impressora: 'low',
+      outro: 'medium',
+    };
+
+    const levelMap: Record<string, number> = { low: 0, medium: 1, high: 2 };
+    const levelNames = ['low', 'medium', 'high'];
+
+    let level = levelMap[basePriority[category] ?? 'medium'];
+
+    const text = `${title} ${description}`.toLowerCase();
+
+    const urgentKeywords = ['urgente', 'urgência', 'parado', 'não funciona', 'nao funciona', 'caiu', 'bloqueado', 'impossível', 'impossivel', 'prazo', 'hoje', 'não consigo', 'nao consigo'];
+    const calmKeywords = ['sem pressa', 'quando puder', 'futuramente', 'eventualmente'];
+
+    const isUrgent = urgentKeywords.some(k => text.includes(k));
+    const isCalm = calmKeywords.some(k => text.includes(k));
+
+    if (isUrgent) level = Math.min(level + 1, 2);
+    else if (isCalm) level = Math.max(level - 1, 0);
+
+    return levelNames[level];
+  };
+
+  // Recalculate priority automatically whenever relevant fields change
+  useEffect(() => {
+    const newPriority = calculatePriority(
+      formData.ticketDepartment,
+      formData.category,
+      formData.title,
+      formData.description,
+    );
+    setFormData(prev => ({ ...prev, priority: newPriority }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.ticketDepartment, formData.category, formData.title, formData.description]);
 
   // SLA mapping based on priority
   const getSlaHours = (priority: string): number => {
@@ -851,51 +894,6 @@ export default function OpenTicketPage() {
                       )}
                     </div>
 
-                    {/* Priority as Visual Scale */}
-                    <div className="form-group">
-                      <label>
-                        Impacto no Atendimento <span className="required">*</span>
-                      </label>
-                      <div className="priority-scale" role="radiogroup" aria-label="Impacto no Atendimento">
-                        <button
-                          type="button"
-                          className={`priority-option priority-low ${formData.priority === 'low' ? 'active' : ''}`}
-                          onClick={() => setFormData(prev => ({ ...prev, priority: 'low' }))}
-                          role="radio"
-                          aria-checked={formData.priority === 'low'}
-                        >
-                          <div className="priority-indicator"></div>
-                          <div className="priority-label">Baixo</div>
-                          <div className="priority-desc">Pode esperar alguns dias</div>
-                        </button>
-                        <button
-                          type="button"
-                          className={`priority-option priority-medium ${formData.priority === 'medium' ? 'active' : ''}`}
-                          onClick={() => setFormData(prev => ({ ...prev, priority: 'medium' }))}
-                          role="radio"
-                          aria-checked={formData.priority === 'medium'}
-                        >
-                          <div className="priority-indicator"></div>
-                          <div className="priority-label">Médio</div>
-                          <div className="priority-desc">Afeta minhas atividades</div>
-                        </button>
-                        <button
-                          type="button"
-                          className={`priority-option priority-high ${formData.priority === 'high' ? 'active' : ''}`}
-                          onClick={() => setFormData(prev => ({ ...prev, priority: 'high' }))}
-                          role="radio"
-                          aria-checked={formData.priority === 'high'}
-                        >
-                          <div className="priority-indicator"></div>
-                          <div className="priority-label">Alto</div>
-                          <div className="priority-desc">Dificulta muito o trabalho</div>
-                        </button>
-
-                      </div>
-                      <span className="field-hint">
-                        Selecione o nível que melhor representa o impacto no seu trabalho
-                      </span>
-                    </div>
                   </div>
                   
                   <div className="step-actions">
@@ -981,14 +979,17 @@ export default function OpenTicketPage() {
                           <span className="summary-label">Descrição:</span>
                           <span className="summary-value">{formData.description}</span>
                         </div>
-                        <div className="summary-item">
-                          <span className="summary-label">Impacto:</span>
-                          <span className={`summary-value priority-badge priority-${formData.priority}`}>
-                            {formData.priority === 'low' && 'Baixo'}
-                            {formData.priority === 'medium' && 'Médio'}
-                            {formData.priority === 'high' && 'Alto'}
-                          </span>
-                        </div>
+                        {formData.ticketDepartment === 'ti' && (
+                          <div className="summary-item">
+                            <span className="summary-label">Prioridade:</span>
+                            <span className={`summary-value priority-badge priority-${formData.priority}`}>
+                              {formData.priority === 'low' && '🟢 Baixa'}
+                              {formData.priority === 'medium' && '🟡 Média'}
+                              {formData.priority === 'high' && '🔴 Alta'}
+                            </span>
+                            <span className="priority-auto-note">Definida automaticamente pelo sistema</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
