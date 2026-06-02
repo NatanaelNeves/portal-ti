@@ -576,6 +576,7 @@ export default function OpenTicketPage() {
                       </button>
                       <button
                         type="button"
+                        className={`department-card ${formData.ticketDepartment === 'administrativo' ? 'active' : ''}`}
                         onClick={() => {
                           setFormData(prev => ({
                             ...prev,
