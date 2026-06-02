@@ -15,7 +15,7 @@ export const RH_CATEGORY_SCHEMAS: Record<string, RhCategorySchema> = {
   },
   RH_PONTO: {
     required: ['adjustmentDate'],
-    optional: ['correctedTime', 'notes'],
+    optional: ['correctedTime', 'adjustments', 'notes'],
     visibility: 'public',
   },
   RH_FOLHA: {

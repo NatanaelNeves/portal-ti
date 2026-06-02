@@ -80,6 +80,34 @@ export const createTicketSchema = z.object({
         });
       }
     });
+
+    if (data.category === 'RH_PONTO') {
+      const adjustments = (details as Record<string, unknown>).adjustments;
+
+      if (Array.isArray(adjustments) && adjustments.length > 0) {
+        adjustments.forEach((adjustment, index) => {
+          const adjustmentObject = adjustment as Record<string, unknown>;
+          const date = typeof adjustmentObject.date === 'string' ? adjustmentObject.date.trim() : '';
+          const correctedTime = typeof adjustmentObject.correctedTime === 'string' ? adjustmentObject.correctedTime.trim() : '';
+
+          if (!date) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['requestDetails', 'adjustments', index, 'date'],
+              message: 'Campo obrigatório',
+            });
+          }
+
+          if (!correctedTime) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['requestDetails', 'adjustments', index, 'correctedTime'],
+              message: 'Campo obrigatório',
+            });
+          }
+        });
+      }
+    }
   }
 });
 

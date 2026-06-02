@@ -32,6 +32,12 @@ interface TicketDetail {
   assigned_to?: string;
 }
 
+interface RhPointAdjustment {
+  date?: string;
+  correctedTime?: string;
+  notes?: string;
+}
+
 interface Message {
   id: string;
   message: string;
@@ -173,6 +179,16 @@ export default function AdminTicketDetailPage() {
       setSubmitting(false);
     }
   };
+
+  const rhAdjustments = Array.isArray(ticket?.metadata?.adjustments)
+    ? ticket!.metadata!.adjustments.map((adjustment: any) => ({
+        date: typeof adjustment?.date === 'string' ? adjustment.date : '',
+        correctedTime: typeof adjustment?.correctedTime === 'string' ? adjustment.correctedTime : '',
+        notes: typeof adjustment?.notes === 'string' ? adjustment.notes : '',
+      })) as RhPointAdjustment[]
+    : [];
+
+  const hasRhAdjustments = rhAdjustments.length > 0;
 
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { label: string; className: string }> = {
@@ -479,11 +495,28 @@ export default function AdminTicketDetailPage() {
                   {ticket.metadata.medicalLeaveDays && (
                     <span><strong>Dias de afastamento:</strong> {ticket.metadata.medicalLeaveDays}</span>
                   )}
-                  {ticket.metadata.adjustmentDate && (
-                    <span><strong>Data de ajuste:</strong> {ticket.metadata.adjustmentDate}</span>
-                  )}
-                  {ticket.metadata.correctedTime && (
-                    <span><strong>Horário corrigido:</strong> {ticket.metadata.correctedTime}</span>
+                  {hasRhAdjustments ? (
+                    <div style={{ display: 'grid', gap: '0.75rem', width: '100%' }}>
+                      <strong>Datas de ajuste:</strong>
+                      {rhAdjustments.map((adjustment, index) => (
+                        <div key={`${adjustment.date || 'adjustment'}-${index}`} style={{ display: 'grid', gap: '0.35rem', padding: '0.75rem', border: '1px solid #e5e7eb', borderRadius: '10px', background: '#fafafa' }}>
+                          <span><strong>Data:</strong> {adjustment.date || 'Não informada'}</span>
+                          <span><strong>Horário corrigido:</strong> {adjustment.correctedTime || 'Não informado'}</span>
+                          {adjustment.notes && (
+                            <span><strong>Justificativa:</strong> {adjustment.notes}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <>
+                      {ticket.metadata.adjustmentDate && (
+                        <span><strong>Data de ajuste:</strong> {ticket.metadata.adjustmentDate}</span>
+                      )}
+                      {ticket.metadata.correctedTime && (
+                        <span><strong>Horário corrigido:</strong> {ticket.metadata.correctedTime}</span>
+                      )}
+                    </>
                   )}
                   {ticket.metadata.payrollMonth && (
                     <span><strong>Competência:</strong> {ticket.metadata.payrollMonth}</span>

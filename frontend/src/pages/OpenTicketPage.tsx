@@ -16,7 +16,13 @@ interface FormData {
   priority: string;
   ticketDepartment: string; // 'ti' | 'administrativo' | 'rh'
   category: string;
-  requestDetails: Record<string, string>;
+  requestDetails: Record<string, any>;
+}
+
+interface RhPointAdjustment {
+  date: string;
+  correctedTime: string;
+  notes: string;
 }
 
 interface FieldError {
@@ -201,6 +207,103 @@ export default function OpenTicketPage() {
     { value: 'RH_OUTROS', label: 'Outros RH', icon: '📋' },
   ];
 
+  const createEmptyRhAdjustment = (): RhPointAdjustment => ({
+    date: '',
+    correctedTime: '',
+    notes: '',
+  });
+
+  const getRhAdjustments = (details: Record<string, any>): RhPointAdjustment[] => {
+    if (Array.isArray(details.adjustments) && details.adjustments.length > 0) {
+      return details.adjustments.map((item: any) => ({
+        date: String(item?.date ?? ''),
+        correctedTime: String(item?.correctedTime ?? ''),
+        notes: String(item?.notes ?? ''),
+      }));
+    }
+
+    if (details.adjustmentDate || details.correctedTime || details.notes) {
+      return [{
+        date: String(details.adjustmentDate ?? ''),
+        correctedTime: String(details.correctedTime ?? ''),
+        notes: String(details.notes ?? ''),
+      }];
+    }
+
+    return [createEmptyRhAdjustment()];
+  };
+
+  const normalizeRhPointRequestDetails = (details: Record<string, any>) => {
+    const adjustments = getRhAdjustments(details)
+      .map((item) => ({
+        date: item.date.trim(),
+        correctedTime: item.correctedTime.trim(),
+        notes: item.notes.trim(),
+      }))
+      .filter((item) => item.date || item.correctedTime || item.notes);
+
+    if (adjustments.length === 0) {
+      return null;
+    }
+
+    const invalidAdjustment = adjustments.find((item) => !item.date || !item.correctedTime);
+    if (invalidAdjustment) {
+      return { error: 'Cada ajuste precisa de data e horário corretos.' };
+    }
+
+    return {
+      ...details,
+      adjustments,
+      adjustmentDate: adjustments[0].date,
+      correctedTime: adjustments[0].correctedTime,
+    };
+  };
+
+  const updateRhAdjustment = (index: number, field: keyof RhPointAdjustment, value: string) => {
+    setFormData((prev) => {
+      const adjustments = getRhAdjustments(prev.requestDetails);
+      const nextAdjustments = adjustments.map((item, currentIndex) => (
+        currentIndex === index ? { ...item, [field]: value } : item
+      ));
+
+      return {
+        ...prev,
+        requestDetails: {
+          ...prev.requestDetails,
+          adjustments: nextAdjustments,
+        },
+      };
+    });
+  };
+
+  const addRhAdjustment = () => {
+    setFormData((prev) => {
+      const adjustments = getRhAdjustments(prev.requestDetails);
+      return {
+        ...prev,
+        requestDetails: {
+          ...prev.requestDetails,
+          adjustments: [...adjustments, createEmptyRhAdjustment()],
+        },
+      };
+    });
+  };
+
+  const removeRhAdjustment = (index: number) => {
+    setFormData((prev) => {
+      const adjustments = getRhAdjustments(prev.requestDetails);
+      const nextAdjustments = adjustments.filter((_, currentIndex) => currentIndex !== index);
+
+      return {
+        ...prev,
+        requestDetails: {
+          ...prev.requestDetails,
+          adjustments: nextAdjustments.length > 0 ? nextAdjustments : [createEmptyRhAdjustment()],
+        },
+      };
+    });
+  };
+
   const handleRequestDetailChange = (field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -273,6 +376,30 @@ export default function OpenTicketPage() {
       return;
     }
 
+    const isRhPointRequest = formData.ticketDepartment === 'rh' && formData.category === 'RH_PONTO';
+    let requestDetailsPayload = Object.keys(formData.requestDetails).length > 0 ? { ...formData.requestDetails } : undefined;
+
+    if (isRhPointRequest) {
+      const normalizedDetails = normalizeRhPointRequestDetails(formData.requestDetails);
+
+      if (!normalizedDetails) {
+        setError('Adicione pelo menos um ajuste de ponto.');
+        showToast.error('Adicione pelo menos um ajuste de ponto.');
+        setLoading(false);
+        return;
+      }
+
+      if ('error' in normalizedDetails) {
+        const errorMessage = normalizedDetails.error || 'Cada ajuste precisa de data e horário corretos.';
+        setError(errorMessage);
+        showToast.error(errorMessage);
+        setLoading(false);
+        return;
+      }
+
+      requestDetailsPayload = normalizedDetails;
+    }
+
     console.log('Iniciando criação de chamado...', {
       email: formData.email,
       name: formData.name,
@@ -318,7 +445,7 @@ export default function OpenTicketPage() {
           priority: formData.priority,
           department: formData.ticketDepartment,
           category: formData.category || undefined,
-          requestDetails: Object.keys(formData.requestDetails).length > 0 ? formData.requestDetails : undefined,
+          requestDetails: requestDetailsPayload,
         }),
       });
 
@@ -449,7 +576,6 @@ export default function OpenTicketPage() {
                       </button>
                       <button
                         type="button"
-                        className={`department-card ${formData.ticketDepartment === 'administrativo' ? 'active' : ''}`}
                         onClick={() => {
                           setFormData(prev => ({
                             ...prev,
@@ -547,7 +673,13 @@ export default function OpenTicketPage() {
                               key={cat.value}
                               type="button"
                               className={`chip ${formData.category === cat.value ? 'active' : ''}`}
-                              onClick={() => setFormData(prev => ({ ...prev, category: cat.value, requestDetails: {} }))}
+                              onClick={() => setFormData(prev => ({
+                                ...prev,
+                                category: cat.value,
+                                requestDetails: cat.value === 'RH_PONTO'
+                                  ? { adjustments: [createEmptyRhAdjustment()] }
+                                  : {},
+                              }))}
                               role="radio"
                               aria-checked={formData.category === cat.value}
                             >
@@ -774,29 +906,68 @@ export default function OpenTicketPage() {
 
                     {formData.ticketDepartment === 'rh' && formData.category === 'RH_PONTO' && (
                       <div className="form-group">
-                        <label htmlFor="adjustmentDate">
-                          Data do Ajuste <span className="required">*</span>
-                        </label>
-                        <input
-                          id="adjustmentDate"
-                          type="date"
-                          value={formData.requestDetails.adjustmentDate || ''}
-                          onChange={e => handleRequestDetailChange('adjustmentDate', e.target.value)}
-                        />
-                        <label style={{ marginTop: '0.75rem' }}>Horário Correto</label>
-                        <input
-                          type="time"
-                          value={formData.requestDetails.correctedTime || ''}
-                          onChange={e => handleRequestDetailChange('correctedTime', e.target.value)}
-                          placeholder="HH:MM"
-                        />
-                        <label style={{ marginTop: '0.75rem' }}>Observações</label>
-                        <textarea
-                          value={formData.requestDetails.notes || ''}
-                          onChange={e => handleRequestDetailChange('notes', e.target.value)}
-                          placeholder="Justificativa para o ajuste..."
-                          rows={2}
-                        />
+                        <div className="field-hint" style={{ marginBottom: '0.75rem' }}>
+                          Adicione todas as datas do mês que precisam de correção no mesmo chamado.
+                        </div>
+                        {getRhAdjustments(formData.requestDetails).map((adjustment, index) => (
+                          <div
+                            key={index}
+                            className="form-group"
+                            style={{
+                              border: '1px solid #e5e7eb',
+                              borderRadius: '10px',
+                              padding: '1rem',
+                              marginBottom: '0.75rem',
+                              background: '#fafafa',
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center' }}>
+                              <strong>Ajuste {index + 1}</strong>
+                              {getRhAdjustments(formData.requestDetails).length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => removeRhAdjustment(index)}
+                                  style={{ border: 'none', background: 'transparent', color: '#dc2626', cursor: 'pointer', fontWeight: 600 }}
+                                >
+                                  Remover
+                                </button>
+                              )}
+                            </div>
+                            <label htmlFor={`adjustmentDate-${index}`} style={{ marginTop: '0.75rem' }}>
+                              Data do Ajuste <span className="required">*</span>
+                            </label>
+                            <input
+                              id={`adjustmentDate-${index}`}
+                              type="date"
+                              value={adjustment.date}
+                              onChange={e => updateRhAdjustment(index, 'date', e.target.value)}
+                            />
+                            <label htmlFor={`correctedTime-${index}`} style={{ marginTop: '0.75rem' }}>Horário Correto</label>
+                            <input
+                              id={`correctedTime-${index}`}
+                              type="time"
+                              value={adjustment.correctedTime}
+                              onChange={e => updateRhAdjustment(index, 'correctedTime', e.target.value)}
+                              placeholder="HH:MM"
+                            />
+                            <label htmlFor={`adjustmentNotes-${index}`} style={{ marginTop: '0.75rem' }}>Justificativa</label>
+                            <textarea
+                              id={`adjustmentNotes-${index}`}
+                              value={adjustment.notes}
+                              onChange={e => updateRhAdjustment(index, 'notes', e.target.value)}
+                              placeholder="Explique o motivo deste ajuste..."
+                              rows={2}
+                            />
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={addRhAdjustment}
+                          className="btn btn-secondary"
+                          style={{ marginTop: '0.25rem' }}
+                        >
+                          + Adicionar outra data
+                        </button>
                       </div>
                     )}
 
