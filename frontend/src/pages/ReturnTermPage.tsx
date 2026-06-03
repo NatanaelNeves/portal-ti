@@ -183,6 +183,8 @@ export default function ReturnTermPage() {
         ? `${BACKEND_URL}/api/inventory/terms/retroactive-return`
         : `${BACKEND_URL}/api/inventory/terms/${termId}/devolucao`;
 
+      const currentUser = JSON.parse(localStorage.getItem('internal_user') || '{}');
+
       const payload = retroMode ? {
         equipment_id: equipmentId,
         issued_date: equipment?.acquisition_date || formData.return_date,
@@ -197,7 +199,9 @@ export default function ReturnTermPage() {
         return_destination: formData.equipment_condition === 'avarias' ? 'maintenance' : 'available',
         return_problems: formData.damage_description || 'Nenhum problema relatado',
         return_checklist: formData.checklist,
-        returned_items: []
+        returned_items: [],
+        issued_by_id: currentUser.id,
+        issued_by_name: currentUser.name,
       } : {
         return_date: formData.return_date,
         return_reason: formData.return_reason,

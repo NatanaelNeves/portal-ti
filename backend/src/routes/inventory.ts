@@ -574,11 +574,11 @@ inventoryRouter.post('/movements/deliver', async (req: Request, res: Response) =
     let finalIssuedByName = issued_by_name || 'Sistema';
     if (!finalIssuedById) {
       const adminUser = await database.query(`
-        SELECT id, full_name FROM internal_users WHERE role IN ('admin', 'ti_staff') ORDER BY created_at LIMIT 1
+        SELECT id, name FROM internal_users WHERE role IN ('admin', 'ti_staff') ORDER BY created_at LIMIT 1
       `);
       if (adminUser.rows.length > 0) {
         finalIssuedById = adminUser.rows[0].id;
-        finalIssuedByName = finalIssuedByName === 'Sistema' ? adminUser.rows[0].full_name : finalIssuedByName;
+        finalIssuedByName = finalIssuedByName === 'Sistema' ? adminUser.rows[0].name : finalIssuedByName;
       }
     }
 
@@ -1175,12 +1175,12 @@ inventoryRouter.post('/terms/retroactive-return', async (req: Request, res: Resp
     let finalIssuedByName = issued_by_name || 'Sistema';
     if (!finalIssuedById) {
       const adminUser = await database.query(
-        `SELECT id, full_name FROM internal_users WHERE role IN ('admin', 'ti_staff') ORDER BY created_at LIMIT 1`
+        `SELECT id, name FROM internal_users WHERE role IN ('admin', 'ti_staff') ORDER BY created_at LIMIT 1`
       );
       if (adminUser.rows.length > 0) {
         finalIssuedById = adminUser.rows[0].id;
         if (finalIssuedByName === 'Sistema') {
-          finalIssuedByName = adminUser.rows[0].full_name;
+          finalIssuedByName = adminUser.rows[0].name;
         }
       }
     }
