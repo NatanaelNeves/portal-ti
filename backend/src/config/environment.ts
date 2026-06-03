@@ -92,4 +92,8 @@ export const config = {
   api: {
     url: process.env.API_URL || 'https://portal-ti-backend.azurewebsites.net',
   },
+  anthropic: {
+    apiKey: process.env.ANTHROPIC_API_KEY || '',
+    enabled: Boolean(process.env.ANTHROPIC_API_KEY),
+  },
 };

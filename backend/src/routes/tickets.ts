@@ -204,7 +204,8 @@ ticketsRouter.get('/', async (req: Request, res: Response) => {
     const search = req.query.search as string;
     const date_from = req.query.date_from as string;
     const date_to = req.query.date_to as string;
-    const departmentFilter = req.query.department as string; // 'ti' | 'administrativo'
+    const departmentFilter = req.query.department as string;
+    const requester_id = req.query.requester_id as string;
     
     // Parâmetros de paginação
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
@@ -403,6 +404,12 @@ ticketsRouter.get('/', async (req: Request, res: Response) => {
           paramCount++;
         }
 
+        if (requester_id) {
+          conditions.push(`t.requester_id = $${paramCount}`);
+          params.push(requester_id);
+          paramCount++;
+        }
+
         // Query para total de registros
         const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
         const countQuery = `SELECT COUNT(*) FROM tickets t ${whereClause}`;
@@ -472,6 +479,61 @@ ticketsRouter.get('/', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error fetching tickets:', error);
     res.status(500).json({ error: 'Failed to fetch tickets' });
+  }
+});
+
+/**
+ * GET /export/excel - Exportar chamados filtrados para Excel (usuário interno)
+ */
+ticketsRouter.get('/export/excel', authenticate, async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers['authorization'] as string;
+    if (!authHeader) return res.status(401).json({ error: 'Autenticação necessária' });
+
+    const token = authHeader.substring(7);
+    const jwt = require('jsonwebtoken');
+    const { config } = require('../config/environment');
+    let decoded: any;
+    try { decoded = jwt.verify(token, config.jwt.secret); } catch { return res.status(401).json({ error: 'Token inválido' }); }
+    if (!canViewTicketsAsInternalRole(decoded.role)) return res.status(403).json({ error: 'Acesso negado' });
+
+    const status = req.query.status ? (Array.isArray(req.query.status) ? req.query.status : [req.query.status]) : null;
+    const priority = req.query.priority ? (Array.isArray(req.query.priority) ? req.query.priority : [req.query.priority]) : null;
+    const search = req.query.search as string;
+    const date_from = req.query.date_from as string;
+    const date_to = req.query.date_to as string;
+    const departmentFilter = req.query.department as string;
+
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let pc = 1;
+
+    if (departmentFilter) { conditions.push(`COALESCE(t.department,'ti') = $${pc}`); params.push(departmentFilter); pc++; }
+    else if (decoded.role === UserRole.IT_STAFF) conditions.push(`COALESCE(t.department,'ti') = 'ti'`);
+    else if (decoded.role === UserRole.ADMIN_STAFF) { conditions.push(`COALESCE(t.department,'ti') = 'administrativo'`); conditions.push(`(t.assigned_to_id = $${pc} OR t.assigned_to_id IS NULL)`); params.push(decoded.id); pc++; }
+    else if (decoded.role === UserRole.RH_STAFF) conditions.push(`COALESCE(t.department,'ti') = 'rh'`);
+
+    if (status?.length) { conditions.push(`t.status = ANY($${pc})`); params.push(status); pc++; }
+    if (priority?.length) { conditions.push(`t.priority = ANY($${pc})`); params.push(priority); pc++; }
+    if (search) { conditions.push(`(t.title ILIKE $${pc} OR t.description ILIKE $${pc})`); params.push(`%${search}%`); pc++; }
+    if (date_from) { conditions.push(`t.created_at >= $${pc}`); params.push(date_from); pc++; }
+    if (date_to) { conditions.push(`t.created_at <= $${pc}`); params.push(date_to); pc++; }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const result = await database.query(
+      `SELECT t.*, iu.name AS assigned_to_name, pu.name AS requester_name, pu.email AS requester_email
+       FROM tickets t
+       LEFT JOIN internal_users iu ON t.assigned_to_id = iu.id
+       LEFT JOIN public_users pu ON t.requester_type = 'public' AND t.requester_id = pu.id
+       ${where} ORDER BY t.created_at DESC LIMIT 5000`,
+      params,
+    );
+
+    const { ExcelReportService } = require('../services/excelReportService');
+    await ExcelReportService.generateTicketsReport(result.rows, res, `chamados-${new Date().toISOString().split('T')[0]}`);
+  } catch (err) {
+    console.error('Error exporting tickets:', err);
+    res.status(500).json({ error: 'Falha ao exportar' });
   }
 });
 
@@ -649,6 +711,35 @@ ticketsRouter.post('/', validate(createTicketSchema), async (req: Request, res: 
     );
 
     console.log('POST /tickets - Ticket created:', ticket.rows[0].id);
+
+    // ── Classificação automática por IA (assíncrona, não bloqueia resposta) ───
+    setImmediate(async () => {
+      try {
+        const { classifyTicket } = await import('../services/aiService');
+        const classification = await classifyTicket(title, description, department || 'ti');
+        if (classification) {
+          await database.query(
+            `UPDATE tickets SET
+               type = COALESCE(NULLIF($1, ''), type),
+               category = COALESCE(NULLIF($2, ''), category),
+               priority = COALESCE(NULLIF($3, ''), priority),
+               metadata = metadata || $4::jsonb,
+               updated_at = NOW()
+             WHERE id = $5`,
+            [
+              classification.type,
+              classification.category,
+              classification.priority,
+              JSON.stringify({ ai_classification: classification }),
+              ticket.rows[0].id,
+            ],
+          );
+          console.log(`[AI] Ticket ${ticket.rows[0].id} classificado: ${classification.type}/${classification.category} prioridade=${classification.priority}`);
+        }
+      } catch (aiErr) {
+        console.error('[AI] Classificação assíncrona falhou:', aiErr);
+      }
+    });
 
     await database.query(
       `INSERT INTO ticket_history (
@@ -1308,7 +1399,7 @@ ticketsRouter.post('/:id/manual-close', authenticate, async (req: Request, res: 
 ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { status, assigned_to_id, priority } = req.body;
+    const { status, assigned_to_id, priority, linked_equipment_id } = req.body;
 
     console.log('🔧 PATCH /tickets/:id - Iniciando atualização');
     console.log('Ticket ID:', id);
@@ -1458,6 +1549,12 @@ ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (r
       fields.push(`priority = $${paramCount}`);
       values.push(priority);
       console.log(`✅ Atualizando priority para: ${priority}`);
+      paramCount++;
+    }
+
+    if (linked_equipment_id !== undefined) {
+      fields.push(`linked_equipment_id = $${paramCount}`);
+      values.push(linked_equipment_id || null);
       paramCount++;
     }
 

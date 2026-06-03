@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { showToast } from '../utils/toast';
+import { aiService, type TicketSummary } from '../services/aiService';
 import StatusTimeline from '../components/StatusTimeline';
 import TicketAttachments from '../components/TicketAttachments';
 import QuickActionsCard from '../components/QuickActionsCard';
@@ -29,7 +30,17 @@ interface TicketDetail {
   requester_email?: string;
   requester_department?: string;
   requester_unit?: string;
+  requester_id?: string;
   assigned_to?: string;
+  linked_equipment_id?: string | null;
+}
+
+interface Equipment {
+  id: string;
+  internal_code: string;
+  brand: string;
+  model: string;
+  type: string;
 }
 
 interface RhPointAdjustment {
@@ -65,6 +76,13 @@ export default function AdminTicketDetailPage() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [aiSummary, setAiSummary] = useState<TicketSummary | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
+  const [requesterHistory, setRequesterHistory] = useState<any[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const internalToken = localStorage.getItem('internal_token');
 
@@ -82,8 +100,37 @@ export default function AdminTicketDetailPage() {
     if (id) {
       fetchTicket(id);
       fetchUsers();
+      fetchEquipment();
     }
   }, [id, internalToken, navigate]);
+
+  const fetchEquipment = async () => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/inventory/equipment?limit=200`, {
+        headers: { Authorization: `Bearer ${internalToken}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setEquipment(data.equipment || data.data || []);
+      }
+    } catch { /* silent */ }
+  };
+
+  const loadRequesterHistory = async (requesterId: string) => {
+    if (!requesterId) return;
+    setHistoryLoading(true);
+    setShowHistory(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/tickets?requester_id=${requesterId}&limit=20&sort=created_at&order=desc`, {
+        headers: { Authorization: `Bearer ${internalToken}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setRequesterHistory(data.data || []);
+      }
+    } catch { /* */ }
+    setHistoryLoading(false);
+  };
 
   const fetchUsers = async () => {
     try {
@@ -110,6 +157,7 @@ export default function AdminTicketDetailPage() {
       if (!ticketRes.ok) throw new Error('Erro ao carregar chamado');
       const ticketData = await ticketRes.json();
       if (ticketData.assigned_to_id) ticketData.assigned_to = ticketData.assigned_to_id;
+      if (!ticketData.requester_id) ticketData.requester_id = ticketData.requester_id;
       setTicket(ticketData);
       setMessages(ticketData.messages || []);
     } catch (err: any) {
@@ -270,6 +318,21 @@ export default function AdminTicketDetailPage() {
     return false;
   };
 
+  const handleGenerateSummary = async () => {
+    if (!id) return;
+    if (aiSummary) { setShowSummary(s => !s); return; }
+    setSummaryLoading(true);
+    setShowSummary(true);
+    const result = await aiService.summarizeTicket(id);
+    if (result) {
+      setAiSummary(result);
+    } else {
+      showToast.error('IA não disponível ou falhou ao gerar resumo');
+      setShowSummary(false);
+    }
+    setSummaryLoading(false);
+  };
+
   if (loading) {
     return (
       <div className="admin-ticket-detail loading">
@@ -324,10 +387,47 @@ export default function AdminTicketDetailPage() {
               <span className={`badge ${statusBadge.className}`}>{statusBadge.label}</span>
               <span className={`badge ${priorityBadge.className}`}>{priorityBadge.label}</span>
             </div>
+            <button
+              type="button"
+              className={`btn-ai-summary ${showSummary ? 'active' : ''}`}
+              onClick={handleGenerateSummary}
+              disabled={summaryLoading}
+              title="Gerar resumo com IA"
+            >
+              {summaryLoading ? '⏳ Gerando...' : showSummary ? '✦ Ocultar Resumo' : '✦ Resumo IA'}
+            </button>
           </div>
           <h1 className="ticket-title-heading">{ticket.title}</h1>
         </div>
       </header>
+
+      {/* ── Painel de Resumo IA ── */}
+      {showSummary && (
+        <div className="ai-summary-panel">
+          {summaryLoading ? (
+            <div className="ai-summary-loading">
+              <div className="ai-summary-spinner" />
+              <span>Analisando chamado...</span>
+            </div>
+          ) : aiSummary ? (
+            <>
+              <div className="ai-summary-header">
+                <span>✦ Resumo gerado por IA</span>
+                <small>claude-haiku • apenas contexto</small>
+              </div>
+              <p className="ai-summary-text">{aiSummary.summary}</p>
+              {aiSummary.keyPoints.length > 0 && (
+                <ul className="ai-summary-points">
+                  {aiSummary.keyPoints.map((p, i) => <li key={i}>{p}</li>)}
+                </ul>
+              )}
+              <div className="ai-summary-next">
+                <strong>Próximo passo sugerido:</strong> {aiSummary.suggestedNextStep}
+              </div>
+            </>
+          ) : null}
+        </div>
+      )}
 
       {error && <div className="alert alert-error">{error}</div>}
 
@@ -457,6 +557,35 @@ export default function AdminTicketDetailPage() {
                     : ticket.department === 'rh' ? 'Recursos Humanos'
                     : 'TI'}
                 </div>
+              </div>
+
+              {/* Linked Equipment */}
+              <div className="detail-field">
+                <label className="field-label">Equipamento</label>
+                {isEditing ? (
+                  <select
+                    value={ticket.linked_equipment_id || ''}
+                    onChange={e => handleUpdateTicket({ linked_equipment_id: e.target.value || null } as any)}
+                    disabled={submitting}
+                    className="select-input"
+                  >
+                    <option value="">Nenhum</option>
+                    {equipment.map(eq => (
+                      <option key={eq.id} value={eq.id}>
+                        {eq.internal_code} — {eq.brand} {eq.model}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="field-value">
+                    {ticket.linked_equipment_id
+                      ? equipment.find(e => e.id === ticket.linked_equipment_id)?.internal_code
+                        ? `${equipment.find(e => e.id === ticket.linked_equipment_id)!.internal_code} — ${equipment.find(e => e.id === ticket.linked_equipment_id)!.brand} ${equipment.find(e => e.id === ticket.linked_equipment_id)!.model}`
+                        : 'Carregando...'
+                      : <span className="text-muted">Sem equipamento vinculado</span>
+                    }
+                  </div>
+                )}
               </div>
 
               {/* Category */}
@@ -668,7 +797,22 @@ export default function AdminTicketDetailPage() {
           {/* Requester Info */}
           {ticket.requester_type === 'public' && (
             <div className="sidebar-card">
-              <h3 className="sidebar-card-title">Solicitante</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <h3 className="sidebar-card-title" style={{ margin: 0 }}>Solicitante</h3>
+                {ticket.requester_id && (
+                  <button
+                    className="btn-ai-summary"
+                    style={{ fontSize: '0.72rem', padding: '3px 10px' }}
+                    onClick={() => {
+                      if (showHistory) { setShowHistory(false); return; }
+                      loadRequesterHistory(ticket.requester_id!);
+                    }}
+                    title="Ver histórico de chamados deste solicitante"
+                  >
+                    {showHistory ? 'Ocultar' : 'Histórico'}
+                  </button>
+                )}
+              </div>
               <div className="sidebar-meta">
                 <div className="meta-item">
                   <span className="meta-label">Nome</span>
@@ -691,6 +835,33 @@ export default function AdminTicketDetailPage() {
                   <span className="meta-value">{ticket.type}</span>
                 </div>
               </div>
+
+              {/* Histórico 360° */}
+              {showHistory && (
+                <div style={{ marginTop: '0.75rem', borderTop: '1px solid #e5e7eb', paddingTop: '0.75rem' }}>
+                  <strong style={{ fontSize: '0.8rem', color: '#374151' }}>Chamados anteriores</strong>
+                  {historyLoading ? (
+                    <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: '0.5rem 0 0' }}>Carregando...</p>
+                  ) : requesterHistory.length === 0 ? (
+                    <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: '0.5rem 0 0' }}>Nenhum chamado anterior.</p>
+                  ) : (
+                    <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      {requesterHistory.filter(h => h.id !== ticket.id).slice(0, 8).map((h: any) => (
+                        <a
+                          key={h.id}
+                          href={`/admin/chamados/${h.id}`}
+                          style={{ fontSize: '0.78rem', color: '#1e40af', textDecoration: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0.5rem', background: '#f8fafc', borderRadius: '4px', border: '1px solid #e2e8f0' }}
+                        >
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{h.title}</span>
+                          <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', color: '#64748b', whiteSpace: 'nowrap' }}>
+                            {new Date(h.created_at).toLocaleDateString('pt-BR')}
+                          </span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

@@ -4,7 +4,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import '../styles/AnalyticsDashboard.css';
-import { useToastStore } from '../stores/toastStore';
+import { showToast } from '../utils/toast';
 
 interface OverviewStats {
   totalTickets: number;
@@ -48,7 +48,6 @@ const AnalyticsDashboard: React.FC = () => {
   const [technicianStats, setTechnicianStats] = useState<TechnicianStats[]>([]);
   const [slaStats, setSlaStats] = useState<SLAStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const { error } = useToastStore();
 
   useEffect(() => {
     fetchAllStats();
@@ -85,7 +84,7 @@ const AnalyticsDashboard: React.FC = () => {
         setSlaStats(data);
       }
     } catch (err: any) {
-      error('Erro ao carregar estatísticas');
+      showToast.error('Erro ao carregar estatísticas');
       console.error(err);
     } finally {
       setLoading(false);

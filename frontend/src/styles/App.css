@@ -15,3 +15,33 @@
     padding: 1rem;
   }
 }
+
+/* ── App loading screen ─────────────────────────────────────────────────────── */
+.app-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background-color: #f5f5f5;
+  gap: 1rem;
+}
+
+.app-loading__spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #007A33;
+  border-radius: 50%;
+  animation: app-spin 0.7s linear infinite;
+}
+
+.app-loading__text {
+  color: #64748b;
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+
+@keyframes app-spin {
+  to { transform: rotate(360deg); }
+}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/Comments.css';
 import { useAuthStore } from '../stores/authStore';
-import { useToastStore } from '../stores/toastStore';
+import { showToast } from '../utils/toast';
 
 interface Message {
   id: string;
@@ -25,7 +25,6 @@ const Comments: React.FC<CommentsProps> = ({ ticketId }) => {
   const [submitting, setSubmitting] = useState(false);
   
   const { user } = useAuthStore();
-  const { success, error } = useToastStore();
 
   useEffect(() => {
     fetchMessages();
@@ -73,7 +72,7 @@ const Comments: React.FC<CommentsProps> = ({ ticketId }) => {
     e.preventDefault();
     
     if (!newMessage.trim()) {
-      error('Por favor, escreva uma mensagem');
+      showToast.error('Por favor, escreva uma mensagem');
       return;
     }
 
@@ -107,12 +106,12 @@ const Comments: React.FC<CommentsProps> = ({ ticketId }) => {
         throw new Error('Erro ao enviar mensagem');
       }
 
-      success('Mensagem enviada!');
+      showToast.success('Mensagem enviada!');
       setNewMessage('');
       setIsInternal(false);
       fetchMessages();
     } catch (err: any) {
-      error(err.message || 'Erro ao enviar mensagem');
+      showToast.error(err.message || 'Erro ao enviar mensagem');
     } finally {
       setSubmitting(false);
     }

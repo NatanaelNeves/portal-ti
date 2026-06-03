@@ -204,12 +204,66 @@ async function sendReservation1hRemindersAndAutoNoShow(): Promise<void> {
   }
 }
 
+// ─── Job: Alertas de garantia de equipamentos ────────────────────────────────
+async function notifyWarrantyExpiring(): Promise<void> {
+  try {
+    console.log('[SCHEDULER] Verificando garantias prestes a vencer...');
+
+    const result = await database.query(
+      `SELECT ie.id, ie.internal_code, ie.brand, ie.model, ie.type, ie.warranty_expiration,
+              (ie.warranty_expiration::date - CURRENT_DATE) AS days_remaining
+       FROM inventory_equipment ie
+       WHERE ie.warranty_expiration IS NOT NULL
+         AND ie.current_status != 'inactive'
+         AND (ie.warranty_expiration::date - CURRENT_DATE) IN (30, 15, 7)`,
+    );
+
+    if (result.rows.length === 0) {
+      console.log('[SCHEDULER] Nenhuma garantia vencendo nos próximos dias.');
+      return;
+    }
+
+    const itUsersResult = await database.query(
+      `SELECT email FROM internal_users WHERE role IN ('admin', 'it_staff') AND is_active = true`,
+    );
+    const itEmails: string[] = itUsersResult.rows.map((r: { email: string }) => r.email).filter(Boolean);
+
+    if (!itEmails.length) {
+      console.log('[SCHEDULER] Nenhum usuário de TI para notificar sobre garantias.');
+      return;
+    }
+
+    for (const row of result.rows) {
+      await EmailService.sendWarrantyAlert(
+        itEmails,
+        {
+          internalCode: row.internal_code,
+          brand: row.brand || '',
+          model: row.model || '',
+          type: row.type,
+          warrantyExpiration: row.warranty_expiration,
+        },
+        Number(row.days_remaining),
+      );
+    }
+
+    console.log(`[SCHEDULER] ${result.rows.length} alerta(s) de garantia enviado(s).`);
+  } catch (err) {
+    console.error('[SCHEDULER] Erro ao verificar garantias:', err);
+  }
+}
+
 // ─── Registrar jobs ──────────────────────────────────────────────────────────
 export function initializeScheduler(): void {
   // Tickets: todo dia às 03:00 UTC
   cron.schedule('0 3 * * *', () => {
     notifyTicketsNearAutoClose();
     autoCloseAwaitingConfirmationTickets();
+  });
+
+  // Garantias: todo dia às 09:00 UTC
+  cron.schedule('0 9 * * *', () => {
+    notifyWarrantyExpiring();
   });
 
   // Reservas: lembrete 24h todo dia às 08:00 UTC
@@ -223,6 +277,6 @@ export function initializeScheduler(): void {
   });
 
   console.log(
-    `✓ Scheduler iniciado: tickets (03:00), lembretes reserva 24h (08:00), lembretes 1h + auto-noshow (horário)`,
+    `✓ Scheduler iniciado: tickets (03:00), garantias (09:00), reservas 24h (08:00), reservas 1h + noshow (horário)`,
   );
 }

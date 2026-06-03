@@ -1,5 +1,5 @@
 import './styles/App.css';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useAuthStore } from './stores/authStore';
 import { Toaster } from 'react-hot-toast';
@@ -56,10 +56,13 @@ import RhDashboardPage from './pages/RhDashboardPage';
 import RhTicketsPage from './pages/RhTicketsPage';
 import RhReportsPage from './pages/RhReportsPage';
 
+// Error pages
+import NotFoundPage from './pages/NotFoundPage';
+import StatusPage from './pages/StatusPage';
+
 // Components
 import Navigation from './components/Navigation';
 import InternalProtectedRoute from './components/InternalProtectedRoute';
-import ToastContainer from './components/ToastContainer';
 import { NotificationProvider } from './contexts/NotificationContext';
 
 function App() {
@@ -72,7 +75,12 @@ function App() {
   }, [loadStoredUser]);
 
   if (!isReady) {
-    return <div>Carregando...</div>;
+    return (
+      <div className="app-loading">
+        <div className="app-loading__spinner" />
+        <span className="app-loading__text">Carregando...</span>
+      </div>
+    );
   }
 
   return (
@@ -80,7 +88,6 @@ function App() {
       <Router>
         <div className="app">
           <Toaster />
-          <ToastContainer />
           <Navigation />
           <main className="main-content">
             <Routes>
@@ -90,6 +97,7 @@ function App() {
             <Route path="/meus-chamados" element={<MyTicketsPage />} />
             <Route path="/chamado/:id" element={<TicketDetailPage />} />
             <Route path="/central" element={<InformationCenterPage />} />
+            <Route path="/status" element={<StatusPage />} />
             <Route path="/reservar" element={<ReservationPublicPage />} />
             <Route path="/reservar/acompanhar" element={<ReservationTrackingPage />} />
             <Route path="/reservar/acompanhar/:token" element={<ReservationTrackingPage />} />
@@ -145,7 +153,7 @@ function App() {
             <Route path="/gestor/solicitacoes" element={<InternalProtectedRoute allowedRoles={['manager', 'admin']}><GestorTicketsPage /></InternalProtectedRoute>} />
 
             {/* Fallback */}
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </main>
       </div>

@@ -72,6 +72,11 @@ export default function AdminTicketsPage() {
   const [userRole, setUserRole] = useState<string>('');
   const [isContextReady, setIsContextReady] = useState(false);
   const [priorityFeedback, setPriorityFeedback] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [exportLoading, setExportLoading] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('internal_token');
@@ -138,7 +143,7 @@ export default function AdminTicketsPage() {
     if (!isContextReady) return;
     fetchTickets();
     fetchUsers();
-  }, [isContextReady, filterStatus, filterPriority, assignmentFilter, selectedStatuses, selectedPriorities, searchText, currentPage, departmentFilter, currentUserId]);
+  }, [isContextReady, filterStatus, filterPriority, assignmentFilter, selectedStatuses, selectedPriorities, searchText, currentPage, departmentFilter, currentUserId, dateFrom, dateTo]);
 
   useEffect(() => {
     if (!isContextReady) return;
@@ -240,6 +245,59 @@ export default function AdminTicketsPage() {
     }
   };
 
+  const toggleSelect = (ticketId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(ticketId) ? next.delete(ticketId) : next.add(ticketId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === sortedTickets.length && sortedTickets.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(sortedTickets.map(t => t.id)));
+    }
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleBulkClose = async () => {
+    if (!selectedIds.size) return;
+    setBulkLoading(true);
+    try {
+      await Promise.all(
+        Array.from(selectedIds).map(id => api.patch(`/tickets/${id}`, { status: 'closed' }))
+      );
+      clearSelection();
+      fetchTickets();
+    } catch {
+      setError('Erro ao fechar chamados em lote');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleBulkAssignToMe = async () => {
+    if (!selectedIds.size || !currentUserId) return;
+    setBulkLoading(true);
+    try {
+      await Promise.all(
+        Array.from(selectedIds).map(id =>
+          api.patch(`/tickets/${id}`, { status: 'in_progress', assigned_to_id: currentUserId })
+        )
+      );
+      clearSelection();
+      fetchTickets();
+    } catch {
+      setError('Erro ao assumir chamados em lote');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
   const fetchTickets = async () => {
     try {
       setLoading(true);
@@ -295,6 +353,9 @@ export default function AdminTicketsPage() {
         quickPriorities.forEach((priority) => params.append('priority', priority));
       }
       
+      if (dateFrom) params.append('date_from', dateFrom);
+      if (dateTo) params.append('date_to', new Date(dateTo + 'T23:59:59').toISOString());
+
       // Paginação
       params.append('page', currentPage.toString());
       params.append('limit', '20');
@@ -833,8 +894,29 @@ export default function AdminTicketsPage() {
             </div>
           </div>
 
+            <div className="filter-group">
+              <label className="filter-label">Período</label>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <input
+                  type="date"
+                  className="filter-input"
+                  value={dateFrom}
+                  onChange={e => { setDateFrom(e.target.value); setCurrentPage(1); }}
+                  style={{ flex: 1 }}
+                />
+                <span style={{ color: '#6b7280', fontSize: '0.8rem' }}>até</span>
+                <input
+                  type="date"
+                  className="filter-input"
+                  value={dateTo}
+                  onChange={e => { setDateTo(e.target.value); setCurrentPage(1); }}
+                  style={{ flex: 1 }}
+                />
+              </div>
+            </div>
+
           <div className="advanced-filters-footer">
-            <button 
+            <button
               type="button"
               className="advanced-clear-btn advanced-clear-btn-inline"
               onClick={() => {
@@ -843,6 +925,8 @@ export default function AdminTicketsPage() {
                 setSelectedPriorities([]);
                 setFilterStatus('all');
                 setFilterPriority(null);
+                setDateFrom('');
+                setDateTo('');
                 setCurrentPage(1);
               }}
             >
@@ -909,15 +993,101 @@ export default function AdminTicketsPage() {
           <section className="ticket-queue card ticket-queue--attached">
             <div className="queue-header card-header">
               <h2>Fila de Atendimento</h2>
-              <span className="queue-count">
-                {sortedTickets.length} chamados
-                {filterStatus !== 'all' && ` (${getStatusLabel(filterStatus)})`}
-                {filterPriority && ` • Prioridade ${getPriorityLabel(filterPriority)}`}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <span className="queue-count">
+                  {sortedTickets.length} chamados
+                  {filterStatus !== 'all' && ` (${getStatusLabel(filterStatus)})`}
+                  {filterPriority && ` • Prioridade ${getPriorityLabel(filterPriority)}`}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  disabled={exportLoading}
+                  onClick={async () => {
+                    setExportLoading(true);
+                    try {
+                      const token = localStorage.getItem('internal_token');
+                      const p = new URLSearchParams();
+                      const deptForExport = userRole === 'admin_staff' ? 'administrativo' : userRole === 'it_staff' ? 'ti' : departmentFilter;
+                      if (deptForExport) p.append('department', deptForExport);
+                      selectedStatuses.forEach(s => p.append('status', s));
+                      selectedPriorities.forEach(pr => p.append('priority', pr));
+                      if (searchText.trim()) p.append('search', searchText.trim());
+                      if (dateFrom) p.append('date_from', dateFrom);
+                      if (dateTo) p.append('date_to', new Date(dateTo + 'T23:59:59').toISOString());
+                      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/tickets/export/excel?${p.toString()}`, {
+                        headers: { Authorization: `Bearer ${token}` },
+                      });
+                      if (!res.ok) throw new Error();
+                      const blob = await res.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `chamados-${new Date().toISOString().split('T')[0]}.xlsx`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    } catch {
+                      alert('Erro ao exportar');
+                    } finally {
+                      setExportLoading(false);
+                    }
+                  }}
+                  title="Exportar chamados filtrados para Excel"
+                >
+                  {exportLoading ? '...' : '⬇ Excel'}
+                </button>
+              </div>
             </div>
 
-            {loading ? (
-              <div className="loading">Carregando...</div>
+            {/* Barra de ações em lote */}
+            {selectedIds.size > 0 && (
+              <div className="bulk-action-bar">
+                <span className="bulk-count">{selectedIds.size} selecionado{selectedIds.size !== 1 ? 's' : ''}</span>
+                <div className="bulk-actions">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={toggleSelectAll}
+                  >
+                    {selectedIds.size === sortedTickets.length ? 'Desmarcar todos' : 'Selecionar todos'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={handleBulkAssignToMe}
+                    disabled={bulkLoading}
+                  >
+                    Assumir selecionados
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-warning btn-sm"
+                    onClick={handleBulkClose}
+                    disabled={bulkLoading}
+                  >
+                    Fechar selecionados
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={clearSelection}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+
+          {loading ? (
+              <div className="tickets-list">
+                {[1,2,3,4,5].map(i => (
+                  <div key={i} className="ticket-card ticket-skeleton">
+                    <div className="skeleton-line skeleton-line--title" />
+                    <div className="skeleton-line skeleton-line--meta" />
+                    <div className="skeleton-line skeleton-line--badges" />
+                  </div>
+                ))}
+              </div>
             ) : sortedTickets.length === 0 ? (
               <div className="empty-queue">
                 <span className="empty-icon"><i className="ti ti-inbox-off" /></span>
@@ -930,10 +1100,18 @@ export default function AdminTicketsPage() {
                   return (
                   <div
                     key={ticket.id}
-                    className={`ticket-card ticket-status-${ticket.status} ${selectedTicket?.id === ticket.id ? 'active' : ''} ticket-priority-${ticket.priority || 'neutral'}`}
+                    className={`ticket-card ticket-status-${ticket.status} ${selectedTicket?.id === ticket.id ? 'active' : ''} ticket-priority-${ticket.priority || 'neutral'} ${selectedIds.has(ticket.id) ? 'ticket-card--selected' : ''}`}
                     onClick={() => setSelectedTicket(ticket)}
                   >
                     <div className="ticket-card-top">
+                      <input
+                        type="checkbox"
+                        className="ticket-checkbox"
+                        checked={selectedIds.has(ticket.id)}
+                        onChange={() => {}}
+                        onClick={(e) => toggleSelect(ticket.id, e)}
+                        title="Selecionar chamado"
+                      />
                       <div className="ticket-card-main">
                         <div className="ticket-card-title">{ticket.title}</div>
                         <div className="ticket-card-requester">

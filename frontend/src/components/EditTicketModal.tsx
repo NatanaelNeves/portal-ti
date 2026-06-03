@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import '../styles/EditTicketModal.css';
-import { useToastStore } from '../stores/toastStore';
+import { showToast } from '../utils/toast';
 
 interface EditTicketModalProps {
   isOpen: boolean;
@@ -23,18 +23,17 @@ const EditTicketModal: React.FC<EditTicketModalProps> = ({
   const [description, setDescription] = useState(currentDescription);
   const [submitting, setSubmitting] = useState(false);
   
-  const { success, error } = useToastStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!title.trim()) {
-      error('O título não pode estar vazio');
+      showToast.error('O título não pode estar vazio');
       return;
     }
 
     if (!description.trim()) {
-      error('A descrição não pode estar vazia');
+      showToast.error('A descrição não pode estar vazia');
       return;
     }
 
@@ -69,11 +68,11 @@ const EditTicketModal: React.FC<EditTicketModalProps> = ({
         throw new Error(data.error || 'Erro ao atualizar chamado');
       }
 
-      success('Chamado atualizado com sucesso!');
+      showToast.success('Chamado atualizado com sucesso!');
       onSuccess({ title, description });
       onClose();
     } catch (err: any) {
-      error(err.message ||'Erro ao atualizar chamado');
+      showToast.error(err.message || 'Erro ao atualizar chamado');
     } finally {
       setSubmitting(false);
     }

@@ -1053,6 +1053,90 @@ export async function initializeDatabase(): Promise<void> {
       END $$;
     `);
 
+    // ── Migração: helpful_yes/helpful_no em information_articles ─────
+    await database.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='information_articles' AND column_name='helpful_yes') THEN
+          ALTER TABLE information_articles ADD COLUMN helpful_yes INT DEFAULT 0;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='information_articles' AND column_name='helpful_no') THEN
+          ALTER TABLE information_articles ADD COLUMN helpful_no INT DEFAULT 0;
+        END IF;
+      END $$;
+    `);
+
+    // ── Migração: linked_equipment_id em tickets ──────────────────────
+    await database.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tickets' AND column_name='linked_equipment_id') THEN
+          ALTER TABLE tickets ADD COLUMN linked_equipment_id UUID REFERENCES inventory_equipment(id) ON DELETE SET NULL;
+        END IF;
+      END $$;
+    `);
+
+    // ── Tabela de incidentes do sistema (portal de status) ────────────
+    await database.query(`
+      CREATE TABLE IF NOT EXISTS system_incidents (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        severity VARCHAR(20) NOT NULL DEFAULT 'medium',
+        status VARCHAR(20) NOT NULL DEFAULT 'active',
+        created_by_id UUID REFERENCES internal_users(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        resolved_at TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await database.query(`CREATE INDEX IF NOT EXISTS idx_incidents_status ON system_incidents(status);`);
+
+    // ── Migração: coluna sla_breach_notified_at em tickets ───────────
+    await database.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name='tickets' AND column_name='sla_breach_notified_at') THEN
+          ALTER TABLE tickets ADD COLUMN sla_breach_notified_at TIMESTAMP;
+        END IF;
+      END $$;
+    `);
+    console.log('✓ Coluna sla_breach_notified_at adicionada em tickets');
+
+    // ── Índices de performance para tickets ──────────────────────────
+    await database.query(`
+      CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status);
+      CREATE INDEX IF NOT EXISTS idx_tickets_department ON tickets(department);
+      CREATE INDEX IF NOT EXISTS idx_tickets_assigned_to_id ON tickets(assigned_to_id);
+      CREATE INDEX IF NOT EXISTS idx_tickets_created_at ON tickets(created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_tickets_requester_id ON tickets(requester_id);
+      CREATE INDEX IF NOT EXISTS idx_tickets_priority ON tickets(priority);
+    `);
+    console.log('✓ Índices de performance dos tickets criados');
+
+    // ── UNIQUE em public_users.email (com remoção de duplicatas) ─────
+    await database.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'public_users_email_unique'
+            AND conrelid = 'public_users'::regclass
+        ) THEN
+          -- Remove duplicatas mantendo o registro com last_access mais recente
+          DELETE FROM public_users pu1
+          USING public_users pu2
+          WHERE pu1.email = pu2.email
+            AND pu1.created_at < pu2.created_at
+            AND pu1.id <> pu2.id;
+
+          ALTER TABLE public_users ADD CONSTRAINT public_users_email_unique UNIQUE (email);
+        END IF;
+      END $$;
+    `);
+    console.log('✓ UNIQUE constraint em public_users.email adicionada');
+
     // ── Seed: admin user ─────────────────────────────────────────────
     // Only seeds if NO admin exists. In production, users are created via API.
     let seedAdminId: string | null = null;

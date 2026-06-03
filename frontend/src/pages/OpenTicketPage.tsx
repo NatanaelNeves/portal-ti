@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { showToast } from '../utils/toast';
 import '../styles/OpenTicketPage.css';
 import { BACKEND_URL } from '../services/api';
 import { INSTITUTION_UNITS } from '../utils/institutionOptions';
+import { aiService, type ArticleSuggestion } from '../services/aiService';
 
 interface FormData {
   email: string;
@@ -60,6 +61,9 @@ export default function OpenTicketPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successData, setSuccessData] = useState<SuccessData | null>(null);
+  const [articleSuggestions, setArticleSuggestions] = useState<ArticleSuggestion[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const suggestDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Automatic priority calculation — applies only to TI tickets
   const calculatePriority = (department: string, category: string, title: string, description: string): string => {
@@ -103,6 +107,26 @@ export default function OpenTicketPage() {
     setFormData(prev => ({ ...prev, priority: newPriority }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.ticketDepartment, formData.category, formData.title, formData.description]);
+
+  // Sugestão de artigos com debounce ao digitar a descrição
+  useEffect(() => {
+    const query = `${formData.title} ${formData.description}`.trim();
+    if (query.length < 30) {
+      setArticleSuggestions([]);
+      return;
+    }
+    if (suggestDebounceRef.current) clearTimeout(suggestDebounceRef.current);
+    suggestDebounceRef.current = setTimeout(async () => {
+      setSuggestionsLoading(true);
+      const suggestions = await aiService.suggestArticles(query);
+      setArticleSuggestions(suggestions);
+      setSuggestionsLoading(false);
+    }, 800);
+    return () => {
+      if (suggestDebounceRef.current) clearTimeout(suggestDebounceRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.title, formData.description]);
 
   // SLA mapping based on priority
   const getSlaHours = (priority: string): number => {
@@ -871,6 +895,35 @@ export default function OpenTicketPage() {
                         <span id="description-error" className="error-message" role="alert">
                           {fieldErrors.description}
                         </span>
+                      )}
+
+                      {/* Sugestões de artigos da KB */}
+                      {(suggestionsLoading || articleSuggestions.length > 0) && (
+                        <div className="kb-suggestions">
+                          <div className="kb-suggestions-header">
+                            <span className="kb-suggestions-icon">💡</span>
+                            <span>Artigos que podem ajudar</span>
+                            {suggestionsLoading && <span className="kb-suggestions-loading">buscando...</span>}
+                          </div>
+                          {articleSuggestions.map(article => (
+                            <a
+                              key={article.id}
+                              href={`/central#${article.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="kb-suggestion-item"
+                            >
+                              <span className="kb-suggestion-category">{article.category}</span>
+                              <span className="kb-suggestion-title">{article.title}</span>
+                              <span className="kb-suggestion-arrow">→</span>
+                            </a>
+                          ))}
+                          {articleSuggestions.length > 0 && (
+                            <p className="kb-suggestions-footer">
+                              Se um desses artigos resolver seu problema, não precisa abrir chamado.
+                            </p>
+                          )}
+                        </div>
                       )}
                     </div>
 

@@ -721,4 +721,62 @@ export class EmailService {
       html,
     });
   }
+
+  /**
+   * Alerta de garantia prestes a vencer
+   */
+  static async sendWarrantyAlert(
+    itEmails: string[],
+    equipment: { internalCode: string; brand: string; model: string; type: string; warrantyExpiration: string },
+    daysRemaining: number
+  ): Promise<void> {
+    if (!itEmails.length) return;
+
+    const urgencyColor = daysRemaining <= 7 ? '#dc3545' : daysRemaining <= 15 ? '#F28C38' : '#007A33';
+    const urgencyLabel = daysRemaining <= 7 ? 'CRÍTICO' : daysRemaining <= 15 ? 'URGENTE' : 'ATENÇÃO';
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: ${urgencyColor}; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #fff; padding: 24px; border: 1px solid #e5e7eb; border-radius: 0 0 8px 8px; }
+          .badge { display: inline-block; background: ${urgencyColor}; color: #fff; padding: 4px 12px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; }
+          .info-table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+          .info-table td { padding: 8px 12px; border-bottom: 1px solid #f0f0f0; }
+          .info-table td:first-child { font-weight: 600; width: 40%; color: #555; }
+          .footer { text-align: center; color: #999; font-size: 0.8rem; margin-top: 24px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h2 style="margin:0;">⚠️ Alerta de Garantia</h2>
+            <p style="margin:4px 0 0;">${urgencyLabel} — Vence em ${daysRemaining} dia${daysRemaining !== 1 ? 's' : ''}</p>
+          </div>
+          <div class="content">
+            <p>O equipamento abaixo tem a garantia vencendo em <strong>${daysRemaining} dia${daysRemaining !== 1 ? 's' : ''}</strong>:</p>
+            <table class="info-table">
+              <tr><td>Código Interno</td><td>${equipment.internalCode}</td></tr>
+              <tr><td>Tipo</td><td>${equipment.type}</td></tr>
+              <tr><td>Marca / Modelo</td><td>${equipment.brand} ${equipment.model}</td></tr>
+              <tr><td>Vencimento da Garantia</td><td><strong>${new Date(equipment.warrantyExpiration).toLocaleDateString('pt-BR')}</strong></td></tr>
+            </table>
+            <p style="color:#555;">Verifique se é necessário renovar a garantia, acionar suporte ou registrar a situação no inventário.</p>
+          </div>
+          <div class="footer">Portal de Serviços Internos — Setor de TI</div>
+        </div>
+      </body></html>
+    `;
+
+    await this.sendEmail({
+      to: itEmails[0],
+      ...(itEmails.length > 1 ? { cc: itEmails.slice(1).join(',') } : {}),
+      subject: `⚠️ [${urgencyLabel}] Garantia vencendo em ${daysRemaining}d — ${equipment.internalCode} ${equipment.brand} ${equipment.model}`,
+      html,
+    });
+  }
 }

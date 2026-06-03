@@ -124,6 +124,8 @@ app.use('/api', require('./routes/knowledge').default);
 app.use('/api/dashboard', require('./routes/dashboard').default);
 app.use('/api/reports', require('./routes/reports').default);
 app.use('/api/reservations', require('./routes/reservations').default);
+app.use('/api/ai', require('./routes/ai').default);
+app.use('/api/status', require('./routes/status').default);
 
 // Error handling
 app.use((err: any, req: any, res: Response, next: any) => {
