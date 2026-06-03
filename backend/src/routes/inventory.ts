@@ -1126,6 +1126,7 @@ inventoryRouter.get('/terms/:termId/return-pdf', async (req: Request, res: Respo
 // POST - Criar termo retroativo de devolução para equipamentos já cadastrados no banco
 inventoryRouter.post('/terms/retroactive-return', async (req: Request, res: Response) => {
   try {
+    console.log('🔄 retroactive-return payload:', JSON.stringify(req.body));
     const {
       equipment_id,
       responsible_id,

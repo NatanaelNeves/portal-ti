@@ -223,7 +223,8 @@ export default function ReturnTermPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Erro ao registrar devolução');
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.details || errData.error || 'Erro ao registrar devolução');
       }
 
       const data = await response.json();
