@@ -598,7 +598,11 @@ export default function AdminTicketsPage() {
     <div className="admin-tickets-dashboard">
       <header className="dashboard-header card">
         <div className="dashboard-header-main">
-          <h1>{departmentFilter === 'administrativo' ? 'Central Operacional Administrativa' : 'Central Operacional TI'}</h1>
+          <h1>
+            {departmentFilter === 'administrativo' ? 'Central Operacional Administrativa'
+              : departmentFilter === 'rh' ? 'Central Operacional RH'
+              : 'Central Operacional TI'}
+          </h1>
         </div>
         <div className="dashboard-header-status">
           <span className="status-chip">
@@ -634,6 +638,12 @@ export default function AdminTicketsPage() {
             onClick={() => { setDepartmentFilter('administrativo'); setCurrentPage(1); }}
           >
             <i className="ti ti-building" /> Administrativo
+          </button>
+          <button
+            className={`dept-tab ${departmentFilter === 'rh' ? 'active' : ''}`}
+            onClick={() => { setDepartmentFilter('rh'); setCurrentPage(1); }}
+          >
+            <i className="ti ti-users" /> RH
           </button>
         </div>
       )}
@@ -950,8 +960,11 @@ export default function AdminTicketsPage() {
                     </div>
 
                     <div className="ticket-card-badges">
-                      {ticket.department && ticket.department !== 'ti' && (
+                      {ticket.department === 'administrativo' && departmentFilter === '' && (
                         <span className="badge badge-dept-admin">Administrativo</span>
+                      )}
+                      {ticket.department === 'rh' && departmentFilter === '' && (
+                        <span className="badge badge-dept-rh">RH</span>
                       )}
                       {(!ticket.department || ticket.department === 'ti') && departmentFilter === '' && (
                         <span className="badge badge-dept-ti">TI</span>
@@ -1144,7 +1157,9 @@ export default function AdminTicketsPage() {
                   <div className="info-row">
                     <span className="info-label">Departamento:</span>
                     <span className="info-value">
-                      {selectedTicket.department === 'administrativo' ? 'Administrativo' : 'TI'}
+                      {selectedTicket.department === 'administrativo' ? 'Administrativo'
+                        : selectedTicket.department === 'rh' ? 'RH'
+                        : 'TI'}
                     </span>
                   </div>
                   {selectedTicket.category && (
