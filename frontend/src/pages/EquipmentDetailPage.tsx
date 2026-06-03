@@ -251,15 +251,31 @@ export default function EquipmentDetailPage() {
               <div className="card card-actions">
                 <h3>⚡ Ações Rápidas</h3>
                 <div className="action-buttons-grid">
-                  <button className="btn btn-new-term" onClick={() => navigate(`/inventario/equipamento/${equipmentId}/assinar-termo`)}>
-                    <span className="btn-icon">✍️</span> Novo Termo
-                  </button>
-                  <button className="btn btn-new-term" onClick={() => navigate(`/inventario/equipamento/${equipmentId}/termo-de-devolucao`)}>
-                    <span className="btn-icon">🗂️</span> Termo de Devolução
-                  </button>
-                  <button className="btn btn-move" onClick={() => navigate(`/inventario/equipamento/${equipmentId}/movimentar`)}>
-                    <span className="btn-icon">↔️</span> Movimentar
-                  </button>
+                  {(equipment.current_status === 'available' || equipment.current_status === 'in_stock') && (
+                    <button className="btn btn-success" onClick={() => navigate(`/inventario/equipamentos/entregar?equipment=${equipmentId}`)}>
+                      <span className="btn-icon">📤</span> Entregar
+                    </button>
+                  )}
+                  {equipment.current_status === 'in_use' && (
+                    <button className="btn btn-danger" onClick={() => navigate(`/inventario/equipamentos/devolver?equipment=${equipmentId}`)}>
+                      <span className="btn-icon">📥</span> Devolver
+                    </button>
+                  )}
+                  {equipment.current_status === 'in_use' && (
+                    <button className="btn btn-move" onClick={() => navigate(`/inventario/equipamento/${equipmentId}/movimentar`)}>
+                      <span className="btn-icon">↔️</span> Movimentar
+                    </button>
+                  )}
+                  {equipment.current_status === 'in_use' && (
+                    <button className="btn btn-new-term" onClick={() => navigate(`/inventario/equipamento/${equipmentId}/assinar-termo`)}>
+                      <span className="btn-icon">✍️</span> Criar Termo
+                    </button>
+                  )}
+                  {equipment.current_status === 'in_use' && (
+                    <button className="btn btn-new-term" onClick={() => navigate(`/inventario/equipamento/${equipmentId}/termo-de-devolucao`)}>
+                      <span className="btn-icon">🗂️</span> Termo Devolução
+                    </button>
+                  )}
                   <button className="btn btn-print" onClick={() => window.print()}>
                     <span className="btn-icon">🖨️</span> Imprimir
                   </button>

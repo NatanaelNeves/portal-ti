@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api, { BACKEND_URL } from '../services/api';
 import '../styles/DeliverEquipmentPage.css';
 import { INSTITUTION_UNITS } from '../utils/institutionOptions';
@@ -33,14 +33,16 @@ interface DeliveryForm {
 
 const DeliverEquipmentPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const preselectedId = searchParams.get('equipment') || '';
   const [availableEquipment, setAvailableEquipment] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [generateTerm, setGenerateTerm] = useState(false);
-  
+  const [generateTerm, setGenerateTerm] = useState(true);
+
   const [formData, setFormData] = useState<DeliveryForm>({
-    equipmentId: '',
+    equipmentId: preselectedId,
     responsibleName: '',
     responsibleCpf: '',
     responsibleEmail: '',
@@ -67,6 +69,12 @@ const DeliverEquipmentPage: React.FC = () => {
   useEffect(() => {
     fetchAvailableEquipment();
   }, []);
+
+  useEffect(() => {
+    if (preselectedId && availableEquipment.length > 0) {
+      setFormData(prev => ({ ...prev, equipmentId: preselectedId }));
+    }
+  }, [preselectedId, availableEquipment]);
 
   const fetchAvailableEquipment = async () => {
     try {

@@ -250,7 +250,7 @@ export default function EquipmentPage() {
                   ...(isAvailableStatus(equipment.current_status) ? [{
                     label: 'Entregar',
                     icon: <IcoDeliver />,
-                    onClick: () => navigate('/inventario/equipamentos/entregar'),
+                    onClick: () => navigate(`/inventario/equipamentos/entregar?equipment=${equipment.id}`),
                     variant: 'success' as const,
                   }] : []),
                   ...(equipment.current_status === 'in_use' ? [

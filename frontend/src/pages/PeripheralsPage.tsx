@@ -278,7 +278,7 @@ export default function PeripheralsPage() {
                   ...(isAvailable ? [{
                     label: 'Entregar',
                     icon: <IcoDeliver />,
-                    onClick: () => navigate('/inventario/equipamentos/entregar'),
+                    onClick: () => navigate(`/inventario/equipamentos/entregar?equipment=${peripheral.id}`),
                     variant: 'success' as const,
                   }] : []),
                   ...(peripheral.current_status === 'in_use' ? [

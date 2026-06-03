@@ -23,6 +23,9 @@ interface ReturnFormData {
   return_reason: 'desligamento' | 'troca' | 'manutencao' | 'outro';
   reason_other: string;
   received_by: string;
+  responsible_name: string;
+  responsible_department: string;
+  responsible_unit: string;
   equipment_condition: 'perfeito' | 'desgaste' | 'avarias';
   checklist: {
     tela: ChecklistItem;
@@ -50,6 +53,9 @@ export default function ReturnTermPage() {
     return_reason: 'desligamento',
     reason_other: '',
     received_by: '',
+    responsible_name: '',
+    responsible_department: '',
+    responsible_unit: '',
     equipment_condition: 'perfeito',
     checklist: {
       tela: { name: 'Tela (sem rachaduras/pixels mortos)', checked: false },
@@ -87,6 +93,12 @@ export default function ReturnTermPage() {
         const data = await response.json();
         if (data.equipment) {
           setEquipment(data.equipment);
+          setFormData(prev => ({
+            ...prev,
+            responsible_name: data.equipment.current_responsible_name || '',
+            responsible_department: data.equipment.current_unit || '',
+            responsible_unit: data.equipment.current_unit || '',
+          }));
         }
       } catch {
         // prefill opcional
@@ -130,6 +142,10 @@ export default function ReturnTermPage() {
       }
       if (formData.return_reason === 'outro' && !formData.reason_other.trim()) {
         setError('Especifique o motivo da devolução');
+        return false;
+      }
+      if (retroMode && !formData.responsible_name.trim()) {
+        setError('Informe o nome de quem estava com o equipamento');
         return false;
       }
       if (!formData.received_by.trim()) {
@@ -192,6 +208,9 @@ export default function ReturnTermPage() {
         return_reason: formData.return_reason,
         reason_other: formData.reason_other,
         received_by: formData.received_by,
+        responsible_name: formData.responsible_name || equipment?.current_responsible_name || 'Não informado',
+        responsible_department: formData.responsible_department || equipment?.current_unit || '',
+        responsible_unit: formData.responsible_unit || equipment?.current_unit || '',
         equipment_condition: formData.equipment_condition,
         checklist: formData.checklist,
         damage_description: formData.damage_description,
@@ -273,11 +292,47 @@ export default function ReturnTermPage() {
                 {retroMode && equipment && (
                   <div className="alert alert-info">
                     <strong>Equipamento:</strong> {equipment.internal_code} - {equipment.brand} {equipment.model}
-                    <br />
-                    <strong>Responsável atual:</strong> {equipment.current_responsible_name || 'Não informado'}
                   </div>
                 )}
-                
+
+                {retroMode && (
+                  <div className="form-section">
+                    <h3>👤 Quem estava com o equipamento?</h3>
+                    <div className="form-group">
+                      <label>Nome do Responsável *</label>
+                      <input
+                        type="text"
+                        name="responsible_name"
+                        value={formData.responsible_name}
+                        onChange={handleInputChange}
+                        placeholder="Nome completo de quem tinha o equipamento"
+                      />
+                    </div>
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label>Setor / Departamento</label>
+                        <input
+                          type="text"
+                          name="responsible_department"
+                          value={formData.responsible_department}
+                          onChange={handleInputChange}
+                          placeholder="Ex: Educação, Administrativo"
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Unidade</label>
+                        <input
+                          type="text"
+                          name="responsible_unit"
+                          value={formData.responsible_unit}
+                          onChange={handleInputChange}
+                          placeholder="Ex: Sede, Fortaleza/CE"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="form-group">
                   <label>Data da Devolução *</label>
                   <input type="date" name="return_date" value={formData.return_date} onChange={handleInputChange} />

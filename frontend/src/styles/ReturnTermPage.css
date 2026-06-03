@@ -65,6 +65,33 @@
   border-left: 4px solid #c33;
 }
 
+.alert-info {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-left: 4px solid #3b82f6;
+}
+
+.form-section {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+
+.form-section h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #374151;
+  margin: 0 0 16px 0;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
 .form-container {
   background: white;
   border: 1px solid #e5e7eb;
