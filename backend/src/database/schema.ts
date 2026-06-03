@@ -1053,6 +1053,28 @@ export async function initializeDatabase(): Promise<void> {
       END $$;
     `);
 
+    // ── Tabela de chamados recorrentes ────────────────────────────────
+    await database.query(`
+      CREATE TABLE IF NOT EXISTS recurring_tickets (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        title VARCHAR(255) NOT NULL,
+        description TEXT NOT NULL,
+        type VARCHAR(50) NOT NULL DEFAULT 'request',
+        priority VARCHAR(50) NOT NULL DEFAULT 'medium',
+        department VARCHAR(50) NOT NULL DEFAULT 'ti',
+        category VARCHAR(100),
+        frequency VARCHAR(20) NOT NULL DEFAULT 'monthly',
+        day_of_week SMALLINT,
+        day_of_month SMALLINT,
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        created_by_id UUID REFERENCES internal_users(id),
+        last_created_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('✓ Tabela recurring_tickets criada');
+
     // ── Migração: helpful_yes/helpful_no em information_articles ─────
     await database.query(`
       DO $$

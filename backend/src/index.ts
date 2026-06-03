@@ -126,6 +126,7 @@ app.use('/api/reports', require('./routes/reports').default);
 app.use('/api/reservations', require('./routes/reservations').default);
 app.use('/api/ai', require('./routes/ai').default);
 app.use('/api/status', require('./routes/status').default);
+app.use('/api/recurring', require('./routes/recurring').default);
 
 // Error handling
 app.use((err: any, req: any, res: Response, next: any) => {

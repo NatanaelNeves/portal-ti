@@ -745,4 +745,121 @@ dashboardRouter.get("/gestor", async (req: Request, res: Response) => {
   }
 });
 
+// ── GET /kpis — Dashboard de KPIs completo ────────────────────────────────────
+dashboardRouter.get("/kpis", async (req: Request, res: Response) => {
+  try {
+    const user = getInternalUserFromToken(req, res);
+    if (!user) return;
+    if (![UserRole.ADMIN, UserRole.IT_STAFF, UserRole.ADMIN_STAFF, UserRole.RH_STAFF, UserRole.MANAGER].includes(user.role)) {
+      res.status(403).json({ error: 'Acesso negado' }); return;
+    }
+
+    const dept = user.role === UserRole.IT_STAFF ? `AND COALESCE(t.department,'ti') = 'ti'`
+      : user.role === UserRole.ADMIN_STAFF ? `AND COALESCE(t.department,'ti') = 'administrativo'`
+      : user.role === UserRole.RH_STAFF ? `AND COALESCE(t.department,'ti') = 'rh'`
+      : '';
+
+    const SLA_HOURS: Record<string, number> = { urgent: 4, high: 24, medium: 72, low: 168 };
+
+    const [slaResult, ratingResult, volumeResult, categoryResult, ageResult, kbResult] = await Promise.all([
+      // SLA compliance por prioridade (últimos 30 dias)
+      database.query(`
+        SELECT
+          priority,
+          COUNT(*) AS total,
+          COUNT(*) FILTER (WHERE
+            resolved_at IS NOT NULL AND
+            EXTRACT(EPOCH FROM (resolved_at - created_at))/3600 <=
+            CASE priority WHEN 'urgent' THEN 4 WHEN 'high' THEN 24 WHEN 'medium' THEN 72 ELSE 168 END
+          ) AS within_sla
+        FROM tickets t
+        WHERE created_at >= NOW() - INTERVAL '30 days' ${dept}
+        GROUP BY priority
+        ORDER BY priority
+      `),
+      // Satisfação média e distribuição
+      database.query(`
+        SELECT
+          ROUND(AVG(rating), 1) AS avg_rating,
+          COUNT(*) AS total_ratings,
+          COUNT(*) FILTER (WHERE rating >= 4) AS positive,
+          COUNT(*) FILTER (WHERE rating <= 2) AS negative
+        FROM tickets t
+        WHERE rating IS NOT NULL ${dept}
+      `),
+      // Volume semanal (últimas 12 semanas)
+      database.query(`
+        SELECT
+          TO_CHAR(DATE_TRUNC('week', created_at), 'DD/MM') AS week,
+          COUNT(*) AS total,
+          COUNT(*) FILTER (WHERE status IN ('closed','resolved')) AS resolved
+        FROM tickets t
+        WHERE created_at >= NOW() - INTERVAL '12 weeks' ${dept}
+        GROUP BY DATE_TRUNC('week', created_at)
+        ORDER BY DATE_TRUNC('week', created_at)
+      `),
+      // Top categorias
+      database.query(`
+        SELECT category, COUNT(*) AS total
+        FROM tickets t
+        WHERE category IS NOT NULL AND created_at >= NOW() - INTERVAL '30 days' ${dept}
+        GROUP BY category ORDER BY total DESC LIMIT 8
+      `),
+      // Tickets abertos por faixa de idade
+      database.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE age_hours < 8)  AS fresh,
+          COUNT(*) FILTER (WHERE age_hours >= 8  AND age_hours < 24) AS one_day,
+          COUNT(*) FILTER (WHERE age_hours >= 24 AND age_hours < 72) AS three_days,
+          COUNT(*) FILTER (WHERE age_hours >= 72) AS old
+        FROM (
+          SELECT EXTRACT(EPOCH FROM (NOW()-created_at))/3600 AS age_hours
+          FROM tickets t
+          WHERE status NOT IN ('closed','resolved') ${dept}
+        ) sub
+      `),
+      // KB: artigos mais / menos úteis
+      database.query(`
+        SELECT title, views_count,
+          COALESCE(helpful_yes,0) AS helpful_yes,
+          COALESCE(helpful_no,0)  AS helpful_no
+        FROM information_articles WHERE is_public = true
+        ORDER BY (COALESCE(helpful_yes,0) + COALESCE(helpful_no,0)) DESC
+        LIMIT 5
+      `),
+    ]);
+
+    const slaByPriority = slaResult.rows.map((r: any) => ({
+      priority: r.priority,
+      total: toInt(r.total),
+      withinSla: toInt(r.within_sla),
+      compliance: r.total > 0 ? Math.round((toInt(r.within_sla) / toInt(r.total)) * 100) : 0,
+      slaHours: SLA_HOURS[r.priority] ?? 72,
+    }));
+
+    const overallSlaTotal = slaByPriority.reduce((s: number, r: any) => s + r.total, 0);
+    const overallSlaWithin = slaByPriority.reduce((s: number, r: any) => s + r.withinSla, 0);
+
+    res.json({
+      sla: {
+        overall: overallSlaTotal > 0 ? Math.round((overallSlaWithin / overallSlaTotal) * 100) : 0,
+        byPriority: slaByPriority,
+      },
+      satisfaction: {
+        avg: toFloat(ratingResult.rows[0]?.avg_rating),
+        total: toInt(ratingResult.rows[0]?.total_ratings),
+        positive: toInt(ratingResult.rows[0]?.positive),
+        negative: toInt(ratingResult.rows[0]?.negative),
+      },
+      volume: { weekly: volumeResult.rows },
+      categories: categoryResult.rows,
+      openByAge: ageResult.rows[0] || {},
+      kb: kbResult.rows,
+    });
+  } catch (error) {
+    console.error("Erro no dashboard KPIs:", error);
+    res.status(500).json({ error: "Failed to load KPI data" });
+  }
+});
+
 export default dashboardRouter;

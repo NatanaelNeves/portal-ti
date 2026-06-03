@@ -59,6 +59,8 @@ import RhReportsPage from './pages/RhReportsPage';
 // Error pages
 import NotFoundPage from './pages/NotFoundPage';
 import StatusPage from './pages/StatusPage';
+import KpiDashboardPage from './pages/KpiDashboardPage';
+import RecurringTicketsPage from './pages/RecurringTicketsPage';
 
 // Components
 import Navigation from './components/Navigation';
@@ -115,6 +117,8 @@ function App() {
             <Route path="/admin/estoque" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff']}><InventoryPage /></InternalProtectedRoute>} />
             <Route path="/admin/documentos" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff']}><DocumentsPage /></InternalProtectedRoute>} />
             <Route path="/admin/relatorios" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff', 'manager']}><ReportsPage /></InternalProtectedRoute>} />
+            <Route path="/admin/kpis" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff', 'admin_staff', 'rh_staff', 'manager']}><KpiDashboardPage /></InternalProtectedRoute>} />
+            <Route path="/admin/recorrentes" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff']}><RecurringTicketsPage /></InternalProtectedRoute>} />
 
             {/* Inventory Module Routes - IT Staff Only */}
             <Route path="/inventario" element={<InternalProtectedRoute requireITStaff={true}><InventoryDashboardPage /></InternalProtectedRoute>} />

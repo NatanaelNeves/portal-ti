@@ -100,7 +100,7 @@ informationRouter.get("/knowledge", async (req: Request, res: Response) => {
 
     console.log('✅ Buscando artigos...');
     const result = await database.query(
-      "SELECT id, title, content, category, is_public, created_at, views_count FROM information_articles ORDER BY created_at DESC"
+      "SELECT id, title, content, category, is_public, created_at, views_count, COALESCE(helpful_yes,0) AS helpful_yes, COALESCE(helpful_no,0) AS helpful_no FROM information_articles ORDER BY created_at DESC"
     );
     console.log(`✅ ${result.rows.length} artigos encontrados`);
     res.json({ articles: result.rows });

@@ -1,5 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
-
+﻿
 .inventory-layout {
   display: flex;
   gap: 0;
@@ -8,7 +7,7 @@
   font-family: 'DM Sans', sans-serif;
 }
 
-/* ── Sidebar ── */
+/* â”€â”€ Sidebar â”€â”€ */
 .inventory-sidebar {
   width: 248px;
   background: #FFFFFF;
@@ -38,7 +37,7 @@
   letter-spacing: -0.01em;
 }
 
-/* ── Nav ── */
+/* â”€â”€ Nav â”€â”€ */
 .inventory-nav {
   display: flex;
   flex-direction: column;
@@ -105,14 +104,14 @@
   color: inherit;
 }
 
-/* ── Main ── */
+/* â”€â”€ Main â”€â”€ */
 .inventory-main {
   flex: 1;
   overflow-y: auto;
   min-width: 0;
 }
 
-/* ── Responsive ── */
+/* â”€â”€ Responsive â”€â”€ */
 @media (max-width: 768px) {
   .inventory-layout {
     flex-direction: column;

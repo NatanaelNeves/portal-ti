@@ -109,4 +109,58 @@ router.post('/summarize/:ticketId', authMiddleware, async (req: Request, res: Re
   }
 });
 
+// POST /api/ai/chat — chatbot com contexto da KB
+router.post('/chat', async (req: Request, res: Response) => {
+  const { message, history } = req.body;
+  if (!message?.trim()) { res.status(400).json({ error: 'message obrigatório' }); return; }
+  if (!isAIEnabled()) { res.status(503).json({ error: 'IA não configurada' }); return; }
+
+  try {
+    const Anthropic = (await import('@anthropic-ai/sdk')).default;
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    // Busca artigos relevantes da KB como contexto
+    const articlesResult = await database.query(
+      `SELECT title, content FROM information_articles WHERE is_public = true ORDER BY views_count DESC LIMIT 15`,
+    );
+    const kbContext = articlesResult.rows
+      .map((a: any) => `## ${a.title}\n${a.content.slice(0, 400)}`)
+      .join('\n\n');
+
+    const systemPrompt = `Você é um assistente do Portal de TI da organização "O Pequeno Nazareno". Seu papel é responder dúvidas simples dos colaboradores sobre suporte técnico, procedimentos internos e uso dos sistemas.
+
+Use os artigos da Base de Conhecimento abaixo como referência:
+
+${kbContext}
+
+Regras:
+- Responda em português brasileiro de forma clara e direta
+- Se souber a resposta com base nos artigos, responda diretamente
+- Se não souber ou for muito específico, oriente o usuário a abrir um chamado
+- Nunca invente informações técnicas
+- Resposta máxima: 3 parágrafos curtos`;
+
+    const messages = [
+      ...((history || []) as Array<{ role: string; content: string }>).slice(-6).map(m => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      })),
+      { role: 'user' as const, content: message },
+    ];
+
+    const response = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 512,
+      system: systemPrompt,
+      messages,
+    });
+
+    const reply = response.content[0].type === 'text' ? response.content[0].text : '';
+    res.json({ reply });
+  } catch (err) {
+    console.error('[AI chat]', err);
+    res.status(500).json({ error: 'Falha ao processar mensagem' });
+  }
+});
+
 export default router;

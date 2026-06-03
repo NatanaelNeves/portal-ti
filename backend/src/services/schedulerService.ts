@@ -204,6 +204,62 @@ async function sendReservation1hRemindersAndAutoNoShow(): Promise<void> {
   }
 }
 
+// ─── Job: Chamados recorrentes ───────────────────────────────────────────────
+async function createRecurringTickets(): Promise<void> {
+  try {
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0=domingo
+    const dayOfMonth = now.getDate();
+
+    const result = await database.query(
+      `SELECT * FROM recurring_tickets WHERE is_active = true`,
+    );
+
+    for (const cfg of result.rows) {
+      const isDue =
+        (cfg.frequency === 'daily') ||
+        (cfg.frequency === 'weekly' && cfg.day_of_week === dayOfWeek) ||
+        (cfg.frequency === 'monthly' && cfg.day_of_month === dayOfMonth);
+
+      if (!isDue) continue;
+
+      // Evita criar duplicata no mesmo dia
+      const alreadyCreated = await database.query(
+        `SELECT 1 FROM tickets WHERE title = $1 AND DATE(created_at) = CURRENT_DATE LIMIT 1`,
+        [cfg.title],
+      );
+      if (alreadyCreated.rows.length > 0) continue;
+
+      const adminUser = await database.query(
+        `SELECT id FROM internal_users WHERE role = 'admin' AND is_active = true ORDER BY created_at LIMIT 1`,
+      );
+      const requesterId = cfg.created_by_id || adminUser.rows[0]?.id;
+      if (!requesterId) continue;
+
+      await database.query(
+        `INSERT INTO tickets (title, description, type, priority, status, department, category, requester_type, requester_id, metadata)
+         VALUES ($1, $2, $3, $4, 'open', $5, $6, 'it_staff', $7, $8::jsonb)`,
+        [
+          cfg.title, cfg.description, cfg.type, cfg.priority,
+          cfg.department, cfg.category, requesterId,
+          JSON.stringify({ auto_generated: true, recurring_id: cfg.id }),
+        ],
+      );
+
+      await database.query(
+        `UPDATE recurring_tickets SET last_created_at = NOW(), updated_at = NOW() WHERE id = $1`,
+        [cfg.id],
+      );
+    }
+
+    if (result.rows.length > 0) {
+      console.log(`[SCHEDULER] Chamados recorrentes: ${result.rows.length} configuração(ões) verificadas`);
+    }
+  } catch (err) {
+    console.error('[SCHEDULER] Erro em chamados recorrentes:', err);
+  }
+}
+
 // ─── Job: Alertas de garantia de equipamentos ────────────────────────────────
 async function notifyWarrantyExpiring(): Promise<void> {
   try {
@@ -234,6 +290,27 @@ async function notifyWarrantyExpiring(): Promise<void> {
     }
 
     for (const row of result.rows) {
+      // Criar chamado automático apenas para alertas de 30 dias
+      if (Number(row.days_remaining) === 30) {
+        await database.query(
+          `INSERT INTO tickets (title, description, type, priority, status, department, category, requester_type, requester_id, metadata)
+           SELECT
+             $1, $2, 'request', 'medium', 'open', 'ti', 'Hardware/Garantia',
+             'it_staff',
+             (SELECT id FROM internal_users WHERE role = 'admin' AND is_active = true ORDER BY created_at LIMIT 1),
+             $3::jsonb
+           WHERE NOT EXISTS (
+             SELECT 1 FROM tickets
+             WHERE title = $1 AND created_at > NOW() - INTERVAL '35 days'
+           )`,
+          [
+            `[Garantia] ${row.internal_code} — ${row.brand || ''} ${row.model || ''} vence em 30 dias`,
+            `A garantia do equipamento ${row.internal_code} (${row.type} ${row.brand || ''} ${row.model || ''}) vence em ${new Date(row.warranty_expiration).toLocaleDateString('pt-BR')}.\n\nVerifique a necessidade de renovação ou acionamento do suporte do fabricante.`,
+            JSON.stringify({ auto_generated: true, equipment_id: row.id, warranty_expiration: row.warranty_expiration }),
+          ],
+        ).catch(e => console.error('[SCHEDULER] Erro ao criar chamado de garantia:', e));
+      }
+
       await EmailService.sendWarrantyAlert(
         itEmails,
         {
@@ -255,6 +332,11 @@ async function notifyWarrantyExpiring(): Promise<void> {
 
 // ─── Registrar jobs ──────────────────────────────────────────────────────────
 export function initializeScheduler(): void {
+  // Chamados recorrentes: todo dia às 07:00 UTC
+  cron.schedule('0 7 * * *', () => {
+    createRecurringTickets();
+  });
+
   // Tickets: todo dia às 03:00 UTC
   cron.schedule('0 3 * * *', () => {
     notifyTicketsNearAutoClose();

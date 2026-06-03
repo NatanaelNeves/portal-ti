@@ -20,6 +20,8 @@ export default function InformationCenterPage() {
   const [error, setError] = useState('');
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [feedbackSent, setFeedbackSent] = useState<Record<string, boolean>>({});
+  const [articlesPage, setArticlesPage] = useState(1);
+  const ARTICLES_PER_PAGE = 9;
 
   const sendFeedback = async (articleId: string, helpful: boolean) => {
     if (feedbackSent[articleId]) return;
@@ -64,7 +66,7 @@ export default function InformationCenterPage() {
     }
   };
 
-  const filteredArticles = articles.filter((article) => {
+  const allFilteredArticles = articles.filter((article) => {
     const matchesCategory =
       selectedCategory === 'all' || article.category === selectedCategory;
     const matchesSearch =
@@ -72,6 +74,12 @@ export default function InformationCenterPage() {
       article.content.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesCategory && matchesSearch;
   });
+
+  const totalArticlePages = Math.ceil(allFilteredArticles.length / ARTICLES_PER_PAGE);
+  const filteredArticles = allFilteredArticles.slice(
+    (articlesPage - 1) * ARTICLES_PER_PAGE,
+    articlesPage * ARTICLES_PER_PAGE,
+  );
 
   return (
     <div className="information-center-page">
@@ -87,7 +95,7 @@ export default function InformationCenterPage() {
             type="text"
             placeholder="O que você precisa encontrar? Ex: como trocar toner da impressora..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => { setSearchTerm(e.target.value); setArticlesPage(1); }}
             className="search-input"
           />
         </div>
@@ -98,7 +106,7 @@ export default function InformationCenterPage() {
             <button
               key={cat.id}
               className={`category-btn ${selectedCategory === cat.id ? 'active' : ''}`}
-              onClick={() => setSelectedCategory(cat.id)}
+              onClick={() => { setSelectedCategory(cat.id); setArticlesPage(1); }}
             >
               {cat.name}
             </button>
@@ -141,22 +149,37 @@ export default function InformationCenterPage() {
           </div>
         ) : (
           /* Articles List */
-          <div className="articles-grid">
-            {filteredArticles.map((article) => (
-              <div
-                key={article.id}
-                className="article-card"
-                onClick={() => setSelectedArticle(article)}
-              >
-                <div className="article-category">{article.category}</div>
-                <h3>{article.title}</h3>
-                <p>{article.content.substring(0, 100)}...</p>
-                <a href="#" className="read-more">
-                  Ler mais →
-                </a>
+          <>
+            <div className="articles-grid">
+              {filteredArticles.map((article) => (
+                <div
+                  key={article.id}
+                  className="article-card"
+                  onClick={() => setSelectedArticle(article)}
+                >
+                  <div className="article-category">{article.category}</div>
+                  <h3>{article.title}</h3>
+                  <p>{article.content.substring(0, 100)}...</p>
+                  <a href="#" className="read-more">Ler mais →</a>
+                </div>
+              ))}
+            </div>
+            {totalArticlePages > 1 && (
+              <div className="articles-pagination">
+                <button
+                  className="pagination-btn"
+                  disabled={articlesPage === 1}
+                  onClick={() => setArticlesPage(p => p - 1)}
+                >◀ Anterior</button>
+                <span className="pagination-info">Página {articlesPage} de {totalArticlePages}</span>
+                <button
+                  className="pagination-btn"
+                  disabled={articlesPage === totalArticlePages}
+                  onClick={() => setArticlesPage(p => p + 1)}
+                >Próxima ▶</button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
 

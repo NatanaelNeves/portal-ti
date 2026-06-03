@@ -83,6 +83,7 @@ export default function AdminTicketDetailPage() {
   const [requesterHistory, setRequesterHistory] = useState<any[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const internalToken = localStorage.getItem('internal_token');
 
@@ -382,7 +383,16 @@ export default function AdminTicketDetailPage() {
 
         <div className="ticket-header-content">
           <div className="ticket-header-top">
-            <span className="ticket-id-label">#{ticket.id.substring(0, 8).toUpperCase()}</span>
+            <span className="ticket-id-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              #{ticket.id.substring(0, 8).toUpperCase()}
+              <button
+                onClick={() => { navigator.clipboard.writeText(window.location.href); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+                title="Copiar link do chamado"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8rem', color: copied ? '#059669' : '#94a3b8', padding: '0 2px' }}
+              >
+                {copied ? '✓' : '🔗'}
+              </button>
+            </span>
             <div className="ticket-header-badges">
               <span className={`badge ${statusBadge.className}`}>{statusBadge.label}</span>
               <span className={`badge ${priorityBadge.className}`}>{priorityBadge.label}</span>

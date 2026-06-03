@@ -1,5 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=DM+Mono:wght@400;500&display=swap');
-
+﻿
 .equipment-page {
   padding: 2rem;
   min-height: 100vh;
@@ -7,7 +6,7 @@
   font-family: 'DM Sans', sans-serif;
 }
 
-/* ── Header ── */
+/* â”€â”€ Header â”€â”€ */
 .eq-page-header {
   display: flex;
   justify-content: space-between;
@@ -68,7 +67,7 @@
 
 .eq-btn-primary:hover { background: #3730A3; }
 
-/* ── Alert ── */
+/* â”€â”€ Alert â”€â”€ */
 .eq-alert-error {
   padding: 12px 16px;
   background: #FEF2F2;
@@ -79,7 +78,7 @@
   font-size: 0.875rem;
 }
 
-/* ── Stats ── */
+/* â”€â”€ Stats â”€â”€ */
 .eq-stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -116,7 +115,7 @@
   letter-spacing: 0.03em;
 }
 
-/* ── Filters ── */
+/* â”€â”€ Filters â”€â”€ */
 .eq-filters {
   background: white;
   border: 1px solid #E2E8F0;
@@ -155,7 +154,7 @@
 
 .eq-filter-group select:focus { outline: none; border-color: #4338CA; }
 
-/* ── Table ── */
+/* â”€â”€ Table â”€â”€ */
 .eq-table-wrap {
   background: white;
   border: 1px solid #E2E8F0;
@@ -232,7 +231,7 @@
 .eq-unit  { color: #475569; font-size: 0.85rem; }
 .eq-empty { color: #CBD5E1; font-style: italic; }
 
-/* ── Empty state ── */
+/* â”€â”€ Empty state â”€â”€ */
 .eq-empty-state {
   text-align: center;
   padding: 4rem 2rem;
@@ -251,7 +250,7 @@
 
 .eq-empty-state p { color: #64748B; font-size: 0.875rem; margin: 0; }
 
-/* ── Loading ── */
+/* â”€â”€ Loading â”€â”€ */
 .eq-loading {
   text-align: center;
   padding: 3rem;

@@ -4,7 +4,6 @@ import api from '../services/api';
 import '../styles/GlobalSearch.css';
 
 interface SearchResult {
-  // Equipment results
   id?: string;
   code?: string;
   category?: string;
@@ -15,19 +14,14 @@ interface SearchResult {
   status?: string;
   unit?: string;
   responsible_name?: string;
-  
-  // Person results
   name?: string;
   cpf?: string;
   department?: string;
   equipment_count?: number;
-  
-  // Movement results
   movement_number?: string;
   date?: string;
   equipment_code?: string;
   equipment_type?: string;
-  
   result_type: 'equipment' | 'person' | 'movement';
 }
 
@@ -41,14 +35,33 @@ interface SearchResponse {
   };
 }
 
+interface TicketResult { id: string; title: string; status: string; priority: string; }
+interface ArticleResult { id: string; title: string; category: string; }
+
 const GlobalSearch: React.FC = () => {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResponse | null>(null);
+  const [tickets, setTickets] = useState<TicketResult[]>([]);
+  const [articles, setArticles] = useState<ArticleResult[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Ctrl+K shortcut
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        inputRef.current?.focus();
+        setIsOpen(q => query.length >= 2 ? true : q);
+      }
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [query]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -57,7 +70,6 @@ const GlobalSearch: React.FC = () => {
         setIsOpen(false);
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
@@ -80,14 +92,36 @@ const GlobalSearch: React.FC = () => {
   const performSearch = async () => {
     try {
       setLoading(true);
-      const response = await api.get<SearchResponse>(
-        `/inventory/search?q=${encodeURIComponent(query)}`
-      );
-      setResults(response.data);
+      const q = encodeURIComponent(query);
+      const token = localStorage.getItem('internal_token');
+      const authHeader = token ? { Authorization: `Bearer ${token}` } : undefined;
+
+      const [invRes, ticketRes, articleRes] = await Promise.allSettled([
+        api.get<SearchResponse>(`/inventory/search?q=${q}`),
+        fetch(`${api.defaults.baseURL}/tickets?search=${q}&limit=5`, authHeader ? { headers: authHeader } : undefined).then(r => r.json()),
+        fetch(`${api.defaults.baseURL}/information-articles?public=true`).then(r => r.json()),
+      ]);
+
+      if (invRes.status === 'fulfilled') setResults(invRes.value.data);
+      else setResults(null);
+
+      if (ticketRes.status === 'fulfilled') {
+        const data = ticketRes.value;
+        setTickets((data.data || []).filter((t: TicketResult) =>
+          t.title?.toLowerCase().includes(query.toLowerCase())
+        ).slice(0, 5));
+      }
+
+      if (articleRes.status === 'fulfilled') {
+        const data = articleRes.value;
+        setArticles((data.articles || []).filter((a: ArticleResult) =>
+          a.title?.toLowerCase().includes(query.toLowerCase())
+        ).slice(0, 4));
+      }
+
       setIsOpen(true);
     } catch (error) {
       console.error('Search error:', error);
-      setResults(null);
     } finally {
       setLoading(false);
     }
@@ -130,7 +164,7 @@ const GlobalSearch: React.FC = () => {
           ref={inputRef}
           type="text"
           className="search-input"
-          placeholder="🔍 Buscar equipamento, pessoa ou movimento..."
+          placeholder="🔍 Buscar... (Ctrl+K)"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => query.length >= 2 && setIsOpen(true)}
@@ -227,10 +261,42 @@ const GlobalSearch: React.FC = () => {
             </div>
           )}
 
-          {results.totalResults === 0 && (
+          {/* Tickets Section */}
+          {tickets.length > 0 && (
+            <div className="results-section">
+              <div className="section-header">🎫 Chamados ({tickets.length})</div>
+              {tickets.map(t => (
+                <div key={t.id} className="result-item" onClick={() => { navigate(`/admin/chamados/${t.id}`); setIsOpen(false); setQuery(''); }}>
+                  <div className="result-icon">📋</div>
+                  <div className="result-content">
+                    <div className="result-title">{t.title}</div>
+                    <div className="result-meta"><span>{t.status}</span><span>{t.priority}</span></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Articles Section */}
+          {articles.length > 0 && (
+            <div className="results-section">
+              <div className="section-header">📚 Artigos ({articles.length})</div>
+              {articles.map(a => (
+                <div key={a.id} className="result-item" onClick={() => { navigate('/central'); setIsOpen(false); setQuery(''); }}>
+                  <div className="result-icon">📖</div>
+                  <div className="result-content">
+                    <div className="result-title">{a.title}</div>
+                    <div className="result-meta"><span>{a.category}</span></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {(!results || results.totalResults === 0) && tickets.length === 0 && articles.length === 0 && (
             <div className="no-results">
-              <p>Nenhum resultado encontrado para "{results.query}"</p>
-              <small>Tente buscar por código, nome, marca ou modelo</small>
+              <p>Nenhum resultado encontrado para "{query}"</p>
+              <small>Tente buscar por código, nome, título ou categoria</small>
             </div>
           )}
         </div>

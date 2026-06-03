@@ -574,6 +574,48 @@ export default function OpenTicketPage() {
               {/* Step 1: Choose Department */}
               {currentStep === 1 && (
                 <div className="form-step" data-step="1">
+                  {/* Templates rápidos */}
+                  <div className="step-card" style={{ marginBottom: '1rem' }}>
+                    <h2 className="section-title" style={{ marginBottom: '0.5rem' }}>Comece rápido</h2>
+                    <p className="section-subtitle">Problemas comuns — clique para preencher automaticamente</p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.75rem' }}>
+                      {[
+                        { label: '🌐 Internet fora', dept: 'ti', cat: 'internet', title: 'Internet sem conexão', desc: 'Estou sem acesso à internet no meu computador.' },
+                        { label: '🖨️ Impressora', dept: 'ti', cat: 'impressora', title: 'Impressora com problema', desc: 'A impressora não está funcionando corretamente.' },
+                        { label: '🔐 Senha/Acesso', dept: 'ti', cat: 'outro', title: 'Problema de acesso ao sistema', desc: 'Não estou conseguindo acessar o sistema / minha senha está bloqueada.' },
+                        { label: '💻 Computador lento', dept: 'ti', cat: 'computador', title: 'Computador lento ou travando', desc: 'Meu computador está muito lento e travando com frequência.' },
+                        { label: '🔑 Cópia de chave', dept: 'administrativo', cat: 'copia_chave', title: 'Solicitar cópia de chave', desc: 'Preciso de uma cópia de chave.' },
+                        { label: '⏰ Ajuste de ponto', dept: 'rh', cat: 'RH_PONTO', title: 'Ajuste de ponto', desc: '' },
+                      ].map(tmpl => (
+                        <button
+                          key={tmpl.label}
+                          type="button"
+                          style={{ padding: '0.4rem 0.85rem', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '99px', cursor: 'pointer', fontSize: '0.82rem', transition: 'background 0.15s' }}
+                          onMouseOver={e => (e.currentTarget.style.background = '#e2e8f0')}
+                          onMouseOut={e => (e.currentTarget.style.background = '#f1f5f9')}
+                          onClick={() => {
+                            setFormData(prev => ({
+                              ...prev,
+                              ticketDepartment: tmpl.dept,
+                              category: tmpl.cat,
+                              title: tmpl.title,
+                              description: tmpl.desc,
+                              type: tmpl.dept === 'ti' ? 'incident' : 'request',
+                              requestDetails: tmpl.cat === 'RH_PONTO' ? { adjustments: [{ date: '', correctedTime: '', notes: '' }] } : {},
+                            }));
+                            if (formData.email && formData.name) {
+                              setCurrentStep(3);
+                            } else {
+                              setCurrentStep(2);
+                            }
+                          }}
+                        >
+                          {tmpl.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="step-card">
                     <h2 className="section-title">Tipo de Solicitação</h2>
                     <p className="section-subtitle">Selecione para qual departamento é sua solicitação</p>

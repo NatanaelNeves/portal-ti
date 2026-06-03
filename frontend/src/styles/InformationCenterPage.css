@@ -291,3 +291,51 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+/* ── Paginação artigos ───────────────────────────────────────────────── */
+.articles-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding: 1rem 0;
+}
+
+.pagination-btn {
+  padding: 0.4rem 1rem;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background 0.15s;
+}
+
+.pagination-btn:hover:not(:disabled) { background: #f1f5f9; }
+.pagination-btn:disabled { opacity: 0.4; cursor: default; }
+.pagination-info { font-size: 0.85rem; color: #64748b; }
+
+/* ── Feedback artigo ─────────────────────────────────────────────────── */
+.article-feedback {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.feedback-label { font-size: 0.9rem; color: #64748b; }
+
+.feedback-btn {
+  padding: 0.35rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background 0.15s;
+}
+
+.feedback-btn:hover { background: #f1f5f9; }
+.feedback-thanks { font-size: 0.85rem; color: #059669; font-weight: 600; }

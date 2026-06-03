@@ -12,6 +12,8 @@ interface Article {
   is_public: boolean;
   created_at: string;
   views_count: number;
+  helpful_yes?: number;
+  helpful_no?: number;
 }
 
 const PRESET_CATEGORIES = [
@@ -471,6 +473,11 @@ export default function KnowledgeManagementPage() {
               <div className="km-card-footer">
                 <div className="km-card-meta">
                   <span><i className="ti ti-eye" /> {article.views_count} visualizações</span>
+                  {((article.helpful_yes ?? 0) + (article.helpful_no ?? 0)) > 0 && (
+                    <span title="Feedbacks útil/não útil">
+                      👍 {article.helpful_yes ?? 0} · 👎 {article.helpful_no ?? 0}
+                    </span>
+                  )}
                   <span>{article.created_at ? new Date(article.created_at).toLocaleDateString('pt-BR') : '-'}</span>
                 </div>
                 <div className="km-card-actions" onClick={(e) => e.stopPropagation()}>

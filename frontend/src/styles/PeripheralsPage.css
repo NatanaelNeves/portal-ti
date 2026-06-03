@@ -1,5 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=DM+Mono:wght@400;500&display=swap');
-
+﻿
 .peripherals-page {
   padding: 2rem;
   min-height: 100vh;
@@ -7,7 +6,7 @@
   font-family: 'DM Sans', sans-serif;
 }
 
-/* ── Header ── */
+/* â”€â”€ Header â”€â”€ */
 .per-header {
   display: flex;
   justify-content: space-between;
@@ -54,7 +53,7 @@
 .per-btn-primary { background: #4338CA; color: white; }
 .per-btn-primary:hover { background: #3730A3; }
 
-/* ── Alert ── */
+/* â”€â”€ Alert â”€â”€ */
 .per-alert-error {
   padding: 12px 16px;
   background: #FEF2F2;
@@ -65,7 +64,7 @@
   font-size: 0.875rem;
 }
 
-/* ── Stats ── */
+/* â”€â”€ Stats â”€â”€ */
 .per-stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -102,7 +101,7 @@
   letter-spacing: 0.03em;
 }
 
-/* ── Type Summary ── */
+/* â”€â”€ Type Summary â”€â”€ */
 .per-type-summary {
   background: white;
   border: 1px solid #E2E8F0;
@@ -166,7 +165,7 @@
 
 .per-type-stats strong { color: #0F172A; }
 
-/* ── Filters ── */
+/* â”€â”€ Filters â”€â”€ */
 .per-filters {
   background: white;
   border: 1px solid #E2E8F0;
@@ -206,7 +205,7 @@
 
 .per-filter-group select:focus { outline: none; border-color: #4338CA; }
 
-/* ── Table ── */
+/* â”€â”€ Table â”€â”€ */
 .per-table-wrap {
   background: white;
   border: 1px solid #E2E8F0;
@@ -284,7 +283,7 @@
 .per-unit  { color: #475569; font-size: 0.85rem; }
 .per-empty { color: #CBD5E1; font-style: italic; }
 
-/* ── Empty state ── */
+/* â”€â”€ Empty state â”€â”€ */
 .per-empty-state {
   text-align: center;
   padding: 3rem;
@@ -293,7 +292,7 @@
 
 .per-empty-state p { margin: 0; font-size: 0.9rem; }
 
-/* ── Loading ── */
+/* â”€â”€ Loading â”€â”€ */
 .per-loading {
   text-align: center;
   padding: 3rem;

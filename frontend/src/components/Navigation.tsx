@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import GlobalSearch from './GlobalSearch';
+import ChatWidget from './ChatWidget';
 import { useNotifications } from '../contexts/NotificationContext';
 import '../styles/Navigation.css';
 
@@ -20,6 +21,8 @@ export default function Navigation() {
   // Navegação para usuários públicos (não autenticados)
   if (!isInternalUser) {
     return (
+      <>
+      <ChatWidget />
       <nav className="navbar navbar-public">
         <div className="navbar-brand" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
           <h1>Portal de Serviços Internos</h1>
@@ -48,6 +51,7 @@ export default function Navigation() {
           </button>
         </div>
       </nav>
+      </>
     );
   }
 
@@ -101,6 +105,7 @@ export default function Navigation() {
 
   if (showAssetsLink) {
     navLinks.push({ label: 'Inventário', action: () => navigate('/inventario') });
+    navLinks.push({ label: 'Recorrentes', action: () => navigate('/admin/recorrentes') });
   }
 
   if (showDocumentsLink) {
@@ -109,6 +114,7 @@ export default function Navigation() {
 
   if (showReportsLink) {
     navLinks.push({ label: 'Relatórios', action: () => navigate('/admin/relatorios') });
+    navLinks.push({ label: 'KPIs', action: () => navigate('/admin/kpis') });
   }
 
   if (showRhReportsLink) {
@@ -142,11 +148,9 @@ export default function Navigation() {
       </div>
 
       <div className="navbar-right">
-        {showAssetsLink && (
-          <div className="navbar-search">
-            <GlobalSearch />
-          </div>
-        )}
+        <div className="navbar-search">
+          <GlobalSearch />
+        </div>
         <div className="navbar-user">
           <span className="user-info">{userData?.name}</span>
           <button onClick={handleLogout} className="logout-btn">
