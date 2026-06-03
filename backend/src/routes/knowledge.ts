@@ -44,6 +44,26 @@ informationRouter.get("/information-articles/:id", async (req: Request, res: Res
   }
 });
 
+// Public — feedback "foi útil?"
+informationRouter.post("/information-articles/:id/feedback", async (req: Request, res: Response) => {
+  try {
+    const { helpful } = req.body;
+    if (typeof helpful !== 'boolean') {
+      res.status(400).json({ error: 'Campo "helpful" (boolean) obrigatório' });
+      return;
+    }
+    const col = helpful ? 'helpful_yes' : 'helpful_no';
+    await database.query(
+      `UPDATE information_articles SET ${col} = ${col} + 1 WHERE id = $1 AND is_public = true`,
+      [req.params.id],
+    );
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("Error saving feedback:", error);
+    res.status(500).json({ error: "Failed to save feedback" });
+  }
+});
+
 // Protected routes for TI/Admin - Manage knowledge base
 informationRouter.get("/knowledge", async (req: Request, res: Response) => {
   try {

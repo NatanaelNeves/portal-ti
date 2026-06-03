@@ -19,6 +19,19 @@ export default function InformationCenterPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
+  const [feedbackSent, setFeedbackSent] = useState<Record<string, boolean>>({});
+
+  const sendFeedback = async (articleId: string, helpful: boolean) => {
+    if (feedbackSent[articleId]) return;
+    try {
+      await fetch(`${BACKEND_URL}/api/information-articles/${articleId}/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ helpful }),
+      });
+    } catch { /* silent */ }
+    setFeedbackSent(prev => ({ ...prev, [articleId]: true }));
+  };
 
   const categories = [
     { id: 'all', name: 'Todos os Tópicos' },
@@ -110,6 +123,17 @@ export default function InformationCenterPage() {
               Categoria: <span>{selectedArticle.category}</span>
             </p>
             <div className="article-content">{selectedArticle.content}</div>
+            <div className="article-feedback">
+              {feedbackSent[selectedArticle.id] ? (
+                <span className="feedback-thanks">Obrigado pelo feedback!</span>
+              ) : (
+                <>
+                  <span className="feedback-label">Esse artigo foi útil?</span>
+                  <button className="feedback-btn feedback-yes" onClick={() => sendFeedback(selectedArticle.id, true)}>👍 Sim</button>
+                  <button className="feedback-btn feedback-no" onClick={() => sendFeedback(selectedArticle.id, false)}>👎 Não</button>
+                </>
+              )}
+            </div>
           </div>
         ) : filteredArticles.length === 0 ? (
           <div className="empty-state">
