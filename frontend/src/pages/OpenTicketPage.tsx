@@ -470,6 +470,7 @@ export default function OpenTicketPage() {
           department: formData.ticketDepartment,
           category: formData.category || undefined,
           requestDetails: requestDetailsPayload,
+          requester_name: formData.name,
         }),
       });
 

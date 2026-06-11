@@ -27,29 +27,31 @@ router.post('/public-access', validate(publicAccessSchema), async (req: Request,
     );
 
     if (user.rows.length > 0) {
-      // User exists, update department/unit if provided and return token
+      // User exists — update department/unit only, never overwrite name.
+      // The name typed in the form is preserved in tickets.requester_name at
+      // creation time, so each ticket always shows the exact name provided.
       const existingUser = user.rows[0];
-      
+
       if (department || unit) {
         await database.query(
-          `UPDATE public_users 
-           SET department = COALESCE($1, department), 
+          `UPDATE public_users
+           SET department = COALESCE($1, department),
                unit = COALESCE($2, unit),
                last_access = CURRENT_TIMESTAMP
            WHERE email = $3`,
           [department, unit, email]
         );
       }
-      
+
       res.json({
         user_token: existingUser.user_token,
         user: {
           id: existingUser.id,
           email: existingUser.email,
-          name: existingUser.name,
+          name: name || existingUser.name,
           department: department || existingUser.department,
           unit: unit || existingUser.unit,
-          user_token: existingUser.user_token
+          user_token: existingUser.user_token,
         },
         message: 'Welcome back!',
       });

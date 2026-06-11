@@ -155,7 +155,7 @@ reportsRouter.get('/satisfaction', async (req: Request, res: Response) => {
            t.rated_at,
            COALESCE(t.department, 'ti') AS department,
            iu.name AS assignee_name,
-           pu.name AS requester_name
+           COALESCE(t.requester_name, pu.name) AS requester_name
          FROM tickets t
          LEFT JOIN internal_users iu ON iu.id = t.assigned_to_id
          LEFT JOIN public_users pu ON pu.id = t.requester_id AND t.requester_type = 'public'
@@ -702,7 +702,7 @@ reportsRouter.get('/export/tickets', async (req: Request, res: Response) => {
          t.created_at,
          t.updated_at,
          t.resolved_at,
-         COALESCE(pu.name, iu_req.name) as requester_name,
+         COALESCE(t.requester_name, pu.name, iu_req.name) as requester_name,
          COALESCE(pu.email, iu_req.email) as requester_email,
          iu_assigned.name as assigned_to_name,
          iu_assigned.email as assigned_to_email,
@@ -797,7 +797,7 @@ reportsRouter.get('/export/excel/tickets', async (req: Request, res: Response) =
          t.created_at,
          t.updated_at,
          t.resolved_at,
-         COALESCE(pu.name, iu_req.name) as requester_name,
+         COALESCE(t.requester_name, pu.name, iu_req.name) as requester_name,
          COALESCE(pu.email, iu_req.email) as requester_email,
          iu_assigned.name as assigned_to_name,
          iu_assigned.email as assigned_to_email,
@@ -960,7 +960,7 @@ reportsRouter.get('/export/excel/consolidated', async (req: Request, res: Respon
     const tickets = await database.query(
       `SELECT 
          t.id, t.title, t.status, t.priority, t.type, t.created_at,
-         COALESCE(pu.name, iu_req.name) as requester_name,
+         COALESCE(t.requester_name, pu.name, iu_req.name) as requester_name,
          iu_assigned.name as assigned_to_name
        FROM tickets t
        LEFT JOIN public_users pu ON t.requester_type = 'public' AND t.requester_id = pu.id

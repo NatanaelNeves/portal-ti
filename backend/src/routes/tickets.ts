@@ -435,12 +435,12 @@ ticketsRouter.get('/', async (req: Request, res: Response) => {
         // Query para dados paginados
         params.push(limit, offset);
         const dataQuery = `
-          SELECT t.*, 
+          SELECT t.*,
                  t.assigned_to_id as assigned_to,
                  (SELECT COUNT(*) FROM ticket_messages WHERE ticket_id = t.id) as message_count,
                  (SELECT COUNT(*) FROM ticket_attachments WHERE ticket_id = t.id) as attachment_count,
                  iu.name as assigned_to_name,
-                 pu.name as requester_name,
+                 COALESCE(t.requester_name, pu.name) as requester_name,
                  pu.email as requester_email,
                  pu.department as requester_department,
                  pu.unit as requester_unit
@@ -521,7 +521,9 @@ ticketsRouter.get('/export/excel', authenticate, async (req: Request, res: Respo
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const result = await database.query(
-      `SELECT t.*, iu.name AS assigned_to_name, pu.name AS requester_name, pu.email AS requester_email
+      `SELECT t.*, iu.name AS assigned_to_name,
+              COALESCE(t.requester_name, pu.name) AS requester_name,
+              pu.email AS requester_email
        FROM tickets t
        LEFT JOIN internal_users iu ON t.assigned_to_id = iu.id
        LEFT JOIN public_users pu ON t.requester_type = 'public' AND t.requester_id = pu.id
@@ -552,9 +554,9 @@ ticketsRouter.get('/:id', async (req: Request, res: Response) => {
 
     // Buscar ticket com dados do solicitante (se for público)
     const ticket = await database.query(
-      `SELECT t.*, 
+      `SELECT t.*,
               t.assigned_to_id as assigned_to,
-              pu.name as requester_name,
+              COALESCE(t.requester_name, pu.name) as requester_name,
               pu.email as requester_email,
               pu.department as requester_department,
               pu.unit as requester_unit
@@ -673,7 +675,7 @@ ticketsRouter.get('/:id', async (req: Request, res: Response) => {
 ticketsRouter.post('/', validate(createTicketSchema), async (req: Request, res: Response) => {
   try {
     const userToken = req.headers['x-user-token'] as string;
-    const { title, description, type, priority, department, category, requestDetails } = req.body;
+    const { title, description, type, priority, department, category, requestDetails, requester_name: requesterNameFromBody } = req.body;
 
     console.log('POST /tickets - Token:', userToken ? 'present' : 'missing');
     console.log('POST /tickets - Body:', { title, description, type, priority, department, category });
@@ -698,12 +700,14 @@ ticketsRouter.post('/', validate(createTicketSchema), async (req: Request, res: 
     // Create ticket
     const ticket = await database.query(
       `INSERT INTO tickets (
-        requester_type, requester_id, title, description,
+        requester_type, requester_id, requester_name, title, description,
         type, priority, status, department, category, metadata
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *`,
       [
-        'public', publicUser.rows[0].id, title, description,
+        'public', publicUser.rows[0].id,
+        requesterNameFromBody || publicUser.rows[0].name,
+        title, description,
         type || 'support', priority || 'medium', 'open', department || 'ti',
         category || null,
         JSON.stringify(requestDetails || {}),

@@ -448,7 +448,7 @@ dashboardRouter.get('/admin-staff', async (req: Request, res: Response) => {
       ),
       database.query(
         `SELECT t.id, t.title, t.status, t.priority, t.created_at, t.updated_at,
-                pu.name AS requester_name,
+                COALESCE(t.requester_name, pu.name) AS requester_name,
                 COALESCE(t.department, 'ti') AS department,
                 t.category
          FROM tickets t

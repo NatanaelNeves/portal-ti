@@ -98,6 +98,7 @@ export async function initializeDatabase(): Promise<void> {
         metadata JSONB DEFAULT '{}',
         requester_type VARCHAR(20) NOT NULL DEFAULT 'public',
         requester_id UUID NOT NULL,
+        requester_name VARCHAR(255),
         assigned_to_id UUID REFERENCES internal_users(id),
         department_id UUID REFERENCES departments(id),
         resolved_at TIMESTAMP,
