@@ -250,7 +250,7 @@ ticketsRouter.get('/', async (req: Request, res: Response) => {
       }
 
       if (search) {
-        conditions.push(`(t.title ILIKE $${paramCount} OR t.description ILIKE $${paramCount})`);
+        conditions.push(`(t.title ILIKE $${paramCount} OR t.description ILIKE $${paramCount} OR COALESCE(t.requester_name, '') ILIKE $${paramCount})`);
         params.push(`%${search}%`);
         paramCount++;
       }
@@ -387,7 +387,17 @@ ticketsRouter.get('/', async (req: Request, res: Response) => {
         }
 
         if (search) {
-          conditions.push(`(t.title ILIKE $${paramCount} OR t.description ILIKE $${paramCount})`);
+          conditions.push(`(
+            t.title ILIKE $${paramCount}
+            OR t.description ILIKE $${paramCount}
+            OR COALESCE(t.requester_name, '') ILIKE $${paramCount}
+            OR EXISTS (
+              SELECT 1 FROM public_users pu2
+              WHERE pu2.id = t.requester_id
+                AND t.requester_type = 'public'
+                AND (pu2.name ILIKE $${paramCount} OR pu2.email ILIKE $${paramCount})
+            )
+          )`);
           params.push(`%${search}%`);
           paramCount++;
         }
@@ -515,7 +525,7 @@ ticketsRouter.get('/export/excel', authenticate, async (req: Request, res: Respo
 
     if (status?.length) { conditions.push(`t.status = ANY($${pc})`); params.push(status); pc++; }
     if (priority?.length) { conditions.push(`t.priority = ANY($${pc})`); params.push(priority); pc++; }
-    if (search) { conditions.push(`(t.title ILIKE $${pc} OR t.description ILIKE $${pc})`); params.push(`%${search}%`); pc++; }
+    if (search) { conditions.push(`(t.title ILIKE $${pc} OR t.description ILIKE $${pc} OR COALESCE(t.requester_name,'') ILIKE $${pc} OR EXISTS (SELECT 1 FROM public_users pu2 WHERE pu2.id = t.requester_id AND t.requester_type = 'public' AND (pu2.name ILIKE $${pc} OR pu2.email ILIKE $${pc})))`); params.push(`%${search}%`); pc++; }
     if (date_from) { conditions.push(`t.created_at >= $${pc}`); params.push(date_from); pc++; }
     if (date_to) { conditions.push(`t.created_at <= $${pc}`); params.push(date_to); pc++; }
 

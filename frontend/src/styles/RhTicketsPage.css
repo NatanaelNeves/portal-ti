@@ -435,6 +435,82 @@
   border: 2px solid #fff;
 }
 
+.rh-filter-btn-closed {
+  color: #6b7280;
+  border-radius: 8px 8px 0 0;
+}
+
+.rh-filter-btn-closed.active {
+  background: #fff;
+  color: #374151;
+  border-color: #dbe4ea;
+  border-bottom-color: #6b7280;
+}
+
+/* ── Closed search bar ───────────────────────────────────── */
+.rh-closed-search-bar {
+  background: #fff;
+  border: 1px solid #e4eaef;
+  border-top: none;
+  border-bottom: none;
+  padding: 10px 14px;
+}
+
+.rh-closed-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f8fafc;
+  border: 1px solid #dbe4ea;
+  border-radius: 8px;
+  padding: 0 10px;
+  transition: border-color 0.15s;
+}
+
+.rh-closed-search-wrap:focus-within {
+  border-color: #7c3aed;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.08);
+}
+
+.rh-closed-search-icon {
+  width: 16px;
+  height: 16px;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.rh-closed-search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.88rem;
+  color: #1f2d3d;
+  padding: 9px 0;
+}
+
+.rh-closed-search-input::placeholder { color: #9ca3af; }
+
+.rh-closed-search-clear {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9ca3af;
+  font-size: 0.75rem;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, background 0.15s;
+}
+
+.rh-closed-search-clear:hover {
+  color: #374151;
+  background: #f3f4f6;
+}
+
 /* ── Queue ────────────────────────────────────────────────── */
 .rh-ticket-queue {
   overflow: hidden;

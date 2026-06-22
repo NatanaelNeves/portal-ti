@@ -83,6 +83,8 @@ export default function RhTicketsPage() {
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [priorityFeedback, setPriorityFeedback] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [viewMode, setViewMode] = useState<'active' | 'closed'>('active');
+  const [closedSearch, setClosedSearch] = useState('');
   const prevTotalRef = useRef(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -109,6 +111,18 @@ export default function RhTicketsPage() {
   const buildParams = useCallback(() => {
     const params = new URLSearchParams();
     params.append('department', 'rh');
+
+    if (viewMode === 'closed') {
+      params.append('status', 'closed');
+      params.append('status', 'resolved');
+      if (closedSearch.trim()) params.append('search', closedSearch.trim());
+      params.append('page', currentPage.toString());
+      params.append('limit', '20');
+      params.append('sort', 'updated_at');
+      params.append('order', 'desc');
+      return params;
+    }
+
     const hasAdv = selectedStatuses.length > 0 || selectedPriorities.length > 0 || searchText.trim() !== '';
     const active = ['open', 'in_progress', 'waiting_user', 'aguardando_confirmacao'];
 
@@ -139,7 +153,7 @@ export default function RhTicketsPage() {
     params.append('sort', 'created_at');
     params.append('order', 'desc');
     return params;
-  }, [filterStatus, filterPriority, assignmentFilter, selectedStatuses, selectedPriorities, searchText, currentPage, currentUserId]);
+  }, [filterStatus, filterPriority, assignmentFilter, selectedStatuses, selectedPriorities, searchText, currentPage, currentUserId, viewMode, closedSearch]);
 
   const applyResponse = useCallback((resp: any, silent: boolean) => {
     const data = resp.data;
@@ -208,7 +222,7 @@ export default function RhTicketsPage() {
     if (!currentUserId && currentUserId !== '') return;
     void fetchTickets();
     void fetchUsers();
-  }, [filterStatus, filterPriority, assignmentFilter, selectedStatuses, selectedPriorities, searchText, currentPage, currentUserId]);
+  }, [filterStatus, filterPriority, assignmentFilter, selectedStatuses, selectedPriorities, searchText, currentPage, currentUserId, viewMode, closedSearch]);
 
   // Polling
   useEffect(() => {
@@ -540,41 +554,85 @@ export default function RhTicketsPage() {
         <div className="rh-queue-column">
           <div className="rh-assignment-filters">
             <button
-              className={`rh-filter-btn ${assignmentFilter === 'all' ? 'active' : ''}`}
-              onClick={() => { setAssignmentFilter('all'); setFilterStatus('all'); }}
+              className={`rh-filter-btn ${assignmentFilter === 'all' && viewMode === 'active' ? 'active' : ''}`}
+              onClick={() => { setAssignmentFilter('all'); setFilterStatus('all'); setViewMode('active'); setClosedSearch(''); setCurrentPage(1); }}
             >
               Fila ativa
             </button>
             <button
-              className={`rh-filter-btn ${assignmentFilter === 'mine' ? 'active' : ''}`}
-              onClick={() => { setAssignmentFilter('mine'); setFilterStatus('all'); }}
+              className={`rh-filter-btn ${assignmentFilter === 'mine' && viewMode === 'active' ? 'active' : ''}`}
+              onClick={() => { setAssignmentFilter('mine'); setFilterStatus('all'); setViewMode('active'); setClosedSearch(''); setCurrentPage(1); }}
             >
               Meus atendimentos ({myCount})
             </button>
             <button
-              className={`rh-filter-btn ${assignmentFilter === 'unassigned' ? 'active' : ''}`}
-              onClick={() => { setAssignmentFilter('unassigned'); setFilterStatus('all'); }}
+              className={`rh-filter-btn ${assignmentFilter === 'unassigned' && viewMode === 'active' ? 'active' : ''}`}
+              onClick={() => { setAssignmentFilter('unassigned'); setFilterStatus('all'); setViewMode('active'); setClosedSearch(''); setCurrentPage(1); }}
             >
               Não atribuídos
             </button>
             <button
-              className={`rh-filter-btn rh-filter-btn-toggle ${showFilters ? 'active' : ''}`}
+              className={`rh-filter-btn rh-filter-btn-closed ${viewMode === 'closed' ? 'active' : ''}`}
               onClick={() => {
-                setShowFilters(!showFilters);
-                if (!showFilters) { setFilterStatus('all'); setFilterPriority(null); }
+                if (viewMode === 'closed') {
+                  setViewMode('active');
+                  setClosedSearch('');
+                  setCurrentPage(1);
+                } else {
+                  setViewMode('closed');
+                  setClosedSearch('');
+                  setShowFilters(false);
+                  setCurrentPage(1);
+                }
               }}
             >
-              {showFilters ? 'Ocultar filtros' : 'Filtros avançados'}
-              {hasAdv && <span className="rh-filter-counter">{activeFiltersCount}</span>}
+              Fechados / Resolvidos
             </button>
+            {viewMode === 'active' && (
+              <button
+                className={`rh-filter-btn rh-filter-btn-toggle ${showFilters ? 'active' : ''}`}
+                onClick={() => {
+                  setShowFilters(!showFilters);
+                  if (!showFilters) { setFilterStatus('all'); setFilterPriority(null); }
+                }}
+              >
+                {showFilters ? 'Ocultar filtros' : 'Filtros avançados'}
+                {hasAdv && <span className="rh-filter-counter">{activeFiltersCount}</span>}
+              </button>
+            )}
           </div>
+
+          {viewMode === 'closed' && (
+            <div className="rh-closed-search-bar">
+              <div className="rh-closed-search-wrap">
+                <svg className="rh-closed-search-icon" viewBox="0 0 24 24" fill="none">
+                  <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
+                  <path d="M20 20L16.6 16.6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+                <input
+                  type="text"
+                  className="rh-closed-search-input"
+                  placeholder="Buscar por título, nome do solicitante ou e-mail..."
+                  value={closedSearch}
+                  onChange={e => { setClosedSearch(e.target.value); setCurrentPage(1); }}
+                  autoFocus
+                />
+                {closedSearch && (
+                  <button type="button" className="rh-closed-search-clear" onClick={() => { setClosedSearch(''); setCurrentPage(1); }}>
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           <section className="card rh-ticket-queue">
             <div className="rh-queue-header card-header">
-              <h2>Fila de Atendimento RH</h2>
+              <h2>{viewMode === 'closed' ? 'Chamados Fechados / Resolvidos' : 'Fila de Atendimento RH'}</h2>
               <span className="rh-queue-count">
-                {tickets.length} chamados
-                {filterPriority && ` • Prioridade ${PRIORITY_LABELS[filterPriority]}`}
+                {totalTickets || tickets.length} chamados
+                {viewMode === 'active' && filterPriority && ` • Prioridade ${PRIORITY_LABELS[filterPriority]}`}
+                {viewMode === 'closed' && closedSearch && ` • "${closedSearch}"`}
               </span>
             </div>
 
@@ -582,9 +640,19 @@ export default function RhTicketsPage() {
               <div className="loading">Carregando...</div>
             ) : tickets.length === 0 ? (
               <div className="rh-empty-queue">
-                <span className="rh-empty-icon">✨</span>
-                <p>Nenhum chamado na fila!</p>
-                <small>Você está em dia com o atendimento</small>
+                {viewMode === 'closed' ? (
+                  <>
+                    <span className="rh-empty-icon">🔍</span>
+                    <p>{closedSearch ? 'Nenhum resultado encontrado' : 'Nenhum chamado fechado'}</p>
+                    <small>{closedSearch ? `Tente buscar por outro termo` : 'Não há chamados fechados ou resolvidos'}</small>
+                  </>
+                ) : (
+                  <>
+                    <span className="rh-empty-icon">✨</span>
+                    <p>Nenhum chamado na fila!</p>
+                    <small>Você está em dia com o atendimento</small>
+                  </>
+                )}
               </div>
             ) : (
               <div className="rh-tickets-list">
