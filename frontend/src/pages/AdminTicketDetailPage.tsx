@@ -261,6 +261,16 @@ export default function AdminTicketDetailPage() {
     return badges[priority] || { label: priority, className: '' };
   };
 
+  const getTypeLabel = (type?: string) => {
+    switch (type) {
+      case 'incident': return 'Incidente';
+      case 'request': return 'Solicitação';
+      case 'change': return 'Mudança';
+      case 'problem': return 'Problema';
+      default: return type || '—';
+    }
+  };
+
   const getInitials = (name?: string) => {
     if (!name) return '?';
     return name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
@@ -702,8 +712,12 @@ export default function AdminTicketDetailPage() {
               ) : (
                 messages.map((msg) => {
                   const isStaff = msg.author_type === 'it_staff';
+                  const staffFallback =
+                    ticket?.department === 'rh' ? 'Equipe RH'
+                    : ticket?.department === 'administrativo' ? 'Equipe Administrativa'
+                    : 'Equipe TI';
                   const authorDisplay = isStaff
-                    ? msg.author_name || 'Equipe TI'
+                    ? msg.author_name || staffFallback
                     : msg.author_name || ticket?.requester_name || 'Usuário';
                   return (
                     <div
@@ -787,6 +801,7 @@ export default function AdminTicketDetailPage() {
           <TicketAttachments
             ticketId={ticket.id}
             authToken={internalToken || ''}
+            department={ticket.department}
           />
         </main>
 
@@ -842,7 +857,7 @@ export default function AdminTicketDetailPage() {
                 </div>
                 <div className="meta-item">
                   <span className="meta-label">Tipo</span>
-                  <span className="meta-value">{ticket.type}</span>
+                  <span className="meta-value">{getTypeLabel(ticket.type)}</span>
                 </div>
               </div>
 

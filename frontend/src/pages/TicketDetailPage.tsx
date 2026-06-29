@@ -466,6 +466,26 @@ export default function TicketDetailPage() {
     }
   };
 
+  const getTypeLabel = (type?: string) => {
+    switch (type) {
+      case 'incident': return 'Incidente';
+      case 'request': return 'Solicitação';
+      case 'change': return 'Mudança';
+      case 'problem': return 'Problema';
+      default: return type || '—';
+    }
+  };
+
+  const getPriorityLabel = (priority?: string) => {
+    switch (priority) {
+      case 'low': return 'Baixa';
+      case 'medium': return 'Média';
+      case 'high': return 'Alta';
+      case 'critical': return 'Crítica';
+      default: return priority || '—';
+    }
+  };
+
   const normalizedRating = ticket.rating !== null && ticket.rating !== undefined
     ? Number(ticket.rating)
     : null;
@@ -491,7 +511,7 @@ export default function TicketDetailPage() {
               hour: '2-digit',
               minute: '2-digit'
             })}</span>
-            <span>📁 {ticket.type}</span>
+            <span>📁 {getTypeLabel(ticket.type)}</span>
           </div>
         </div>
 
@@ -622,7 +642,11 @@ export default function TicketDetailPage() {
                     <div className="message-header">
                       <span className="message-author">
                         {isStaff
-                          ? msg.author_name || 'Equipe TI'
+                          ? msg.author_name || (
+                              ticket.department === 'rh' ? 'Equipe RH'
+                              : ticket.department === 'administrativo' ? 'Equipe Administrativa'
+                              : 'Equipe TI'
+                            )
                           : 'Você'}
                       </span>
                       <span className="message-time">
@@ -667,6 +691,7 @@ export default function TicketDetailPage() {
           ticketId={id!}
           userToken={token || userToken || undefined}
           authToken={isInternalUser && internalToken ? internalToken : undefined}
+          department={ticket.department}
         />
 
         {/* Informações técnicas (colapsável) */}
@@ -706,11 +731,11 @@ export default function TicketDetailPage() {
             </div>
             <div className="detail-item">
               <label>Tipo:</label>
-              <span>{ticket.type}</span>
+              <span>{getTypeLabel(ticket.type)}</span>
             </div>
             <div className="detail-item">
               <label>Prioridade:</label>
-              <span>{ticket.priority}</span>
+              <span>{getPriorityLabel(ticket.priority)}</span>
             </div>
             <div className="detail-item">
               <label>Criado em:</label>

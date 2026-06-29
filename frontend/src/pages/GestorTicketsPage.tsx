@@ -184,6 +184,7 @@ export default function GestorTicketsPage() {
     }
   };
 
+  const getTypeLabel = (t?: string) => (({ incident: 'Incidente', request: 'Solicitação', change: 'Mudança', problem: 'Problema' } as Record<string,string>)[t || ''] || t || '—');
   const getStatusLabel = (s: string) => (({ open: 'Aberto', in_progress: 'Em Atendimento', waiting_user: 'Aguardando', resolved: 'Resolvido', closed: 'Fechado' } as Record<string,string>)[s] || s);
   const getPriorityLabel = (p: string) => (({ urgent: 'Alta', high: 'Alta', medium: 'Media', low: 'Baixa' } as Record<string,string>)[p] || p);
   const getStatusClass = (s: string) => (({ open: 'badge-open', in_progress: 'badge-progress', waiting_user: 'badge-warning', resolved: 'badge-success', closed: 'badge-neutral' } as Record<string,string>)[s] || 'badge-neutral');
@@ -343,10 +344,10 @@ export default function GestorTicketsPage() {
                   <div className="gt-ticket-badges">
                     <span className={`gt-badge ${getStatusClass(ticket.status)}`}>{getStatusLabel(ticket.status)}</span>
                     <span className={`gt-badge ${getPriorityClass(ticket.priority)}`}>{getPriorityLabel(ticket.priority)}</span>
-                    <span className="gt-badge badge-type">{ticket.type}</span>
+                    <span className="gt-badge badge-type">{getTypeLabel(ticket.type)}</span>
                     {filterTeam === 'all' && (
-                      <span className={`gt-badge ${ticket.department === 'administrativo' ? 'badge-team-adm' : 'badge-team-ti'}`}>
-                        {ticket.department === 'administrativo' ? 'Adm.' : 'TI'}
+                      <span className={`gt-badge ${ticket.department === 'administrativo' ? 'badge-team-adm' : ticket.department === 'rh' ? 'badge-team-rh' : 'badge-team-ti'}`}>
+                        {ticket.department === 'administrativo' ? 'Adm.' : ticket.department === 'rh' ? 'RH' : 'TI'}
                       </span>
                     )}
                   </div>

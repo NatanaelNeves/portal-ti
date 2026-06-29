@@ -8,8 +8,10 @@ interface NextActionProps {
 }
 
 export default function NextAction({ status, department, lastUpdate, estimatedTime }: NextActionProps) {
-  const isAdminDept = department === 'administrativo';
-  const teamLabel = isAdminDept ? 'equipe administrativa' : 'equipe de TI';
+  const teamLabel =
+    department === 'administrativo' ? 'equipe administrativa'
+    : department === 'rh' ? 'equipe de RH'
+    : 'equipe de TI';
 
   const getActionMessage = () => {
     switch (status) {

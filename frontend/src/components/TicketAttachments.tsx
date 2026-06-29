@@ -18,9 +18,10 @@ interface Props {
   ticketId: string;
   userToken?: string;
   authToken?: string;
+  department?: string;
 }
 
-export default function TicketAttachments({ ticketId, userToken, authToken }: Props) {
+export default function TicketAttachments({ ticketId, userToken, authToken, department }: Props) {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
@@ -293,7 +294,9 @@ export default function TicketAttachments({ ticketId, userToken, authToken }: Pr
                   <span aria-hidden="true">·</span>
                   <span>{formatDate(attachment.created_at)}</span>
                   <span aria-hidden="true">·</span>
-                  <span>{attachment.uploaded_by_type === 'it_staff' ? 'Equipe TI' : 'Usuário'}</span>
+                  <span>{attachment.uploaded_by_type === 'it_staff'
+                    ? (department === 'rh' ? 'Equipe RH' : department === 'administrativo' ? 'Equipe Administrativa' : 'Equipe TI')
+                    : 'Usuário'}</span>
                 </div>
               </div>
               <div className="attachment-actions">
