@@ -52,6 +52,7 @@ export default function AdminTicketsPage() {
   const [filterPriority, setFilterPriority] = useState<'high' | 'medium' | 'low' | null>(null);
   const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'mine' | 'unassigned'>('all');
   const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [currentUserName, setCurrentUserName] = useState<string>('');
   const [stats, setStats] = useState<TicketStats>({
     waitingUser: 0,
     inProgress: 0,
@@ -95,6 +96,7 @@ export default function AdminTicketsPage() {
     try {
       const user = JSON.parse(userData);
       setCurrentUserId(user.id || '');
+      setCurrentUserName(user.name || '');
       setUserRole(user.role || '');
       setCurrentPage(1);
 
@@ -584,6 +586,13 @@ export default function AdminTicketsPage() {
     setCurrentPage(1);
   };
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Bom dia';
+    if (hour < 18) return 'Boa tarde';
+    return 'Boa noite';
+  };
+
   const getSLAThresholdHours = (priority: string) => {
     if (priority === 'critical') return 4;
     if (priority === 'high') return 24;
@@ -664,6 +673,11 @@ export default function AdminTicketsPage() {
               : departmentFilter === 'rh' ? 'Central Operacional RH'
               : 'Central Operacional TI'}
           </h1>
+          <p className="dashboard-greeting">
+            {getGreeting()}{currentUserName ? `, ${currentUserName.split(' ')[0]}` : ''}. Hoje existem{' '}
+            <strong>{sortedTickets.length} chamados</strong> na fila
+            {myTicketsCount > 0 ? <> e <strong>{myTicketsCount}</strong> atribuídos a você</> : null}.
+          </p>
         </div>
         <div className="dashboard-header-status">
           <span className="status-chip">
@@ -1097,10 +1111,13 @@ export default function AdminTicketsPage() {
             ) : (
               <div className="tickets-list">
                 {sortedTickets.map((ticket) => {
+                  const overdue = isTicketOverdue(ticket);
+                  const ageTone = getAgeToneClass(ticket.created_at);
+                  const ageEmoji = ageTone === 'time-ago--critical' ? '🟠' : ageTone === 'time-ago--warning' ? '🟡' : '🟢';
                   return (
                   <div
                     key={ticket.id}
-                    className={`ticket-card ticket-status-${ticket.status} ${selectedTicket?.id === ticket.id ? 'active' : ''} ticket-priority-${ticket.priority || 'neutral'} ${selectedIds.has(ticket.id) ? 'ticket-card--selected' : ''}`}
+                    className={`ticket-card ticket-status-${ticket.status} ${selectedTicket?.id === ticket.id ? 'active' : ''} ticket-priority-${ticket.priority || 'neutral'} ${selectedIds.has(ticket.id) ? 'ticket-card--selected' : ''} ${overdue ? 'ticket-card--overdue' : ''}`}
                     onClick={() => setSelectedTicket(ticket)}
                   >
                     <div className="ticket-card-top">
@@ -1134,7 +1151,11 @@ export default function AdminTicketsPage() {
                           )}
                         </div>
                       </div>
-                      <span className={`time-ago ${getAgeToneClass(ticket.created_at)}`}>{getTimeAgo(ticket.created_at)}</span>
+                      {overdue ? (
+                        <span className="overdue-flag">🔴 {getSlaElapsedHours(ticket)}h atrasado</span>
+                      ) : (
+                        <span className={`time-ago ${ageTone}`}>{ageEmoji} {getTimeAgo(ticket.created_at)}</span>
+                      )}
                     </div>
 
                     <div className="ticket-card-badges">
@@ -1150,9 +1171,6 @@ export default function AdminTicketsPage() {
                       {ticket.category && (
                         <span className="badge badge-category">{ticket.category}</span>
                       )}
-                      <span className={`badge ${getTypeBadgeClass(ticket.type)}`}>
-                        {getTypeLabel(ticket.type)}
-                      </span>
                       <span className={`badge ${getPriorityBadgeClass(ticket.priority)}`}>
                         {getPriorityLabel(ticket.priority)}
                       </span>
@@ -1165,12 +1183,31 @@ export default function AdminTicketsPage() {
                       <span className="assigned">
                         {getUserName(ticket.assigned_to)}
                       </span>
-                      <span className={`sla-chip ${isTicketOverdue(ticket) ? 'sla-chip-overdue' : ''}`}>
-                        {getSlaElapsedHours(ticket)}h
-                        {isTicketOverdue(ticket) ? ' • Atrasado' : ''}
-                      </span>
+                      {!overdue && (
+                        <span className="sla-chip">{getSlaElapsedHours(ticket)}h em aberto</span>
+                      )}
                       <div className="footer-actions">
+                        {!ticket.assigned_to && ticket.status === 'open' && (
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm btn-assume"
+                            onClick={(e) => handleQuickAssume(ticket.id, e)}
+                            title="Assumir atendimento"
+                          >
+                            ⚡ Assumir atendimento
+                          </button>
+                        )}
                         <div className="card-quick-actions">
+                          {canQuickResolve(ticket) && (
+                            <button
+                              type="button"
+                              className="btn btn-success btn-sm"
+                              onClick={(e) => handleQuickStatusChange(ticket.id, 'resolved', e)}
+                              title="Resolver chamado"
+                            >
+                              Resolver
+                            </button>
+                          )}
                           <button
                             type="button"
                             className="btn btn-secondary btn-sm"
@@ -1182,30 +1219,7 @@ export default function AdminTicketsPage() {
                           >
                             Detalhes
                           </button>
-                          {canQuickResolve(ticket) && (
-                            <button
-                              type="button"
-                              className="btn btn-success btn-sm"
-                              onClick={(e) => handleQuickStatusChange(ticket.id, 'resolved', e)}
-                              title="Resolver chamado"
-                            >
-                              Resolver
-                            </button>
-                          )}
                         </div>
-                        {!ticket.assigned_to && ticket.status === 'open' && (
-                          <button
-                            type="button"
-                            className="btn btn-primary btn-sm btn-assume"
-                            onClick={(e) => handleQuickAssume(ticket.id, e)}
-                            title="Assumir atendimento"
-                          >
-                            Assumir
-                          </button>
-                        )}
-                        <span className={`badge badge-mini ${getStatusBadgeClass(ticket.status)}`}>
-                          {getStatusLabel(ticket.status)}
-                        </span>
                       </div>
                     </div>
                   </div>
