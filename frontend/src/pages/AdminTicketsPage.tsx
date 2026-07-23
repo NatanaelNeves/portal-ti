@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import StatusTimeline from '../components/StatusTimeline';
 import '../styles/AdminTicketsPage.css';
 
 interface Ticket {
@@ -37,6 +38,15 @@ interface TicketStats {
   inProgress: number;
   newToday: number;
   resolvedToday: number;
+}
+
+interface TicketMessage {
+  id: string;
+  message: string;
+  author_type: string;
+  author_name?: string;
+  created_at: string;
+  is_internal: boolean;
 }
 
 const FILTER_PRIORITY_STORAGE_KEY = 'adminTickets.filterPriority';
@@ -78,6 +88,8 @@ export default function AdminTicketsPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [exportLoading, setExportLoading] = useState(false);
+  const [previewMessages, setPreviewMessages] = useState<TicketMessage[]>([]);
+  const [previewMessagesLoading, setPreviewMessagesLoading] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('internal_token');
@@ -173,6 +185,28 @@ export default function AdminTicketsPage() {
       window.clearInterval(refreshInterval);
     };
   }, [isContextReady, filterStatus, filterPriority, assignmentFilter, selectedStatuses, selectedPriorities, searchText, currentPage, departmentFilter, currentUserId]);
+
+  // Load the activity history for whichever ticket is previewed, so the panel
+  // reads like a real workspace instead of a static summary card.
+  useEffect(() => {
+    if (!selectedTicket) {
+      setPreviewMessages([]);
+      return;
+    }
+    let cancelled = false;
+    setPreviewMessagesLoading(true);
+    api.get(`/tickets/${selectedTicket.id}`)
+      .then((res) => {
+        if (!cancelled) setPreviewMessages(res.data?.messages || []);
+      })
+      .catch(() => {
+        if (!cancelled) setPreviewMessages([]);
+      })
+      .finally(() => {
+        if (!cancelled) setPreviewMessagesLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [selectedTicket?.id]);
 
   const fetchUsers = async () => {
     try {
@@ -769,6 +803,19 @@ export default function AdminTicketsPage() {
             <span className={getMetricValueClass(stats.resolvedToday)}>{stats.resolvedToday}</span>
             <span className="summary-pill-label">Resolvidos</span>
           </div>
+          {(stats.newToday + stats.resolvedToday) > 0 && (
+            <div className="day-progress" title={`${stats.resolvedToday} de ${stats.newToday + stats.resolvedToday} chamados do dia já resolvidos`}>
+              <div className="day-progress-track">
+                <div
+                  className="day-progress-fill"
+                  style={{ width: `${Math.round((stats.resolvedToday / (stats.newToday + stats.resolvedToday)) * 100)}%` }}
+                />
+              </div>
+              <span className="day-progress-label">
+                {stats.resolvedToday} de {stats.newToday + stats.resolvedToday} resolvidos hoje
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1135,9 +1182,6 @@ export default function AdminTicketsPage() {
                           {ticket.requester_type === 'public' && ticket.requester_name ? (
                             <>
                               <span className="requester-name">{ticket.requester_name}</span>
-                              {ticket.requester_email && (
-                                <span className="requester-meta">{ticket.requester_email}</span>
-                              )}
                               {(ticket.requester_department || ticket.requester_unit) && (
                                 <span className="requester-meta">
                                   {ticket.requester_department && `${ticket.requester_department}`}
@@ -1197,17 +1241,17 @@ export default function AdminTicketsPage() {
                             ⚡ Assumir atendimento
                           </button>
                         )}
+                        {canQuickResolve(ticket) && (
+                          <button
+                            type="button"
+                            className="btn btn-success btn-sm btn-resolve"
+                            onClick={(e) => handleQuickStatusChange(ticket.id, 'resolved', e)}
+                            title="Resolver chamado"
+                          >
+                            ✓ Resolver chamado
+                          </button>
+                        )}
                         <div className="card-quick-actions">
-                          {canQuickResolve(ticket) && (
-                            <button
-                              type="button"
-                              className="btn btn-success btn-sm"
-                              onClick={(e) => handleQuickStatusChange(ticket.id, 'resolved', e)}
-                              title="Resolver chamado"
-                            >
-                              Resolver
-                            </button>
-                          )}
                           <button
                             type="button"
                             className="btn btn-secondary btn-sm"
@@ -1293,6 +1337,10 @@ export default function AdminTicketsPage() {
                 Aberto há {getTimeAgo(selectedTicket.created_at)} • Responsável: {getUserName(selectedTicket.assigned_to)}
               </div>
 
+              <div className="panel-timeline-wrap">
+                <StatusTimeline currentStatus={selectedTicket.status} />
+              </div>
+
               <div className="panel-actions">
                 <button 
                   className="btn btn-primary btn-block"
@@ -1318,9 +1366,33 @@ export default function AdminTicketsPage() {
                 </button>
               </div>
 
-              <section className="panel-section">
+              <section className="panel-section panel-section--description">
                 <h4>Descrição</h4>
                 <p>{selectedTicket.description}</p>
+              </section>
+
+              <section className="panel-section">
+                <h4>Histórico</h4>
+                {previewMessagesLoading ? (
+                  <p className="panel-history-empty">Carregando histórico...</p>
+                ) : previewMessages.length === 0 ? (
+                  <p className="panel-history-empty">Nenhuma mensagem registrada ainda.</p>
+                ) : (
+                  <ul className="panel-history-list">
+                    {previewMessages.slice(-6).map((msg) => (
+                      <li key={msg.id} className={`panel-history-item ${msg.is_internal ? 'is-internal' : ''}`}>
+                        <span className="panel-history-time">
+                          {new Date(msg.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <span className="panel-history-author">
+                          {msg.author_name || (msg.author_type === 'system' ? 'Sistema' : 'Solicitante')}
+                          {msg.is_internal ? ' · nota interna' : ''}
+                        </span>
+                        <p className="panel-history-text">{msg.message}</p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </section>
 
               <section className="panel-section">
@@ -1363,26 +1435,11 @@ export default function AdminTicketsPage() {
                     </div>
                   )}
                   <div className="info-row">
-                    <span className="info-label">Prioridade:</span>
-                    <span className="info-value">{getPriorityLabel(selectedTicket.priority)}</span>
-                  </div>
-                  <div className="info-row">
-                    <span className="info-label">Tipo:</span>
-                    <span className="info-value">{selectedTicket.type}</span>
-                  </div>
-                  <div className="info-row">
-                    <span className="info-label">Status:</span>
-                    <span className="info-value">{getStatusLabel(selectedTicket.status)}</span>
+                    <span className="info-label">Responsável:</span>
+                    <span className="info-value">{getUserName(selectedTicket.assigned_to)}</span>
                   </div>
                 </div>
               </section>
-
-              <div className="panel-info">
-                <div className="info-row">
-                  <span className="info-label">Responsável:</span>
-                  <span className="info-value">{getUserName(selectedTicket.assigned_to)}</span>
-                </div>
-              </div>
             </div>
           </aside>
         ) : (
