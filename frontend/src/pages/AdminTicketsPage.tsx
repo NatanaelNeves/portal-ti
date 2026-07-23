@@ -1,8 +1,36 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import StatusTimeline from '../components/StatusTimeline';
 import '../styles/AdminTicketsPage.css';
+
+// Tweens a displayed integer toward `value` over `duration`ms whenever it
+// changes, instead of snapping — the small "counting" motion that makes a
+// dashboard feel alive rather than a static report.
+function useAnimatedCount(value: number, duration = 450): number {
+  const [display, setDisplay] = useState(value);
+  const fromRef = useRef(value);
+  useEffect(() => {
+    const from = fromRef.current;
+    const to = value;
+    if (from === to) return;
+    let raf = 0;
+    const start = performance.now();
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setDisplay(Math.round(from + (to - from) * eased));
+      if (t < 1) {
+        raf = requestAnimationFrame(tick);
+      } else {
+        fromRef.current = to;
+      }
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value, duration]);
+  return display;
+}
 
 interface Ticket {
   id: string;
@@ -90,6 +118,7 @@ export default function AdminTicketsPage() {
   const [exportLoading, setExportLoading] = useState(false);
   const [previewMessages, setPreviewMessages] = useState<TicketMessage[]>([]);
   const [previewMessagesLoading, setPreviewMessagesLoading] = useState(false);
+  const [panelSwitching, setPanelSwitching] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('internal_token');
@@ -206,6 +235,18 @@ export default function AdminTicketsPage() {
         if (!cancelled) setPreviewMessagesLoading(false);
       });
     return () => { cancelled = true; };
+  }, [selectedTicket?.id]);
+
+  // A brief skeleton flicker on every switch — long enough to read as an
+  // intentional transition, short enough to never feel like a stall.
+  useEffect(() => {
+    if (!selectedTicket) {
+      setPanelSwitching(false);
+      return;
+    }
+    setPanelSwitching(true);
+    const timer = window.setTimeout(() => setPanelSwitching(false), 150);
+    return () => window.clearTimeout(timer);
   }, [selectedTicket?.id]);
 
   const fetchUsers = async () => {
@@ -521,7 +562,7 @@ export default function AdminTicketsPage() {
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
       case 'open':
-        return 'badge-status-neutral';
+        return 'badge-status-open';
       case 'in_progress':
         return 'badge-status-progress';
       case 'waiting_user':
@@ -531,9 +572,9 @@ export default function AdminTicketsPage() {
       case 'resolved':
         return 'badge-status-success';
       case 'closed':
-        return 'badge-status-neutral';
+        return 'badge-status-closed';
       default:
-        return 'badge-status-neutral';
+        return 'badge-status-open';
     }
   };
 
@@ -675,21 +716,32 @@ export default function AdminTicketsPage() {
   // A API já retorna ordenado e paginado
   const sortedTickets = filteredTickets;
 
-  const myTicketsCount = tickets.filter(t => 
-    t.assigned_to === currentUserId && 
-    t.status !== 'closed' && 
+  const myTicketsCount = tickets.filter(t =>
+    t.assigned_to === currentUserId &&
+    t.status !== 'closed' &&
     t.status !== 'resolved'
   ).length;
+
+  // Numbers tween into place instead of snapping whenever the queue changes
+  const animatedQueueCount = useAnimatedCount(sortedTickets.length);
+  const animatedMyCount = useAnimatedCount(myTicketsCount);
+  const animatedWaiting = useAnimatedCount(stats.waitingUser);
+  const animatedNewToday = useAnimatedCount(stats.newToday);
+  const animatedResolvedToday = useAnimatedCount(stats.resolvedToday);
+  const animatedPriorityAll = useAnimatedCount(totalTickets || sortedTickets.length);
+  const animatedPriorityHigh = useAnimatedCount(getPriorityCount('high'));
+  const animatedPriorityMedium = useAnimatedCount(getPriorityCount('medium'));
+  const animatedPriorityLow = useAnimatedCount(getPriorityCount('low'));
 
   const activeFiltersCount = selectedStatuses.length + selectedPriorities.length + (searchText.trim() ? 1 : 0);
   const formattedLastUpdate = lastUpdate
     ? `${lastUpdate.toLocaleDateString('pt-BR')} às ${lastUpdate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
     : 'Ainda sem atualização';
   const priorityOptions: Array<{ value: 'high' | 'medium' | 'low' | null; label: string; count: number }> = [
-    { value: null, label: 'Todas', count: totalTickets || sortedTickets.length },
-    { value: 'high', label: 'Alta', count: getPriorityCount('high') },
-    { value: 'medium', label: 'Media', count: getPriorityCount('medium') },
-    { value: 'low', label: 'Baixa', count: getPriorityCount('low') },
+    { value: null, label: 'Todas', count: animatedPriorityAll },
+    { value: 'high', label: 'Alta', count: animatedPriorityHigh },
+    { value: 'medium', label: 'Media', count: animatedPriorityMedium },
+    { value: 'low', label: 'Baixa', count: animatedPriorityLow },
   ];
   const panelCanResolve = selectedTicket ? canQuickResolve(selectedTicket) : false;
   const panelCanWait = selectedTicket ? canMoveToWaiting(selectedTicket) : false;
@@ -709,8 +761,8 @@ export default function AdminTicketsPage() {
           </h1>
           <p className="dashboard-greeting">
             {getGreeting()}{currentUserName ? `, ${currentUserName.split(' ')[0]}` : ''}. Hoje existem{' '}
-            <strong>{sortedTickets.length} chamados</strong> na fila
-            {myTicketsCount > 0 ? <> e <strong>{myTicketsCount}</strong> atribuídos a você</> : null}.
+            <strong>{animatedQueueCount} chamados</strong> na fila
+            {myTicketsCount > 0 ? <> e <strong>{animatedMyCount}</strong> atribuídos a você</> : null}.
           </p>
         </div>
         <div className="dashboard-header-status">
@@ -719,10 +771,10 @@ export default function AdminTicketsPage() {
             <span>{formattedLastUpdate}</span>
           </span>
           <span className="status-chip">
-            <strong>{sortedTickets.length}</strong> na fila
+            <strong>{animatedQueueCount}</strong> na fila
           </span>
           <span className="status-chip">
-            <strong>{myTicketsCount}</strong> meus atendimentos
+            <strong>{animatedMyCount}</strong> meus atendimentos
           </span>
         </div>
       </header>
@@ -731,25 +783,25 @@ export default function AdminTicketsPage() {
       {(userRole === 'admin' || userRole === 'manager') && (
         <div className="department-tabs">
           <button
-            className={`dept-tab ${departmentFilter === '' ? 'active' : ''}`}
+            className={`dept-tab dept-tab--all ${departmentFilter === '' ? 'active' : ''}`}
             onClick={() => { setDepartmentFilter(''); setCurrentPage(1); }}
           >
             <i className="ti ti-layout-grid" /> Todos
           </button>
           <button
-            className={`dept-tab ${departmentFilter === 'ti' ? 'active' : ''}`}
+            className={`dept-tab dept-tab--ti ${departmentFilter === 'ti' ? 'active' : ''}`}
             onClick={() => { setDepartmentFilter('ti'); setCurrentPage(1); }}
           >
             <i className="ti ti-device-desktop" /> TI
           </button>
           <button
-            className={`dept-tab ${departmentFilter === 'administrativo' ? 'active' : ''}`}
+            className={`dept-tab dept-tab--admin ${departmentFilter === 'administrativo' ? 'active' : ''}`}
             onClick={() => { setDepartmentFilter('administrativo'); setCurrentPage(1); }}
           >
             <i className="ti ti-building" /> Administrativo
           </button>
           <button
-            className={`dept-tab ${departmentFilter === 'rh' ? 'active' : ''}`}
+            className={`dept-tab dept-tab--rh ${departmentFilter === 'rh' ? 'active' : ''}`}
             onClick={() => { setDepartmentFilter('rh'); setCurrentPage(1); }}
           >
             <i className="ti ti-users" /> RH
@@ -796,11 +848,11 @@ export default function AdminTicketsPage() {
 
         <div className="day-summary-compact" aria-label="Resumo do dia">
           <div className="summary-pill">
-            <span className={getMetricValueClass(stats.newToday)}>{stats.newToday}</span>
+            <span className={getMetricValueClass(stats.newToday)}>{animatedNewToday}</span>
             <span className="summary-pill-label">Novos</span>
           </div>
           <div className="summary-pill">
-            <span className={getMetricValueClass(stats.resolvedToday)}>{stats.resolvedToday}</span>
+            <span className={getMetricValueClass(stats.resolvedToday)}>{animatedResolvedToday}</span>
             <span className="summary-pill-label">Resolvidos</span>
           </div>
           {(stats.newToday + stats.resolvedToday) > 0 && (
@@ -812,7 +864,7 @@ export default function AdminTicketsPage() {
                 />
               </div>
               <span className="day-progress-label">
-                {stats.resolvedToday} de {stats.newToday + stats.resolvedToday} resolvidos hoje
+                {animatedResolvedToday} de {stats.newToday + stats.resolvedToday} resolvidos hoje
               </span>
             </div>
           )}
@@ -1095,7 +1147,7 @@ export default function AdminTicketsPage() {
                   }}
                   title="Exportar chamados filtrados para Excel"
                 >
-                  {exportLoading ? '...' : '⬇ Excel'}
+                  {exportLoading ? <span className="btn-spinner" aria-label="Exportando..." /> : '⬇ Excel'}
                 </button>
               </div>
             </div>
@@ -1213,7 +1265,9 @@ export default function AdminTicketsPage() {
                         <span className="badge badge-dept-ti">TI</span>
                       )}
                       {ticket.category && (
-                        <span className="badge badge-category">{ticket.category}</span>
+                        <span className={`badge badge-category badge-category--${ticket.department === 'administrativo' ? 'admin' : ticket.department === 'rh' ? 'rh' : 'ti'}`}>
+                          {ticket.category}
+                        </span>
                       )}
                       <span className={`badge ${getPriorityBadgeClass(ticket.priority)}`}>
                         {getPriorityLabel(ticket.priority)}
@@ -1321,6 +1375,16 @@ export default function AdminTicketsPage() {
             </div>
 
             <div className="panel-content card-body">
+              {panelSwitching ? (
+                <div className="panel-skeleton" aria-hidden="true">
+                  <div className="skeleton-line" style={{ height: 16, width: '70%', borderRadius: 4 }} />
+                  <div className="skeleton-line" style={{ height: 12, width: '40%', borderRadius: 4, marginTop: 10 }} />
+                  <div className="skeleton-line" style={{ height: 60, borderRadius: 8, marginTop: 16 }} />
+                  <div className="skeleton-line" style={{ height: 12, width: '55%', borderRadius: 4, marginTop: 16 }} />
+                  <div className="skeleton-line" style={{ height: 12, width: '80%', borderRadius: 4, marginTop: 8 }} />
+                </div>
+              ) : (
+              <div key={selectedTicket.id} className="panel-fade-in">
               <div className="panel-badges">
                 <span className={`badge ${getStatusBadgeClass(selectedTicket.status)}`}>
                   {getStatusLabel(selectedTicket.status)}
@@ -1440,6 +1504,8 @@ export default function AdminTicketsPage() {
                   </div>
                 </div>
               </section>
+              </div>
+              )}
             </div>
           </aside>
         ) : (
@@ -1450,19 +1516,19 @@ export default function AdminTicketsPage() {
               <p>Selecione um chamado da fila para ver o preview detalhado.</p>
               <div className="empty-panel-metrics">
                 <div className="empty-metric-card">
-                  <span className={getMetricValueClass(sortedTickets.length)}>{sortedTickets.length}</span>
+                  <span className={getMetricValueClass(sortedTickets.length)}>{animatedQueueCount}</span>
                   <span className="empty-metric-label">Na fila</span>
                 </div>
                 <div className="empty-metric-card">
-                  <span className={getMetricValueClass(myTicketsCount)}>{myTicketsCount}</span>
+                  <span className={getMetricValueClass(myTicketsCount)}>{animatedMyCount}</span>
                   <span className="empty-metric-label">Meus atendimentos</span>
                 </div>
                 <div className="empty-metric-card">
-                  <span className={getMetricValueClass(stats.waitingUser)}>{stats.waitingUser}</span>
+                  <span className={getMetricValueClass(stats.waitingUser)}>{animatedWaiting}</span>
                   <span className="empty-metric-label">Aguardando usuário</span>
                 </div>
                 <div className="empty-metric-card">
-                  <span className={getMetricValueClass(stats.resolvedToday)}>{stats.resolvedToday}</span>
+                  <span className={getMetricValueClass(stats.resolvedToday)}>{animatedResolvedToday}</span>
                   <span className="empty-metric-label">Resolvidos hoje</span>
                 </div>
               </div>

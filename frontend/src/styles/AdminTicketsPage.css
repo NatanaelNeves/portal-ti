@@ -3,43 +3,89 @@
    ROOT TOKENS
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 .admin-tickets-dashboard {
-  --atd-bg:        #D8DCE8;
+  /* ── Neutrals: light, airy, near-white — depth comes from elevation,
+     not from a dark page background (Stripe/Vercel dashboard approach) ── */
+  --atd-bg:        #F3F4F9;
   --atd-surface:   #FFFFFF;
-  --atd-border:    #DDE3EC;
-  --atd-border-lt: #EEF1F7;
-  --atd-text:      #1A2233;
-  --atd-muted:     #6B7A8D;
-  --atd-soft:      #8C97A8;
+  --atd-border:    #E3E6EF;
+  --atd-border-lt: #EEF0F6;
+  --atd-text:      #16192B;
+  --atd-muted:     #666F8C;
+  --atd-soft:      #96A0BA;
 
   --atd-indigo:    #6366F1;
   --atd-indigo-dk: #4338CA;
   --atd-indigo-lt: #EEF2FF;
   --atd-indigo-md: #C7D2FE;
 
-  --atd-high:      #DC2626;
-  --atd-high-bg:   #FFF5F5;
-  --atd-high-b:    #FECACA;
-  --atd-med:       #D97706;
-  --atd-med-bg:    #FFFBF0;
-  --atd-med-b:     #FDE68A;
-  --atd-low:       #059669;
-  --atd-low-bg:    #F0FDF9;
-  --atd-low-b:     #A7F3D0;
+  /* ── Priority: warm urgency scale — refined, not cartoonish ── */
+  --atd-high:      #F04438;
+  --atd-high-dk:   #B42318;
+  --atd-high-bg:   #FEF3F2;
+  --atd-high-b:    #FDA29B;
+  --atd-med:       #F79009;
+  --atd-med-dk:    #B54708;
+  --atd-med-bg:    #FFFAEB;
+  --atd-med-b:     #FEC84B;
+  --atd-low:       #12B76A;
+  --atd-low-dk:    #027A48;
+  --atd-low-bg:    #ECFDF3;
+  --atd-low-b:     #6CE9A6;
 
-  --atd-radius-sm: 6px;
-  --atd-radius:    10px;
-  --atd-radius-lg: 14px;
-  --atd-shadow:    0 1px 3px rgba(15,23,42,.06), 0 1px 2px rgba(15,23,42,.04);
-  --atd-shadow-md: 0 4px 16px rgba(15,23,42,.10), 0 1px 4px rgba(15,23,42,.06);
+  /* ── Department identity: technological green / elegant blue / refined
+     violet — muted enough to feel premium, saturated enough to scan ── */
+  --atd-ti:        #12B886;
+  --atd-ti-dk:     #087F5B;
+  --atd-ti-bg:     #E9FBF5;
+  --atd-admin:     #3B5BDB;
+  --atd-admin-dk:  #2A46B0;
+  --atd-admin-bg:  #EEF1FE;
+  --atd-rh:        #8B5CF6;
+  --atd-rh-dk:     #6D28D9;
+  --atd-rh-bg:     #F6F2FF;
+
+  /* ── Status: cool workflow scale, distinct hues per stage ── */
+  --atd-status-open:     #2E90FA;
+  --atd-status-open-dk:  #175CD3;
+  --atd-status-prog:     #9E77ED;
+  --atd-status-prog-dk:  #6941C6;
+  --atd-status-wait:     #FB6514;
+  --atd-status-wait-dk:  #B93815;
+  --atd-status-done:     #17B26A;
+  --atd-status-done-dk:  #067647;
+  --atd-status-closed:   #667085;
+
+  --atd-radius-sm: 8px;
+  --atd-radius:    12px;
+  --atd-radius-lg: 16px;
+
+  /* ── Elevation: a real depth system — resting, hover, floating ── */
+  --atd-elev-1: 0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.08);
+  --atd-elev-2: 0 2px 6px rgba(16,24,40,.06), 0 6px 16px rgba(16,24,40,.10);
+  --atd-elev-3: 0 8px 16px rgba(16,24,40,.08), 0 20px 40px rgba(16,24,40,.14);
+  --atd-shadow:    var(--atd-elev-1);
+  --atd-shadow-md: var(--atd-elev-2);
+  --atd-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 
   font-family: 'DM Sans', system-ui, sans-serif;
   min-height: 100vh;
-  background: var(--atd-bg);
-  padding: 0 20px 24px;
+  background:
+    radial-gradient(ellipse 900px 500px at 100% -10%, rgba(99,102,241,.05), transparent 60%),
+    radial-gradient(ellipse 700px 500px at -10% 20%, rgba(139,92,246,.04), transparent 55%),
+    var(--atd-bg);
+  padding: 12px 20px 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   color: var(--atd-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-tickets-dashboard * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }
 
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -49,7 +95,8 @@
   background: var(--atd-surface);
   border: 1px solid var(--atd-border);
   border-radius: var(--atd-radius);
-  box-shadow: var(--atd-shadow);
+  box-shadow: var(--atd-elev-1), inset 0 1px 0 rgba(255,255,255,.6);
+  transition: box-shadow .25s var(--atd-ease), border-color .25s var(--atd-ease), transform .25s var(--atd-ease);
 }
 
 .admin-tickets-dashboard .card-header {
@@ -73,7 +120,7 @@
   background: #0D1625;
   border: none;
   border-radius: var(--atd-radius-lg);
-  padding: 20px 24px;
+  padding: 14px 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -99,11 +146,19 @@
 .admin-tickets-dashboard .dashboard-header::after {
   content: '';
   position: absolute;
-  inset: 0;
+  inset: -20%;
   background:
-    radial-gradient(ellipse 60% 80% at 8% 50%, rgba(99,102,241,.16) 0%, transparent 65%),
-    radial-gradient(ellipse 30% 60% at 92% 30%, rgba(139,92,246,.10) 0%, transparent 60%);
+    radial-gradient(ellipse 40% 70% at 10% 50%, rgba(99,102,241,.22) 0%, transparent 65%),
+    radial-gradient(ellipse 26% 55% at 85% 25%, rgba(139,92,246,.16) 0%, transparent 60%),
+    radial-gradient(ellipse 30% 50% at 60% 90%, rgba(18,185,134,.10) 0%, transparent 60%);
+  background-size: 160% 160%;
+  animation: auroraDrift 16s ease-in-out infinite alternate;
   pointer-events: none;
+}
+
+@keyframes auroraDrift {
+  0%   { background-position: 0% 30%; }
+  100% { background-position: 100% 70%; }
 }
 
 .admin-tickets-dashboard .dashboard-header-main {
@@ -168,7 +223,7 @@
   border-radius: 50%;
   background: #4ADE80;
   box-shadow: 0 0 0 2px rgba(74,222,128,.3);
-  animation: livePulse 2.2s ease-in-out infinite;
+  animation: livePulse 2.8s ease-in-out infinite;
 }
 
 @keyframes livePulse {
@@ -202,29 +257,61 @@
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all .15s ease;
+  transition: background .15s var(--atd-ease), color .15s var(--atd-ease), box-shadow .2s var(--atd-ease), transform .15s var(--atd-ease);
 }
 
 .admin-tickets-dashboard .dept-tab i {
   font-size: 1rem;
   opacity: .7;
+  transition: transform .2s var(--atd-ease), opacity .2s var(--atd-ease);
 }
 
 .admin-tickets-dashboard .dept-tab:hover {
   background: var(--atd-indigo-lt);
   color: var(--atd-indigo-dk);
+  transform: translateY(-1px);
+}
+
+.admin-tickets-dashboard .dept-tab:hover i {
+  transform: scale(1.12);
+  opacity: 1;
+}
+
+.admin-tickets-dashboard .dept-tab:active {
+  transform: translateY(0) scale(0.98);
 }
 
 .admin-tickets-dashboard .dept-tab.active {
-  background: var(--atd-indigo);
+  background: linear-gradient(135deg, var(--atd-indigo) 0%, var(--atd-indigo-dk) 100%);
   border-color: var(--atd-indigo-dk);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(99,102,241,.3);
+  box-shadow: 0 2px 10px rgba(99,102,241,.35);
 }
 
 .admin-tickets-dashboard .dept-tab.active i {
   opacity: 1;
 }
+
+/* Each department tab picks up its own identity color once active —
+   the same hues used across badges, so the whole page speaks one language */
+.admin-tickets-dashboard .dept-tab--ti.active {
+  background: linear-gradient(135deg, var(--atd-ti) 0%, var(--atd-ti-dk) 100%);
+  border-color: var(--atd-ti-dk);
+  box-shadow: 0 2px 10px rgba(18,184,134,.35);
+}
+.admin-tickets-dashboard .dept-tab--admin.active {
+  background: linear-gradient(135deg, var(--atd-admin) 0%, var(--atd-admin-dk) 100%);
+  border-color: var(--atd-admin-dk);
+  box-shadow: 0 2px 10px rgba(59,91,219,.35);
+}
+.admin-tickets-dashboard .dept-tab--rh.active {
+  background: linear-gradient(135deg, var(--atd-rh) 0%, var(--atd-rh-dk) 100%);
+  border-color: var(--atd-rh-dk);
+  box-shadow: 0 2px 10px rgba(139,92,246,.35);
+}
+.admin-tickets-dashboard .dept-tab--ti:hover:not(.active)    { background: var(--atd-ti-bg); color: var(--atd-ti-dk); }
+.admin-tickets-dashboard .dept-tab--admin:hover:not(.active) { background: var(--atd-admin-bg); color: var(--atd-admin-dk); }
+.admin-tickets-dashboard .dept-tab--rh:hover:not(.active)    { background: var(--atd-rh-bg); color: var(--atd-rh-dk); }
 
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    ALERTS & WARNINGS
@@ -267,7 +354,7 @@
   background: var(--atd-surface);
   border: 1px solid var(--atd-border);
   border-radius: var(--atd-radius);
-  padding: 10px 16px;
+  padding: 8px 14px;
   box-shadow: var(--atd-shadow);
   flex-wrap: wrap;
 }
@@ -306,7 +393,16 @@
   font-size: 0.78rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all .15s ease;
+  transition: background .18s var(--atd-ease), border-color .18s var(--atd-ease), color .18s var(--atd-ease), transform .15s var(--atd-ease), box-shadow .18s var(--atd-ease);
+}
+
+.admin-tickets-dashboard .priority-chip:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--atd-elev-1);
+}
+
+.admin-tickets-dashboard .priority-chip:active:not(:disabled) {
+  transform: translateY(0) scale(.97);
 }
 
 .admin-tickets-dashboard .priority-chip:disabled {
@@ -508,11 +604,40 @@
   font-weight: 600;
   letter-spacing: 0.01em;
   cursor: pointer;
-  transition: all .14s ease;
+  transition: transform .15s var(--atd-ease), box-shadow .2s var(--atd-ease), background .2s var(--atd-ease), filter .2s var(--atd-ease);
   white-space: nowrap;
   line-height: 1;
   position: relative;
   overflow: hidden;
+}
+
+.admin-tickets-dashboard .btn:hover:not(:disabled) {
+  filter: brightness(1.04);
+}
+
+/* CSS-only "press pulse" ripple: instant to show on press (0s while
+   :active), fading out over .5s the moment the button is released —
+   a tactile click response with no JS pointer tracking needed. */
+.admin-tickets-dashboard .btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 65%);
+  opacity: 0;
+  transform: scale(.4);
+  transition: opacity .5s ease-out, transform .5s ease-out;
+  pointer-events: none;
+}
+
+.admin-tickets-dashboard .btn:active::after {
+  opacity: 1;
+  transform: scale(1.6);
+  transition: opacity 0s, transform 0s;
+}
+
+.admin-tickets-dashboard .btn-secondary::after,
+.admin-tickets-dashboard .card-quick-actions .btn::after {
+  background: radial-gradient(circle, rgba(67,56,202,.16) 0%, rgba(67,56,202,0) 65%);
 }
 
 /* Primary â€” indigo filled */
@@ -524,13 +649,13 @@
   text-shadow: 0 1px 2px rgba(0,0,0,.15);
 }
 
-.admin-tickets-dashboard .btn-primary:hover {
+.admin-tickets-dashboard .btn-primary:hover:not(:disabled) {
   background: linear-gradient(135deg, #4F46E5 0%, #4338CA 100%);
-  box-shadow: 0 3px 12px rgba(99,102,241,.4), inset 0 1px 0 rgba(255,255,255,.1);
+  box-shadow: 0 4px 16px rgba(99,102,241,.45), inset 0 1px 0 rgba(255,255,255,.1);
   transform: translateY(-1px);
 }
 
-.admin-tickets-dashboard .btn-primary:active { transform: translateY(0); box-shadow: 0 1px 4px rgba(99,102,241,.3); }
+.admin-tickets-dashboard .btn-primary:active:not(:disabled) { transform: translateY(0) scale(.98); box-shadow: 0 1px 4px rgba(99,102,241,.3); }
 
 /* Secondary â€” ghost with soft fill */
 .admin-tickets-dashboard .btn-secondary {
@@ -541,12 +666,26 @@
   backdrop-filter: blur(4px);
 }
 
-.admin-tickets-dashboard .btn-secondary:hover {
+.admin-tickets-dashboard .btn-secondary:hover:not(:disabled) {
   background: #fff;
   border-color: #A5B4FC;
   color: var(--atd-indigo-dk);
   box-shadow: 0 2px 8px rgba(99,102,241,.12), inset 0 1px 0 rgba(255,255,255,1);
+  transform: translateY(-1px);
 }
+
+.admin-tickets-dashboard .btn-secondary:active:not(:disabled) { transform: translateY(0) scale(.98); }
+
+.admin-tickets-dashboard .btn-spinner {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid rgba(67,56,202,.25);
+  border-top-color: var(--atd-indigo-dk);
+  animation: btnSpin .6s linear infinite;
+}
+
+@keyframes btnSpin { to { transform: rotate(360deg); } }
 
 /* Success â€” emerald */
 .admin-tickets-dashboard .btn-success {
@@ -563,7 +702,7 @@
   transform: translateY(-1px);
 }
 
-.admin-tickets-dashboard .btn-success:active  { transform: translateY(0); }
+.admin-tickets-dashboard .btn-success:active  { transform: translateY(0) scale(.98); }
 .admin-tickets-dashboard .btn-success:disabled {
   opacity: .45;
   cursor: not-allowed;
@@ -586,7 +725,7 @@
   transform: translateY(-1px);
 }
 
-.admin-tickets-dashboard .btn-warning:active  { transform: translateY(0); }
+.admin-tickets-dashboard .btn-warning:active  { transform: translateY(0) scale(.98); }
 .admin-tickets-dashboard .btn-warning:disabled {
   opacity: .45;
   cursor: not-allowed;
@@ -832,7 +971,7 @@
 .admin-tickets-dashboard .assignment-filters {
   display: flex;
   gap: 6px;
-  padding: 10px 12px;
+  padding: 8px 12px;
   background: var(--atd-surface);
   border: 1px solid var(--atd-border);
   border-bottom: none;
@@ -858,12 +997,18 @@
   font-size: 0.82rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all .15s;
+  transition: background .18s var(--atd-ease), color .18s var(--atd-ease), border-color .18s var(--atd-ease), transform .15s var(--atd-ease), box-shadow .18s var(--atd-ease);
 }
 
 .admin-tickets-dashboard .filter-btn:hover {
   background: var(--atd-bg);
   color: var(--atd-text);
+  transform: translateY(-1px);
+  box-shadow: var(--atd-elev-1);
+}
+
+.admin-tickets-dashboard .filter-btn:active {
+  transform: translateY(0) scale(.97);
 }
 
 .admin-tickets-dashboard .filter-btn.active {
@@ -1004,14 +1149,21 @@
   border-left: 3px solid transparent;
   border-radius: var(--atd-radius-sm);
   cursor: pointer;
-  transition: background .12s, border-color .12s, box-shadow .15s, transform .12s;
+  transition: background .22s var(--atd-ease), border-color .22s var(--atd-ease), box-shadow .22s var(--atd-ease), transform .18s var(--atd-ease);
   position: relative;
+  will-change: transform;
 }
 
 .admin-tickets-dashboard .ticket-card:hover {
-  background: #F6F8FB;
+  background: #F8F9FD;
   border-color: var(--atd-border-lt);
-  box-shadow: 0 2px 8px rgba(15,23,42,.06);
+  box-shadow: var(--atd-elev-2);
+  transform: translateY(-2px) scale(1.006);
+}
+
+.admin-tickets-dashboard .ticket-card:active {
+  transform: translateY(-1px) scale(0.997);
+  transition-duration: .08s;
 }
 
 .admin-tickets-dashboard .ticket-card.active {
@@ -1019,20 +1171,31 @@
   border-color: var(--atd-indigo-md);
   border-left-color: var(--atd-indigo);
   border-left-width: 4px;
-  box-shadow: 0 3px 14px rgba(99,102,241,.18);
-  transform: translateX(1px);
+  box-shadow: var(--atd-elev-2), 0 0 0 1px rgba(99,102,241,.16), 0 0 28px rgba(99,102,241,.14);
+  transform: translateY(-1px);
 }
 
 /* Priority accent stripes */
 .admin-tickets-dashboard .ticket-priority-high   { border-left-color: var(--atd-high); }
-.admin-tickets-dashboard .ticket-priority-urgent { border-left-color: #991B1B; }
+.admin-tickets-dashboard .ticket-priority-urgent { border-left-color: var(--atd-high-dk); }
 .admin-tickets-dashboard .ticket-priority-medium { border-left-color: var(--atd-med); }
 .admin-tickets-dashboard .ticket-priority-low    { border-left-color: var(--atd-low); }
 .admin-tickets-dashboard .ticket-priority-neutral { border-left-color: #CBD5E1; }
 
-.admin-tickets-dashboard .ticket-card.active.ticket-priority-high   { background: var(--atd-high-bg); }
-.admin-tickets-dashboard .ticket-card.active.ticket-priority-medium { background: var(--atd-med-bg); }
-.admin-tickets-dashboard .ticket-card.active.ticket-priority-low    { background: var(--atd-low-bg); }
+/* Selected card glows in its own priority color — a soft, discreet halo,
+   not just a border swap, so the eye finds it instantly across a busy queue */
+.admin-tickets-dashboard .ticket-card.active.ticket-priority-high {
+  background: var(--atd-high-bg);
+  box-shadow: var(--atd-elev-2), 0 0 0 1px rgba(240,68,56,.2), 0 0 28px rgba(240,68,56,.16);
+}
+.admin-tickets-dashboard .ticket-card.active.ticket-priority-medium {
+  background: var(--atd-med-bg);
+  box-shadow: var(--atd-elev-2), 0 0 0 1px rgba(247,144,9,.2), 0 0 28px rgba(247,144,9,.16);
+}
+.admin-tickets-dashboard .ticket-card.active.ticket-priority-low {
+  background: var(--atd-low-bg);
+  box-shadow: var(--atd-elev-2), 0 0 0 1px rgba(18,183,106,.2), 0 0 28px rgba(18,183,106,.16);
+}
 
 /* Overdue tickets get a loud, unmissable treatment */
 .admin-tickets-dashboard .ticket-card--overdue {
@@ -1132,37 +1295,136 @@
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    BADGE SYSTEM
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+/* Color is information here, not decoration. Priority and status are
+   solid gradient-filled pills with a soft colored glow — they demand
+   an instant reaction, so they get the most visual weight and read in
+   milliseconds even across a dense queue. Department and category are
+   classification, not action, so they get a quieter colored-dot chip —
+   still fully colored, just a different register on the same scale. */
 .admin-tickets-dashboard .badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 0.68rem;
-  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: .04em;
   white-space: nowrap;
+  transition: transform .15s var(--atd-ease), box-shadow .15s var(--atd-ease);
 }
 
-.admin-tickets-dashboard .badge-status-neutral   { background: #F1F5F9; color: #475569; border: 1px solid #CBD5E1; }
-.admin-tickets-dashboard .badge-status-progress  { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
-.admin-tickets-dashboard .badge-status-warning   { background: var(--atd-med-bg); color: #92400E; border: 1px solid var(--atd-med-b); }
-.admin-tickets-dashboard .badge-status-success   { background: var(--atd-low-bg); color: #065F46; border: 1px solid var(--atd-low-b); }
+/* ── Status: Aberto=azul · Em atendimento=roxo · Aguardando=laranja ·
+   Resolvido=verde — each a two-tone gradient with a matching glow ── */
+.admin-tickets-dashboard .badge-status-open {
+  background: linear-gradient(135deg, var(--atd-status-open) 0%, var(--atd-status-open-dk) 100%);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(23,92,211,.25), 0 0 0 1px rgba(23,92,211,.12);
+  text-shadow: 0 1px 1px rgba(0,0,0,.12);
+}
+.admin-tickets-dashboard .badge-status-progress {
+  background: linear-gradient(135deg, var(--atd-status-prog) 0%, var(--atd-status-prog-dk) 100%);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(105,65,198,.25), 0 0 0 1px rgba(105,65,198,.12);
+  text-shadow: 0 1px 1px rgba(0,0,0,.12);
+}
+.admin-tickets-dashboard .badge-status-warning {
+  background: linear-gradient(135deg, var(--atd-status-wait) 0%, var(--atd-status-wait-dk) 100%);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(185,56,21,.25), 0 0 0 1px rgba(185,56,21,.12);
+  text-shadow: 0 1px 1px rgba(0,0,0,.12);
+}
+.admin-tickets-dashboard .badge-status-success {
+  background: linear-gradient(135deg, var(--atd-status-done) 0%, var(--atd-status-done-dk) 100%);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(6,118,71,.25), 0 0 0 1px rgba(6,118,71,.12);
+  text-shadow: 0 1px 1px rgba(0,0,0,.12);
+}
+.admin-tickets-dashboard .badge-status-closed  { background: #EEF0F4; color: var(--atd-status-closed); }
+.admin-tickets-dashboard .badge-status-neutral {
+  background: linear-gradient(135deg, var(--atd-status-open) 0%, var(--atd-status-open-dk) 100%);
+  color: #fff;
+}
 
-.admin-tickets-dashboard .badge-priority-high    { background: var(--atd-high-bg); color: #991B1B; border: 1px solid var(--atd-high-b); }
-.admin-tickets-dashboard .badge-priority-urgent  { background: #FFF0F0; color: #7F1D1D; border: 1px solid #FECACA; }
-.admin-tickets-dashboard .badge-priority-medium  { background: var(--atd-med-bg); color: #92400E; border: 1px solid var(--atd-med-b); }
-.admin-tickets-dashboard .badge-priority-low     { background: var(--atd-low-bg); color: #065F46; border: 1px solid var(--atd-low-b); }
-.admin-tickets-dashboard .badge-priority-neutral { background: #F8FAFC; color: var(--atd-muted); border: 1px solid var(--atd-border); }
+/* ── Priority: Alta=vermelho · Média=âmbar · Baixa=verde ── */
+.admin-tickets-dashboard .badge-priority-high {
+  background: linear-gradient(135deg, var(--atd-high) 0%, var(--atd-high-dk) 100%);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(180,35,24,.28), 0 0 0 1px rgba(180,35,24,.12);
+  text-shadow: 0 1px 1px rgba(0,0,0,.12);
+}
+.admin-tickets-dashboard .badge-priority-urgent {
+  background: linear-gradient(135deg, var(--atd-high-dk) 0%, #7A2E22 100%);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(122,46,34,.3);
+}
+.admin-tickets-dashboard .badge-priority-medium {
+  background: linear-gradient(135deg, var(--atd-med) 0%, var(--atd-med-dk) 100%);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(181,71,8,.25), 0 0 0 1px rgba(181,71,8,.12);
+  text-shadow: 0 1px 1px rgba(0,0,0,.12);
+}
+.admin-tickets-dashboard .badge-priority-low {
+  background: linear-gradient(135deg, var(--atd-low) 0%, var(--atd-low-dk) 100%);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(2,122,72,.25), 0 0 0 1px rgba(2,122,72,.12);
+  text-shadow: 0 1px 1px rgba(0,0,0,.12);
+}
+.admin-tickets-dashboard .badge-priority-neutral { background: #99A1B7; color: #fff; }
 
-.admin-tickets-dashboard .badge-type-incident { background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; }
+.admin-tickets-dashboard .badge-type-incident { background: var(--atd-high-bg); color: var(--atd-high-dk); border: 1px solid var(--atd-high-b); }
 .admin-tickets-dashboard .badge-type-neutral  { background: var(--atd-indigo-lt); color: var(--atd-indigo-dk); border: 1px solid var(--atd-indigo-md); }
 
-.admin-tickets-dashboard .badge-dept-ti    { background: var(--atd-indigo-lt); color: var(--atd-indigo-dk); border: 1px solid var(--atd-indigo-md); }
-.admin-tickets-dashboard .badge-dept-admin { background: #F5F3FF; color: #5B21B6; border: 1px solid #DDD6FE; }
-.admin-tickets-dashboard .badge-dept-rh    { background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; }
-.admin-tickets-dashboard .badge-category   { background: var(--atd-bg); color: var(--atd-muted); border: 1px solid var(--atd-border); text-transform: capitalize; letter-spacing: 0; }
+/* ── Department: TI=verde tecnológico · Administrativo=azul elegante ·
+   RH=roxo sofisticado — colored dot + tinted chip, one hue per team ── */
+.admin-tickets-dashboard .badge-dept-ti,
+.admin-tickets-dashboard .badge-dept-admin,
+.admin-tickets-dashboard .badge-dept-rh,
+.admin-tickets-dashboard .badge-category {
+  font-weight: 700;
+}
+
+.admin-tickets-dashboard .badge-dept-ti,
+.admin-tickets-dashboard .badge-dept-admin,
+.admin-tickets-dashboard .badge-dept-rh {
+  position: relative;
+  padding-left: 18px;
+}
+
+.admin-tickets-dashboard .badge-dept-ti::before,
+.admin-tickets-dashboard .badge-dept-admin::before,
+.admin-tickets-dashboard .badge-dept-rh::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  box-shadow: 0 0 4px currentColor;
+}
+
+.admin-tickets-dashboard .badge-dept-ti    { background: var(--atd-ti-bg); color: var(--atd-ti-dk); }
+.admin-tickets-dashboard .badge-dept-ti::before    { background: var(--atd-ti); color: var(--atd-ti); }
+.admin-tickets-dashboard .badge-dept-admin { background: var(--atd-admin-bg); color: var(--atd-admin-dk); }
+.admin-tickets-dashboard .badge-dept-admin::before { background: var(--atd-admin); color: var(--atd-admin); }
+.admin-tickets-dashboard .badge-dept-rh    { background: var(--atd-rh-bg); color: var(--atd-rh-dk); }
+.admin-tickets-dashboard .badge-dept-rh::before    { background: var(--atd-rh); color: var(--atd-rh); }
+
+/* Category inherits its department's hue at lower saturation — it reads
+   as "part of that team's cluster" instead of introducing a 5th, unrelated
+   color that the operator would have to learn separately. */
+.admin-tickets-dashboard .badge-category {
+  text-transform: capitalize;
+  letter-spacing: 0;
+  border: 1px solid transparent;
+}
+
+.admin-tickets-dashboard .badge-category--ti    { background: var(--atd-ti-bg); color: var(--atd-ti-dk); border-color: rgba(18,184,134,.25); }
+.admin-tickets-dashboard .badge-category--admin { background: var(--atd-admin-bg); color: var(--atd-admin-dk); border-color: rgba(59,91,219,.22); }
+.admin-tickets-dashboard .badge-category--rh    { background: var(--atd-rh-bg); color: var(--atd-rh-dk); border-color: rgba(139,92,246,.22); }
 
 .admin-tickets-dashboard .badge-mini {
   font-size: 0.6rem;
@@ -1280,7 +1542,7 @@
   transform: translateY(-1px) scale(1.02);
 }
 
-.admin-tickets-dashboard .btn-assume:active { transform: translateY(0) scale(1); }
+.admin-tickets-dashboard .btn-assume:active { transform: translateY(0) scale(.98); }
 
 /* Resolver â€” same footprint as Assumir when it's the card's primary action,
    so the two most decisive actions in the queue read with equal weight */
@@ -1296,7 +1558,7 @@
   transform: translateY(-1px) scale(1.02);
 }
 
-.admin-tickets-dashboard .btn-resolve:active { transform: translateY(0) scale(1); }
+.admin-tickets-dashboard .btn-resolve:active { transform: translateY(0) scale(.98); }
 
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    PAGINATION
@@ -1734,3 +1996,22 @@
 .admin-tickets-dashboard .skeleton-line--title { height: 14px; width: 70%; }
 .admin-tickets-dashboard .skeleton-line--meta  { height: 11px; width: 45%; }
 .admin-tickets-dashboard .skeleton-line--badges{ height: 11px; width: 55%; }
+
+/* Panel switch: a 150ms skeleton flicker, then the real content fades and
+   slides in — the same "never snap" language as the Linear issue panel. */
+.admin-tickets-dashboard .panel-skeleton {
+  display: flex;
+  flex-direction: column;
+}
+
+@keyframes panelFadeSlide {
+  from { opacity: 0; transform: translateX(10px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.admin-tickets-dashboard .panel-fade-in {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: panelFadeSlide .3s var(--atd-ease);
+}
