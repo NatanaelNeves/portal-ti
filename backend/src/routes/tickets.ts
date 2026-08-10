@@ -38,6 +38,29 @@ const canAdminStaffAccessAdministrativeTicket = (ticket: TicketAccessRow, userId
 
 const STATUS_AWAITING_CONFIRMATION = 'aguardando_confirmacao';
 
+// Prazo de atendimento por prioridade, usado para dar visibilidade de fila ao solicitante
+const SLA_HOURS_BY_PRIORITY: Record<string, number> = { critical: 4, high: 24, medium: 72, low: 168 };
+// 'waiting_user' fica de fora: o atraso ali é do solicitante, não da equipe,
+// então não faz sentido contar como prazo estourado.
+const STATUSES_WITH_ACTIVE_QUEUE = ['open', 'in_progress'];
+
+const withSlaDueAt = <T extends { priority?: string; status?: string; created_at: string | Date }>(ticket: T) => {
+  if (!ticket.status || !STATUSES_WITH_ACTIVE_QUEUE.includes(ticket.status)) {
+    return { ...ticket, sla_due_at: null };
+  }
+  const slaHours = SLA_HOURS_BY_PRIORITY[ticket.priority || 'medium'] ?? SLA_HOURS_BY_PRIORITY.medium;
+  const dueAt = new Date(new Date(ticket.created_at).getTime() + slaHours * 60 * 60 * 1000);
+  return { ...ticket, sla_due_at: dueAt.toISOString() };
+};
+
+const buildEstimatedLabel = (priority: string, createdAt: Date): string => {
+  const slaHours = SLA_HOURS_BY_PRIORITY[priority] ?? SLA_HOURS_BY_PRIORITY.medium;
+  const dueDate = new Date(createdAt.getTime() + slaHours * 60 * 60 * 1000);
+  const formattedDate = dueDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  const formattedTime = dueDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return `Prazo estimado de atendimento: até ${formattedDate} às ${formattedTime}`;
+};
+
 const canManuallyCloseRole = (role: string) => {
   return [UserRole.IT_STAFF, UserRole.ADMIN_STAFF, UserRole.RH_STAFF, UserRole.ADMIN, UserRole.MANAGER].includes(role as UserRole) || role === 'gestor';
 };
@@ -304,7 +327,7 @@ ticketsRouter.get('/', async (req: Request, res: Response) => {
       const tickets = await database.query(dataQuery, params);
 
       return res.json({
-        data: tickets.rows,
+        data: tickets.rows.map(withSlaDueAt),
         pagination: {
           page,
           limit,
@@ -616,7 +639,7 @@ ticketsRouter.get('/:id', async (req: Request, res: Response) => {
       );
 
       return res.json({
-        ...ticket.rows[0],
+        ...withSlaDueAt(ticket.rows[0]),
         messages: messages.rows
       });
     }
@@ -666,7 +689,7 @@ ticketsRouter.get('/:id', async (req: Request, res: Response) => {
         );
 
         return res.json({
-          ...ticket.rows[0],
+          ...withSlaDueAt(ticket.rows[0]),
           messages: messages.rows
         });
       } catch (err) {
@@ -817,7 +840,23 @@ ticketsRouter.post('/', validate(createTicketSchema), async (req: Request, res: 
       // Não falhar a requisição por erro de email
     }
 
-    res.status(201).json(ticket.rows[0]);
+    // 📧 CONFIRMAÇÃO: avisa o solicitante que o chamado foi recebido e dá o prazo estimado,
+    // para reduzir quem aparece pessoalmente sem saber se o chamado "pegou"
+    if (publicUser.rows[0].email) {
+      void EmailService.notifyTicketReceived(
+        ticket.rows[0].id,
+        title,
+        publicUser.rows[0].email,
+        publicUser.rows[0].name,
+        ticket.rows[0].priority,
+        buildEstimatedLabel(ticket.rows[0].priority, new Date(ticket.rows[0].created_at)),
+        userToken,
+      ).catch((emailError) => {
+        console.error('Error sending ticket received email:', emailError);
+      });
+    }
+
+    res.status(201).json(withSlaDueAt(ticket.rows[0]));
   } catch (error: any) {
     console.error('Error creating ticket:', error.message);
     console.error('Stack:', error.stack);

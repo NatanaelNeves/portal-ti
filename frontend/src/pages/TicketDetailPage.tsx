@@ -26,6 +26,7 @@ interface TicketDetail {
   rating?: number | null;
   feedback?: string | null;
   rated_at?: string | null;
+  sla_due_at?: string | null;
 }
 
 interface Message {
@@ -47,6 +48,30 @@ interface HistoryItem {
   metadata?: Record<string, any> | null;
   created_at: string;
 }
+
+const formatEstimatedTime = (slaDueAt: string | null | undefined, nowMs: number): string | undefined => {
+  if (!slaDueAt) return undefined;
+
+  const dueMs = new Date(slaDueAt).getTime();
+  const diffMs = dueMs - nowMs;
+
+  if (diffMs <= 0) {
+    return '⚠️ Prazo estimado excedido — sua equipe já foi notificada';
+  }
+
+  const diffHours = diffMs / (1000 * 60 * 60);
+  if (diffHours < 24) {
+    const hours = Math.floor(diffHours);
+    const minutes = Math.round((diffHours - hours) * 60);
+    const parts = [hours > 0 ? `${hours}h` : '', minutes > 0 ? `${minutes}min` : ''].filter(Boolean);
+    return `⏱️ Prazo estimado: em até ${parts.join(' ')}`;
+  }
+
+  const dueDate = new Date(slaDueAt);
+  const formattedDate = dueDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  const formattedTime = dueDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return `⏱️ Prazo estimado: até ${formattedDate} às ${formattedTime}`;
+};
 
 export default function TicketDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -519,10 +544,11 @@ export default function TicketDetailPage() {
         <StatusTimeline currentStatus={ticket.status} />
 
         {/* Próxima ação esperada */}
-        <NextAction 
+        <NextAction
           status={ticket.status}
           department={ticket.department}
           lastUpdate={ticket.updated_at}
+          estimatedTime={formatEstimatedTime(ticket.sla_due_at, nowMs)}
         />
 
         {ticket.status === 'aguardando_confirmacao' && (

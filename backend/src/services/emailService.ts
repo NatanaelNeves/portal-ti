@@ -250,6 +250,86 @@ export class EmailService {
   }
 
   /**
+   * Confirmar recebimento do chamado para o solicitante, com prazo estimado por prioridade.
+   * Evita que a pessoa fique sem saber se o chamado "pegou" e precise ir cobrar pessoalmente.
+   */
+  static async notifyTicketReceived(
+    ticketId: string,
+    title: string,
+    requesterEmail: string,
+    requesterName: string,
+    priority: string,
+    estimatedLabel: string,
+    publicToken?: string
+  ): Promise<void> {
+    const priorityLabel = {
+      low: 'Baixa',
+      medium: 'Média',
+      high: 'Alta',
+      critical: 'Urgente',
+    }[priority] || 'Média';
+
+    const ticketLink = buildPublicTicketLink(ticketId, publicToken);
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #007A33; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f9f9f9; padding: 30px; border: 1px solid #ddd; }
+          .ticket-info { background: white; padding: 20px; margin: 20px 0; border-left: 4px solid #007A33; }
+          .estimate-box { background: #fff3e0; color: #b45309; padding: 15px; border-radius: 5px; margin: 15px 0; font-weight: bold; }
+          .button { display: inline-block; background: #007A33; color: white; padding: 12px 30px;
+                    text-decoration: none; border-radius: 5px; margin: 20px 0; }
+          .footer { text-align: center; color: #666; font-size: 12px; margin-top: 30px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>✅ Chamado Recebido</h1>
+          </div>
+          <div class="content">
+            <p>Olá ${requesterName},</p>
+            <p>Recebemos sua solicitação e ela já está na fila de atendimento.</p>
+
+            <div class="ticket-info">
+              <h3>${title}</h3>
+              <p><strong>ID:</strong> #${ticketId.substring(0, 8)}</p>
+              <p><strong>Prioridade:</strong> ${priorityLabel}</p>
+            </div>
+
+            <div class="estimate-box">⏱️ ${estimatedLabel}</div>
+
+            <a href="${ticketLink}" class="button">
+              Acompanhar Chamado
+            </a>
+
+            <p style="color: #666; font-size: 14px;">
+              Você será notificado por aqui a cada atualização. Não é necessário comparecer pessoalmente para agilizar o atendimento.
+            </p>
+          </div>
+
+          <div class="footer">
+            <p>Portal de TI - O Pequeno Nazareno</p>
+            <p>Esta é uma mensagem automática, não responda este email.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    await this.sendEmail({
+      to: requesterEmail,
+      subject: `✅ Chamado Recebido: ${title}`,
+      html,
+      text: `Chamado Recebido\n\nTítulo: ${title}\nID: #${ticketId.substring(0, 8)}\nPrioridade: ${priorityLabel}\n${estimatedLabel}\n\nAcompanhe em: ${ticketLink}`,
+    });
+  }
+
+  /**
    * Notificar chamado atribuído (para o técnico)
    */
   static async notifyTicketAssigned(

@@ -13,7 +13,25 @@ interface Ticket {
   category?: string;
   created_at: string;
   updated_at: string;
+  sla_due_at?: string | null;
 }
+
+const formatSlaBadge = (slaDueAt: string | null | undefined): string | null => {
+  if (!slaDueAt) return null;
+
+  const diffMs = new Date(slaDueAt).getTime() - Date.now();
+  if (diffMs <= 0) {
+    return '⚠️ Prazo estimado excedido';
+  }
+
+  const diffHours = diffMs / (1000 * 60 * 60);
+  if (diffHours < 24) {
+    return `⏱️ Previsto em até ${Math.max(1, Math.ceil(diffHours))}h`;
+  }
+
+  const dueDate = new Date(slaDueAt);
+  return `⏱️ Previsto até ${dueDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
+};
 
 export default function MyTicketsPage() {
   const navigate = useNavigate();
@@ -422,6 +440,9 @@ export default function MyTicketsPage() {
                   <span className="date">
                     Aberta em: {ticket.created_at ? new Date(ticket.created_at).toLocaleDateString('pt-BR') : '-'}
                   </span>
+                  {formatSlaBadge(ticket.sla_due_at) && (
+                    <span className="sla-estimate">{formatSlaBadge(ticket.sla_due_at)}</span>
+                  )}
                 </div>
                 <div className="ticket-code">
                   Código: {ticket.id.substring(0, 8).toUpperCase()}

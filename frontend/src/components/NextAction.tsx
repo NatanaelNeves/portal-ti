@@ -77,7 +77,7 @@ export default function NextAction({ status, department, lastUpdate, estimatedTi
         <p className="action-message">{action.message}</p>
         {estimatedTime && (
           <div className="action-estimate">
-            ⏱️ Prazo estimado: {estimatedTime}
+            {estimatedTime}
           </div>
         )}
         {lastUpdate && status !== 'resolved' && status !== 'closed' && (
