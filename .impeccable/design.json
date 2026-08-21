@@ -1,247 +1,234 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-21T09:01:07.8836593-03:00",
-  "title": "Design System: Portal de Serviços Internos — Operação Administrativa",
+  "generatedAt": "2026-08-21T11:00:17.1927855-03:00",
+  "title": "Design System: Portal de Serviços Internos — Central Administrativa",
   "extensions": {
     "colorMeta": {
       "ink": {
         "role": "neutral",
         "displayName": "Tinta Florestal",
-        "canonical": "#132a21",
+        "canonical": "#102c22",
         "tonalRamp": ["oklch(15% 0.035 155)", "oklch(26% 0.035 155)", "oklch(38% 0.035 155)", "oklch(50% 0.035 155)", "oklch(62% 0.035 155)", "oklch(74% 0.035 155)", "oklch(86% 0.035 155)", "oklch(95% 0.035 155)"]
       },
-      "ink-soft": {
+      "ink-muted": {
         "role": "neutral",
-        "displayName": "Tinta Suave",
-        "canonical": "#52645d",
+        "displayName": "Tinta Operacional Suave",
+        "canonical": "#64766e",
         "tonalRamp": ["oklch(15% 0.018 155)", "oklch(26% 0.018 155)", "oklch(38% 0.018 155)", "oklch(50% 0.018 155)", "oklch(62% 0.018 155)", "oklch(74% 0.018 155)", "oklch(86% 0.018 155)", "oklch(95% 0.018 155)"]
-      },
-      "command-deep": {
-        "role": "primary",
-        "displayName": "Verde Comando Profundo",
-        "canonical": "#09271b",
-        "tonalRamp": ["oklch(15% 0.055 155)", "oklch(26% 0.055 155)", "oklch(38% 0.055 155)", "oklch(50% 0.055 155)", "oklch(62% 0.055 155)", "oklch(74% 0.055 155)", "oklch(86% 0.055 155)", "oklch(95% 0.055 155)"]
-      },
-      "command": {
-        "role": "primary",
-        "displayName": "Verde Comando",
-        "canonical": "#103c2a",
-        "tonalRamp": ["oklch(15% 0.07 155)", "oklch(26% 0.07 155)", "oklch(38% 0.07 155)", "oklch(50% 0.07 155)", "oklch(62% 0.07 155)", "oklch(74% 0.07 155)", "oklch(86% 0.07 155)", "oklch(95% 0.07 155)"]
       },
       "evergreen": {
         "role": "primary",
-        "displayName": "Verde Sempre-vivo",
-        "canonical": "#15553a",
-        "tonalRamp": ["oklch(15% 0.085 155)", "oklch(26% 0.085 155)", "oklch(38% 0.085 155)", "oklch(50% 0.085 155)", "oklch(62% 0.085 155)", "oklch(74% 0.085 155)", "oklch(86% 0.085 155)", "oklch(95% 0.085 155)"]
+        "displayName": "Evergreen Institucional",
+        "canonical": "#063c2d",
+        "tonalRamp": ["oklch(15% 0.075 155)", "oklch(26% 0.075 155)", "oklch(38% 0.075 155)", "oklch(50% 0.075 155)", "oklch(62% 0.075 155)", "oklch(74% 0.075 155)", "oklch(86% 0.075 155)", "oklch(95% 0.075 155)"]
       },
-      "action-green": {
+      "evergreen-active": {
         "role": "primary",
-        "displayName": "Verde Operacional",
-        "canonical": "#1d6b48",
-        "tonalRamp": ["oklch(15% 0.095 155)", "oklch(26% 0.095 155)", "oklch(38% 0.095 155)", "oklch(50% 0.095 155)", "oklch(62% 0.095 155)", "oklch(74% 0.095 155)", "oklch(86% 0.095 155)", "oklch(95% 0.095 155)"]
+        "displayName": "Evergreen de Seleção",
+        "canonical": "#075039",
+        "tonalRamp": ["oklch(15% 0.09 155)", "oklch(26% 0.09 155)", "oklch(38% 0.09 155)", "oklch(50% 0.09 155)", "oklch(62% 0.09 155)", "oklch(74% 0.09 155)", "oklch(86% 0.09 155)", "oklch(95% 0.09 155)"]
       },
-      "mist-green": {
+      "action": {
         "role": "primary",
-        "displayName": "Névoa Verde",
-        "canonical": "#dcebe2",
-        "tonalRamp": ["oklch(15% 0.025 155)", "oklch(26% 0.025 155)", "oklch(38% 0.025 155)", "oklch(50% 0.025 155)", "oklch(62% 0.025 155)", "oklch(74% 0.025 155)", "oklch(86% 0.025 155)", "oklch(95% 0.025 155)"]
+        "displayName": "Verde de Ação",
+        "canonical": "#14945a",
+        "tonalRamp": ["oklch(15% 0.13 150)", "oklch(26% 0.13 150)", "oklch(38% 0.13 150)", "oklch(50% 0.13 150)", "oklch(62% 0.13 150)", "oklch(74% 0.13 150)", "oklch(86% 0.13 150)", "oklch(95% 0.13 150)"]
       },
-      "wash-green": {
+      "action-bright": {
         "role": "primary",
-        "displayName": "Lavagem Verde",
-        "canonical": "#edf5f0",
-        "tonalRamp": ["oklch(15% 0.014 155)", "oklch(26% 0.014 155)", "oklch(38% 0.014 155)", "oklch(50% 0.014 155)", "oklch(62% 0.014 155)", "oklch(74% 0.014 155)", "oklch(86% 0.014 155)", "oklch(95% 0.014 155)"]
-      },
-      "action-mint": {
-        "role": "primary",
-        "displayName": "Menta de Ação",
-        "canonical": "#a7d9b6",
-        "tonalRamp": ["oklch(15% 0.065 150)", "oklch(26% 0.065 150)", "oklch(38% 0.065 150)", "oklch(50% 0.065 150)", "oklch(62% 0.065 150)", "oklch(74% 0.065 150)", "oklch(86% 0.065 150)", "oklch(95% 0.065 150)"]
-      },
-      "paper": {
-        "role": "neutral",
-        "displayName": "Papel Operacional",
-        "canonical": "#fffefa",
-        "tonalRamp": ["oklch(15% 0.008 95)", "oklch(26% 0.008 95)", "oklch(38% 0.008 95)", "oklch(50% 0.008 95)", "oklch(62% 0.008 95)", "oklch(74% 0.008 95)", "oklch(86% 0.008 95)", "oklch(95% 0.008 95)"]
+        "displayName": "Verde Vivo",
+        "canonical": "#46bd73",
+        "tonalRamp": ["oklch(15% 0.115 150)", "oklch(26% 0.115 150)", "oklch(38% 0.115 150)", "oklch(50% 0.115 150)", "oklch(62% 0.115 150)", "oklch(74% 0.115 150)", "oklch(86% 0.115 150)", "oklch(95% 0.115 150)"]
       },
       "canvas": {
         "role": "neutral",
         "displayName": "Canvas Mineral",
-        "canonical": "#f3f6f2",
-        "tonalRamp": ["oklch(15% 0.008 145)", "oklch(26% 0.008 145)", "oklch(38% 0.008 145)", "oklch(50% 0.008 145)", "oklch(62% 0.008 145)", "oklch(74% 0.008 145)", "oklch(86% 0.008 145)", "oklch(95% 0.008 145)"]
+        "canonical": "#f4f7f5",
+        "tonalRamp": ["oklch(15% 0.008 155)", "oklch(26% 0.008 155)", "oklch(38% 0.008 155)", "oklch(50% 0.008 155)", "oklch(62% 0.008 155)", "oklch(74% 0.008 155)", "oklch(86% 0.008 155)", "oklch(95% 0.008 155)"]
       },
-      "divider": {
+      "paper": {
         "role": "neutral",
-        "displayName": "Linha de Ledger",
-        "canonical": "#d8e0da",
-        "tonalRamp": ["oklch(15% 0.01 150)", "oklch(26% 0.01 150)", "oklch(38% 0.01 150)", "oklch(50% 0.01 150)", "oklch(62% 0.01 150)", "oklch(74% 0.01 150)", "oklch(86% 0.01 150)", "oklch(95% 0.01 150)"]
+        "displayName": "Papel de Trabalho",
+        "canonical": "#ffffff",
+        "tonalRamp": ["oklch(15% 0 0)", "oklch(26% 0 0)", "oklch(38% 0 0)", "oklch(50% 0 0)", "oklch(62% 0 0)", "oklch(74% 0 0)", "oklch(86% 0 0)", "oklch(95% 0 0)"]
       },
-      "divider-strong": {
+      "line": {
         "role": "neutral",
-        "displayName": "Linha de Ledger Forte",
-        "canonical": "#bdc9c0",
-        "tonalRamp": ["oklch(15% 0.016 150)", "oklch(26% 0.016 150)", "oklch(38% 0.016 150)", "oklch(50% 0.016 150)", "oklch(62% 0.016 150)", "oklch(74% 0.016 150)", "oklch(86% 0.016 150)", "oklch(95% 0.016 150)"]
+        "displayName": "Linha de Registro",
+        "canonical": "#dde5df",
+        "tonalRamp": ["oklch(15% 0.012 155)", "oklch(26% 0.012 155)", "oklch(38% 0.012 155)", "oklch(50% 0.012 155)", "oklch(62% 0.012 155)", "oklch(74% 0.012 155)", "oklch(86% 0.012 155)", "oklch(95% 0.012 155)"]
       },
       "info": {
         "role": "secondary",
         "displayName": "Azul Informativo",
-        "canonical": "#245d8f",
-        "tonalRamp": ["oklch(15% 0.09 250)", "oklch(26% 0.09 250)", "oklch(38% 0.09 250)", "oklch(50% 0.09 250)", "oklch(62% 0.09 250)", "oklch(74% 0.09 250)", "oklch(86% 0.09 250)", "oklch(95% 0.09 250)"]
+        "canonical": "#2d73d2",
+        "tonalRamp": ["oklch(15% 0.14 255)", "oklch(26% 0.14 255)", "oklch(38% 0.14 255)", "oklch(50% 0.14 255)", "oklch(62% 0.14 255)", "oklch(74% 0.14 255)", "oklch(86% 0.14 255)", "oklch(95% 0.14 255)"]
       },
-      "info-soft": {
+      "analysis": {
         "role": "secondary",
-        "displayName": "Azul Informativo Suave",
-        "canonical": "#e8f1f8",
-        "tonalRamp": ["oklch(15% 0.025 250)", "oklch(26% 0.025 250)", "oklch(38% 0.025 250)", "oklch(50% 0.025 250)", "oklch(62% 0.025 250)", "oklch(74% 0.025 250)", "oklch(86% 0.025 250)", "oklch(95% 0.025 250)"]
+        "displayName": "Violeta Analítico",
+        "canonical": "#7f56c5",
+        "tonalRamp": ["oklch(15% 0.13 300)", "oklch(26% 0.13 300)", "oklch(38% 0.13 300)", "oklch(50% 0.13 300)", "oklch(62% 0.13 300)", "oklch(74% 0.13 300)", "oklch(86% 0.13 300)", "oklch(95% 0.13 300)"]
       },
       "warning": {
         "role": "tertiary",
-        "displayName": "Âmbar de Atenção",
-        "canonical": "#a45c12",
-        "tonalRamp": ["oklch(15% 0.11 65)", "oklch(26% 0.11 65)", "oklch(38% 0.11 65)", "oklch(50% 0.11 65)", "oklch(62% 0.11 65)", "oklch(74% 0.11 65)", "oklch(86% 0.11 65)", "oklch(95% 0.11 65)"]
-      },
-      "warning-soft": {
-        "role": "tertiary",
-        "displayName": "Âmbar de Atenção Suave",
-        "canonical": "#fff2dd",
-        "tonalRamp": ["oklch(15% 0.035 65)", "oklch(26% 0.035 65)", "oklch(38% 0.035 65)", "oklch(50% 0.035 65)", "oklch(62% 0.035 65)", "oklch(74% 0.035 65)", "oklch(86% 0.035 65)", "oklch(95% 0.035 65)"]
+        "displayName": "Laranja de Atenção",
+        "canonical": "#ed8a22",
+        "tonalRamp": ["oklch(15% 0.14 65)", "oklch(26% 0.14 65)", "oklch(38% 0.14 65)", "oklch(50% 0.14 65)", "oklch(62% 0.14 65)", "oklch(74% 0.14 65)", "oklch(86% 0.14 65)", "oklch(95% 0.14 65)"]
       },
       "danger": {
         "role": "tertiary",
         "displayName": "Vermelho de Exceção",
-        "canonical": "#a33b35",
-        "tonalRamp": ["oklch(15% 0.105 25)", "oklch(26% 0.105 25)", "oklch(38% 0.105 25)", "oklch(50% 0.105 25)", "oklch(62% 0.105 25)", "oklch(74% 0.105 25)", "oklch(86% 0.105 25)", "oklch(95% 0.105 25)"]
-      },
-      "danger-soft": {
-        "role": "tertiary",
-        "displayName": "Vermelho de Exceção Suave",
-        "canonical": "#fbeae8",
-        "tonalRamp": ["oklch(15% 0.025 25)", "oklch(26% 0.025 25)", "oklch(38% 0.025 25)", "oklch(50% 0.025 25)", "oklch(62% 0.025 25)", "oklch(74% 0.025 25)", "oklch(86% 0.025 25)", "oklch(95% 0.025 25)"]
+        "canonical": "#d9464f",
+        "tonalRamp": ["oklch(15% 0.15 25)", "oklch(26% 0.15 25)", "oklch(38% 0.15 25)", "oklch(50% 0.15 25)", "oklch(62% 0.15 25)", "oklch(74% 0.15 25)", "oklch(86% 0.15 25)", "oklch(95% 0.15 25)"]
       }
     },
     "typographyMeta": {
-      "display": { "displayName": "Display", "purpose": "Títulos de página e mensagens executivas." },
-      "headline": { "displayName": "Headline", "purpose": "Narrativas de impacto dentro de blocos executivos." },
-      "title": { "displayName": "Title", "purpose": "Títulos de seção e agrupamento analítico." },
-      "body": { "displayName": "Body", "purpose": "Contexto, descrições e leitura contínua." },
-      "label": { "displayName": "Label", "purpose": "Estados, filtros, metadados e cabeçalhos de tabela." }
+      "display": { "displayName": "Display", "purpose": "Saudação e contexto principal do cabeçalho de comando." },
+      "headline": { "displayName": "Headline", "purpose": "Títulos compactos de página, incluindo a Central de Chamados." },
+      "title": { "displayName": "Title", "purpose": "Cabeçalhos de painel, seção e agrupamento operacional." },
+      "body": { "displayName": "Body", "purpose": "Contexto, explicações e descrições curtas." },
+      "label": { "displayName": "Label", "purpose": "Filtros, estados, metadados e orientação de controles." }
     },
     "shadows": [
-      { "name": "command-ambient", "value": "0 18px 48px -36px rgba(9, 39, 27, 0.9)", "purpose": "Halo baixo sob cabeçalhos de comando." },
-      { "name": "selection-low", "value": "0 4px 12px -10px rgba(19, 42, 33, 0.7)", "purpose": "Confirma tabs e filtros selecionados." },
-      { "name": "cell-outline", "value": "inset 0 0 0 1px #1d6b48", "purpose": "Hover estrutural sem deslocar células de KPI." }
+      { "name": "shell-side", "value": "8px 0 30px -28px rgba(3,37,27,.9)", "purpose": "Separação quase imperceptível entre sidebar e área de trabalho." },
+      { "name": "topbar-paper", "value": "0 7px 22px -24px rgba(6,60,45,.75)", "purpose": "Mantém a faixa de utilidades legível sobre o canvas." },
+      { "name": "command-ambient", "value": "0 18px 42px -34px rgba(6,60,45,.95)", "purpose": "Somente no cabeçalho evergreen do dashboard." },
+      { "name": "surface-low", "value": "0 10px 28px -26px rgba(15,61,44,.55)", "purpose": "Profundidade opcional em painéis do dashboard." },
+      { "name": "route-inset", "value": "inset 3px 0 0 #58d289", "purpose": "Marca a rota ativa sem deslocar o item." }
     ],
     "motion": [
-      { "name": "state-standard", "value": "150ms ease", "purpose": "Mudanças discretas de hover, foco e seleção." },
-      { "name": "status-pulse", "value": "1.4s ease-in-out infinite", "purpose": "Somente para indicar sincronização em andamento." },
-      { "name": "count-update", "value": "450ms cubic ease-out", "purpose": "Transição de contagens operacionais quando os dados mudam." },
-      { "name": "reduced-motion", "value": "0.01ms", "purpose": "Desativa movimento quando prefers-reduced-motion está ativo." }
+      { "name": "drawer-enter", "value": "240ms cubic-bezier(.2,.8,.2,1)", "purpose": "Entrada e saída do drawer administrativo no mobile." },
+      { "name": "data-arc", "value": "550ms cubic-bezier(.2,.8,.2,1)", "purpose": "Atualização do arco de distribuição do dashboard." },
+      { "name": "micro-state", "value": "150ms ease", "purpose": "Hover, foco e seleção discretos em controles." },
+      { "name": "reduced-motion", "value": "0.01ms", "purpose": "Neutraliza transições e animações quando prefers-reduced-motion está ativo." }
     ],
     "breakpoints": [
-      { "name": "wide-density", "value": "1500px" },
-      { "name": "stack-primary", "value": "1180px" },
-      { "name": "stack-header", "value": "900px" },
-      { "name": "mobile-command", "value": "620px" }
+      { "name": "mobile-dense", "value": "620px" },
+      { "name": "shell-drawer", "value": "760px" },
+      { "name": "filter-stack", "value": "900px" },
+      { "name": "shell-compact", "value": "1040px" },
+      { "name": "master-detail-stack", "value": "1180px" }
     ]
   },
   "components": [
     {
-      "name": "Primary Command Button",
+      "name": "Primary Action Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "Ação principal sobre cabeçalhos verde-profundo.",
-      "html": "<button class=\"ds-btn-primary\">EXPORTAR RELATÓRIO</button>",
-      "css": ".ds-btn-primary { display:inline-flex; align-items:center; justify-content:center; min-height:43px; padding:0 16px; color:#09271b; background:#a7d9b6; border:1px solid #a7d9b6; border-radius:9px; font:700 .76rem/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; transition:transform 150ms ease,box-shadow 150ms ease; } .ds-btn-primary:hover { transform:translateY(-1px); box-shadow:0 8px 20px -14px rgba(0,0,0,.8); } .ds-btn-primary:focus-visible { outline:3px solid rgba(36,93,143,.32); outline-offset:2px; } .ds-btn-primary:active { transform:translateY(0); }"
+      "description": "Ação principal clara para criar ou concluir trabalho.",
+      "html": "<button class=\"ds-btn-primary\">NOVO CHAMADO</button>",
+      "css": ".ds-btn-primary{min-height:38px;display:inline-flex;align-items:center;justify-content:center;padding:0 14px;color:#fff;background:#14945a;border:1px solid #14945a;border-radius:8px;font:750 .72rem/1 'DM Sans',system-ui,sans-serif;transition:background 150ms ease}.ds-btn-primary:hover{background:#0d7c4a}.ds-btn-primary:focus-visible{outline:3px solid rgba(27,122,81,.2);outline-offset:2px}.ds-btn-primary:active{background:#075039}"
     },
     {
-      "name": "Secondary Command Button",
+      "name": "Command Header Button",
       "kind": "button",
-      "refersTo": "button-secondary",
-      "description": "Ação auxiliar discreta dentro de um cabeçalho escuro.",
-      "html": "<button class=\"ds-btn-secondary\">ATUALIZAR DADOS</button>",
-      "css": ".ds-btn-secondary { display:inline-flex; align-items:center; justify-content:center; min-height:42px; padding:0 14px; color:#edf6f0; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.16); border-radius:9px; font:700 .76rem/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; transition:background 150ms ease,border-color 150ms ease; } .ds-btn-secondary:hover { background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.25); } .ds-btn-secondary:focus-visible { outline:3px solid rgba(36,93,143,.55); outline-offset:2px; } .ds-btn-secondary:active { background:rgba(255,255,255,.16); }"
+      "refersTo": "button-command",
+      "description": "Ação de alto contraste dentro do cabeçalho evergreen do dashboard.",
+      "html": "<div class=\"ds-command-stage\"><button class=\"ds-btn-command\">ATUALIZAR PAINEL</button></div>",
+      "css": ".ds-command-stage{padding:18px;background:#063c2d;border-radius:14px}.ds-btn-command{min-height:42px;display:inline-flex;align-items:center;justify-content:center;padding:0 15px;color:#fff;background:#46bd73;border:1px solid #46bd73;border-radius:8px;font:750 .8rem/1 'DM Sans',system-ui,sans-serif;transition:background 150ms ease}.ds-btn-command:hover{background:#38aa65}.ds-btn-command:focus-visible{outline:3px solid rgba(255,255,255,.42);outline-offset:2px}.ds-btn-command:active{background:#2f9859}"
     },
     {
       "name": "Operational Field",
       "kind": "input",
       "refersTo": "field",
-      "description": "Campo claro para período, filtro ou busca administrativa.",
-      "html": "<label class=\"ds-field-label\">PERÍODO<input class=\"ds-field\" type=\"date\"></label>",
-      "css": ".ds-field-label { display:grid; gap:7px; color:#52645d; font:700 .7rem/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; letter-spacing:.04em; } .ds-field { width:100%; min-height:41px; padding:0 11px; color:#132a21; background:#fff; border:1px solid #bdc9c0; border-radius:9px; font:400 .78rem/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; transition:border-color 150ms ease,outline-color 150ms ease; } .ds-field:hover { border-color:#8fa196; } .ds-field:focus-visible { outline:3px solid rgba(36,93,143,.32); outline-offset:2px; border-color:#245d8f; }"
+      "description": "Campo de busca ou filtro com papel branco e foco evergreen.",
+      "html": "<label class=\"ds-field-label\">BUSCAR<input class=\"ds-field\" type=\"search\" placeholder=\"Número, assunto ou solicitante\"></label>",
+      "css": ".ds-field-label{display:grid;gap:7px;color:#64766e;font:800 .61rem/1.2 'DM Sans',system-ui,sans-serif;letter-spacing:.05em}.ds-field{min-height:40px;padding:0 12px;color:#102c22;background:#fff;border:1px solid #dde5df;border-radius:8px;font:400 .78rem/1.4 'DM Sans',system-ui,sans-serif;transition:border-color 150ms ease,box-shadow 150ms ease}.ds-field:hover{border-color:#b8c7bd}.ds-field:focus-visible{border-color:#1b7a51;outline:none;box-shadow:0 0 0 3px rgba(27,122,81,.13)}"
     },
     {
       "name": "Selected Priority Chip",
       "kind": "chip",
       "refersTo": "chip-selected",
-      "description": "Filtro ativo com contagem embutida e estado textual.",
-      "html": "<button class=\"ds-chip-selected\">URGENTES <span>4</span></button>",
-      "css": ".ds-chip-selected { display:inline-flex; align-items:center; gap:9px; min-height:34px; padding:0 10px; color:#fff; background:#103c2a; border:1px solid #103c2a; border-radius:999px; font:700 .72rem/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; transition:background 150ms ease; } .ds-chip-selected span { min-width:22px; padding:2px 6px; background:rgba(255,255,255,.16); border-radius:999px; text-align:center; } .ds-chip-selected:hover { background:#15553a; } .ds-chip-selected:focus-visible { outline:3px solid rgba(36,93,143,.32); outline-offset:2px; } .ds-chip-selected:active { background:#09271b; }"
+      "description": "Filtro rápido ativo com estado textual e contagem embutida.",
+      "html": "<button class=\"ds-chip-selected\">ALTA <span>8</span></button>",
+      "css": ".ds-chip-selected{min-height:32px;display:inline-flex;align-items:center;gap:6px;padding:0 10px;color:#fff;background:#075039;border:1px solid #075039;border-radius:999px;font:650 .68rem/1 'DM Sans',system-ui,sans-serif;transition:background 150ms ease}.ds-chip-selected span{min-width:20px;height:20px;display:grid;place-items:center;padding:0 5px;background:rgba(255,255,255,.16);border-radius:10px;font-size:.6rem}.ds-chip-selected:hover{background:#063c2d}.ds-chip-selected:focus-visible{outline:3px solid rgba(45,115,210,.25);outline-offset:2px}.ds-chip-selected:active{background:#102c22}"
     },
     {
-      "name": "KPI Ledger Cell",
-      "kind": "card",
-      "refersTo": "card-ledger",
-      "description": "Célula compacta que liga rótulo, número e evidência secundária.",
-      "html": "<article class=\"ds-kpi-cell\"><span class=\"ds-kpi-label\">CHAMADOS RESOLVIDOS</span><strong>148</strong><small>+12% em relação ao período anterior</small></article>",
-      "css": ".ds-kpi-cell { display:grid; gap:12px; min-height:150px; padding:22px; color:#132a21; background:#fffefa; border:1px solid #d8e0da; border-radius:14px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-variant-numeric:tabular-nums; transition:background 150ms ease,box-shadow 150ms ease; } .ds-kpi-label { color:#52645d; font-size:.68rem; font-weight:750; letter-spacing:.06em; } .ds-kpi-cell strong { font-size:3rem; line-height:1; letter-spacing:-.04em; } .ds-kpi-cell small { padding-top:11px; color:#52645d; border-top:1px solid #d8e0da; font-size:.76rem; } .ds-kpi-cell:hover { background:#fff; box-shadow:inset 0 0 0 1px #1d6b48; } .ds-kpi-cell:focus-within { outline:3px solid rgba(36,93,143,.32); outline-offset:2px; }"
-    },
-    {
-      "name": "Impact Ledger",
-      "kind": "custom",
-      "refersTo": "card-ledger",
-      "description": "Bloco assinatura que traduz operação em narrativa executiva e quatro evidências.",
-      "html": "<section class=\"ds-impact\"><div class=\"ds-impact-copy\"><h2>O trabalho da equipe, traduzido em resultado</h2><p>Volume, velocidade e qualidade no período selecionado.</p></div><div class=\"ds-impact-grid\"><div><span>RESOLVIDOS</span><strong>148</strong></div><div><span>PENDENTES</span><strong>21</strong></div><div><span>TEMPO MÉDIO</span><strong>3,2h</strong></div><div><span>SATISFAÇÃO</span><strong>94%</strong></div></div></section>",
-      "css": ".ds-impact { display:grid; grid-template-columns:.85fr 1.15fr; overflow:hidden; color:#fff; background:#103c2a; border-radius:14px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; } .ds-impact-copy { display:flex; flex-direction:column; justify-content:center; min-height:288px; padding:30px; } .ds-impact h2 { margin:0; max-width:480px; font-size:clamp(1.7rem,3vw,2.65rem); line-height:1.08; letter-spacing:-.035em; } .ds-impact p { margin:18px 0 0; color:#c8d8ce; line-height:1.6; } .ds-impact-grid { display:grid; grid-template-columns:repeat(2,1fr); background:rgba(255,255,255,.055); border-left:1px solid rgba(255,255,255,.11); } .ds-impact-grid div { display:flex; flex-direction:column; justify-content:space-between; gap:18px; min-height:144px; padding:25px; border-bottom:1px solid rgba(255,255,255,.11); } .ds-impact-grid div:nth-child(odd) { border-right:1px solid rgba(255,255,255,.11); } .ds-impact-grid span { color:#bcd0c3; font-size:.72rem; } .ds-impact-grid strong { font-size:clamp(2rem,3.4vw,3.2rem); line-height:1; letter-spacing:-.04em; font-variant-numeric:tabular-nums; } @media(max-width:700px){.ds-impact{grid-template-columns:1fr}.ds-impact-grid{border-left:0;border-top:1px solid rgba(255,255,255,.11)}}"
-    },
-    {
-      "name": "Active Navigation Item",
+      "name": "Evergreen Sidebar Navigation",
       "kind": "nav",
       "refersTo": "navigation-active",
-      "description": "Rota atual claramente marcada na navegação administrativa.",
-      "html": "<nav class=\"ds-nav\"><button class=\"ds-nav-item\">Painel</button><button class=\"ds-nav-item ds-nav-active\" aria-current=\"page\">Relatórios</button></nav>",
-      "css": ".ds-nav { display:flex; gap:4px; padding:8px; background:#0d1625; border-radius:12px; } .ds-nav-item { min-height:34px; padding:4px 10px; color:rgba(203,213,225,.8); background:transparent; border:1px solid transparent; border-radius:8px; font:600 .74rem/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; transition:background 150ms ease,color 150ms ease; } .ds-nav-item:hover { color:#fff; background:rgba(167,217,182,.08); } .ds-nav-item:focus-visible { outline:3px solid rgba(36,93,143,.55); outline-offset:2px; } .ds-nav-active { color:#fff; background:rgba(167,217,182,.13); border-color:rgba(167,217,182,.22); }"
+      "description": "Moldura administrativa fixa com rota ativa, contagem e saída no rodapé.",
+      "html": "<nav class=\"ds-sidebar\" aria-label=\"Navegação interna\"><strong>Portal Interno</strong><small>ADMINISTRAÇÃO</small><button class=\"ds-nav-item ds-nav-active\" aria-current=\"page\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" aria-hidden=\"true\"><path d=\"M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z\"/></svg><span>Painel</span></button><button class=\"ds-nav-item\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" aria-hidden=\"true\"><path d=\"M4 7h16v12H4zM7 4h10v3H7z\"/></svg><span>Chamados</span><b>12</b></button></nav>",
+      "css": ".ds-sidebar{width:236px;min-height:280px;display:flex;flex-direction:column;gap:4px;padding:22px 14px;color:#f4fbf7;background:#063c2d;border-right:1px solid rgba(255,255,255,.09);font-family:'DM Sans',system-ui,sans-serif}.ds-sidebar>strong{margin:8px 8px 0;color:#fff;font-size:.96rem}.ds-sidebar>small{margin:0 8px 18px;color:#64d892;font-size:.62rem;font-weight:700;letter-spacing:.08em}.ds-nav-item{min-height:44px;display:grid;grid-template-columns:22px 1fr auto;align-items:center;gap:10px;padding:0 12px;color:rgba(238,249,242,.8);background:transparent;border:1px solid transparent;border-radius:9px;font:550 .83rem/1 'DM Sans',system-ui,sans-serif;text-align:left;transition:background 150ms ease,color 150ms ease}.ds-nav-item svg{width:20px;height:20px}.ds-nav-item b{min-width:20px;height:20px;display:grid;place-items:center;padding:0 5px;color:#083d2e;background:#73d99c;border-radius:10px;font-size:.66rem}.ds-nav-item:hover{color:#fff;background:rgba(255,255,255,.075)}.ds-nav-item:focus-visible{outline:3px solid rgba(147,231,183,.35);outline-offset:2px}.ds-nav-active{color:#fff;background:rgba(124,218,160,.17);border-color:rgba(150,229,180,.12);box-shadow:inset 3px 0 0 #58d289}.ds-nav-active svg{color:#7ce0a4}"
     },
     {
-      "name": "Recoverable Error",
+      "name": "Dashboard KPI Cell",
+      "kind": "card",
+      "refersTo": "surface-operational",
+      "description": "Métrica compacta com ícone categórico, número tabular e evidência secundária.",
+      "html": "<article class=\"ds-kpi\"><span class=\"ds-kpi-icon\">↗</span><strong>24</strong><h3>Chamados abertos</h3><small>6 aguardam atendimento</small></article>",
+      "css": ".ds-kpi{min-height:154px;display:grid;grid-template-columns:42px 1fr;grid-template-rows:auto auto auto;align-content:start;column-gap:11px;padding:16px;color:#102c22;background:#fff;border:1px solid #dde5df;border-radius:12px;font-family:'DM Sans',system-ui,sans-serif;transition:background 150ms ease,border-color 150ms ease,box-shadow 150ms ease}.ds-kpi-icon{grid-row:1/4;width:40px;height:40px;display:grid;place-items:center;color:#188f55;background:#eaf6ef;border-radius:50%}.ds-kpi strong{font-size:2rem;font-weight:780;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.035em}.ds-kpi h3{margin:8px 0 0;color:#304a40;font-size:.72rem}.ds-kpi small{margin-top:7px;color:#198953;font-size:.66rem;font-weight:650}.ds-kpi:hover{background:#fbfdfc;border-color:#aebfb4;box-shadow:0 12px 28px -24px rgba(15,61,44,.65)}.ds-kpi:focus-within{outline:3px solid rgba(45,115,210,.22);outline-offset:2px}"
+    },
+    {
+      "name": "Filter and Day Summary Ledger",
       "kind": "custom",
-      "description": "Falha operacional textual com uma próxima ação clara.",
-      "html": "<div class=\"ds-error\" role=\"alert\"><div><strong>Não foi possível atualizar os dados</strong><span>Os números exibidos podem estar desatualizados.</span></div><button>TENTAR NOVAMENTE</button></div>",
-      "css": ".ds-error { display:flex; align-items:center; justify-content:space-between; gap:18px; padding:14px 16px; color:#7f2d28; background:#fbeae8; border:1px solid #edc4bf; border-radius:10px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; } .ds-error div { display:grid; gap:3px; } .ds-error span { font-size:.74rem; } .ds-error button { min-height:38px; padding:0 12px; color:#7f2d28; background:#fff; border:1px solid #dca6a0; border-radius:8px; font-size:.72rem; font-weight:720; } .ds-error button:hover { background:#fff7f6; } .ds-error button:focus-visible { outline:3px solid rgba(36,93,143,.32); outline-offset:2px; } .ds-error button:active { background:#fbeae8; }"
+      "refersTo": "surface-operational",
+      "description": "Filtros de departamento e prioridade anexados a um resumo regrado do dia.",
+      "html": "<section class=\"ds-filter-ledger\"><div class=\"ds-filter-stack\"><div class=\"ds-filter-row\"><b>DEPARTAMENTO</b><button class=\"ds-tab-active\">TI</button><button>RH</button></div><div class=\"ds-filter-row\"><b>PRIORIDADE</b><button class=\"ds-chip-active\">ALTA <span>8</span></button><button>MÉDIA <span>5</span></button></div></div><div class=\"ds-day-summary\"><div><strong>18</strong><small>ABERTOS</small></div><div><strong>11</strong><small>RESOLVIDOS</small></div><div class=\"ds-progress\"><span><i></i></span><small>61% resolvidos hoje</small></div></div></section>",
+      "css": ".ds-filter-ledger{display:grid;grid-template-columns:minmax(340px,1fr) 360px;gap:14px;color:#102c22;font-family:'DM Sans',system-ui,sans-serif}.ds-filter-stack{display:grid}.ds-filter-row{min-height:54px;display:flex;align-items:center;gap:6px;padding:6px 14px;background:#fff;border:1px solid #dde5df}.ds-filter-row:first-child{border-bottom:0;border-radius:10px 10px 0 0}.ds-filter-row:last-child{border-radius:0 0 10px 10px}.ds-filter-row>b{margin-right:4px;color:#6a7a73;font-size:.61rem;letter-spacing:.05em}.ds-filter-row button{min-height:34px;padding:0 12px;color:#54675f;background:transparent;border:1px solid transparent;border-radius:7px;font:650 .7rem/1 'DM Sans',system-ui,sans-serif}.ds-filter-row button:hover{background:#edf6f1}.ds-filter-row button:focus-visible{outline:3px solid rgba(45,115,210,.22);outline-offset:2px}.ds-filter-row .ds-tab-active,.ds-filter-row .ds-chip-active{color:#fff;background:#075039;border-color:#075039}.ds-filter-row button span{margin-left:5px;padding:2px 5px;background:rgba(255,255,255,.16);border-radius:10px}.ds-day-summary{display:grid;grid-template-columns:95px 105px 1fr;overflow:hidden;background:#fff;border:1px solid #dde5df;border-radius:10px}.ds-day-summary>div{display:grid;align-content:center;gap:3px;padding:0 16px;border-right:1px solid #dde5df}.ds-day-summary>div:last-child{border-right:0}.ds-day-summary strong{color:#087b49;font-size:1.45rem}.ds-day-summary small{color:#4e6258;font-size:.62rem}.ds-progress span{height:6px;overflow:hidden;background:#e8eeea;border-radius:999px}.ds-progress i{display:block;width:61%;height:100%;background:#14945a;border-radius:999px}@media(max-width:700px){.ds-filter-ledger{grid-template-columns:1fr}.ds-day-summary{min-height:74px}}"
+    },
+    {
+      "name": "Continuous Ticket Queue Row",
+      "kind": "card",
+      "refersTo": "surface-operational",
+      "description": "Linha selecionável de uma fila contínua, com prioridade, SLA e responsável explícitos.",
+      "html": "<div class=\"ds-queue\"><button class=\"ds-ticket-row ds-ticket-active\"><strong>#1842 · Acesso ao sistema financeiro</strong><small>Solicitante: Maria Silva</small><span class=\"ds-ticket-meta\"><b>ALTA</b><em>Meta de SLA · 2h</em><i>João · TI</i></span></button><button class=\"ds-ticket-row\"><strong>#1841 · Notebook sem conexão</strong><small>Solicitante: Paulo Lima</small><span class=\"ds-ticket-meta\"><b>MÉDIA</b><em>Meta de SLA · 5h</em><i>Não atribuído</i></span></button></div>",
+      "css": ".ds-queue{overflow:hidden;background:#fff;border:1px solid #dde5df;border-radius:0 0 11px 11px;font-family:'DM Sans',system-ui,sans-serif}.ds-ticket-row{width:100%;display:grid;gap:4px;padding:14px;color:#102c22;background:#fff;border:0;border-bottom:1px solid #e7ece9;text-align:left;transition:background 150ms ease,box-shadow 150ms ease}.ds-ticket-row:last-child{border-bottom:0}.ds-ticket-row>strong{font-size:.79rem}.ds-ticket-row>small{color:#64766e;font-size:.64rem}.ds-ticket-meta{display:flex;align-items:center;gap:7px;margin-top:5px;padding-top:8px;border-top:1px dashed #e2e8e4}.ds-ticket-meta b,.ds-ticket-meta em{padding:4px 7px;border-radius:999px;font-size:.56rem;font-style:normal}.ds-ticket-meta b{color:#8a4f0f;background:#fff3e7}.ds-ticket-meta em{color:#40564c;background:#f1f4f2}.ds-ticket-meta i{margin-left:auto;color:#586b62;font-size:.61rem;font-style:normal}.ds-ticket-row:hover{background:#f7fbf8}.ds-ticket-row:focus-visible{outline:3px solid rgba(45,115,210,.22);outline-offset:-3px}.ds-ticket-active{background:#eef8f2;box-shadow:inset 0 0 0 1px #6abb8d}"
+    },
+    {
+      "name": "Sticky Ticket Detail Panel",
+      "kind": "custom",
+      "refersTo": "surface-operational",
+      "description": "Contexto acionável da seleção com metadados, ações e descrição em uma coluna regrada.",
+      "html": "<article class=\"ds-detail\"><header><span>#1842</span><h2>Acesso ao sistema financeiro</h2></header><div class=\"ds-detail-meta\">Aberto hoje · Prioridade alta · TI</div><div class=\"ds-detail-actions\"><button>ATRIBUIR A MIM</button><button class=\"ds-detail-ghost\">AGUARDAR</button></div><section><h3>DESCRIÇÃO</h3><p>Usuária precisa recuperar o acesso para concluir o fechamento do setor.</p></section><section><h3>CONTEXTO</h3><p>Solicitante: Maria Silva · Setor solicitante: Financeiro</p></section></article>",
+      "css": ".ds-detail{overflow:hidden;color:#102c22;background:#fff;border:1px solid #dde5df;border-radius:11px;font-family:'DM Sans',system-ui,sans-serif}.ds-detail header{padding:18px 20px;border-bottom:1px solid #dde5df}.ds-detail header span{color:#0e8750;font-size:.66rem;font-weight:800}.ds-detail h2{margin:6px 0 0;font-size:1.05rem;line-height:1.25}.ds-detail-meta{padding:10px 20px 14px;color:#64766e;border-bottom:1px solid #dde5df;font-size:.68rem}.ds-detail-actions{display:grid;grid-template-columns:1fr auto;gap:8px;padding:16px 20px;border-bottom:1px solid #dde5df}.ds-detail-actions button{min-height:38px;padding:0 12px;color:#fff;background:#0d8750;border:1px solid #0d8750;border-radius:7px;font:750 .66rem/1 'DM Sans',system-ui,sans-serif}.ds-detail-actions .ds-detail-ghost{color:#087347;background:#fff;border-color:#14945a}.ds-detail-actions button:hover{filter:brightness(.94)}.ds-detail-actions button:focus-visible{outline:3px solid rgba(45,115,210,.22);outline-offset:2px}.ds-detail section{padding:16px 20px;border-bottom:1px solid #dde5df}.ds-detail section:last-child{border-bottom:0}.ds-detail h3{margin:0 0 8px;color:#60736a;font-size:.59rem;letter-spacing:.045em}.ds-detail p{margin:0;color:#2d453b;font-size:.72rem;line-height:1.6}"
     }
   ],
   "narrative": {
-    "northStar": "The Operational Impact Ledger",
-    "overview": "O sistema visual trata a operação de TI como um livro de evidências vivo: sóbrio, confiável e rápido de ler. O verde-esmeralda institucional cria o mundo de comando; superfícies de papel levemente aquecido organizam métricas, filas e relatos sem parecer uma coleção genérica de cartões. A densidade é alta, mas cada bloco tem hierarquia explícita, números tabulares e divisões regradas que favorecem leitura em varredura.\n\nA experiência deve conduzir uma narrativa operacional completa: primeiro mostrar onde há atenção e qual é o ritmo atual, depois permitir executar a fila e, por fim, traduzir o trabalho em impacto para a liderança. O cabeçalho da primeira viewport sempre estabelece contexto e estado; a informação priorizada vem imediatamente abaixo. Estados de carregamento, falha e sucesso são parte do sistema, não acabamento opcional.",
+    "northStar": "The Institutional Operations Desk",
+    "overview": "A interface administrativa é uma central de operações institucional, não uma barra genérica sobre uma grade de cartões. A moldura evergreen permanece fixa e reconhecível durante o expediente; dentro dela, a topbar branca funciona como uma faixa de utilidades e o canvas mineral recebe superfícies brancas, planas e regradas. O resultado é sóbrio, humano e operacional: denso o bastante para trabalhar, hierárquico o bastante para decidir sem reler.\n\nO percurso visual é sempre o mesmo: reconhecer o escopo atual, ler a saúde da operação, entrar na fila e agir com contexto. O dashboard entrega estado, indicadores, desempenho e ações em capítulos claros; a Central de Chamados aproxima filtros rápidos, resumo do dia, fila contínua e detalhe acionável. A cor aparece quando há uma ação, seleção ou estado real — nunca para compensar falta de hierarquia.",
     "keyCharacteristics": [
-      "Verde profundo para contexto de comando; papel e canvas quentes para trabalho prolongado.",
-      "Divisões de ledger, tabelas e listas contínuas no lugar de mosaicos soltos.",
-      "Tipografia de sistema precisa, números tabulares e títulos compactos de alto contraste.",
-      "Cor semântica reservada para prioridade, SLA, risco e estado real.",
-      "Responsividade que reorganiza a hierarquia sem esconder controles essenciais."
+      "Sidebar evergreen fixa com rota ativa marcada por lavagem verde e filete interno.",
+      "Topbar branca e calma para busca global, data, notificações e identidade do usuário.",
+      "Canvas mineral com superfícies brancas delimitadas por linhas frias de 1px.",
+      "Hierarquia tipográfica compacta em DM Sans e números operacionais tabulares.",
+      "Dashboard em capítulos: comando, indicadores, desempenho, atividade, prioridade e atalhos.",
+      "Fila em composição mestre–detalhe, com filtros e resumo do dia antes da lista.",
+      "Cor semântica e movimento contido, sempre ligados a estado ou feedback real."
     ],
     "rules": [
-      { "name": "The Evidence Color Rule", "body": "Verde, azul, âmbar e vermelho devem comunicar significado operacional; não decorar áreas sem estado.", "section": "colors" },
-      { "name": "The Paper-and-Ink Rule", "body": "Conteúdo denso vive em papel quente com tinta florestal. Branco puro aparece apenas em controles, realces e estados ativos.", "section": "colors" },
-      { "name": "The Number-Is-Evidence Rule", "body": "Valores operacionais importantes usam alinhamento e numerais tabulares; nunca variam de posição durante atualização.", "section": "typography" },
-      { "name": "The Two-Level Scan Rule", "body": "Cada região começa com uma decisão ou número e termina com contexto; evite mais de dois níveis de texto competindo dentro da mesma célula.", "section": "typography" },
-      { "name": "The Priority-First Rule", "body": "A primeira viewport contém estado atual e resumo priorizado; gráficos exploratórios e histórico vêm depois.", "section": "layout" },
-      { "name": "The Ledger Continuity Rule", "body": "Métricas relacionadas compartilham uma moldura e divisores de 1px; não as fragmente em cartões flutuantes sem relação visual.", "section": "layout" },
-      { "name": "The Flat-by-Default Rule", "body": "Superfícies de trabalho ficam planas em repouso; sombra não substitui borda, contraste ou hierarquia.", "section": "elevation" },
-      { "name": "The Outer-Silhouette Rule", "body": "Arredonde a moldura do conjunto, não cada célula de uma grade. A continuidade visual é parte da linguagem de ledger.", "section": "shapes" }
+      { "name": "The State-Earns-Color Rule", "body": "Verde, azul, violeta, laranja e vermelho só entram quando existe ação, seleção, categoria analítica ou estado real para comunicar.", "section": "colors" },
+      { "name": "The Evergreen Frame Rule", "body": "O evergreen pertence à moldura persistente e às seleções; grandes áreas de conteúdo permanecem claras para leitura prolongada.", "section": "colors" },
+      { "name": "The White-Surface Rule", "body": "O branco organiza conteúdo e controle sobre o canvas mineral; ele não deve virar uma coleção de cartões soltos sem relação.", "section": "colors" },
+      { "name": "The Number-Is-Evidence Rule", "body": "Contagens, percentuais, horas e posição de fila usam numerais tabulares e permanecem alinhados durante atualização.", "section": "typography" },
+      { "name": "The Compact-Authority Rule", "body": "Títulos administrativos são compactos e densos; escala exagerada não substitui uma ordem de leitura clara.", "section": "typography" },
+      { "name": "The Fixed-Frame Rule", "body": "A navegação lateral e a topbar definem o mundo; conteúdo, filtros e detalhe se organizam dentro dessa moldura, sem uma segunda barra genérica concorrente.", "section": "layout" },
+      { "name": "The Context-Before-Queue Rule", "body": "Escopo, atualização, filtros e ação principal aparecem antes da lista; a fila nunca começa sem explicar o que está sendo mostrado.", "section": "layout" },
+      { "name": "The Continuous-Queue Rule", "body": "Chamados são linhas de uma fila contínua, separadas por divisores e estados de seleção; não são cartões flutuantes independentes.", "section": "layout" },
+      { "name": "The Flat-by-Default Rule", "body": "Se uma borda, divisor ou fundo tonal explica a relação, não adicione sombra.", "section": "elevation" },
+      { "name": "The Inset-State Rule", "body": "Seleção acontece dentro da geometria existente — filete, contorno interno ou lavagem — e não por elevação dramática.", "section": "elevation" },
+      { "name": "The Outer-Silhouette Rule", "body": "Arredonde a moldura externa do conjunto; células internas, linhas de fila e métricas anexadas compartilham bordas retas.", "section": "shapes" },
+      { "name": "The Pill-Means-Status Rule", "body": "Uma pílula deve carregar estado, filtro ou contagem breve; nunca é ornamento.", "section": "shapes" }
     ],
     "dos": [
-      "Do começar páginas administrativas com um cabeçalho de comando que declare contexto, estado e ação principal.",
-      "Do agrupar métricas comparáveis em ledgers contínuos com divisores de 1px.",
-      "Do manter carregamento, erro, vazio, sucesso e atualização visíveis e honestos.",
-      "Do preservar rótulos explícitos junto a cor, especialmente em prioridade, SLA e falha.",
-      "Do manter 44px como mínimo de alvo interativo em telas de até 620px."
+      "Do manter sidebar evergreen e topbar de papel como moldura persistente da operação administrativa.",
+      "Do colocar contexto, escopo, atualização, filtros e ação principal na primeira viewport.",
+      "Do organizar dashboard e fila por capítulos, faixas anexadas, listas contínuas e divisores de 1px.",
+      "Do usar DM Sans, pesos compactos e números tabulares para leitura em varredura.",
+      "Do manter estados de carregamento, erro, vazio, atualização, exportação e sucesso textualmente claros.",
+      "Do preservar distinção entre equipe responsável, setor solicitante e fila responsável.",
+      "Do comunicar posição e Meta de SLA como estimativas operacionais sujeitas a prioridade e impacto.",
+      "Do garantir foco visível, aria-current, rótulos além da cor e alvos mínimos de 44px no mobile."
     ],
     "donts": [
-      "Don't usar gradientes coloridos, ícones decorativos ou sombras pesadas para fabricar importância.",
-      "Don't inventar métricas ou apresentar dados antigos como atualizados.",
-      "Don't transformar todo dado em cartão arredondado independente; preserve relações em grades, listas e tabelas.",
-      "Don't esconder navegação ou ações essenciais no mobile sem um controle de abertura explícito.",
-      "Don't depender só de cor para comunicar estado, prioridade ou resultado de exportação."
+      "Don't voltar a uma barra horizontal genérica ou a uma grade de cartões sem hierarquia.",
+      "Don't usar cor sem estado, categoria analítica ou ação real que a justifique.",
+      "Don't transformar linhas de chamados, métricas anexadas ou resumos em cartões flutuantes independentes.",
+      "Don't esconder o escopo atual ou misturar equipe responsável com setor solicitante.",
+      "Don't apresentar posição, ordem ou prazo como promessa; use estimativas e “Meta de SLA”.",
+      "Don't usar gradientes decorativos, sombras pesadas, ícones ornamentais ou animação contínua para fabricar importância.",
+      "Don't esconder navegação, filtros essenciais ou ação primária no mobile sem um controle explícito."
     ]
   }
 }

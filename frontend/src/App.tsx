@@ -67,6 +67,8 @@ import Navigation from './components/Navigation';
 import InternalProtectedRoute from './components/InternalProtectedRoute';
 import { NotificationProvider } from './contexts/NotificationContext';
 import './styles/AdminExperience.css';
+import './styles/AdminReferenceRedesign.css';
+import './styles/AdminUnifiedPages.css';
 
 function App() {
   const { loadStoredUser } = useAuthStore();

@@ -23,7 +23,7 @@ O portal conecta o atendimento de chamados aos ativos e às rotinas internas da 
 - Uso recorrente em desktop pela equipe interna durante o expediente.
 - Dashboard para leitura rápida da saúde da operação.
 - Página de chamados para triagem, filtros, atribuição e acompanhamento.
-- Relatórios para análise por período, equipe, status, prioridade e SLA.
+- Relatórios para análise por período, equipe responsável (TI, RH ou Administrativo), setor solicitante, status, prioridade e SLA, com o escopo atual sempre visível.
 - Apresentação de resultados para coordenação e liderança.
 
 ## Capabilities and Constraints
@@ -31,6 +31,8 @@ O portal conecta o atendimento de chamados aos ativos e às rotinas internas da 
 - Aplicação React e TypeScript existente; manter rotas, integrações de API e permissões por perfil.
 - Preservar os termos já usados no produto: chamados, ativos, inventário, SLA, equipe e relatórios.
 - Não inventar métricas que a API não fornece; indicadores derivados devem usar apenas dados já disponíveis.
+- Tratar equipe responsável e setor solicitante como dimensões distintas: a primeira define quem atende; a segunda identifica de onde veio a demanda.
+- Posição de fila e SLA são estimativas operacionais. Usar “Meta de SLA” e avisos de reordenação por impacto; nunca comunicar prazo ou ordem como promessa.
 - Interface responsiva e utilizável em telas menores, embora o contexto principal seja desktop.
 
 ## Brand Commitments
@@ -53,6 +55,7 @@ O portal conecta o atendimento de chamados aos ativos e às rotinas internas da 
 - Densidade com legibilidade: permitir leitura rápida sem esconder informação útil.
 - Uma operação, três perspectivas: executar no dashboard e chamados; explicar nos relatórios.
 - Confiança por honestidade: estados vazios, falhas e métricas devem ser claros e nunca decorativos.
+- Transparência sem promessa: mostrar posição estimada, quantidade à frente e total da fila quando disponíveis, explicando que prioridade e impacto podem alterar a ordem.
 
 ## Accessibility & Inclusion
 

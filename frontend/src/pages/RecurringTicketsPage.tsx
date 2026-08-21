@@ -63,7 +63,7 @@ export default function RecurringTicketsPage() {
   };
 
   return (
-    <div style={{ padding: '1.5rem', maxWidth: 900, margin: '0 auto' }}>
+    <div className="recurring-tickets-page">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
         <div>
           <h1 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: 0 }}>Chamados Recorrentes</h1>

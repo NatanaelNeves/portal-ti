@@ -90,7 +90,6 @@ export default function AdminTicketsPage() {
   const [filterPriority, setFilterPriority] = useState<'high' | 'medium' | 'low' | null>(null);
   const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'mine' | 'unassigned'>('all');
   const [currentUserId, setCurrentUserId] = useState<string>('');
-  const [currentUserName, setCurrentUserName] = useState<string>('');
   const [stats, setStats] = useState<TicketStats>({
     waitingUser: 0,
     inProgress: 0,
@@ -137,7 +136,6 @@ export default function AdminTicketsPage() {
     try {
       const user = JSON.parse(userData);
       setCurrentUserId(user.id || '');
-      setCurrentUserName(user.name || '');
       setUserRole(user.role || '');
       setCurrentPage(1);
 
@@ -473,6 +471,10 @@ export default function AdminTicketsPage() {
       console.log('  - Awaiting Confirmation:', ticketList.filter((t: Ticket) => t.status === 'aguardando_confirmacao').length);
       
       setTickets(ticketList);
+      setSelectedTicket((current) => {
+        if (current && ticketList.some((ticket: Ticket) => ticket.id === current.id)) return current;
+        return ticketList[0] || null;
+      });
 
       // Resumo executivo: usa stats da consulta sem filtros da lista
       if (summaryData?.stats) {
@@ -661,13 +663,6 @@ export default function AdminTicketsPage() {
     setCurrentPage(1);
   };
 
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Bom dia';
-    if (hour < 18) return 'Boa tarde';
-    return 'Boa noite';
-  };
-
   const getSLAThresholdHours = (priority: string) => {
     if (priority === 'critical') return 4;
     if (priority === 'high') return 24;
@@ -754,15 +749,10 @@ export default function AdminTicketsPage() {
     <div className="admin-tickets-dashboard">
       <header className="dashboard-header card">
         <div className="dashboard-header-main">
-          <h1>
-            {departmentFilter === 'administrativo' ? 'Central Operacional Administrativa'
-              : departmentFilter === 'rh' ? 'Central Operacional RH'
-              : 'Central Operacional TI'}
-          </h1>
+          <h1>Central de Chamados</h1>
           <p className="dashboard-greeting">
-            {getGreeting()}{currentUserName ? `, ${currentUserName.split(' ')[0]}` : ''}. Hoje existem{' '}
-            <strong>{animatedQueueCount} chamados</strong> na fila
-            {myTicketsCount > 0 ? <> e <strong>{animatedMyCount}</strong> atribuídos a você</> : null}.
+            Gerencie e acompanhe os chamados da equipe
+            {departmentFilter ? ` de ${departmentFilter === 'rh' ? 'RH' : departmentFilter === 'ti' ? 'TI' : 'Administrativo'}` : ''}.
           </p>
         </div>
         <div className="dashboard-header-status">
@@ -770,18 +760,16 @@ export default function AdminTicketsPage() {
             <span className="status-dot" aria-hidden="true"></span>
             <span>{formattedLastUpdate}</span>
           </span>
-          <span className="status-chip">
-            <strong>{animatedQueueCount}</strong> na fila
-          </span>
-          <span className="status-chip">
-            <strong>{animatedMyCount}</strong> meus atendimentos
-          </span>
+          <button type="button" className="header-new-ticket" onClick={() => navigate('/abrir-chamado')}>
+            <i className="ti ti-plus" aria-hidden="true" /> Novo chamado
+          </button>
         </div>
       </header>
 
-      {/* Department Tabs - visible for admin and manager */}
-      {(userRole === 'admin' || userRole === 'manager') && (
-        <div className="department-tabs">
+      <section className="ticket-filter-ledger" aria-label="Filtros e resumo da fila">
+        {/* Department Tabs - visible for admin and manager */}
+        {(userRole === 'admin' || userRole === 'manager') && (
+          <div className="department-tabs">
           <button
             className={`dept-tab dept-tab--all ${departmentFilter === '' ? 'active' : ''}`}
             onClick={() => { setDepartmentFilter(''); setCurrentPage(1); }}
@@ -816,8 +804,8 @@ export default function AdminTicketsPage() {
             <span>{error}</span>
           </div>
           <button type="button" onClick={fetchTickets}>Tentar novamente</button>
-        </div>
-      )}
+          </div>
+        )}
 
       {hasAdvancedFilters && (
         <div className="filters-warning">
@@ -878,6 +866,7 @@ export default function AdminTicketsPage() {
           )}
         </div>
       </div>
+      </section>
 
       {priorityFeedback && (
         <div className="priority-feedback" role="status" aria-live="polite">
@@ -1129,10 +1118,27 @@ export default function AdminTicketsPage() {
                     try {
                       const token = localStorage.getItem('internal_token');
                       const p = new URLSearchParams();
+                      const hasAdvancedFilters = selectedStatuses.length > 0 || selectedPriorities.length > 0 || searchText.trim() !== '';
+                      const activeStatuses = ['open', 'in_progress', 'waiting_user', 'aguardando_confirmacao'];
                       const deptForExport = userRole === 'admin_staff' ? 'administrativo' : userRole === 'it_staff' ? 'ti' : departmentFilter;
+                      const assignmentForExport = userRole === 'admin_staff' ? 'mine' : assignmentFilter;
                       if (deptForExport) p.append('department', deptForExport);
-                      selectedStatuses.forEach(s => p.append('status', s));
-                      selectedPriorities.forEach(pr => p.append('priority', pr));
+                      if (selectedStatuses.length > 0) {
+                        selectedStatuses.forEach(s => p.append('status', s));
+                      } else if (!hasAdvancedFilters) {
+                        if (filterStatus === 'all') activeStatuses.forEach(s => p.append('status', s));
+                        else p.append('status', filterStatus);
+                      }
+                      if (selectedPriorities.length > 0) {
+                        selectedPriorities
+                          .flatMap(priority => priority === 'high' ? ['high', 'urgent'] : [priority])
+                          .forEach(priority => p.append('priority', priority));
+                      } else if (!hasAdvancedFilters && filterPriority) {
+                        (filterPriority === 'high' ? ['high', 'urgent'] : [filterPriority])
+                          .forEach(priority => p.append('priority', priority));
+                      }
+                      if (assignmentForExport === 'mine' && currentUserId) p.append('assigned_to', currentUserId);
+                      else if (assignmentForExport === 'unassigned') p.append('assigned_to', 'unassigned');
                       if (searchText.trim()) p.append('search', searchText.trim());
                       if (dateFrom) p.append('date_from', dateFrom);
                       if (dateTo) p.append('date_to', new Date(dateTo + 'T23:59:59').toISOString());

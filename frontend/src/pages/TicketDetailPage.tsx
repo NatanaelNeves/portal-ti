@@ -27,6 +27,14 @@ interface TicketDetail {
   feedback?: string | null;
   rated_at?: string | null;
   sla_due_at?: string | null;
+  queue_visibility?: {
+    state: 'waiting' | 'in_service';
+    position: number | null;
+    ahead: number;
+    totalWaiting: number | null;
+    priorityCanChangeOrder?: boolean;
+    updatedAt: string;
+  } | null;
 }
 
 interface Message {
@@ -56,7 +64,7 @@ const formatEstimatedTime = (slaDueAt: string | null | undefined, nowMs: number)
   const diffMs = dueMs - nowMs;
 
   if (diffMs <= 0) {
-    return '⚠️ Prazo estimado excedido — sua equipe já foi notificada';
+    return 'Meta de SLA excedida — a equipe responsável deve atualizar o chamado';
   }
 
   const diffHours = diffMs / (1000 * 60 * 60);
@@ -64,13 +72,13 @@ const formatEstimatedTime = (slaDueAt: string | null | undefined, nowMs: number)
     const hours = Math.floor(diffHours);
     const minutes = Math.round((diffHours - hours) * 60);
     const parts = [hours > 0 ? `${hours}h` : '', minutes > 0 ? `${minutes}min` : ''].filter(Boolean);
-    return `⏱️ Prazo estimado: em até ${parts.join(' ')}`;
+    return `Meta de SLA para atendimento: em até ${parts.join(' ')}`;
   }
 
   const dueDate = new Date(slaDueAt);
   const formattedDate = dueDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
   const formattedTime = dueDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  return `⏱️ Prazo estimado: até ${formattedDate} às ${formattedTime}`;
+  return `Meta de SLA para atendimento: até ${formattedDate} às ${formattedTime}`;
 };
 
 export default function TicketDetailPage() {
@@ -506,6 +514,7 @@ export default function TicketDetailPage() {
       case 'low': return 'Baixa';
       case 'medium': return 'Média';
       case 'high': return 'Alta';
+      case 'urgent': return 'Urgente';
       case 'critical': return 'Crítica';
       default: return priority || '—';
     }
@@ -549,6 +558,7 @@ export default function TicketDetailPage() {
           department={ticket.department}
           lastUpdate={ticket.updated_at}
           estimatedTime={formatEstimatedTime(ticket.sla_due_at, nowMs)}
+          queueVisibility={ticket.queue_visibility}
         />
 
         {ticket.status === 'aguardando_confirmacao' && (

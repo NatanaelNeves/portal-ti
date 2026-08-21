@@ -43,6 +43,11 @@ interface DashboardData {
   ticketIndicators: TicketIndicators;
   assets: AssetIndicators;
   recentActivity: RecentActivityItem[];
+  filters?: {
+    serviceDepartment: 'all' | 'ti' | 'rh' | 'administrativo';
+    serviceDepartmentLabel: string;
+    canSelectServiceDepartment: boolean;
+  };
 }
 
 const EMPTY_DASHBOARD_DATA: DashboardData = {
@@ -102,6 +107,7 @@ const normalizeDashboardData = (payload: Partial<DashboardData>): DashboardData 
       addedThisMonth: payload.assets?.addedThisMonth ?? 0,
     },
     recentActivity: Array.isArray(payload.recentActivity) ? payload.recentActivity : [],
+    filters: payload.filters,
   };
 };
 
@@ -248,11 +254,55 @@ const QA_ICONS = {
   ),
 };
 
+const DONUT_COLORS = ['#28a967', '#2d73d2', '#ed8a22', '#7f56c5', '#d9464f', '#8ca097'];
+
+const DonutChart = ({
+  entries,
+  total,
+  centerLabel,
+}: {
+  entries: Array<{ label: string; count: number }>;
+  total: number;
+  centerLabel: string;
+}) => {
+  const radius = 46;
+  const circumference = 2 * Math.PI * radius;
+  let accumulated = 0;
+
+  return (
+    <div className="donut-visual">
+      <svg viewBox="0 0 120 120" role="img" aria-label={`${centerLabel}: ${total}`}>
+        <circle className="donut-track" cx="60" cy="60" r={radius} />
+        {entries.map((entry, index) => {
+          const fraction = total > 0 ? entry.count / total : 0;
+          const segment = circumference * fraction;
+          const offset = circumference * accumulated;
+          accumulated += fraction;
+          return (
+            <circle
+              key={`${entry.label}-${index}`}
+              className="donut-segment"
+              cx="60"
+              cy="60"
+              r={radius}
+              stroke={DONUT_COLORS[index % DONUT_COLORS.length]}
+              strokeDasharray={`${segment} ${Math.max(0, circumference - segment)}`}
+              strokeDashoffset={-offset}
+            />
+          );
+        })}
+      </svg>
+      <span className="donut-center"><strong>{total}</strong><small>{centerLabel}</small></span>
+    </div>
+  );
+};
+
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
   const [data, setData] = useState<DashboardData>(EMPTY_DASHBOARD_DATA);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [serviceDepartment, setServiceDepartment] = useState<'all' | 'ti' | 'rh' | 'administrativo'>('all');
 
   useEffect(() => {
     const token = localStorage.getItem('internal_token');
@@ -279,21 +329,29 @@ export default function AdminDashboardPage() {
       }
     }
 
-    void fetchDashboardData();
-  }, [navigate]);
+    const controller = new AbortController();
+    void fetchDashboardData(controller.signal);
+    return () => controller.abort();
+  }, [navigate, serviceDepartment]);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async (signal?: AbortSignal) => {
     try {
       setLoading(true);
-      const response = await api.get<Partial<DashboardData>>('/dashboard/admin', { timeout: 15000 });
+      const response = await api.get<Partial<DashboardData>>('/dashboard/admin', {
+        params: serviceDepartment === 'all' ? undefined : { department: serviceDepartment },
+        signal,
+        timeout: 15000,
+      });
       setData(normalizeDashboardData(response.data ?? {}));
       setError('');
     } catch (err: any) {
       const message = err.response?.data?.error || err.message || 'Erro ao carregar dashboard';
-      setError(message);
-      console.error('Dashboard fetch error:', err);
+      if (err?.code !== 'ERR_CANCELED') {
+        setError(message);
+        console.error('Dashboard fetch error:', err);
+      }
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   };
 
@@ -400,6 +458,7 @@ export default function AdminDashboardPage() {
 
   let userName = 'Equipe';
   let canManageUsers = false;
+  let canSelectServiceDepartment = false;
 
   const internalUserRaw = localStorage.getItem('internal_user');
   if (internalUserRaw) {
@@ -407,9 +466,11 @@ export default function AdminDashboardPage() {
       const parsedUser = JSON.parse(internalUserRaw) as { name?: string; role?: string };
       userName = parsedUser.name?.trim() || 'Equipe';
       canManageUsers = parsedUser.role === 'admin' || parsedUser.role === 'it_staff';
+      canSelectServiceDepartment = parsedUser.role === 'admin';
     } catch {
       userName = 'Equipe';
       canManageUsers = false;
+      canSelectServiceDepartment = false;
     }
   }
 
@@ -538,286 +599,96 @@ export default function AdminDashboardPage() {
     );
   };
 
+  const assetDonutEntries = assetStatusEntries.map((entry) => ({ label: entry.label, count: entry.count }));
+  const statusDonutEntries = statusEntries.map(([status, count]) => ({ label: getStatusLabel(status), count }));
+
   return (
     <div className="admin-dashboard-page">
-
-      {/* ── Clean header ── */}
       <header className="ops-dashboard-header">
         <div className="ops-header-content">
           <h1 className="ops-greeting">{getGreeting()}, <span className="ops-greeting-accent">{userName}</span></h1>
-          <p className="ops-subtitle">Painel operacional da TI — chamados, ativos e movimentações.</p>
+          <p className="ops-subtitle">Painel operacional — chamados, ativos e movimentações.</p>
           <div className={`ops-live-badge ${loading ? 'is-syncing' : error ? 'is-offline' : 'is-live'}`}>
             <span className="ops-live-dot" />
             {loading ? 'Sincronizando' : error ? 'Dados indisponíveis' : 'Atualizado agora'}
           </div>
         </div>
-        <nav className="ops-header-actions">
-          {canManageUsers && (
-            <button
-              type="button"
-              className="ops-btn ops-btn-secondary"
-              onClick={() => navigate('/admin/usuarios')}
-              aria-label="Gerenciar equipe"
-            >
-              <SvgUsers /> Gerenciar Equipe
-            </button>
+        <nav className="ops-header-actions" aria-label="Ações do painel">
+          {canSelectServiceDepartment && (
+            <label className="ops-scope-control" htmlFor="dashboard-service-department">
+              <span>Fila responsável</span>
+              <select id="dashboard-service-department" value={serviceDepartment} onChange={(event) => setServiceDepartment(event.target.value as typeof serviceDepartment)}>
+                <option value="all">Todos os atendimentos</option>
+                <option value="ti">TI</option>
+                <option value="rh">Recursos Humanos</option>
+                <option value="administrativo">Administrativo</option>
+              </select>
+            </label>
           )}
-          <button
-            type="button"
-            className="ops-btn ops-btn-primary"
-            onClick={() => navigate('/admin/chamados')}
-            aria-label="Atender chamados"
-          >
-            <SvgHeadset /> Atender Chamados
-          </button>
+          <button type="button" className="ops-btn ops-btn-primary" onClick={() => navigate('/admin/chamados')}><SvgHeadset /> Atender chamados</button>
+          {canManageUsers && <button type="button" className="ops-btn ops-btn-secondary" onClick={() => navigate('/admin/usuarios')}><SvgUsers /> Gerenciar equipe</button>}
         </nav>
       </header>
 
-      {error && (
-        <div className="alert alert-error" role="alert">
-          <div>
-            <strong>Não foi possível atualizar o painel.</strong>
-            <span>{error}</span>
-          </div>
-          <button type="button" onClick={fetchDashboardData}>Tentar novamente</button>
-        </div>
-      )}
+      {error && <div className="alert alert-error" role="alert"><div><strong>Não foi possível atualizar o painel.</strong><span>{error}</span></div><button type="button" onClick={() => void fetchDashboardData()}>Tentar novamente</button></div>}
 
       {loading ? (
-        <div className="loading-container">
-          <div className="spinner" />
-          <p>Carregando painel operacional...</p>
-        </div>
+        <div className="loading-container"><div className="spinner" /><p>Carregando painel operacional...</p></div>
       ) : (
         <main className="ops-dashboard-content">
-
-          {/* ── KPI metrics ── */}
           <section className="kpi-metrics-section">
-            <h2 className="ops-section-title">Indicadores operacionais</h2>
-
-            <div className="kpi-group">
-              <h3 className="kpi-group-title">Chamados</h3>
-              <div className="kpi-grid">{ticketKpiCards.map(renderKpiCard)}</div>
-            </div>
-
-            <div className="kpi-group">
-              <h3 className="kpi-group-title">Ativos e Inventário</h3>
-              <div className="kpi-grid">{assetKpiCards.map(renderKpiCard)}</div>
-            </div>
+            <div className="ops-section-heading"><h2 className="ops-section-title">Indicadores operacionais</h2><span>{data.filters?.serviceDepartmentLabel || 'Todos os atendimentos'}</span></div>
+            <div className="kpi-grid">{ticketKpiCards.map(renderKpiCard)}</div>
           </section>
 
-          {/* ── SLA / Performance ── */}
-          <section className="performance-metrics-section">
-            <h2 className="ops-section-title">Ritmo e desempenho</h2>
+          <section className="dashboard-panel asset-summary-section">
+            <div className="panel-heading"><h2>Ativos e inventário</h2><button type="button" onClick={() => navigate('/inventario')}>Ver todos</button></div>
+            <div className="asset-summary-grid">{assetKpiCards.map(renderKpiCard)}</div>
+          </section>
+
+          <section className="dashboard-panel performance-metrics-section">
+            <div className="panel-heading"><h2>Ritmo e desempenho</h2><span>Operação atual</span></div>
             <div className="performance-card">
-              <div className="performance-header">
-                <div className="performance-header-left">
-                  <div className="performance-title-row">
-                    <SvgClock />
-                    <h3 className="performance-title">SLA Médio Operacional</h3>
-                  </div>
-                  <p className="performance-subtitle">Baseado nos chamados resolvidos recentemente</p>
-                </div>
-                <div className={`performance-trend ${slaTrend.isPositive ? 'positive' : 'negative'}`}>
-                  <span className="trend-value">
-                    {slaTrend.isPositive ? '↓' : '↑'} {slaTrend.trendLabel}
-                  </span>
-                  <span className="trend-label">vs período anterior</span>
-                </div>
-              </div>
-
-              <div className="performance-main-metric">
-                <span className="metric-value">{data.averageSLA.toFixed(1)}</span>
-                <span className="metric-unit">h</span>
-              </div>
-
+              <div className="performance-header"><div className="performance-header-left"><div className="performance-title-row"><SvgClock /><h3 className="performance-title">SLA Médio Operacional</h3></div><p className="performance-subtitle">Baseado nos chamados resolvidos recentemente</p></div><div className={`performance-trend ${slaTrend.isPositive ? 'positive' : 'negative'}`}><span className="trend-value">{slaTrend.isPositive ? '↓' : '↑'} {slaTrend.trendLabel}</span><span className="trend-label">vs período anterior</span></div></div>
+              <div className="performance-main-metric"><span className="metric-value">{data.averageSLA.toFixed(1)}</span><span className="metric-unit">h</span></div>
               <div className="performance-stats-grid">
-                <div className="performance-stat">
-                  <span>Operações hoje</span>
-                  <strong>{operationsToday}</strong>
-                </div>
-                <div className="performance-stat">
-                  <span>Atribuições de ativo</span>
-                  <strong>{data.assets.assignedToday}</strong>
-                </div>
-                <div className="performance-stat">
-                  <span>Ativos em manutenção</span>
-                  <strong>{data.assets.inMaintenance}</strong>
-                </div>
-                <div className="performance-stat">
-                  <span>Compras pendentes</span>
-                  <strong>{data.pendingPurchases}</strong>
-                </div>
+                <div className="performance-stat"><strong>{operationsToday}</strong><span>Operações hoje</span></div>
+                <div className="performance-stat"><strong>{data.assets.assignedToday}</strong><span>Atribuições de ativo</span></div>
+                <div className="performance-stat"><strong>{data.assets.inMaintenance}</strong><span>Ativos em manutenção</span></div>
+                <div className="performance-stat"><strong>{data.pendingPurchases}</strong><span>Compras pendentes</span></div>
               </div>
             </div>
           </section>
 
-          {/* ── Assets overview ── */}
-          <section className="asset-overview-section">
-            <h2 className="ops-section-title">Ativos sob responsabilidade da TI</h2>
-            <div className="asset-overview-grid">
-              <div className="ops-card ops-chart-card">
-                <div className="ops-card-header">
-                  <h3 className="ops-card-title">Distribuição de Ativos por Status</h3>
-                  <span className="ops-card-meta">{totalAssetsForChart} ativos</span>
-                </div>
-                <div className="chart-container">
-                  {totalAssetsForChart === 0 ? (
-                    <div className="empty-state"><p>Nenhum dado disponível</p></div>
-                  ) : (
-                    <div className="chart-bars">
-                      {assetStatusEntries.map(s =>
-                        renderBarItem(s.label, s.count, totalAssetsForChart, s.fillClass)
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="ops-card ops-chart-card">
-                <div className="ops-card-header">
-                  <h3 className="ops-card-title">Movimentação de Ativos Hoje</h3>
-                  <span className="ops-card-meta">Operação diária</span>
-                </div>
-                <div className="asset-flow-list">
-                  {[
-                    { label: 'Entregues',              value: data.assets.assignedToday },
-                    { label: 'Devolvidos',             value: data.assets.returnedToday },
-                    { label: 'Enviados para manutenção', value: data.assets.maintenanceToday },
-                    { label: 'Novos no mês',           value: data.assets.addedThisMonth },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="asset-flow-item">
-                      <span>{label}</span>
-                      <strong>{value}</strong>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+          <section className="dashboard-panel analytics-card asset-overview-section">
+            <div className="panel-heading"><h2>Distribuição de ativos por status</h2><span>{totalAssetsForChart} ativos</span></div>
+            {totalAssetsForChart === 0 ? <div className="empty-state"><p>Nenhum dado disponível</p></div> : <div className="donut-layout"><DonutChart entries={assetDonutEntries} total={totalAssetsForChart} centerLabel="ativos" /><div className="donut-legend">{assetStatusEntries.map((entry, index) => <div key={entry.key}><span className="legend-dot" style={{ backgroundColor: DONUT_COLORS[index] }} /><span>{entry.label}</span><strong>{entry.count}</strong><small>{entry.percent}%</small></div>)}</div></div>}
           </section>
 
-          {/* ── Tickets overview ── */}
-          <section className="ticket-overview-section">
-            <h2 className="ops-section-title">Composição da fila de chamados</h2>
-            <div className="ticket-charts-grid">
-              <div className="ops-card ops-chart-card">
-                <div className="ops-card-header">
-                  <h3 className="ops-card-title">Distribuição de Chamados por Status</h3>
-                  <span className="ops-card-meta">{data.totalTickets} chamados</span>
-                </div>
-                <div className="chart-container">
-                  {data.totalTickets === 0 ? (
-                    <div className="empty-state"><p>Nenhum dado disponível</p></div>
-                  ) : (
-                    <div className="chart-bars">
-                      {statusEntries.map(([status, count]) =>
-                        renderBarItem(getStatusLabel(status), count, data.totalTickets, `status-${status}`)
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="ops-card ops-chart-card">
-                <div className="ops-card-header">
-                  <h3 className="ops-card-title">Distribuição de Chamados por Prioridade</h3>
-                  <span className="ops-card-meta">{data.totalTickets} chamados</span>
-                </div>
-                <div className="chart-container">
-                  {data.totalTickets === 0 ? (
-                    <div className="empty-state"><p>Nenhum dado disponível</p></div>
-                  ) : (
-                    <div className="chart-bars">
-                      {priorityEntries.map(([priority, count]) =>
-                        renderBarItem(getPriorityLabel(priority), count, data.totalTickets, `priority-${priority}`)
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+          <section className="dashboard-panel analytics-card ticket-status-section">
+            <div className="panel-heading"><h2>Distribuição de chamados por status</h2><span>{data.totalTickets} chamados</span></div>
+            {data.totalTickets === 0 ? <div className="empty-state"><p>Nenhum dado disponível</p></div> : <div className="donut-layout"><DonutChart entries={statusDonutEntries} total={data.totalTickets} centerLabel="chamados" /><div className="donut-legend">{statusEntries.slice(0, 6).map(([status, count], index) => <div key={status}><span className="legend-dot" style={{ backgroundColor: DONUT_COLORS[index] }} /><span>{getStatusLabel(status)}</span><strong>{count}</strong><small>{Math.round((count / data.totalTickets) * 100)}%</small></div>)}</div></div>}
           </section>
 
-          {/* ── Recent activity ── */}
-          <section className="recent-activity-section">
-            <h2 className="ops-section-title">Últimas movimentações</h2>
-            <div className="ops-card recent-activity-card">
-              {data.recentActivity.length === 0 ? (
-                <div className="empty-state compact-empty-state">
-                  <p>Sem eventos operacionais recentes.</p>
-                </div>
-              ) : (
-                <>
-                  <ul className="activity-list">
-                    {data.recentActivity.slice(0, 10).map((activity) => (
-                      <li key={activity.id}>
-                        <button
-                          type="button"
-                          className="activity-item"
-                          onClick={() => navigate(activity.route || '/admin/chamados')}
-                        >
-                          <div className="activity-main">
-                            <span className={`activity-icon-circle ${ACTIVITY_ICON_STYLE[activity.type] ?? 'icon-circle-neutral'}`}>
-                              {ACTIVITY_ICONS[activity.type] ?? ACTIVITY_ICONS.ticket_created}
-                            </span>
-                            <div className="activity-texts">
-                              <span className="activity-event">{getActivityLabel(activity.type)}</span>
-                              <p className="activity-title">{activity.title}</p>
-                              <p className="activity-detail">{activity.detail}</p>
-                            </div>
-                          </div>
-                          <div className="activity-meta">
-                            <time dateTime={activity.timestamp}>{formatRelativeTime(activity.timestamp)}</time>
-                            <span className="activity-arrow" aria-hidden="true">→</span>
-                          </div>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                  {data.recentActivity.length > 10 && (
-                    <div className="activity-footer">
-                      <button
-                        type="button"
-                        className="activity-see-all"
-                        onClick={() => navigate('/admin/chamados')}
-                      >
-                        Ver toda a atividade →
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+          <section className="dashboard-panel recent-activity-section">
+            <div className="panel-heading"><h2>Últimas movimentações</h2><button type="button" onClick={() => navigate('/admin/chamados')}>Ver toda a atividade</button></div>
+            {data.recentActivity.length === 0 ? <div className="empty-state compact-empty-state"><p>Sem eventos operacionais recentes.</p></div> : <ul className="activity-list">{data.recentActivity.slice(0, 5).map((activity) => <li key={activity.id}><button type="button" className="activity-item" onClick={() => navigate(activity.route || '/admin/chamados')}><div className="activity-main"><span className={`activity-icon-circle ${ACTIVITY_ICON_STYLE[activity.type] ?? 'icon-circle-neutral'}`}>{ACTIVITY_ICONS[activity.type] ?? ACTIVITY_ICONS.ticket_created}</span><div className="activity-texts"><span className="activity-event">{getActivityLabel(activity.type)}</span><p className="activity-title">{activity.title}</p><p className="activity-detail">{activity.detail}</p></div></div><div className="activity-meta"><time dateTime={activity.timestamp}>{formatRelativeTime(activity.timestamp)}</time><span className="activity-arrow" aria-hidden="true">→</span></div></button></li>)}</ul>}
           </section>
 
-          {/* ── Quick actions ── */}
+          <section className="dashboard-panel analytics-card priority-section">
+            <div className="panel-heading"><h2>Distribuição de chamados por prioridade</h2><span>{data.totalTickets} chamados</span></div>
+            <div className="chart-bars">{priorityEntries.map(([priority, count]) => renderBarItem(getPriorityLabel(priority), count, data.totalTickets, `priority-${priority}`))}</div>
+          </section>
+
           <section className="quick-actions-section">
-            <h2 className="ops-section-title">Continuar trabalhando</h2>
-            <div className="actions-grid">
-              {[
-                { icon: QA_ICONS.chamados,     title: 'Central de Chamados',    desc: 'Gerenciar chamados em fila',      route: '/admin/chamados',    label: 'Central de atendimento de chamados' },
-                { icon: QA_ICONS.ativos,       title: 'Gestão de Ativos',       desc: 'Inventário e movimentações',     route: '/admin/estoque',      label: 'Gestão de ativos e equipamentos' },
-                { icon: QA_ICONS.conhecimento, title: 'Base de Conhecimento',   desc: 'Documentos e playbooks',         route: '/admin/documentos',   label: 'Base de conhecimento e documentação' },
-                { icon: QA_ICONS.relatorios,   title: 'Relatórios',             desc: 'Indicadores e tendências',       route: '/admin/relatorios',   label: 'Relatórios e análises' },
-              ].map(({ icon, title, desc, route, label }) => (
-                <button
-                  key={route}
-                  type="button"
-                  className="action-button"
-                  onClick={() => navigate(route)}
-                  aria-label={label}
-                >
-                  <div className="action-icon">{icon}</div>
-                  <div className="action-content">
-                    <h4>{title}</h4>
-                    <p>{desc}</p>
-                  </div>
-                  <div className="action-arrow" aria-hidden="true">→</div>
-                </button>
-              ))}
-            </div>
+            <h2 className="ops-section-title">Acesso rápido</h2>
+            <div className="actions-grid">{[
+              { icon: QA_ICONS.chamados, title: 'Central de Chamados', desc: 'Gerenciar chamados em fila', route: '/admin/chamados', label: 'Central de atendimento de chamados' },
+              { icon: QA_ICONS.ativos, title: 'Gestão de Ativos', desc: 'Inventário e movimentações', route: '/inventario', label: 'Gestão de ativos e equipamentos' },
+              { icon: QA_ICONS.conhecimento, title: 'Base de Conhecimento', desc: 'Documentos e playbooks', route: '/admin/documentos', label: 'Base de conhecimento e documentação' },
+              { icon: QA_ICONS.relatorios, title: 'Relatórios', desc: 'Indicadores e tendências', route: '/admin/relatorios', label: 'Relatórios e análises' },
+            ].map(({ icon, title, desc, route, label }) => <button key={route} type="button" className="action-button" onClick={() => navigate(route)} aria-label={label}><div className="action-icon">{icon}</div><div className="action-content"><h4>{title}</h4><p>{desc}</p></div><div className="action-arrow" aria-hidden="true">→</div></button>)}</div>
           </section>
-
         </main>
       )}
     </div>

@@ -16,6 +16,8 @@ import {
 import { pollingLimiter } from '../middleware/rateLimiter';
 import { getWebSocketService } from '../services/websocketService';
 import path from 'path';
+import { getQueuePriorityRank, getTicketServiceCycleStartedAt } from '../services/ticketQueueVisibility';
+import { resolveServiceDepartment, serviceDepartmentLabel } from '../services/reportFilterScope';
 
 const ticketsRouter = Router();
 
@@ -39,18 +41,104 @@ const canAdminStaffAccessAdministrativeTicket = (ticket: TicketAccessRow, userId
 const STATUS_AWAITING_CONFIRMATION = 'aguardando_confirmacao';
 
 // Prazo de atendimento por prioridade, usado para dar visibilidade de fila ao solicitante
-const SLA_HOURS_BY_PRIORITY: Record<string, number> = { critical: 4, high: 24, medium: 72, low: 168 };
+const SLA_HOURS_BY_PRIORITY: Record<string, number> = { critical: 4, urgent: 4, high: 24, medium: 72, low: 168 };
 // 'waiting_user' fica de fora: o atraso ali é do solicitante, não da equipe,
 // então não faz sentido contar como prazo estourado.
 const STATUSES_WITH_ACTIVE_QUEUE = ['open', 'in_progress'];
 
-const withSlaDueAt = <T extends { priority?: string; status?: string; created_at: string | Date }>(ticket: T) => {
+const withSlaDueAt = <T extends {
+  priority?: string;
+  status?: string;
+  created_at: string | Date;
+  reopen_reason?: string | null;
+  confirmation_response_at?: string | Date | null;
+}>(ticket: T) => {
   if (!ticket.status || !STATUSES_WITH_ACTIVE_QUEUE.includes(ticket.status)) {
     return { ...ticket, sla_due_at: null };
   }
   const slaHours = SLA_HOURS_BY_PRIORITY[ticket.priority || 'medium'] ?? SLA_HOURS_BY_PRIORITY.medium;
-  const dueAt = new Date(new Date(ticket.created_at).getTime() + slaHours * 60 * 60 * 1000);
+  const serviceCycleStartedAt = getTicketServiceCycleStartedAt(ticket);
+  const dueAt = new Date(new Date(serviceCycleStartedAt).getTime() + slaHours * 60 * 60 * 1000);
   return { ...ticket, sla_due_at: dueAt.toISOString() };
+};
+
+const withQueueVisibility = async <T extends {
+  id: string;
+  department?: string | null;
+  priority?: string;
+  status?: string;
+  created_at: string | Date;
+  reopen_reason?: string | null;
+  confirmation_response_at?: string | Date | null;
+}>(ticket: T) => {
+  const ticketWithSla = withSlaDueAt(ticket);
+
+  if (ticket.status === 'in_progress') {
+    return {
+      ...ticketWithSla,
+      queue_visibility: {
+        state: 'in_service',
+        position: null,
+        ahead: 0,
+        totalWaiting: null,
+        updatedAt: new Date().toISOString(),
+      },
+    };
+  }
+
+  if (ticket.status !== 'open') {
+    return { ...ticketWithSla, queue_visibility: null };
+  }
+
+  const queueEnteredAt = getTicketServiceCycleStartedAt(ticket);
+  const currentPriorityRank = getQueuePriorityRank(ticket.priority);
+  const queue = await database.query(
+    `SELECT
+       COUNT(*)::int AS total_waiting,
+       COUNT(*) FILTER (
+         WHERE priority_rank < $2
+            OR (
+              priority_rank = $2
+              AND (queue_entered_at < $3 OR (queue_entered_at = $3 AND id::text < $4))
+            )
+       )::int AS ahead
+     FROM (
+       SELECT
+         id,
+         CASE priority
+           WHEN 'critical' THEN 0
+           WHEN 'urgent' THEN 0
+           WHEN 'high' THEN 1
+           WHEN 'medium' THEN 2
+           WHEN 'low' THEN 3
+           ELSE 2
+         END AS priority_rank,
+         CASE
+           WHEN reopen_reason IS NOT NULL AND confirmation_response_at IS NOT NULL
+             THEN confirmation_response_at
+           ELSE created_at
+         END AS queue_entered_at
+       FROM tickets
+       WHERE status = 'open'
+         AND COALESCE(department, 'ti') = $1
+     ) waiting_queue`,
+    [ticket.department || 'ti', currentPriorityRank, queueEnteredAt, ticket.id],
+  );
+  const totalWaiting = Number(queue.rows[0]?.total_waiting || 0);
+  const ahead = Number(queue.rows[0]?.ahead || 0);
+  const position = totalWaiting > 0 ? { position: ahead + 1, ahead, totalWaiting } : null;
+
+  return {
+    ...ticketWithSla,
+    queue_visibility: position
+      ? {
+          state: 'waiting',
+          ...position,
+          priorityCanChangeOrder: true,
+          updatedAt: new Date().toISOString(),
+        }
+      : null,
+  };
 };
 
 const buildEstimatedLabel = (priority: string, createdAt: Date): string => {
@@ -366,24 +454,24 @@ ticketsRouter.get('/', async (req: Request, res: Response) => {
         const params: any[] = [];
         let paramCount = 1;
 
-        // Filtro por departamento do chamado
-        if (departmentFilter) {
+        if (departmentFilter && !['ti', 'rh', 'administrativo'].includes(departmentFilter)) {
+          return res.status(400).json({ error: 'Departamento inválido' });
+        }
+
+        const scopedDepartment = resolveServiceDepartment(decoded.role, departmentFilter);
+
+        // O papel operacional sempre prevalece sobre o filtro enviado pelo cliente.
+        if (scopedDepartment) {
           conditions.push(`COALESCE(t.department, 'ti') = $${paramCount}`);
-          params.push(departmentFilter);
+          params.push(scopedDepartment);
           paramCount++;
-        } else if (decoded.role === UserRole.IT_STAFF) {
-          // TI só vê chamados de TI por padrão
-          conditions.push(`COALESCE(t.department, 'ti') = 'ti'`);
-        } else if (decoded.role === UserRole.ADMIN_STAFF) {
-          // Administrativo só vê chamados do administrativo por padrão
-          conditions.push(`COALESCE(t.department, 'ti') = 'administrativo'`);
+        }
+
+        if (decoded.role === UserRole.ADMIN_STAFF) {
           // Auxiliar administrativo vê chamados atribuídos a ele ou sem responsável
           conditions.push(`(t.assigned_to_id = $${paramCount} OR t.assigned_to_id IS NULL)`);
           params.push(decoded.id);
           paramCount++;
-        } else if (decoded.role === UserRole.RH_STAFF) {
-          // RH só vê chamados do RH por padrão
-          conditions.push(`COALESCE(t.department, 'ti') = 'rh'`);
         }
         // ADMIN e MANAGER veem todos se não filtrarem
 
@@ -536,18 +624,38 @@ ticketsRouter.get('/export/excel', authenticate, async (req: Request, res: Respo
     const date_from = req.query.date_from as string;
     const date_to = req.query.date_to as string;
     const departmentFilter = req.query.department as string;
+    const assignedToFilter = req.query.assigned_to as string;
+
+    if (req.query.assigned_to !== undefined && typeof req.query.assigned_to !== 'string') {
+      return res.status(400).json({ error: 'O filtro de responsável deve ter um único valor' });
+    }
 
     const conditions: string[] = [];
     const params: any[] = [];
     let pc = 1;
 
-    if (departmentFilter) { conditions.push(`COALESCE(t.department,'ti') = $${pc}`); params.push(departmentFilter); pc++; }
-    else if (decoded.role === UserRole.IT_STAFF) conditions.push(`COALESCE(t.department,'ti') = 'ti'`);
-    else if (decoded.role === UserRole.ADMIN_STAFF) { conditions.push(`COALESCE(t.department,'ti') = 'administrativo'`); conditions.push(`(t.assigned_to_id = $${pc} OR t.assigned_to_id IS NULL)`); params.push(decoded.id); pc++; }
-    else if (decoded.role === UserRole.RH_STAFF) conditions.push(`COALESCE(t.department,'ti') = 'rh'`);
+    if (departmentFilter && !['ti', 'rh', 'administrativo'].includes(departmentFilter)) {
+      return res.status(400).json({ error: 'Departamento inválido' });
+    }
+
+    const scopedDepartment = resolveServiceDepartment(decoded.role, departmentFilter);
+    if (scopedDepartment) {
+      conditions.push(`COALESCE(t.department,'ti') = $${pc}`);
+      params.push(scopedDepartment);
+      pc++;
+    }
+    if (decoded.role === UserRole.ADMIN_STAFF) {
+      conditions.push(`(t.assigned_to_id = $${pc} OR t.assigned_to_id IS NULL)`);
+      params.push(decoded.id);
+      pc++;
+    }
 
     if (status?.length) { conditions.push(`t.status = ANY($${pc})`); params.push(status); pc++; }
     if (priority?.length) { conditions.push(`t.priority = ANY($${pc})`); params.push(priority); pc++; }
+    if (assignedToFilter && decoded.role !== UserRole.ADMIN_STAFF) {
+      if (assignedToFilter === 'unassigned') conditions.push('t.assigned_to_id IS NULL');
+      else { conditions.push(`t.assigned_to_id = $${pc}`); params.push(assignedToFilter); pc++; }
+    }
     if (search) { conditions.push(`(t.title ILIKE $${pc} OR t.description ILIKE $${pc} OR COALESCE(t.requester_name,'') ILIKE $${pc} OR EXISTS (SELECT 1 FROM public_users pu2 WHERE pu2.id = t.requester_id AND t.requester_type = 'public' AND (pu2.name ILIKE $${pc} OR pu2.email ILIKE $${pc})))`); params.push(`%${search}%`); pc++; }
     if (date_from) { conditions.push(`t.created_at >= $${pc}`); params.push(date_from); pc++; }
     if (date_to) { conditions.push(`t.created_at <= $${pc}`); params.push(date_to); pc++; }
@@ -556,16 +664,36 @@ ticketsRouter.get('/export/excel', authenticate, async (req: Request, res: Respo
     const result = await database.query(
       `SELECT t.*, iu.name AS assigned_to_name,
               COALESCE(t.requester_name, pu.name) AS requester_name,
-              pu.email AS requester_email
+              pu.email AS requester_email,
+              COALESCE(NULLIF(TRIM(pu.department), ''), NULLIF(TRIM(d_req.name), ''), 'Não informado') AS requester_department
        FROM tickets t
        LEFT JOIN internal_users iu ON t.assigned_to_id = iu.id
        LEFT JOIN public_users pu ON t.requester_type = 'public' AND t.requester_id = pu.id
+       LEFT JOIN internal_users iu_req ON t.requester_type = 'internal' AND t.requester_id = iu_req.id
+       LEFT JOIN departments d_req ON d_req.id = iu_req.department_id
        ${where} ORDER BY t.created_at DESC LIMIT 5000`,
       params,
     );
 
     const { ExcelReportService } = require('../services/excelReportService');
-    await ExcelReportService.generateTicketsReport(result.rows, res, `chamados-${new Date().toISOString().split('T')[0]}`);
+    const formattedRows = result.rows.map((ticket: any) => ({
+      id: ticket.id,
+      title: ticket.title,
+      status: ticket.status,
+      priority: ticket.priority,
+      type: ticket.type,
+      serviceDepartment: ticket.department || 'ti',
+      serviceDepartmentLabel: serviceDepartmentLabel(ticket.department || 'ti'),
+      requesterDepartment: ticket.requester_department || 'Não informado',
+      requesterName: ticket.requester_name,
+      assignedToName: ticket.assigned_to_name || 'Não atribuído',
+      createdAt: ticket.created_at,
+      resolvedAt: ticket.resolved_at,
+      timeOpenHours: Number(
+        (new Date(ticket.resolved_at || Date.now()).getTime() - new Date(ticket.created_at).getTime()) / 3600000,
+      ).toFixed(1),
+    }));
+    await ExcelReportService.generateTicketsReport(formattedRows, res, `chamados-${new Date().toISOString().split('T')[0]}`);
   } catch (err) {
     console.error('Error exporting tickets:', err);
     res.status(500).json({ error: 'Falha ao exportar' });
@@ -639,7 +767,7 @@ ticketsRouter.get('/:id', async (req: Request, res: Response) => {
       );
 
       return res.json({
-        ...withSlaDueAt(ticket.rows[0]),
+        ...await withQueueVisibility(ticket.rows[0]),
         messages: messages.rows
       });
     }
@@ -689,7 +817,7 @@ ticketsRouter.get('/:id', async (req: Request, res: Response) => {
         );
 
         return res.json({
-          ...withSlaDueAt(ticket.rows[0]),
+          ...await withQueueVisibility(ticket.rows[0]),
           messages: messages.rows
         });
       } catch (err) {

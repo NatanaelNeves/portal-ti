@@ -1,0 +1,483 @@
+/* Shared visual system for the remaining internal workspace screens. */
+
+:is(
+  .asd-page, .gestor-dashboard-page, .gestor-tickets-page,
+  .rhd-page, .rh-tickets-dashboard, .rhr-page,
+  .reports-page, .dp-page, .ump-page, .km-page, .km-editor-page,
+  .inv-dashboard, .inventory-page, .equipment-page, .nb-page,
+  .peripherals-page, .purchases-page, .responsibilities-page,
+  .admin-res-page, .ard-page, .eq-types-page,
+  .create-equipment-page, .create-purchase-page, .receive-equipment-page,
+  .deliver-equipment-page, .return-equipment-page, .move-equipment-page,
+  .equipment-detail-page, .sign-term-page, .return-term-page,
+  .ticket-detail-page, .kpi-dashboard-page, .recurring-tickets-page
+) {
+  --ui-ink: #102c22;
+  --ui-muted: #64766e;
+  --ui-green-950: #063c2d;
+  --ui-green-900: #075039;
+  --ui-green: #14945a;
+  --ui-green-soft: #eaf6ef;
+  --ui-canvas: #f4f7f5;
+  --ui-paper: #fff;
+  --ui-line: #dde5df;
+  --ui-blue: #2d73d2;
+  --ui-orange: #ed8a22;
+  --ui-red: #d9464f;
+  width: min(1380px, calc(100% - 38px));
+  min-height: calc(100vh - 72px);
+  margin: 0 auto;
+  padding: 22px 0 46px;
+  color: var(--ui-ink);
+  background: transparent;
+  font-family: 'DM Sans', system-ui, sans-serif;
+}
+
+.kpi-dashboard-page, .recurring-tickets-page {
+  --ui-ink: #102c22;
+  --ui-muted: #64766e;
+  --ui-green: #14945a;
+  --ui-line: #dde5df;
+  width: min(1200px, calc(100% - 38px));
+  min-height: calc(100vh - 72px);
+  margin: 0 auto;
+  padding: 22px 0 46px;
+  color: var(--ui-ink);
+  font-family: 'DM Sans', system-ui, sans-serif;
+}
+
+.recurring-tickets-page { width: min(1080px, calc(100% - 38px)); }
+.kpi-dashboard-page > h1, .recurring-tickets-page > div:first-child h1 {
+  color: var(--ui-ink) !important;
+  font-size: clamp(1.3rem, 2vw, 1.75rem) !important;
+  font-weight: 780 !important;
+  letter-spacing: -.03em;
+}
+.kpi-dashboard-page > div:not(:first-of-type),
+.recurring-tickets-page > form,
+.recurring-tickets-page > div:last-child > div {
+  border-color: var(--ui-line) !important;
+  border-radius: 11px !important;
+  box-shadow: 0 10px 28px -27px rgba(15,61,44,.65);
+}
+.recurring-tickets-page button[style*="background: rgb(0, 122, 51)"],
+.recurring-tickets-page button[style*="background: #007A33"] {
+  background: var(--ui-green) !important;
+  border-radius: 8px !important;
+}
+.kpi-dashboard-state { display: grid; place-content: center; color: var(--ui-muted); }
+.kpi-dashboard-error { color: #b43d45; }
+
+/* Page heads */
+:is(.ump-header, .km-list-header, .inv-dash-header, .eq-page-header, .nb-header,
+  .per-header, .admin-res-header, .eq-types-header, .rhd-header, .rhr-header,
+  .gd-header, .gt-header, .asd-topbar, .dp-header,
+  .purchases-page > .page-header, .responsibilities-page > .page-header,
+  .inventory-page .page-header-inventory) {
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 0 0 18px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+:is(.ump-title, .km-list-title, .inv-dash-title, .eq-title, .nb-title, .per-title,
+  .rhd-title, .rhr-title, .dp-title, .asd-topbar-title, .gd-header h1,
+  .gt-header h1, .admin-res-header-main h1, .eq-types-header-main h1,
+  .purchases-page .page-header h1, .responsibilities-page .page-header h1,
+  .inventory-page .page-header-inventory h1) {
+  margin: 0;
+  color: var(--ui-ink);
+  font-size: clamp(1.3rem, 2vw, 1.75rem);
+  font-weight: 780;
+  line-height: 1.15;
+  letter-spacing: -.03em;
+}
+
+:is(.km-list-title, .ump-title) i {
+  width: 38px;
+  height: 38px;
+  display: inline-grid;
+  place-items: center;
+  margin-right: 10px;
+  color: var(--ui-green);
+  background: var(--ui-green-soft);
+  border-radius: 9px;
+}
+
+:is(.km-list-subtitle, .inv-dash-sub, .eq-subtitle, .nb-subtitle, .per-subtitle,
+  .rhd-subtitle, .rhr-subtitle, .dp-subtitle, .admin-res-header-main p,
+  .eq-types-header-main p, .gd-header p) {
+  margin: 6px 0 0;
+  color: var(--ui-muted);
+  font-size: .78rem;
+}
+
+/* Primary and secondary actions */
+:is(.ump-btn-new, .km-btn-new, .inv-btn-refresh, .eq-btn, .nb-btn-primary,
+  .per-btn, .rhd-btn, .rhr-btn, .dp-btn-new, .btn-res-primary,
+  .gestor-dashboard-page .btn-primary, .gestor-tickets-page .btn-primary) {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 15px;
+  color: #fff;
+  background: var(--ui-green);
+  border: 1px solid var(--ui-green);
+  border-radius: 8px;
+  font-size: .73rem;
+  font-weight: 750;
+  box-shadow: none;
+  transform: none;
+}
+
+:is(.ump-btn-new, .km-btn-new, .inv-btn-refresh, .eq-btn, .nb-btn-primary,
+  .per-btn, .rhd-btn, .rhr-btn, .dp-btn-new, .btn-res-primary):hover {
+  color: #fff;
+  background: #0d7c4a;
+  border-color: #0d7c4a;
+  transform: translateY(-1px);
+}
+
+:is(.btn-res-ghost, .nb-btn-outline, .km-back-btn, .gd-btn-link,
+  .ump-page-btn, .dp-action-btn, .gt-close) {
+  min-height: 36px;
+  color: #365148;
+  background: #fff;
+  border: 1px solid var(--ui-line);
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+/* Filter ledgers */
+:is(.ump-filters, .km-search-wrap, .inv-dashboard .inv-dash-content,
+  .eq-filters, .nb-filters, .per-filters, .admin-res-filters, .rhr-filters,
+  .gt-filters, .inventory-page .filters-bar,
+  .purchases-page .filters-bar, .responsibilities-page .filters-bar) {
+  background: #fff;
+  border: 1px solid var(--ui-line);
+  border-radius: 11px;
+  box-shadow: none;
+}
+
+:is(.ump-filters, .eq-filters, .nb-filters, .per-filters, .rhr-filters,
+  .gt-filters, .inventory-page .filters-bar,
+  .purchases-page .filters-bar, .responsibilities-page .filters-bar) {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 12px;
+}
+
+:is(.ump-search-input, .ump-filter-select, .km-search-input, .km-input, .km-select,
+  .eq-filters input, .eq-filters select, .nb-search, .nb-select,
+  .per-filters input, .per-filters select, .res-select, .res-input,
+  .rhr-filter-select, .gt-search, .gt-select,
+  .inventory-page .search-box input, .inventory-page .filter-select,
+  .purchases-page input, .purchases-page select,
+  .responsibilities-page input, .responsibilities-page select) {
+  min-height: 40px;
+  color: #29443a;
+  background: #fbfcfb;
+  border: 1px solid var(--ui-line);
+  border-radius: 8px;
+  font: 600 .73rem/1.2 'DM Sans', system-ui, sans-serif;
+  outline: none;
+  box-shadow: none;
+}
+
+:is(.ump-search-input, .km-search-input, .eq-filters input, .nb-search,
+  .per-filters input, .gt-search):focus,
+:is(.ump-filter-select, .km-select, .eq-filters select, .nb-select,
+  .per-filters select, .res-select, .rhr-filter-select, .gt-select):focus {
+  border-color: #64ad84;
+  box-shadow: 0 0 0 3px rgba(20,148,90,.09);
+}
+
+.km-search-wrap { max-width: 560px; margin-bottom: 12px; }
+.km-filter-pills, .admin-res-date-pills, .gt-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+:is(.km-filter-pill, .res-pill, .gt-tabs button) {
+  min-height: 34px;
+  padding: 0 12px;
+  color: #52655c;
+  background: #fff;
+  border: 1px solid var(--ui-line);
+  border-radius: 999px;
+  font-size: .68rem;
+  font-weight: 680;
+  box-shadow: none;
+}
+
+:is(.km-filter-pill-active, .res-pill.active, .gt-tabs button.active) {
+  color: #fff;
+  background: var(--ui-green-900);
+  border-color: var(--ui-green-900);
+}
+
+/* KPI cards and dashboards */
+:is(.asd-stats, .gd-kpi-grid, .rhd-kpi-grid, .rhr-kpi-grid, .inv-kpi-grid,
+  .eq-stats-grid, .nb-stats, .per-stats-grid,
+  .purchases-page .stats-grid, .responsibilities-page .stats-grid, .dp-stats) {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+:is(.asd-brief, .gd-kpi-card, .rhd-kpi-card, .rhr-kpi-card, .inv-kpi-card,
+  .eq-stat, .nb-stats > *, .per-stat, .purchases-page .stat-card,
+  .responsibilities-page .stat-card, .dp-stat-card) {
+  min-height: 126px;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid var(--ui-line);
+  border-radius: 11px;
+  box-shadow: 0 10px 28px -27px rgba(15,61,44,.65);
+}
+
+:is(.gd-kpi-value, .rhd-kpi-value, .rhr-kpi-value, .inv-kpi-num,
+  .eq-stat-value, .nb-stat-value, .per-stat-value,
+  .purchases-page .stat-value, .responsibilities-page .stat-value, .dp-stat-number) {
+  color: var(--ui-ink);
+  font-size: 1.8rem;
+  font-weight: 790;
+  line-height: 1;
+  letter-spacing: -.035em;
+  font-variant-numeric: tabular-nums;
+}
+
+:is(.gd-kpi-label, .rhd-kpi-label, .rhr-kpi-label, .inv-kpi-label,
+  .eq-stat-label, .nb-stat-label, .per-stat-label,
+  .purchases-page .stat-label, .responsibilities-page .stat-label, .dp-stat-label) {
+  color: #486057;
+  font-size: .68rem;
+  font-weight: 700;
+}
+
+.inv-kpi-icon, .gd-kpi-icon, .rhr-kpi-icon {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  color: var(--ui-green);
+  background: var(--ui-green-soft);
+  border-radius: 9px;
+}
+
+/* Cards, boards and content sections */
+:is(.asd-panel, .gd-chart-card, .gd-table-card, .gd-section, .gt-table-wrap,
+  .gt-detail-panel, .rhd-section, .rhr-chart-card, .inv-section, .inv-nav-card,
+  .km-card, .km-editor-main, .km-sidebar-card, .dp-card,
+  .admin-res-card, .admin-res-active-card, .eq-type-card,
+  .equipment-page .eq-table-wrap, .nb-group, .per-table-wrap, .per-type-card,
+  .inventory-page .notebooks-table-container,
+  .purchases-page .purchases-table, .responsibilities-page .responsibilities-table) {
+  background: #fff;
+  border: 1px solid var(--ui-line);
+  border-radius: 11px;
+  box-shadow: 0 10px 28px -27px rgba(15,61,44,.65);
+}
+
+:is(.inv-section-title, .gd-section-title, .rhd-section-title, .rhr-chart-title,
+  .gt-detail-title, .km-card-title, .dp-card-title, .per-section-title) {
+  color: var(--ui-ink);
+  font-weight: 750;
+  letter-spacing: -.015em;
+}
+
+.inv-dash-row, .gd-charts-row, .gd-tables-row, .rhr-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.inv-nav-cards, .km-grid, .dp-grid, .per-type-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.inv-nav-card, .km-card, .dp-card, .per-type-card {
+  transition: border-color .16s ease, transform .16s ease, box-shadow .16s ease;
+}
+
+.inv-nav-card:hover, .km-card:hover, .dp-card:hover, .per-type-card:hover {
+  border-color: #afc4b7;
+  transform: translateY(-2px);
+  box-shadow: 0 16px 34px -28px rgba(6,60,45,.75);
+}
+
+.inv-qa-btn {
+  min-height: 62px;
+  color: var(--ui-ink);
+  background: #fff;
+  border: 0;
+  border-bottom: 1px solid #e8eeea;
+  border-radius: 0;
+  box-shadow: none;
+}
+.inv-qa-btn:hover { background: #f5faf7; }
+
+/* Tables */
+:is(.ump-table-card, .rhd-table-wrap, .eq-table-wrap, .nb-group-table-wrap,
+  .per-table-wrap, .gt-table-wrap, .inventory-page .notebooks-table-container) {
+  overflow: auto;
+  background: #fff;
+  border: 1px solid var(--ui-line);
+  border-radius: 11px;
+  box-shadow: none;
+}
+
+:is(.ump-table, .rhd-table, .eq-table, .nb-table, .per-table, .gt-table,
+  .gd-table, .purchases-table, .responsibilities-table,
+  .inventory-page .notebooks-table) {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+}
+
+:is(.ump-table, .rhd-table, .eq-table, .nb-table, .per-table, .gt-table,
+  .gd-table, .purchases-table, .responsibilities-table,
+  .inventory-page .notebooks-table) th {
+  height: 44px;
+  padding: 0 14px;
+  color: #667970;
+  background: #f7f9f8;
+  border-bottom: 1px solid var(--ui-line);
+  font-size: .61rem;
+  font-weight: 800;
+  letter-spacing: .045em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+:is(.ump-table, .rhd-table, .eq-table, .nb-table, .per-table, .gt-table,
+  .gd-table, .purchases-table, .responsibilities-table,
+  .inventory-page .notebooks-table) td {
+  min-height: 52px;
+  padding: 12px 14px;
+  color: #334c43;
+  border-bottom: 1px solid #e9eeeb;
+  font-size: .7rem;
+}
+
+:is(.ump-table, .rhd-table, .eq-table, .nb-table, .per-table, .gt-table,
+  .gd-table, .purchases-table, .responsibilities-table,
+  .inventory-page .notebooks-table) tbody tr:hover { background: #f5faf7; }
+
+/* Reservation operations */
+.admin-res-active-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 16px 18px;
+  color: #155b3e;
+  background: #edf8f1;
+  border-color: #cfe8da;
+}
+.admin-res-active-icon { width: 40px; height: 40px; display: grid; place-items: center; background: #d9f0e2; border-radius: 9px; }
+.admin-res-filters { padding: 14px; margin-bottom: 14px; }
+.admin-res-filter-row { display: flex; gap: 8px; }
+.admin-res-list { display: grid; gap: 10px; }
+.admin-res-card { overflow: hidden; }
+.admin-res-card-header { padding: 12px 14px; background: #f8faf9; border-bottom: 1px solid var(--ui-line); }
+.admin-res-card-body { padding: 14px; }
+.admin-res-actions { padding: 10px 14px; background: #fbfcfb; border-top: 1px solid var(--ui-line); }
+
+/* Loading and empty states */
+:is(.ump-loading, .km-loading, .km-empty, .inv-loading, .inv-empty,
+  .eq-loading, .eq-empty-state, .nb-loading, .nb-empty, .per-loading,
+  .per-empty-state, .admin-res-empty, .gt-loading, .gt-empty,
+  .rhd-loading, .rhd-empty, .rhr-loading, .dp-loading, .dp-empty) {
+  min-height: 240px;
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  color: var(--ui-muted);
+  text-align: center;
+  background: #fff;
+  border: 1px dashed #cdd9d1;
+  border-radius: 11px;
+}
+
+/* Modals and editors */
+:is(.ump-modal, .dp-modal, .res-modal, .purchases-page .modal-content) {
+  background: #fff;
+  border: 1px solid var(--ui-line);
+  border-radius: 12px;
+  box-shadow: 0 28px 70px -28px rgba(5,42,30,.55);
+}
+.km-editor-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 14px; }
+.km-editor-main, .km-sidebar-card { padding: 18px; }
+.km-title-input { color: var(--ui-ink); border: 0; border-bottom: 1px solid var(--ui-line); border-radius: 0; font-size: 1.45rem; font-weight: 750; }
+.km-content-textarea { min-height: 420px; border-color: var(--ui-line); border-radius: 8px; }
+
+/* RH and manager ticket workspaces */
+.rh-tickets-dashboard { display: flex; flex-direction: column; gap: 12px; }
+.rh-dashboard-header, .gt-header { background: transparent; border: 0; box-shadow: none; }
+.rh-dashboard-layout, .gt-main-layout { display: grid; grid-template-columns: minmax(390px, .95fr) minmax(500px, 1.3fr); gap: 14px; }
+.rh-tickets-list, .rh-ticket-panel, .gt-list, .gt-detail-panel { background: #fff; border: 1px solid var(--ui-line); border-radius: 11px; }
+.rh-assignment-filters, .rh-priority-toolbar, .rh-day-summary { background: #fff; border-color: var(--ui-line); box-shadow: none; }
+
+@media (max-width: 1080px) {
+  :is(.asd-stats, .gd-kpi-grid, .rhd-kpi-grid, .rhr-kpi-grid, .inv-kpi-grid,
+    .eq-stats-grid, .nb-stats, .per-stats-grid,
+    .purchases-page .stats-grid, .responsibilities-page .stats-grid, .dp-stats) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .inv-nav-cards, .km-grid, .dp-grid, .per-type-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rh-dashboard-layout, .gt-main-layout { grid-template-columns: 1fr; }
+  .km-editor-layout { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 720px) {
+  :is(
+    .asd-page, .gestor-dashboard-page, .gestor-tickets-page,
+    .rhd-page, .rh-tickets-dashboard, .rhr-page,
+    .reports-page, .dp-page, .ump-page, .km-page, .km-editor-page,
+    .inv-dashboard, .inventory-page, .equipment-page, .nb-page,
+    .peripherals-page, .purchases-page, .responsibilities-page,
+    .admin-res-page, .ard-page, .eq-types-page,
+    .ticket-detail-page, .kpi-dashboard-page, .recurring-tickets-page
+  ) {
+    width: min(100% - 22px, 1380px);
+    padding-top: 14px;
+  }
+  :is(.ump-header, .km-list-header, .inv-dash-header, .eq-page-header, .nb-header,
+    .per-header, .admin-res-header, .eq-types-header, .rhd-header, .rhr-header,
+    .gd-header, .gt-header, .asd-topbar, .dp-header) {
+    min-height: 0;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  :is(.asd-stats, .gd-kpi-grid, .rhd-kpi-grid, .rhr-kpi-grid, .inv-kpi-grid,
+    .eq-stats-grid, .nb-stats, .per-stats-grid,
+    .purchases-page .stats-grid, .responsibilities-page .stats-grid, .dp-stats,
+    .inv-dash-row, .gd-charts-row, .gd-tables-row, .rhr-charts-grid,
+    .inv-nav-cards, .km-grid, .dp-grid, .per-type-cards) {
+    grid-template-columns: 1fr;
+  }
+  :is(.ump-filters, .eq-filters, .nb-filters, .per-filters, .rhr-filters,
+    .gt-filters, .inventory-page .filters-bar,
+    .purchases-page .filters-bar, .responsibilities-page .filters-bar) {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .admin-res-filter-row { flex-direction: column; }
+  .admin-res-info-grid { grid-template-columns: 1fr; }
+}

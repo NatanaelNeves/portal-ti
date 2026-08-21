@@ -4,6 +4,13 @@ import { database } from '../database/connection';
 import { config } from '../config/environment';
 import { UserRole } from '../types/enums';
 import { ExcelReportService } from '../services/excelReportService';
+import {
+  appendTicketReportFilters,
+  canSelectServiceDepartment,
+  normalizeRequesterDepartment,
+  resolveServiceDepartment,
+  serviceDepartmentLabel,
+} from '../services/reportFilterScope';
 
 const reportsRouter = Router();
 
@@ -61,8 +68,131 @@ const ensureReportsAccess = (req: Request, res: Response): InternalUserClaims | 
   return user;
 };
 
-const formatTeamLabel = (team: string): string =>
-  team === 'administrativo' ? 'Assistente Administrativo' : 'TI';
+const formatTeamLabel = serviceDepartmentLabel;
+
+interface ReportScope {
+  serviceDepartment: ReturnType<typeof resolveServiceDepartment>;
+  requesterDepartment: string | null;
+  dateFrom: string | null;
+  dateTo: string | null;
+}
+
+const getReportScope = (req: Request, res: Response): ReportScope => {
+  const user = res.locals.reportUser as InternalUserClaims;
+  return {
+    serviceDepartment: resolveServiceDepartment(user.role, req.query.department),
+    requesterDepartment: normalizeRequesterDepartment(req.query.requester_department),
+    dateFrom: normalizeRequesterDepartment(req.query.date_from),
+    dateTo: normalizeRequesterDepartment(req.query.date_to),
+  };
+};
+
+const buildFilteredTicketsCte = (
+  scope: ReportScope,
+  options: { includeDates?: boolean; dateColumn?: 'created_at' | 'rated_at' } = {},
+) => {
+  const { includeDates = true, dateColumn = 'created_at' } = options;
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+
+  if (includeDates && scope.dateFrom) {
+    params.push(scope.dateFrom);
+    conditions.push(`t.${dateColumn} >= $${params.length}::date`);
+  }
+  if (includeDates && scope.dateTo) {
+    params.push(scope.dateTo);
+    conditions.push(`t.${dateColumn} < ($${params.length}::date + INTERVAL '1 day')`);
+  }
+  appendTicketReportFilters({
+    conditions,
+    params,
+    alias: 't',
+    serviceDepartment: scope.serviceDepartment,
+    requesterDepartment: scope.requesterDepartment,
+  });
+
+  return {
+    params,
+    sql: `WITH filtered_tickets AS (
+      SELECT
+        t.*,
+        COALESCE(NULLIF(TRIM(pu.department), ''), NULLIF(TRIM(d_req.name), ''), 'Não informado') AS requester_department_label,
+        COALESCE(t.requester_name, pu.name, iu_req.name, 'Solicitante') AS requester_name_label
+      FROM tickets t
+      LEFT JOIN public_users pu ON t.requester_type = 'public' AND t.requester_id = pu.id
+      LEFT JOIN internal_users iu_req ON t.requester_type = 'internal' AND t.requester_id = iu_req.id
+      LEFT JOIN departments d_req ON d_req.id = iu_req.department_id
+      ${conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''}
+    )`,
+  };
+};
+
+const fetchTicketReportRows = async (req: Request, res: Response, limit: number) => {
+  const scope = getReportScope(req, res);
+  const filtered = buildFilteredTicketsCte(scope);
+  const params = [...filtered.params];
+  const conditions: string[] = [];
+
+  if (req.query.status) {
+    params.push(req.query.status);
+    conditions.push(`t.status = $${params.length}`);
+  }
+  if (req.query.priority) {
+    params.push(req.query.priority);
+    conditions.push(`t.priority = $${params.length}`);
+  }
+  if (req.query.assigned_to === 'unassigned') {
+    conditions.push('t.assigned_to_id IS NULL');
+  } else if (req.query.assigned_to) {
+    params.push(req.query.assigned_to);
+    conditions.push(`t.assigned_to_id = $${params.length}`);
+  }
+
+  return database.query(
+    `${filtered.sql}
+     SELECT
+       t.id,
+       t.title,
+       t.description,
+       t.status,
+       t.priority,
+       t.type,
+       t.created_at,
+       t.updated_at,
+       t.resolved_at,
+       COALESCE(t.department, 'ti') AS service_department,
+       t.requester_department_label,
+       t.requester_name_label AS requester_name,
+       iu_assigned.name AS assigned_to_name,
+       iu_assigned.email AS assigned_to_email,
+       EXTRACT(EPOCH FROM (COALESCE(t.resolved_at, NOW()) - t.created_at)) / 3600 AS time_open_hours
+     FROM filtered_tickets t
+     LEFT JOIN internal_users iu_assigned ON t.assigned_to_id = iu_assigned.id
+     ${conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''}
+     ORDER BY t.created_at DESC
+     LIMIT ${Math.max(1, Math.min(limit, 5000))}`,
+    params,
+  );
+};
+
+const formatTicketReportRow = (ticket: any) => ({
+  id: ticket.id,
+  title: ticket.title,
+  description: ticket.description,
+  status: ticket.status,
+  priority: ticket.priority,
+  type: ticket.type,
+  serviceDepartment: ticket.service_department || 'ti',
+  serviceDepartmentLabel: serviceDepartmentLabel(ticket.service_department || 'ti'),
+  requesterDepartment: ticket.requester_department_label || 'Não informado',
+  requesterName: ticket.requester_name,
+  assignedToName: ticket.assigned_to_name || 'Não atribuído',
+  assignedToEmail: ticket.assigned_to_email || '',
+  createdAt: ticket.created_at,
+  updatedAt: ticket.updated_at,
+  resolvedAt: ticket.resolved_at,
+  timeOpenHours: toFloat(ticket.time_open_hours).toFixed(1),
+});
 
 reportsRouter.use((req: Request, res: Response, next) => {
   const user = ensureReportsAccess(req, res);
@@ -70,7 +200,73 @@ reportsRouter.use((req: Request, res: Response, next) => {
     return;
   }
 
+  res.locals.reportUser = user;
   next();
+});
+
+reportsRouter.use((req: Request, res: Response, next) => {
+  const scalarFilters = ['department', 'requester_department', 'date_from', 'date_to', 'status', 'priority', 'assigned_to'];
+  if (scalarFilters.some((key) => req.query[key] !== undefined && typeof req.query[key] !== 'string')) {
+    return res.status(400).json({ error: 'Os filtros devem ter um único valor' });
+  }
+
+  const department = req.query.department as string | undefined;
+  if (department && !['all', 'ti', 'rh', 'administrativo'].includes(department.toLowerCase())) {
+    return res.status(400).json({ error: 'Equipe responsável inválida' });
+  }
+
+  const isValidDate = (value: unknown) => {
+    if (value === undefined || value === '') return true;
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const parsed = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+  };
+
+  if (!isValidDate(req.query.date_from) || !isValidDate(req.query.date_to)) {
+    return res.status(400).json({ error: 'Data inválida. Use o formato AAAA-MM-DD' });
+  }
+
+  const requesterDepartment = req.query.requester_department as string | undefined;
+  if (requesterDepartment && requesterDepartment.length > 160) {
+    return res.status(400).json({ error: 'Setor solicitante inválido' });
+  }
+
+  next();
+});
+
+reportsRouter.get('/filters', async (req: Request, res: Response) => {
+  try {
+    const scope = getReportScope(req, res);
+    const reportUser = res.locals.reportUser as InternalUserClaims;
+    const canSelectDepartment = canSelectServiceDepartment(reportUser.role);
+    const scoped = buildFilteredTicketsCte({ ...scope, requesterDepartment: null }, { includeDates: false });
+    const requesterDepartments = await database.query(
+      `${scoped.sql}
+       SELECT DISTINCT requester_department_label AS name
+       FROM filtered_tickets
+       WHERE requester_department_label <> 'Não informado'
+       ORDER BY requester_department_label ASC`,
+      scoped.params,
+    );
+
+    return res.json({
+      serviceDepartments: canSelectDepartment
+        ? [
+            { value: 'ti', label: 'TI' },
+            { value: 'rh', label: 'Recursos Humanos' },
+            { value: 'administrativo', label: 'Administrativo' },
+          ]
+        : scope.serviceDepartment
+          ? [{ value: scope.serviceDepartment, label: serviceDepartmentLabel(scope.serviceDepartment) }]
+          : [],
+      activeServiceDepartment: scope.serviceDepartment || 'all',
+      canSelectServiceDepartment: canSelectDepartment,
+      requesterDepartments: requesterDepartments.rows.map((row: { name: string }) => row.name),
+    });
+  } catch (error) {
+    console.error('Error fetching report filters:', error);
+    return res.status(500).json({ error: 'Failed to fetch report filters' });
+  }
 });
 
 /**
@@ -78,76 +274,53 @@ reportsRouter.use((req: Request, res: Response, next) => {
  */
 reportsRouter.get('/satisfaction', async (req: Request, res: Response) => {
   try {
-    const { date_from, date_to, department } = req.query as {
-      date_from?: string;
-      date_to?: string;
-      department?: string;
-    };
-
-    const baseConditions: string[] = ['t.rating IS NOT NULL'];
-    const params: any[] = [];
-    let paramCount = 1;
-
-    if (date_from) {
-      baseConditions.push(`t.rated_at >= $${paramCount}`);
-      params.push(date_from);
-      paramCount++;
-    }
-
-    if (date_to) {
-      baseConditions.push(`t.rated_at <= $${paramCount}`);
-      params.push(date_to);
-      paramCount++;
-    }
-
-    if (department && department !== 'all') {
-      baseConditions.push(`COALESCE(t.department, 'ti') = $${paramCount}`);
-      params.push(department);
-      paramCount++;
-    }
-
-    const whereClause = `WHERE ${baseConditions.join(' AND ')}`;
+    const scope = getReportScope(req, res);
+    const filtered = buildFilteredTicketsCte(scope, { dateColumn: 'rated_at' });
 
     const [overallResult, byStaffResult, byDepartmentResult, feedbackEntriesResult] = await Promise.all([
       database.query(
-        `SELECT
+        `${filtered.sql}
+         SELECT
            COALESCE(AVG(rating), 0) AS avg_rating,
            COUNT(*) FILTER (WHERE rating IS NOT NULL) AS total_ratings,
            COUNT(*) FILTER (WHERE rating >= 4) AS positive_ratings
-         FROM tickets t
-         ${whereClause}`,
-        params,
+         FROM filtered_tickets t
+         WHERE t.rating IS NOT NULL`,
+        filtered.params,
       ),
       database.query(
-        `SELECT
+        `${filtered.sql}
+         SELECT
            iu.id AS staff_id,
            iu.name AS staff_name,
            COUNT(*) FILTER (WHERE t.rating IS NOT NULL) AS total_ratings,
            COALESCE(AVG(t.rating), 0) AS avg_rating,
            COUNT(*) FILTER (WHERE t.rating >= 4) AS positive_ratings
          FROM internal_users iu
-         JOIN tickets t ON t.assigned_to_id = iu.id
-         WHERE iu.role IN ('it_staff', 'admin_staff', 'admin')
-           AND ${baseConditions.join(' AND ')}
+         JOIN filtered_tickets t ON t.assigned_to_id = iu.id
+         WHERE iu.role IN ('it_staff', 'admin_staff', 'rh_staff', 'admin')
+           AND t.rating IS NOT NULL
          GROUP BY iu.id, iu.name
          HAVING COUNT(*) FILTER (WHERE t.rating IS NOT NULL) > 0
          ORDER BY avg_rating DESC, total_ratings DESC`,
-        params,
+        filtered.params,
       ),
       database.query(
-        `SELECT
+        `${filtered.sql}
+         SELECT
            COALESCE(t.department, 'ti') AS department,
            COUNT(*) FILTER (WHERE t.rating IS NOT NULL) AS total_ratings,
            COALESCE(AVG(t.rating), 0) AS avg_rating,
            COUNT(*) FILTER (WHERE t.rating >= 4) AS positive_ratings
-         FROM tickets t
-         ${whereClause}
+         FROM filtered_tickets t
+         WHERE t.rating IS NOT NULL
          GROUP BY COALESCE(t.department, 'ti')
          ORDER BY avg_rating DESC, total_ratings DESC`,
-        params,
+        filtered.params,
       ),
       database.query(
-        `SELECT
+        `${filtered.sql}
+         SELECT
            t.id AS ticket_id,
            t.title AS ticket_title,
            t.rating,
@@ -155,16 +328,15 @@ reportsRouter.get('/satisfaction', async (req: Request, res: Response) => {
            t.rated_at,
            COALESCE(t.department, 'ti') AS department,
            iu.name AS assignee_name,
-           COALESCE(t.requester_name, pu.name) AS requester_name
-         FROM tickets t
+           t.requester_name_label AS requester_name
+         FROM filtered_tickets t
          LEFT JOIN internal_users iu ON iu.id = t.assigned_to_id
-         LEFT JOIN public_users pu ON pu.id = t.requester_id AND t.requester_type = 'public'
-         ${whereClause}
+         WHERE t.rating IS NOT NULL
            AND t.feedback IS NOT NULL
            AND LENGTH(TRIM(t.feedback)) > 0
          ORDER BY t.rated_at DESC
          LIMIT 100`,
-        params,
+        filtered.params,
       ),
     ]);
 
@@ -194,7 +366,7 @@ reportsRouter.get('/satisfaction', async (req: Request, res: Response) => {
         const positive = toInt(row.positive_ratings);
         return {
           department: row.department,
-          departmentLabel: row.department === 'administrativo' ? 'Administrativo' : 'TI',
+          departmentLabel: serviceDepartmentLabel(row.department),
           averageRating: Number(toFloat(row.avg_rating).toFixed(2)),
           totalRatings: total,
           positiveRate: total > 0 ? Number(((positive / total) * 100).toFixed(1)) : 0,
@@ -207,14 +379,15 @@ reportsRouter.get('/satisfaction', async (req: Request, res: Response) => {
         feedback: row.feedback,
         ratedAt: row.rated_at,
         department: row.department,
-        departmentLabel: row.department === 'administrativo' ? 'Administrativo' : 'TI',
+        departmentLabel: serviceDepartmentLabel(row.department),
         assigneeName: row.assignee_name || 'Não atribuído',
         requesterName: row.requester_name || 'Solicitante',
       })),
       filters: {
-        date_from: date_from || null,
-        date_to: date_to || null,
-        department: department || 'all',
+        date_from: scope.dateFrom,
+        date_to: scope.dateTo,
+        department: scope.serviceDepartment || 'all',
+        requester_department: scope.requesterDepartment,
       },
     });
   } catch (error) {
@@ -229,22 +402,8 @@ reportsRouter.get('/satisfaction', async (req: Request, res: Response) => {
  */
 reportsRouter.get('/stats/overview', async (req: Request, res: Response) => {
   try {
-    const { date_from, date_to } = req.query;
-    
-    // Construir condição de data
-    let dateCondition = '';
-    const params: any[] = [];
-    
-    if (date_from && date_to) {
-      dateCondition = 'WHERE created_at BETWEEN $1 AND $2';
-      params.push(date_from, date_to);
-    } else if (date_from) {
-      dateCondition = 'WHERE created_at >= $1';
-      params.push(date_from);
-    } else if (date_to) {
-      dateCondition = 'WHERE created_at <= $1';
-      params.push(date_to);
-    }
+    const scope = getReportScope(req, res);
+    const filtered = buildFilteredTicketsCte(scope);
 
     const [
       totalTickets,
@@ -257,23 +416,26 @@ reportsRouter.get('/stats/overview', async (req: Request, res: Response) => {
       resolutionRate,
     ] = await Promise.all([
       database.query(
-        `SELECT COUNT(*) as total FROM tickets ${dateCondition}`,
-        params
+        `${filtered.sql} SELECT COUNT(*) as total FROM filtered_tickets`,
+        filtered.params,
       ),
       database.query(
-        `SELECT status, COUNT(*) as count 
-         FROM tickets ${dateCondition}
+        `${filtered.sql}
+         SELECT status, COUNT(*) as count
+         FROM filtered_tickets
          GROUP BY status`,
-        params
+        filtered.params,
       ),
       database.query(
-        `SELECT priority, COUNT(*) as count 
-         FROM tickets ${dateCondition}
+        `${filtered.sql}
+         SELECT priority, COUNT(*) as count
+         FROM filtered_tickets
          GROUP BY priority`,
-        params
+        filtered.params,
       ),
       database.query(
-        `SELECT
+        `${filtered.sql}
+         SELECT
            COALESCE(department, 'ti') as team,
            COUNT(*) as total_tickets,
            COUNT(*) FILTER (WHERE status IN ('resolved', 'closed')) as resolved_tickets,
@@ -283,40 +445,44 @@ reportsRouter.get('/stats/overview', async (req: Request, res: Response) => {
              FILTER (WHERE status IN ('resolved', 'closed')),
              0
            ) as avg_resolution_hours
-         FROM tickets
-         ${dateCondition}
+         FROM filtered_tickets
          GROUP BY COALESCE(department, 'ti')
          ORDER BY CASE COALESCE(department, 'ti')
            WHEN 'ti' THEN 1
            ELSE 2
          END`,
-        params
+        filtered.params,
       ),
       database.query(
-        `SELECT AVG(EXTRACT(EPOCH FROM (t.first_response_at - t.created_at)) / 3600) as avg_hours
-         FROM tickets t
-         ${dateCondition ? dateCondition + ' AND t.first_response_at IS NOT NULL' : 'WHERE t.first_response_at IS NOT NULL'}`,
-        params
+        `${filtered.sql}
+         SELECT AVG(EXTRACT(EPOCH FROM (t.first_response_at - t.created_at)) / 3600) as avg_hours
+         FROM filtered_tickets t
+         WHERE t.first_response_at IS NOT NULL`,
+        filtered.params,
       ),
       database.query(
-        `SELECT AVG(EXTRACT(EPOCH FROM (COALESCE(resolved_at, updated_at) - created_at)) / 3600) as avg_hours
-         FROM tickets
-         WHERE status IN ('resolved', 'closed') ${dateCondition ? 'AND ' + dateCondition.replace('WHERE ', '') : ''}`,
-        params
+        `${filtered.sql}
+         SELECT AVG(EXTRACT(EPOCH FROM (COALESCE(resolved_at, updated_at) - created_at)) / 3600) as avg_hours
+         FROM filtered_tickets
+         WHERE status IN ('resolved', 'closed')`,
+        filtered.params,
       ),
       database.query(
-        `SELECT DATE(created_at) as date, COUNT(*) as count
-         FROM tickets
+        `${filtered.sql}
+         SELECT DATE(created_at) as date, COUNT(*) as count
+         FROM filtered_tickets
          WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
          GROUP BY DATE(created_at)
-         ORDER BY date DESC`
+         ORDER BY date DESC`,
+        filtered.params,
       ),
       database.query(
-        `SELECT 
+        `${filtered.sql}
+         SELECT
            COUNT(CASE WHEN status IN ('resolved', 'closed') THEN 1 END) as resolved,
            COUNT(*) as total
-         FROM tickets ${dateCondition}`,
-        params
+         FROM filtered_tickets`,
+        filtered.params,
       ),
     ]);
 
@@ -354,7 +520,13 @@ reportsRouter.get('/stats/overview', async (req: Request, res: Response) => {
         resolved,
         total,
         percentage: resolutionPercentage
-      }
+      },
+      filters: {
+        department: scope.serviceDepartment || 'all',
+        requesterDepartment: scope.requesterDepartment,
+        dateFrom: scope.dateFrom,
+        dateTo: scope.dateTo,
+      },
     });
   } catch (error) {
     console.error('Error fetching overview stats:', error);
@@ -368,29 +540,21 @@ reportsRouter.get('/stats/overview', async (req: Request, res: Response) => {
  */
 reportsRouter.get('/stats/technicians', async (req: Request, res: Response) => {
   try {
-    const { date_from, date_to } = req.query;
-    
-    let dateCondition = '';
-    const params: any[] = [];
-    
-    if (date_from && date_to) {
-      dateCondition = 'AND t.created_at BETWEEN $1 AND $2';
-      params.push(date_from, date_to);
-    } else if (date_from) {
-      dateCondition = 'AND t.created_at >= $1';
-      params.push(date_from);
-    } else if (date_to) {
-      dateCondition = 'AND t.created_at <= $1';
-      params.push(date_to);
-    }
+    const scope = getReportScope(req, res);
+    const filtered = buildFilteredTicketsCte(scope);
 
     const technicianStats = await database.query(
-      `SELECT 
+      `${filtered.sql}
+       SELECT
          iu.id,
          iu.name,
          iu.email,
          iu.role,
-         CASE WHEN iu.role = 'admin_staff' THEN 'administrativo' ELSE 'ti' END as team,
+         COALESCE(t.department, CASE
+           WHEN iu.role = 'admin_staff' THEN 'administrativo'
+           WHEN iu.role = 'rh_staff' THEN 'rh'
+           ELSE 'ti'
+         END) as team,
          COUNT(t.id) as total_tickets,
          COUNT(CASE WHEN t.status IN ('resolved', 'closed') THEN 1 END) as resolved_tickets,
          COUNT(CASE WHEN t.status = 'closed' THEN 1 END) as closed_tickets,
@@ -402,11 +566,15 @@ reportsRouter.get('/stats/technicians', async (req: Request, res: Response) => {
          MIN(t.created_at) as first_ticket_date,
          MAX(t.updated_at) as last_activity_date
        FROM internal_users iu
-       LEFT JOIN tickets t ON t.assigned_to_id = iu.id ${dateCondition}
-       WHERE iu.role IN ('it_staff', 'admin_staff', 'admin') AND iu.is_active = true
-       GROUP BY iu.id, iu.name, iu.email, iu.role
-       ORDER BY CASE WHEN iu.role = 'admin_staff' THEN 2 ELSE 1 END, total_tickets DESC, iu.name ASC`,
-      params
+       JOIN filtered_tickets t ON t.assigned_to_id = iu.id
+       WHERE iu.role IN ('it_staff', 'admin_staff', 'rh_staff', 'admin') AND iu.is_active = true
+       GROUP BY iu.id, iu.name, iu.email, iu.role, COALESCE(t.department, CASE
+         WHEN iu.role = 'admin_staff' THEN 'administrativo'
+         WHEN iu.role = 'rh_staff' THEN 'rh'
+         ELSE 'ti'
+       END)
+       ORDER BY team ASC, total_tickets DESC, iu.name ASC`,
+      filtered.params,
     );
 
     const formattedStats = technicianStats.rows.map((tech: any) => {
@@ -417,7 +585,7 @@ reportsRouter.get('/stats/technicians', async (req: Request, res: Response) => {
         : 0;
 
       return {
-        id: tech.id,
+        id: `${tech.id}:${tech.team}`,
         name: tech.name,
         email: tech.email,
         role: tech.role,
@@ -450,19 +618,12 @@ reportsRouter.get('/stats/technicians', async (req: Request, res: Response) => {
  */
 reportsRouter.get('/stats/sla', async (req: Request, res: Response) => {
   try {
-    const { date_from, date_to } = req.query;
-    
-    let dateFilter = '';
-    const params: any[] = [];
-    
-    if (date_from && date_to) {
-      dateFilter = 'AND t.created_at BETWEEN $1 AND $2';
-      params.push(date_from, date_to);
-    }
+    const scope = getReportScope(req, res);
+    const filtered = buildFilteredTicketsCte(scope);
 
     // Analisar cumprimento de SLA com todas as prioridades
     const slaCompliance = await database.query(
-      `WITH priorities AS (
+      `${filtered.sql}, priorities AS (
          SELECT unnest(ARRAY['critical', 'high', 'medium', 'low']) AS priority
        )
        SELECT 
@@ -492,7 +653,8 @@ reportsRouter.get('/stats/sla', async (req: Request, res: Response) => {
          AVG(EXTRACT(EPOCH FROM (t.first_response_at - t.created_at)) / 3600) as avg_response_hours,
          AVG(EXTRACT(EPOCH FROM (t.resolved_at - t.created_at)) / 3600) as avg_resolution_hours
        FROM priorities p
-       LEFT JOIN tickets t ON t.priority = p.priority ${dateFilter}
+       LEFT JOIN filtered_tickets t
+         ON CASE WHEN t.priority = 'urgent' THEN 'critical' ELSE t.priority END = p.priority
        GROUP BY p.priority
        ORDER BY CASE p.priority
          WHEN 'critical' THEN 1
@@ -500,7 +662,7 @@ reportsRouter.get('/stats/sla', async (req: Request, res: Response) => {
          WHEN 'medium' THEN 3
          WHEN 'low' THEN 4
        END`,
-      params
+      filtered.params,
     );
 
     // Build byPriority array for frontend
@@ -556,6 +718,8 @@ reportsRouter.get('/stats/sla', async (req: Request, res: Response) => {
 reportsRouter.get('/stats/trends', async (req: Request, res: Response) => {
   try {
     const { period = '30days' } = req.query;
+    const scope = getReportScope(req, res);
+    const filtered = buildFilteredTicketsCte(scope);
     
     let interval = '30 days';
     let groupBy = 'DATE(created_at)';
@@ -573,25 +737,30 @@ reportsRouter.get('/stats/trends', async (req: Request, res: Response) => {
 
     // Tickets criados por período
     const ticketsCreated = await database.query(
-      `SELECT TO_CHAR(${groupBy}, '${dateFormat}') as date, COUNT(*) as count
-       FROM tickets
+      `${filtered.sql}
+       SELECT TO_CHAR(${groupBy}, '${dateFormat}') as date, COUNT(*) as count
+       FROM filtered_tickets
        WHERE created_at >= CURRENT_DATE - INTERVAL '${interval}'
        GROUP BY ${groupBy}
-       ORDER BY ${groupBy} ASC`
+       ORDER BY ${groupBy} ASC`,
+      filtered.params,
     );
 
     // Tickets resolvidos por período
     const ticketsResolved = await database.query(
-      `SELECT TO_CHAR(${groupBy.replace('created_at', 'resolved_at')}, '${dateFormat}') as date, COUNT(*) as count
-       FROM tickets
+      `${filtered.sql}
+       SELECT TO_CHAR(${groupBy.replace('created_at', 'resolved_at')}, '${dateFormat}') as date, COUNT(*) as count
+       FROM filtered_tickets
        WHERE resolved_at >= CURRENT_DATE - INTERVAL '${interval}'
        GROUP BY ${groupBy.replace('created_at', 'resolved_at')}
-       ORDER BY ${groupBy.replace('created_at', 'resolved_at')} ASC`
+       ORDER BY ${groupBy.replace('created_at', 'resolved_at')} ASC`,
+      filtered.params,
     );
 
     // Distribuição por status (total atual)
     const byStatus = await database.query(
-      `SELECT 
+      `${filtered.sql}
+       SELECT
          CASE 
            WHEN status = 'open' THEN 'Aberto'
            WHEN status = 'in_progress' THEN 'Em Andamento'
@@ -602,31 +771,36 @@ reportsRouter.get('/stats/trends', async (req: Request, res: Response) => {
            ELSE status
          END as name,
          COUNT(*) as value
-       FROM tickets
+       FROM filtered_tickets
        GROUP BY status
-       ORDER BY value DESC`
+       ORDER BY value DESC`,
+      filtered.params,
     );
 
     // Distribuição por prioridade (total atual)
     const byPriority = await database.query(
-      `SELECT 
+      `${filtered.sql}
+       SELECT
          CASE 
            WHEN priority = 'low' THEN 'Baixa'
            WHEN priority = 'medium' THEN 'Média'
            WHEN priority = 'high' THEN 'Alta'
+           WHEN priority = 'urgent' THEN 'Urgente'
            WHEN priority = 'critical' THEN 'Crítica'
            ELSE priority
          END as name,
          COUNT(*) as value
-       FROM tickets
+       FROM filtered_tickets
        GROUP BY priority
        ORDER BY 
          CASE priority
+           WHEN 'urgent' THEN 1
            WHEN 'critical' THEN 1
            WHEN 'high' THEN 2
            WHEN 'medium' THEN 3
            WHEN 'low' THEN 4
-         END`
+         END`,
+      filtered.params,
     );
 
     res.json({
@@ -653,87 +827,10 @@ reportsRouter.get('/stats/trends', async (req: Request, res: Response) => {
  */
 reportsRouter.get('/export/tickets', async (req: Request, res: Response) => {
   try {
-    const { status, priority, date_from, date_to, assigned_to } = req.query;
-    
-    const conditions: string[] = [];
-    const params: any[] = [];
-    let paramCount = 1;
-
-    if (status) {
-      conditions.push(`t.status = $${paramCount}`);
-      params.push(status);
-      paramCount++;
-    }
-
-    if (priority) {
-      conditions.push(`t.priority = $${paramCount}`);
-      params.push(priority);
-      paramCount++;
-    }
-
-    if (date_from) {
-      conditions.push(`t.created_at >= $${paramCount}`);
-      params.push(date_from);
-      paramCount++;
-    }
-
-    if (date_to) {
-      conditions.push(`t.created_at <= $${paramCount}`);
-      params.push(date_to);
-      paramCount++;
-    }
-
-    if (assigned_to) {
-      conditions.push(`t.assigned_to_id = $${paramCount}`);
-      params.push(assigned_to);
-      paramCount++;
-    }
-
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-
-    const tickets = await database.query(
-      `SELECT 
-         t.id,
-         t.title,
-         t.description,
-         t.status,
-         t.priority,
-         t.type,
-         t.created_at,
-         t.updated_at,
-         t.resolved_at,
-         COALESCE(t.requester_name, pu.name, iu_req.name) as requester_name,
-         COALESCE(pu.email, iu_req.email) as requester_email,
-         iu_assigned.name as assigned_to_name,
-         iu_assigned.email as assigned_to_email,
-         EXTRACT(EPOCH FROM (COALESCE(t.resolved_at, NOW()) - t.created_at)) / 3600 as time_open_hours
-       FROM tickets t
-       LEFT JOIN public_users pu ON t.requester_type = 'public' AND t.requester_id = pu.id
-       LEFT JOIN internal_users iu_req ON t.requester_type = 'internal' AND t.requester_id = iu_req.id
-       LEFT JOIN internal_users iu_assigned ON t.assigned_to_id = iu_assigned.id
-       ${whereClause}
-       ORDER BY t.created_at DESC
-       LIMIT 1000`,
-      params
-    );
+    const tickets = await fetchTicketReportRows(req, res, 1000);
 
     res.json({
-      tickets: tickets.rows.map((t: any) => ({
-        id: t.id,
-        title: t.title,
-        description: t.description,
-        status: t.status,
-        priority: t.priority,
-        type: t.type,
-        requesterName: t.requester_name,
-        requesterEmail: t.requester_email,
-        assignedToName: t.assigned_to_name || 'Não atribuído',
-        assignedToEmail: t.assigned_to_email || '',
-        createdAt: t.created_at,
-        updatedAt: t.updated_at,
-        resolvedAt: t.resolved_at,
-        timeOpenHours: parseFloat(t.time_open_hours || 0).toFixed(1)
-      }))
+      tickets: tickets.rows.map(formatTicketReportRow),
     });
   } catch (error) {
     console.error('Error exporting tickets:', error);
@@ -746,88 +843,8 @@ reportsRouter.get('/export/tickets', async (req: Request, res: Response) => {
  */
 reportsRouter.get('/export/excel/tickets', async (req: Request, res: Response) => {
   try {
-    const { status, priority, date_from, date_to, assigned_to } = req.query;
-    
-    const conditions: string[] = [];
-    const params: any[] = [];
-    let paramCount = 1;
-
-    if (status) {
-      conditions.push(`t.status = $${paramCount}`);
-      params.push(status);
-      paramCount++;
-    }
-
-    if (priority) {
-      conditions.push(`t.priority = $${paramCount}`);
-      params.push(priority);
-      paramCount++;
-    }
-
-    if (date_from) {
-      conditions.push(`t.created_at >= $${paramCount}`);
-      params.push(date_from);
-      paramCount++;
-    }
-
-    if (date_to) {
-      conditions.push(`t.created_at <= $${paramCount}`);
-      params.push(date_to);
-      paramCount++;
-    }
-
-    if (assigned_to && assigned_to !== 'unassigned') {
-      conditions.push(`t.assigned_to_id = $${paramCount}`);
-      params.push(assigned_to);
-      paramCount++;
-    } else if (assigned_to === 'unassigned') {
-      conditions.push('t.assigned_to_id IS NULL');
-    }
-
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-
-    const tickets = await database.query(
-      `SELECT 
-         t.id,
-         t.title,
-         t.description,
-         t.status,
-         t.priority,
-         t.type,
-         t.created_at,
-         t.updated_at,
-         t.resolved_at,
-         COALESCE(t.requester_name, pu.name, iu_req.name) as requester_name,
-         COALESCE(pu.email, iu_req.email) as requester_email,
-         iu_assigned.name as assigned_to_name,
-         iu_assigned.email as assigned_to_email,
-         EXTRACT(EPOCH FROM (COALESCE(t.resolved_at, NOW()) - t.created_at)) / 3600 as time_open_hours
-       FROM tickets t
-       LEFT JOIN public_users pu ON t.requester_type = 'public' AND t.requester_id = pu.id
-       LEFT JOIN internal_users iu_req ON t.requester_type = 'internal' AND t.requester_id = iu_req.id
-       LEFT JOIN internal_users iu_assigned ON t.assigned_to_id = iu_assigned.id
-       ${whereClause}
-       ORDER BY t.created_at DESC
-       LIMIT 5000`,
-      params
-    );
-
-    const formattedTickets = tickets.rows.map((t: any) => ({
-      id: t.id,
-      title: t.title,
-      description: t.description,
-      status: t.status,
-      priority: t.priority,
-      type: t.type,
-      requesterName: t.requester_name,
-      requesterEmail: t.requester_email,
-      assignedToName: t.assigned_to_name || 'Não atribuído',
-      assignedToEmail: t.assigned_to_email || '',
-      createdAt: t.created_at,
-      updatedAt: t.updated_at,
-      resolvedAt: t.resolved_at,
-      timeOpenHours: parseFloat(t.time_open_hours || 0).toFixed(1)
-    }));
+    const tickets = await fetchTicketReportRows(req, res, 5000);
+    const formattedTickets = tickets.rows.map(formatTicketReportRow);
 
     await ExcelReportService.generateTicketsReport(formattedTickets, res);
   } catch (error) {
@@ -841,29 +858,21 @@ reportsRouter.get('/export/excel/tickets', async (req: Request, res: Response) =
  */
 reportsRouter.get('/export/excel/technicians', async (req: Request, res: Response) => {
   try {
-    const { date_from, date_to } = req.query;
-    
-    let dateCondition = '';
-    const params: any[] = [];
-    
-    if (date_from && date_to) {
-      dateCondition = 'AND t.created_at BETWEEN $1 AND $2';
-      params.push(date_from, date_to);
-    } else if (date_from) {
-      dateCondition = 'AND t.created_at >= $1';
-      params.push(date_from);
-    } else if (date_to) {
-      dateCondition = 'AND t.created_at <= $1';
-      params.push(date_to);
-    }
+    const scope = getReportScope(req, res);
+    const filtered = buildFilteredTicketsCte(scope);
 
     const technicianStats = await database.query(
-      `SELECT 
+      `${filtered.sql}
+       SELECT
          iu.id,
          iu.name,
          iu.email,
          iu.role,
-         CASE WHEN iu.role = 'admin_staff' THEN 'administrativo' ELSE 'ti' END as team,
+         COALESCE(t.department, CASE
+           WHEN iu.role = 'admin_staff' THEN 'administrativo'
+           WHEN iu.role = 'rh_staff' THEN 'rh'
+           ELSE 'ti'
+         END) as team,
          COUNT(t.id) as total_tickets,
          COUNT(CASE WHEN t.status IN ('resolved', 'closed') THEN 1 END) as resolved_tickets,
          COUNT(CASE WHEN t.status = 'in_progress' THEN 1 END) as in_progress_tickets,
@@ -872,11 +881,15 @@ reportsRouter.get('/export/excel/technicians', async (req: Request, res: Respons
            FILTER (WHERE t.status IN ('resolved', 'closed')) as avg_resolution_hours,
          MAX(t.updated_at) as last_activity_date
        FROM internal_users iu
-       LEFT JOIN tickets t ON t.assigned_to_id = iu.id ${dateCondition}
-       WHERE iu.role IN ('it_staff', 'admin_staff', 'admin') AND iu.is_active = true
-       GROUP BY iu.id, iu.name, iu.email, iu.role
-       ORDER BY CASE WHEN iu.role = 'admin_staff' THEN 2 ELSE 1 END, total_tickets DESC, iu.name ASC`,
-      params
+       JOIN filtered_tickets t ON t.assigned_to_id = iu.id
+       WHERE iu.role IN ('it_staff', 'admin_staff', 'rh_staff', 'admin') AND iu.is_active = true
+       GROUP BY iu.id, iu.name, iu.email, iu.role, COALESCE(t.department, CASE
+         WHEN iu.role = 'admin_staff' THEN 'administrativo'
+         WHEN iu.role = 'rh_staff' THEN 'rh'
+         ELSE 'ti'
+       END)
+       ORDER BY team ASC, total_tickets DESC, iu.name ASC`,
+      filtered.params,
     );
 
     const formattedStats = technicianStats.rows.map((tech: any) => {
@@ -901,7 +914,15 @@ reportsRouter.get('/export/excel/technicians', async (req: Request, res: Respons
       };
     });
 
-    await ExcelReportService.generateTechniciansReport(formattedStats, res);
+    await ExcelReportService.generateTechniciansReport(formattedStats, res, {
+      serviceDepartment: scope.serviceDepartment
+        ? serviceDepartmentLabel(scope.serviceDepartment)
+        : 'Todos os atendimentos',
+      requesterDepartment: scope.requesterDepartment || 'Todos os setores solicitantes',
+      period: scope.dateFrom || scope.dateTo
+        ? `${scope.dateFrom || 'início'} a ${scope.dateTo || 'hoje'}`
+        : 'Todo o histórico',
+    });
   } catch (error) {
     console.error('Error generating technicians Excel report:', error);
     res.status(500).json({ error: 'Failed to generate technicians report' });
@@ -913,32 +934,65 @@ reportsRouter.get('/export/excel/technicians', async (req: Request, res: Respons
  */
 reportsRouter.get('/export/excel/consolidated', async (req: Request, res: Response) => {
   try {
-    // Buscar visão geral
-    const totalTickets = await database.query('SELECT COUNT(*) as total FROM tickets');
-    const ticketsByStatus = await database.query(
-      'SELECT status, COUNT(*) as count FROM tickets GROUP BY status'
-    );
-    const ticketsByPriority = await database.query(
-      'SELECT priority, COUNT(*) as count FROM tickets GROUP BY priority'
-    );
-    const avgFirstResponse = await database.query(
-      `SELECT AVG(EXTRACT(EPOCH FROM (first_response_at - created_at)) / 3600) as avg_hours
-       FROM tickets
-       WHERE first_response_at IS NOT NULL`
-    );
-    const avgResolution = await database.query(
-      `SELECT AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 3600) as avg_hours
-       FROM tickets WHERE resolved_at IS NOT NULL`
-    );
-    const resolutionRate = await database.query(
-      `SELECT 
-         COUNT(CASE WHEN status IN ('resolved', 'closed') THEN 1 END) as resolved,
-         COUNT(*) as total
-       FROM tickets`
-    );
+    const scope = getReportScope(req, res);
+    const filtered = buildFilteredTicketsCte(scope);
+    const [totalTickets, ticketsByStatus, ticketsByPriority, avgFirstResponse, avgResolution, resolutionRate, tickets, technicians] = await Promise.all([
+      database.query(`${filtered.sql} SELECT COUNT(*) as total FROM filtered_tickets`, filtered.params),
+      database.query(`${filtered.sql} SELECT status, COUNT(*) as count FROM filtered_tickets GROUP BY status`, filtered.params),
+      database.query(`${filtered.sql} SELECT priority, COUNT(*) as count FROM filtered_tickets GROUP BY priority`, filtered.params),
+      database.query(
+        `${filtered.sql}
+         SELECT AVG(EXTRACT(EPOCH FROM (first_response_at - created_at)) / 3600) as avg_hours
+         FROM filtered_tickets
+         WHERE first_response_at IS NOT NULL`,
+        filtered.params,
+      ),
+      database.query(
+        `${filtered.sql}
+         SELECT AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 3600) as avg_hours
+         FROM filtered_tickets WHERE resolved_at IS NOT NULL`,
+        filtered.params,
+      ),
+      database.query(
+        `${filtered.sql}
+         SELECT
+           COUNT(CASE WHEN status IN ('resolved', 'closed') THEN 1 END) as resolved,
+           COUNT(*) as total
+         FROM filtered_tickets`,
+        filtered.params,
+      ),
+      fetchTicketReportRows(req, res, 500),
+      database.query(
+        `${filtered.sql}
+         SELECT
+           iu.name,
+           COALESCE(t.department, CASE
+             WHEN iu.role = 'admin_staff' THEN 'administrativo'
+             WHEN iu.role = 'rh_staff' THEN 'rh'
+             ELSE 'ti'
+           END) as team,
+           COUNT(t.id) as total_tickets,
+           COUNT(CASE WHEN t.status IN ('resolved', 'closed') THEN 1 END) as resolved_tickets,
+           AVG(EXTRACT(EPOCH FROM (COALESCE(t.resolved_at, t.updated_at) - t.created_at)) / 3600)
+             FILTER (WHERE t.status IN ('resolved', 'closed')) as avg_resolution_hours
+         FROM internal_users iu
+         JOIN filtered_tickets t ON t.assigned_to_id = iu.id
+         WHERE iu.role IN ('it_staff', 'admin_staff', 'rh_staff', 'admin') AND iu.is_active = true
+         GROUP BY iu.id, iu.name, iu.role, COALESCE(t.department, CASE
+           WHEN iu.role = 'admin_staff' THEN 'administrativo'
+           WHEN iu.role = 'rh_staff' THEN 'rh'
+           ELSE 'ti'
+         END)
+         ORDER BY team ASC, total_tickets DESC, iu.name ASC`,
+        filtered.params,
+      ),
+    ]);
+
+    const resolvedTotal = toInt(resolutionRate.rows[0]?.resolved);
+    const ticketTotal = toInt(resolutionRate.rows[0]?.total);
 
     const overview = {
-      total: parseInt(totalTickets.rows[0].total),
+      total: toInt(totalTickets.rows[0]?.total),
       byStatus: ticketsByStatus.rows.reduce((acc: any, row: any) => {
         acc[row.status] = parseInt(row.count);
         return acc;
@@ -950,41 +1004,18 @@ reportsRouter.get('/export/excel/consolidated', async (req: Request, res: Respon
       avgFirstResponseHours: parseFloat(avgFirstResponse.rows[0]?.avg_hours || 0).toFixed(1),
       avgResolutionHours: parseFloat(avgResolution.rows[0]?.avg_hours || 0).toFixed(1),
       resolutionRate: {
-        resolved: parseInt(resolutionRate.rows[0].resolved),
-        total: parseInt(resolutionRate.rows[0].total),
-        percentage: parseFloat(((parseInt(resolutionRate.rows[0].resolved) / parseInt(resolutionRate.rows[0].total)) * 100).toFixed(1))
-      }
+        resolved: resolvedTotal,
+        total: ticketTotal,
+        percentage: ticketTotal > 0 ? Number(((resolvedTotal / ticketTotal) * 100).toFixed(1)) : 0,
+      },
+      filters: {
+        serviceDepartment: scope.serviceDepartment ? serviceDepartmentLabel(scope.serviceDepartment) : 'Todos os atendimentos',
+        requesterDepartment: scope.requesterDepartment || 'Todos os setores solicitantes',
+        period: scope.dateFrom || scope.dateTo
+          ? `${scope.dateFrom || 'início'} a ${scope.dateTo || 'hoje'}`
+          : 'Todo o histórico',
+      },
     };
-
-    // Buscar tickets recentes
-    const tickets = await database.query(
-      `SELECT 
-         t.id, t.title, t.status, t.priority, t.type, t.created_at,
-         COALESCE(t.requester_name, pu.name, iu_req.name) as requester_name,
-         iu_assigned.name as assigned_to_name
-       FROM tickets t
-       LEFT JOIN public_users pu ON t.requester_type = 'public' AND t.requester_id = pu.id
-       LEFT JOIN internal_users iu_req ON t.requester_type = 'internal' AND t.requester_id = iu_req.id
-       LEFT JOIN internal_users iu_assigned ON t.assigned_to_id = iu_assigned.id
-       ORDER BY t.created_at DESC
-       LIMIT 500`
-    );
-
-    // Buscar técnicos
-    const technicians = await database.query(
-      `SELECT 
-         iu.name,
-         CASE WHEN iu.role = 'admin_staff' THEN 'administrativo' ELSE 'ti' END as team,
-         COUNT(t.id) as total_tickets,
-         COUNT(CASE WHEN t.status IN ('resolved', 'closed') THEN 1 END) as resolved_tickets,
-         AVG(EXTRACT(EPOCH FROM (COALESCE(t.resolved_at, t.updated_at) - t.created_at)) / 3600)
-           FILTER (WHERE t.status IN ('resolved', 'closed')) as avg_resolution_hours
-       FROM internal_users iu
-       LEFT JOIN tickets t ON t.assigned_to_id = iu.id
-       WHERE iu.role IN ('it_staff', 'admin_staff', 'admin') AND iu.is_active = true
-       GROUP BY iu.id, iu.name, iu.role
-       ORDER BY CASE WHEN iu.role = 'admin_staff' THEN 2 ELSE 1 END, total_tickets DESC, iu.name ASC`
-    );
 
     const formattedTechnicians = technicians.rows.map((tech: any) => ({
       name: tech.name,
@@ -1000,7 +1031,7 @@ reportsRouter.get('/export/excel/consolidated', async (req: Request, res: Respon
 
     await ExcelReportService.generateConsolidatedReport(
       overview,
-      tickets.rows,
+      tickets.rows.map(formatTicketReportRow),
       formattedTechnicians,
       res
     );

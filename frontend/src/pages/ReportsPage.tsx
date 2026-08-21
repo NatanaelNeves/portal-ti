@@ -115,11 +115,22 @@ interface SatisfactionData {
   }>;
 }
 
+type ServiceDepartmentFilter = 'all' | 'ti' | 'rh' | 'administrativo';
+
+interface ReportFilterOptions {
+  serviceDepartments: Array<{ value: Exclude<ServiceDepartmentFilter, 'all'>; label: string }>;
+  activeServiceDepartment: ServiceDepartmentFilter;
+  canSelectServiceDepartment: boolean;
+  requesterDepartments: string[];
+}
+
 const STATUS_CHART_COLORS = ['#378ADD', '#3B6D11', '#BA7517', '#E24B4A', '#7A8A9A'];
 
 const PRIORITY_CHART_COLORS: Record<string, string> = {
   alta: '#E24B4A',
   high: '#E24B4A',
+  urgente: '#E24B4A',
+  urgent: '#E24B4A',
   media: '#BA7517',
   média: '#BA7517',
   medium: '#BA7517',
@@ -133,6 +144,8 @@ const CHART_LEGEND_COLORS: Record<string, string> = {
   resolvidos: '#3B6D11',
   alta: '#E24B4A',
   high: '#E24B4A',
+  urgente: '#E24B4A',
+  urgent: '#E24B4A',
   media: '#BA7517',
   média: '#BA7517',
   medium: '#BA7517',
@@ -181,7 +194,18 @@ const ReportsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [satisfactionDepartment, setSatisfactionDepartment] = useState<'all' | 'ti' | 'administrativo'>('all');
+  const [serviceDepartment, setServiceDepartment] = useState<ServiceDepartmentFilter>('all');
+  const [requesterDepartment, setRequesterDepartment] = useState('all');
+  const [filterOptions, setFilterOptions] = useState<ReportFilterOptions>({
+    serviceDepartments: [
+      { value: 'ti', label: 'TI' },
+      { value: 'rh', label: 'Recursos Humanos' },
+      { value: 'administrativo', label: 'Administrativo' },
+    ],
+    activeServiceDepartment: 'all',
+    canSelectServiceDepartment: false,
+    requesterDepartments: [],
+  });
   
   const [overviewStats, setOverviewStats] = useState<OverviewStats | null>(null);
   const [technicianStats, setTechnicianStats] = useState<TechnicianStats[]>([]);
@@ -192,17 +216,59 @@ const ReportsPage: React.FC = () => {
   const [exporting, setExporting] = useState<'tickets' | 'technicians' | 'consolidated' | null>(null);
   const [exportFeedback, setExportFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
 
-  useEffect(() => {
-    loadData();
-  }, [activeTab, dateFrom, dateTo, trendsPeriod, satisfactionDepartment]);
+  const buildFilterParams = () => {
+    const params = new URLSearchParams();
+    if (dateFrom) params.append('date_from', dateFrom);
+    if (dateTo) params.append('date_to', dateTo);
+    if (serviceDepartment !== 'all') params.append('department', serviceDepartment);
+    if (requesterDepartment !== 'all') params.append('requester_department', requesterDepartment);
+    return params;
+  };
 
-  const loadData = async () => {
+  useEffect(() => {
+    const controller = new AbortController();
+    const loadFilterOptions = async () => {
+      try {
+        const token = localStorage.getItem('internal_token') || localStorage.getItem('token');
+        const params = new URLSearchParams();
+        if (serviceDepartment !== 'all') params.append('department', serviceDepartment);
+        const queryString = params.toString();
+        const response = await fetch(`${BACKEND_URL}/api/reports/filters${queryString ? `?${queryString}` : ''}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        });
+        if (!response.ok) return;
+        const options = await response.json() as ReportFilterOptions;
+        setFilterOptions(options);
+        if (!options.canSelectServiceDepartment && options.activeServiceDepartment !== serviceDepartment) {
+          setServiceDepartment(options.activeServiceDepartment);
+        }
+        setRequesterDepartment((currentDepartment) => (
+          currentDepartment !== 'all' && !options.requesterDepartments.includes(currentDepartment)
+            ? 'all'
+            : currentDepartment
+        ));
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          console.error('Error loading report filters:', error);
+        }
+      }
+    };
+    void loadFilterOptions();
+    return () => controller.abort();
+  }, [serviceDepartment]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadData(controller.signal);
+    return () => controller.abort();
+  }, [activeTab, dateFrom, dateTo, trendsPeriod, serviceDepartment, requesterDepartment]);
+
+  const loadData = async (signal?: AbortSignal) => {
     setLoading(true);
     try {
       const token = localStorage.getItem('internal_token') || localStorage.getItem('token');
-      const params = new URLSearchParams();
-      if (dateFrom) params.append('date_from', dateFrom);
-      if (dateTo) params.append('date_to', dateTo);
+      const params = buildFilterParams();
       
       const queryString = params.toString();
       
@@ -211,20 +277,15 @@ const ReportsPage: React.FC = () => {
           fetch(
             `${BACKEND_URL}/api/reports/stats/overview${queryString ? '?' + queryString : ''}`,
             {
-              headers: { Authorization: `Bearer ${token}` }
+              headers: { Authorization: `Bearer ${token}` },
+              signal,
             }
           ),
           fetch(
-            `${BACKEND_URL}/api/reports/satisfaction${(() => {
-              const satisfactionParams = new URLSearchParams();
-              if (dateFrom) satisfactionParams.append('date_from', dateFrom);
-              if (dateTo) satisfactionParams.append('date_to', dateTo);
-              if (satisfactionDepartment !== 'all') satisfactionParams.append('department', satisfactionDepartment);
-              const qs = satisfactionParams.toString();
-              return qs ? `?${qs}` : '';
-            })()}`,
+            `${BACKEND_URL}/api/reports/satisfaction${queryString ? '?' + queryString : ''}`,
             {
-              headers: { Authorization: `Bearer ${token}` }
+              headers: { Authorization: `Bearer ${token}` },
+              signal,
             }
           ),
         ]);
@@ -240,7 +301,8 @@ const ReportsPage: React.FC = () => {
         const response = await fetch(
           `${BACKEND_URL}/api/reports/stats/technicians${queryString ? '?' + queryString : ''}`,
           {
-            headers: { Authorization: `Bearer ${token}` }
+            headers: { Authorization: `Bearer ${token}` },
+            signal,
           }
         );
         const data = await response.json();
@@ -249,7 +311,8 @@ const ReportsPage: React.FC = () => {
         const response = await fetch(
           `${BACKEND_URL}/api/reports/stats/sla${queryString ? '?' + queryString : ''}`,
           {
-            headers: { Authorization: `Bearer ${token}` }
+            headers: { Authorization: `Bearer ${token}` },
+            signal,
           }
         );
         
@@ -261,27 +324,28 @@ const ReportsPage: React.FC = () => {
         console.log('SLA data received:', data);
         setSlaStats(data);
       } else if (activeTab === 'trends') {
+        const trendParams = buildFilterParams();
+        trendParams.append('period', trendsPeriod);
         const response = await fetch(
-          `${BACKEND_URL}/api/reports/stats/trends?period=${trendsPeriod}`,
+          `${BACKEND_URL}/api/reports/stats/trends?${trendParams.toString()}`,
           {
-            headers: { Authorization: `Bearer ${token}` }
+            headers: { Authorization: `Bearer ${token}` },
+            signal,
           }
         );
         const data = await response.json();
         setTrendsData(data);
       }
     } catch (error) {
-      console.error('Error loading report data:', error);
+      if (!signal?.aborted) console.error('Error loading report data:', error);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   };
 
   const handleExportTickets = async () => {
     const token = localStorage.getItem('internal_token') || localStorage.getItem('token');
-    const params = new URLSearchParams();
-    if (dateFrom) params.append('date_from', dateFrom);
-    if (dateTo) params.append('date_to', dateTo);
+    const params = buildFilterParams();
     
     setExporting('tickets');
     setExportFeedback(null);
@@ -309,9 +373,7 @@ const ReportsPage: React.FC = () => {
 
   const handleExportTechnicians = async () => {
     const token = localStorage.getItem('internal_token') || localStorage.getItem('token');
-    const params = new URLSearchParams();
-    if (dateFrom) params.append('date_from', dateFrom);
-    if (dateTo) params.append('date_to', dateTo);
+    const params = buildFilterParams();
     
     setExporting('technicians');
     setExportFeedback(null);
@@ -339,9 +401,7 @@ const ReportsPage: React.FC = () => {
 
   const handleExportConsolidated = async () => {
     const token = localStorage.getItem('internal_token') || localStorage.getItem('token');
-    const params = new URLSearchParams();
-    if (dateFrom) params.append('date_from', dateFrom);
-    if (dateTo) params.append('date_to', dateTo);
+    const params = buildFilterParams();
     const query = params.toString();
     setExporting('consolidated');
     setExportFeedback(null);
@@ -407,13 +467,14 @@ const ReportsPage: React.FC = () => {
       low: 'Baixa',
       medium: 'Média',
       high: 'Alta',
+      urgent: 'Urgente',
       critical: 'Alta',
     };
     return labels[priority] || priority;
   };
 
   const getPriorityBadgeClass = (priority: string) => {
-    const normalized = priority === 'critical' ? 'high' : priority;
+    const normalized = priority === 'critical' || priority === 'urgent' ? 'high' : priority;
     return `priority-pill priority-${normalized}`;
   };
 
@@ -429,6 +490,7 @@ const ReportsPage: React.FC = () => {
       admin: 'Administrador',
       it_staff: 'TI',
       admin_staff: 'Assistente Administrativo',
+      rh_staff: 'Recursos Humanos',
     };
 
     return labels[role] || role;
@@ -443,7 +505,7 @@ const ReportsPage: React.FC = () => {
     return acc;
   }, {});
 
-  const orderedTeams = ['ti', 'administrativo'].filter((team) => groupedTeamStats[team]?.length > 0);
+  const orderedTeams = ['ti', 'rh', 'administrativo'].filter((team) => groupedTeamStats[team]?.length > 0);
 
   const reportPeriodLabel = useMemo(() => {
     if (dateFrom && dateTo) {
@@ -453,6 +515,10 @@ const ReportsPage: React.FC = () => {
     if (dateTo) return `Até ${new Date(`${dateTo}T12:00:00`).toLocaleDateString('pt-BR')}`;
     return 'Todo o período disponível';
   }, [dateFrom, dateTo]);
+
+  const serviceDepartmentLabel = serviceDepartment === 'all'
+    ? 'Todos os atendimentos'
+    : filterOptions.serviceDepartments.find((department) => department.value === serviceDepartment)?.label || serviceDepartment.toUpperCase();
 
   const executiveImpact = useMemo(() => {
     if (!overviewStats) {
@@ -514,44 +580,74 @@ const ReportsPage: React.FC = () => {
           />
         </label>
         <label>
-          Departamento da satisfação
+          Equipe responsável
           <select
-            value={satisfactionDepartment}
-            onChange={(e) => setSatisfactionDepartment(e.target.value as 'all' | 'ti' | 'administrativo')}
+            value={serviceDepartment}
+            onChange={(e) => setServiceDepartment(e.target.value as ServiceDepartmentFilter)}
+            disabled={!filterOptions.canSelectServiceDepartment}
           >
-            <option value="all">Todos</option>
-            <option value="ti">TI</option>
-            <option value="administrativo">Administrativo</option>
+            {filterOptions.canSelectServiceDepartment && <option value="all">Todos os atendimentos</option>}
+            {filterOptions.serviceDepartments.map((department) => (
+              <option key={department.value} value={department.value}>{department.label}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Setor solicitante
+          <select
+            value={requesterDepartment}
+            onChange={(e) => setRequesterDepartment(e.target.value)}
+          >
+            <option value="all">Todos os setores</option>
+            {filterOptions.requesterDepartments.map((department) => (
+              <option key={department} value={department}>{department}</option>
+            ))}
           </select>
         </label>
         <button 
-          onClick={() => { setDateFrom(''); setDateTo(''); setSatisfactionDepartment('all'); }} 
+          onClick={() => {
+            setDateFrom('');
+            setDateTo('');
+            if (filterOptions.canSelectServiceDepartment) setServiceDepartment('all');
+            setRequesterDepartment('all');
+          }}
           className="clear-filters-btn"
         >
           Limpar Filtros
         </button>
       </div>
 
-      <div className="reports-tabs">
+      <div className="report-scope-summary" role="status">
+        <span>Escopo atual</span>
+        <strong>{serviceDepartmentLabel}</strong>
+        <span>Solicitantes: {requesterDepartment === 'all' ? 'todos os setores' : requesterDepartment}</span>
+        <span>{reportPeriodLabel}</span>
+      </div>
+
+      <div className="reports-tabs" aria-label="Seções do relatório">
         <button
+          aria-pressed={activeTab === 'overview'}
           className={activeTab === 'overview' ? 'active' : ''}
           onClick={() => setActiveTab('overview')}
         >
           Resumo executivo
         </button>
         <button
+          aria-pressed={activeTab === 'technicians'}
           className={activeTab === 'technicians' ? 'active' : ''}
           onClick={() => setActiveTab('technicians')}
         >
           Equipe e contribuição
         </button>
         <button
+          aria-pressed={activeTab === 'sla'}
           className={activeTab === 'sla' ? 'active' : ''}
           onClick={() => setActiveTab('sla')}
         >
           Qualidade e SLA
         </button>
         <button
+          aria-pressed={activeTab === 'trends'}
           className={activeTab === 'trends' ? 'active' : ''}
           onClick={() => setActiveTab('trends')}
         >

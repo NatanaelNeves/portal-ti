@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { database } from "../database/connection";
 import { config } from '../config/environment';
 import { UserRole } from '../types/enums';
+import { resolveServiceDepartment, serviceDepartmentLabel } from '../services/reportFilterScope';
 
 const dashboardRouter = Router();
 
@@ -67,11 +68,19 @@ dashboardRouter.get("/admin", async (req: Request, res: Response) => {
     }
 
     const isITStaffDashboard = user.role === UserRole.IT_STAFF;
-    const ticketScopeCondition = isITStaffDashboard
-      ? "COALESCE(department, 'ti') = 'ti'"
+    if (req.query.department !== undefined && typeof req.query.department !== 'string') {
+      return res.status(400).json({ error: 'O filtro de equipe deve ter um único valor' });
+    }
+    const requestedDepartment = String(req.query.department || '').trim().toLowerCase();
+    if (requestedDepartment && !['all', 'ti', 'rh', 'administrativo'].includes(requestedDepartment)) {
+      return res.status(400).json({ error: 'Equipe responsável inválida' });
+    }
+    const serviceDepartment = resolveServiceDepartment(user.role, req.query.department);
+    const ticketScopeCondition = serviceDepartment
+      ? `COALESCE(department, 'ti') = '${serviceDepartment}'`
       : '1=1';
-    const ticketScopeConditionWithAlias = isITStaffDashboard
-      ? "COALESCE(t.department, 'ti') = 'ti'"
+    const ticketScopeConditionWithAlias = serviceDepartment
+      ? `COALESCE(t.department, 'ti') = '${serviceDepartment}'`
       : '1=1';
 
     const [
@@ -352,6 +361,11 @@ dashboardRouter.get("/admin", async (req: Request, res: Response) => {
       },
       pendingPurchases,
       recentActivity,
+      filters: {
+        serviceDepartment: serviceDepartment || 'all',
+        serviceDepartmentLabel: serviceDepartment ? serviceDepartmentLabel(serviceDepartment) : 'Todos os atendimentos',
+        canSelectServiceDepartment: !isITStaffDashboard,
+      },
     });
   } catch (error) {
     console.error("Erro ao buscar dashboard admin:", error);

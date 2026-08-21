@@ -20,6 +20,8 @@ export class ExcelReportService {
       { header: 'Status', key: 'status', width: 15 },
       { header: 'Prioridade', key: 'priority', width: 12 },
       { header: 'Tipo', key: 'type', width: 15 },
+      { header: 'Equipe responsável', key: 'service_department', width: 22 },
+      { header: 'Setor solicitante', key: 'requester_department', width: 24 },
       { header: 'Solicitante', key: 'requester', width: 25 },
       { header: 'Atribuído a', key: 'assigned_to', width: 25 },
       { header: 'Criado em', key: 'created_at', width: 18 },
@@ -44,18 +46,23 @@ export class ExcelReportService {
         status: this.translateStatus(ticket.status),
         priority: this.translatePriority(ticket.priority),
         type: ticket.type,
+        service_department: ticket.serviceDepartmentLabel || this.translateDepartment(ticket.serviceDepartment),
+        requester_department: ticket.requesterDepartment || 'Não informado',
         requester: ticket.requesterName || 'N/A',
         assigned_to: ticket.assignedToName || 'Não atribuído',
-        created_at: ticket.createdAt ? new Date(ticket.createdAt).toLocaleString('pt-BR') : '',
-        resolved_at: ticket.resolvedAt ? new Date(ticket.resolvedAt).toLocaleString('pt-BR') : 'Em aberto',
+        created_at: ticket.createdAt ? new Date(ticket.createdAt) : null,
+        resolved_at: ticket.resolvedAt ? new Date(ticket.resolvedAt) : 'Em aberto',
         time_open_hours: ticket.timeOpenHours
       });
     });
 
+    worksheet.getColumn('created_at').numFmt = 'dd/mm/yyyy hh:mm';
+    worksheet.getColumn('resolved_at').numFmt = 'dd/mm/yyyy hh:mm';
+
     // Adicionar filtros automáticos
     worksheet.autoFilter = {
       from: 'A1',
-      to: 'J1'
+      to: 'L1'
     };
 
     // Configurar resposta HTTP
@@ -77,9 +84,34 @@ export class ExcelReportService {
    */
   static async generateTechniciansReport(
     technicians: any[],
-    res: Response
+    res: Response,
+    filters?: {
+      serviceDepartment: string;
+      requesterDepartment: string;
+      period: string;
+    },
   ): Promise<void> {
     const workbook = new ExcelJS.Workbook();
+
+    if (filters) {
+      const scopeSheet = workbook.addWorksheet('Escopo');
+      scopeSheet.columns = [
+        { header: 'Filtro', key: 'filter', width: 28 },
+        { header: 'Valor aplicado', key: 'value', width: 36 },
+      ];
+      scopeSheet.addRows([
+        { filter: 'Equipe responsável', value: filters.serviceDepartment },
+        { filter: 'Setor solicitante', value: filters.requesterDepartment },
+        { filter: 'Período analisado', value: filters.period },
+      ]);
+      scopeSheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      scopeSheet.getRow(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF007A33' },
+      };
+    }
+
     const worksheet = workbook.addWorksheet('Performance Equipe');
 
     worksheet.columns = [
@@ -161,6 +193,10 @@ export class ExcelReportService {
     overviewSheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
 
     overviewSheet.addRows([
+      { metric: 'Equipe responsável', value: overview.filters?.serviceDepartment || 'Todos os atendimentos' },
+      { metric: 'Setor solicitante', value: overview.filters?.requesterDepartment || 'Todos os setores solicitantes' },
+      { metric: 'Período analisado', value: overview.filters?.period || 'Todo o histórico' },
+      { metric: '', value: '' },
       { metric: 'Total de Tickets', value: overview.total },
       { metric: 'Taxa de Resolução', value: `${overview.resolutionRate.percentage}%` },
       { metric: 'Tempo Médio 1ª Resposta (h)', value: overview.avgFirstResponseHours },
@@ -174,6 +210,7 @@ export class ExcelReportService {
       { metric: '  - Fechados', value: overview.byStatus.closed || 0 },
       { metric: '', value: '' },
       { metric: 'Por Prioridade', value: '' },
+      { metric: '  - Urgente', value: overview.byPriority.urgent || 0 },
       { metric: '  - Crítico', value: overview.byPriority.critical || 0 },
       { metric: '  - Alto', value: overview.byPriority.high || 0 },
       { metric: '  - Médio', value: overview.byPriority.medium || 0 },
@@ -187,6 +224,8 @@ export class ExcelReportService {
       { header: 'Título', key: 'title', width: 40 },
       { header: 'Status', key: 'status', width: 15 },
       { header: 'Prioridade', key: 'priority', width: 12 },
+      { header: 'Equipe responsável', key: 'service_department', width: 22 },
+      { header: 'Setor solicitante', key: 'requester_department', width: 24 },
       { header: 'Solicitante', key: 'requester', width: 25 },
       { header: 'Atribuído a', key: 'assigned_to', width: 25 },
       { header: 'Criado em', key: 'created_at', width: 18 },
@@ -206,11 +245,16 @@ export class ExcelReportService {
         title: ticket.title,
         status: this.translateStatus(ticket.status),
         priority: this.translatePriority(ticket.priority),
+        service_department: ticket.serviceDepartmentLabel || this.translateDepartment(ticket.serviceDepartment),
+        requester_department: ticket.requesterDepartment || 'Não informado',
         requester: ticket.requesterName || 'N/A',
         assigned_to: ticket.assignedToName || 'Não atribuído',
-        created_at: ticket.createdAt ? new Date(ticket.createdAt).toLocaleString('pt-BR') : '',
+        created_at: ticket.createdAt ? new Date(ticket.createdAt) : null,
       });
     });
+
+    ticketsSheet.getColumn('created_at').numFmt = 'dd/mm/yyyy hh:mm';
+    ticketsSheet.autoFilter = { from: 'A1', to: 'I1' };
 
     // Aba 3: Performance da equipe
     const techSheet = workbook.addWorksheet('Equipe');
@@ -270,10 +314,20 @@ export class ExcelReportService {
   private static translatePriority(priority: string): string {
     const translations: Record<string, string> = {
       critical: 'Crítico',
+      urgent: 'Urgente',
       high: 'Alto',
       medium: 'Médio',
       low: 'Baixo'
     };
     return translations[priority] || priority;
+  }
+
+  private static translateDepartment(department?: string): string {
+    const translations: Record<string, string> = {
+      ti: 'TI',
+      rh: 'Recursos Humanos',
+      administrativo: 'Administrativo',
+    };
+    return translations[department || 'ti'] || department || 'TI';
   }
 }

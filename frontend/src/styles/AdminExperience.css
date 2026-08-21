@@ -94,6 +94,30 @@
   z-index: 1;
 }
 
+.admin-dashboard-page .ops-scope-control {
+  display: grid;
+  gap: 6px;
+  min-width: 210px;
+  color: #dbe9df;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.admin-dashboard-page .ops-scope-control select {
+  min-height: 44px;
+  padding: 0 34px 0 12px;
+  color: #eef6f1;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  font: inherit;
+}
+
+.admin-dashboard-page .ops-scope-control select option {
+  color: var(--admin-ink);
+  background: #fff;
+}
+
 .admin-dashboard-page .ops-greeting {
   max-width: 760px;
   margin: 0;
@@ -1642,7 +1666,7 @@
 
 .reports-page .date-filters {
   display: grid;
-  grid-template-columns: repeat(3, minmax(180px, 1fr)) auto;
+  grid-template-columns: repeat(4, minmax(160px, 1fr)) auto;
   align-items: end;
   gap: 14px;
   margin: 18px 0 0;
@@ -1651,6 +1675,31 @@
   border: 1px solid var(--admin-line);
   border-radius: 12px;
   box-shadow: none;
+}
+
+.reports-page .date-filters select:disabled {
+  color: var(--admin-ink-soft);
+  background: var(--admin-canvas);
+  cursor: not-allowed;
+}
+
+.reports-page .report-scope-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 10px 2px 0;
+  color: var(--admin-ink-soft);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.reports-page .report-scope-summary > * + * {
+  padding-left: 14px;
+  border-left: 1px solid var(--admin-line-strong);
+}
+
+.reports-page .report-scope-summary strong {
+  color: var(--admin-green-800);
 }
 
 .reports-page .date-filters label {
@@ -2113,6 +2162,14 @@
   .reports-page .stats-grid {
     grid-template-columns: repeat(4, minmax(140px, 1fr));
   }
+
+  .reports-page .date-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reports-page .clear-filters-btn {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 900px) {
@@ -2135,6 +2192,10 @@
   .admin-tickets-dashboard .dashboard-header-status,
   .reports-page .export-buttons {
     justify-content: flex-start;
+  }
+
+  .admin-dashboard-page .ops-scope-control {
+    width: 100%;
   }
 
   .admin-dashboard-page .performance-card {
@@ -2164,6 +2225,16 @@
   .reports-page .date-filters {
     grid-template-columns: 1fr;
     align-items: stretch;
+  }
+
+  .reports-page .report-scope-summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .reports-page .report-scope-summary > * + * {
+    padding-left: 0;
+    border-left: 0;
   }
 
   .admin-tickets-dashboard .day-summary-compact {

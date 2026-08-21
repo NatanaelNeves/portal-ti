@@ -33,8 +33,8 @@ export default function KpiDashboardPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div style={{ padding: '2rem', color: '#94a3b8' }}>Carregando KPIs...</div>;
-  if (!data) return <div style={{ padding: '2rem', color: '#dc2626' }}>Erro ao carregar dados.</div>;
+  if (loading) return <div className="kpi-dashboard-page kpi-dashboard-state">Carregando KPIs...</div>;
+  if (!data) return <div className="kpi-dashboard-page kpi-dashboard-state kpi-dashboard-error">Erro ao carregar dados.</div>;
 
   const ageData = [
     { name: '< 8h', value: Number(data.openByAge.fresh || 0), color: '#059669' },
@@ -44,7 +44,7 @@ export default function KpiDashboardPage() {
   ];
 
   return (
-    <div style={{ padding: '1.5rem', maxWidth: 1200, margin: '0 auto' }}>
+    <div className="kpi-dashboard-page">
       <h1 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.25rem' }}>Dashboard de KPIs</h1>
       <p style={{ color: '#64748b', marginBottom: '1.5rem', fontSize: '0.85rem' }}>Últimos 30 dias • Atualizado agora</p>
 
@@ -69,7 +69,7 @@ export default function KpiDashboardPage() {
                     <span style={{ fontWeight: 700, color: SLA_COLOR(p.compliance) }}>{p.compliance}% <small style={{ fontWeight: 400, color: '#94a3b8' }}>({p.withinSla}/{p.total})</small></span>
                   </div>
                   <div style={{ background: '#f1f5f9', borderRadius: '99px', height: 8 }}>
-                    <div style={{ width: `${p.compliance}%`, background: SLA_COLOR(p.compliance), borderRadius: '99px', height: 8, transition: 'width 0.5s' }} />
+                    <div style={{ width: `${p.compliance}%`, background: SLA_COLOR(p.compliance), borderRadius: '99px', height: 8 }} />
                   </div>
                 </div>
               ))}
