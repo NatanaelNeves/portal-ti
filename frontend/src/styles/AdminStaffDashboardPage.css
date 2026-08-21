@@ -607,6 +607,11 @@
 
 /* ═══ TRILHO — ritmo ══════════════════════════════════════════════════════ */
 .asd-stats { margin: 0; }
+.asd-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 28px;
+}
 .asd-stats > div {
   display: flex;
   align-items: baseline;
@@ -615,7 +620,7 @@
   padding: 11px 0;
   border-top: 1px solid var(--border-lt);
 }
-.asd-stats > div:first-child { border-top: none; padding-top: 0; }
+.asd-stats > div:nth-child(-n + 2) { border-top: none; padding-top: 0; }
 .asd-stats > div:last-child { padding-bottom: 0; }
 
 .asd-stats dt { font-size: 0.8125rem; color: var(--ink-3); }
@@ -625,21 +630,6 @@
   font-weight: 500;
   color: var(--ink);
   letter-spacing: -0.025em;
-}
-
-/* Em telas intermediárias o trilho vira uma grade; o ritmo acompanha essa
-   mudança para manter rótulos e números alinhados, sem colunas estreitas. */
-@media (min-width: 769px) and (max-width: 1180px) {
-  .asd-rail-col > .asd-panel:last-child { grid-column: 1 / -1; }
-  .asd-rail-col > .asd-panel:last-child .asd-stats {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: 28px;
-  }
-  .asd-rail-col > .asd-panel:last-child .asd-stats > div:nth-child(2) {
-    border-top: none;
-    padding-top: 0;
-  }
 }
 
 /* ═══ ESQUELETO ═══════════════════════════════════════════════════════════ */
@@ -695,6 +685,9 @@
   .asd-topbar-actions > .asd-btn { flex: 1; }
   .asd-topbar-meta { flex-wrap: wrap; row-gap: 2px; }
   .asd-rail-col { grid-template-columns: 1fr; gap: 18px; }
+  .asd-stats { grid-template-columns: 1fr; }
+  .asd-stats > div:nth-child(2) { border-top: 1px solid var(--border-lt); padding-top: 11px; }
+  .asd-stats > div:first-child { border-top: none; padding-top: 0; }
   .asd-panel { padding: 18px; }
   .asd-panel-queue { padding: 18px 18px 8px; }
   .asd-hero { padding: 24px 20px 22px; }

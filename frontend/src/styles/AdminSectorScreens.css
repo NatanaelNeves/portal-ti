@@ -192,10 +192,22 @@
 .asd-page .asd-shell { max-width: 1380px; }
 
 .asd-page .asd-hero {
-  background: var(--pt-evergreen);
+  background: #063c2d;
   border: 1px solid rgba(255, 255, 255, .08);
   border-radius: 14px;
   box-shadow: var(--pt-shadow-command);
+}
+
+.asd-page .asd-hero .asd-brief {
+  color: #e2f0e8;
+}
+
+.asd-page .asd-hero .asd-brief .asd-n {
+  color: #ffffff;
+}
+
+.asd-page .asd-hero .asd-load-seg-n {
+  color: #063c2d;
 }
 
 .asd-page .asd-btn-solid {
