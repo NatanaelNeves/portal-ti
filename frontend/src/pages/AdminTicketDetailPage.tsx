@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { showToast } from '../utils/toast';
 import { aiService, type TicketSummary } from '../services/aiService';
 import StatusTimeline from '../components/StatusTimeline';
+import TicketTimeline, { type HistoryEvent } from '../components/tickets/TicketTimeline';
 import TicketAttachments from '../components/TicketAttachments';
 import QuickActionsCard from '../components/QuickActionsCard';
 import '../styles/AdminTicketDetailPage.css';
@@ -81,6 +82,10 @@ export default function AdminTicketDetailPage() {
   const [showSummary, setShowSummary] = useState(false);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [requesterHistory, setRequesterHistory] = useState<any[]>([]);
+  // Histórico real do chamado (ticket_history). Só eventos que o backend
+  // efetivamente registrou — nada é derivado nem preenchido.
+  const [timeline, setTimeline] = useState<HistoryEvent[]>([]);
+  const [timelineLoading, setTimelineLoading] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -102,6 +107,7 @@ export default function AdminTicketDetailPage() {
       fetchTicket(id);
       fetchUsers();
       fetchEquipment();
+      fetchHistory(id);
     }
   }, [id, internalToken, navigate]);
 
@@ -131,6 +137,22 @@ export default function AdminTicketDetailPage() {
       }
     } catch { /* */ }
     setHistoryLoading(false);
+  };
+
+  const fetchHistory = async (ticketId: string) => {
+    try {
+      setTimelineLoading(true);
+      const res = await fetch(`${BACKEND_URL}/api/tickets/${ticketId}/history`, {
+        headers: { 'Authorization': `Bearer ${internalToken}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setTimeline(Array.isArray(data.history) ? data.history : []);
+    } catch {
+      // O histórico é complementar: se falhar, o chamado continua utilizável.
+    } finally {
+      setTimelineLoading(false);
+    }
   };
 
   const fetchUsers = async () => {
@@ -194,6 +216,7 @@ export default function AdminTicketDetailPage() {
         throw new Error(errorData.message || errorData.error || 'Erro ao atualizar chamado');
       }
       await fetchTicket(id);
+      await fetchHistory(id);
       setIsEditing(false);
       setError('');
       showToast.success('Chamado atualizado com sucesso!');
@@ -892,21 +915,18 @@ export default function AdminTicketDetailPage() {
 
           {/* Timeline Info */}
           <div className="sidebar-card">
-            <h3 className="sidebar-card-title">Linha do Tempo</h3>
-            <div className="sidebar-meta">
-              <div className="meta-item">
-                <span className="meta-label">Criado em</span>
-                <span className="meta-value meta-date">{formatDate(ticket.created_at)}</span>
-              </div>
-              <div className="meta-item">
-                <span className="meta-label">Atualizado em</span>
-                <span className="meta-value meta-date">{formatDate(ticket.updated_at)}</span>
-              </div>
-              <div className="meta-item">
-                <span className="meta-label">Tempo decorrido</span>
-                <span className="meta-value meta-elapsed">{elapsedHours}h</span>
-              </div>
+            <h3 className="sidebar-card-title">Linha do tempo</h3>
+            <div className="tk-tl-summary">
+              <span title={formatDate(ticket.created_at)}>
+                <i className="ti ti-calendar-plus" aria-hidden="true" />
+                Aberto {formatDate(ticket.created_at)}
+              </span>
+              <span>
+                <i className="ti ti-clock" aria-hidden="true" />
+                {elapsedHours}h decorridas
+              </span>
             </div>
+            <TicketTimeline events={timeline} loading={timelineLoading} />
           </div>
 
         </aside>

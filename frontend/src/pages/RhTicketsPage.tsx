@@ -2,7 +2,16 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { showToast } from '../utils/toast';
+import useTicketsOverview from '../hooks/useTicketsOverview';
+import TicketsHero from '../components/tickets/TicketsHero';
+import MetricCard from '../components/tickets/MetricCard';
+import MetricSkeleton from '../components/tickets/MetricSkeleton';
+import InsightStrip from '../components/tickets/InsightStrip';
+import SectorBreakdown from '../components/tickets/SectorBreakdown';
+import TeamWorkload from '../components/tickets/TeamWorkload';
+import { profileForDepartment } from '../components/tickets/sectorProfiles';
 import '../styles/RhTicketsPage.css';
+import '../styles/TicketsExperience.css';
 
 interface Ticket {
   id: string;
@@ -85,6 +94,15 @@ export default function RhTicketsPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [viewMode, setViewMode] = useState<'active' | 'closed'>('active');
   const [closedSearch, setClosedSearch] = useState('');
+
+  // Mesmo panorama agregado da Central: o servidor escopa em 'rh' pelo papel
+  // (rh_staff) ou pelo parametro (admin visitando esta pagina).
+  const {
+    overview,
+    loading: overviewLoading,
+    reload: reloadOverview,
+  } = useTicketsOverview('rh', true);
+  const rhProfile = profileForDepartment('rh');
   const prevTotalRef = useRef(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -342,10 +360,6 @@ export default function RhTicketsPage() {
   const myCount = tickets.filter(t => t.assigned_to === currentUserId && !['closed','resolved'].includes(t.status)).length;
   const activeFiltersCount = selectedStatuses.length + selectedPriorities.length + (searchText.trim() ? 1 : 0);
 
-  const formattedUpdate = lastUpdate
-    ? `${lastUpdate.toLocaleDateString('pt-BR')} às ${lastUpdate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
-    : 'Ainda sem atualização';
-
   const priorityOptions: Array<{ value: 'high' | 'medium' | 'low' | null; label: string; count: number }> = [
     { value: null,     label: 'Todas',  count: totalTickets || tickets.length },
     { value: 'high',   label: 'Alta',   count: getPriorityCount('high')   },
@@ -364,23 +378,41 @@ export default function RhTicketsPage() {
   return (
     <div className="rh-tickets-dashboard">
       {/* Header */}
-      <header className="rh-dashboard-header card">
-        <div>
-          <h1>Central Operacional RH</h1>
+      <TicketsHero
+        profile={rhProfile}
+        scopeLabel="Recursos Humanos"
+        lastUpdate={lastUpdate}
+        searchValue={searchText}
+        onSearchChange={(value) => { setSearchText(value); setCurrentPage(1); }}
+        onRefresh={() => { fetchTickets(); reloadOverview(); }}
+        onNewTicket={() => navigate('/abrir-chamado')}
+        onToggleFilters={() => setShowFilters(!showFilters)}
+        filtersOpen={showFilters}
+        activeFilterCount={
+          (assignmentFilter !== 'all' ? 1 : 0) +
+          (filterPriority ? 1 : 0) +
+          (searchText.trim() ? 1 : 0) +
+          (selectedStatuses.length > 0 ? 1 : 0) +
+          (selectedPriorities.length > 0 ? 1 : 0)
+        }
+        refreshing={isSyncing || loading}
+      />
+
+      {overviewLoading && !overview ? (
+        <MetricSkeleton count={5} />
+      ) : overview ? (
+        <div className="tk-metrics">
+          {rhProfile.metrics(overview).map((metric, index) => (
+            <MetricCard key={metric.key} metric={metric} index={index} />
+          ))}
         </div>
-        <div className="rh-dashboard-header-status">
-          <span className="rh-status-chip">
-            <span className={`rh-status-dot`} style={{ opacity: isSyncing ? 1 : 0.5 }} />
-            <span>{formattedUpdate}</span>
-          </span>
-          <span className="rh-status-chip">
-            <strong>{tickets.length}</strong> na fila
-          </span>
-          <span className="rh-status-chip">
-            <strong>{myCount}</strong> meus atendimentos
-          </span>
-        </div>
-      </header>
+      ) : null}
+
+      {overview && <InsightStrip overview={overview} />}
+      {overview && <SectorBreakdown overview={overview} />}
+      {overview && overview.workload.length > 0 && (
+        <TeamWorkload workload={overview.workload} />
+      )}
 
       {error && <div className="alert alert-error">{error}</div>}
 

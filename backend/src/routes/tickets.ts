@@ -17,7 +17,7 @@ import { pollingLimiter } from '../middleware/rateLimiter';
 import { getWebSocketService } from '../services/websocketService';
 import path from 'path';
 import { getQueuePriorityRank, getTicketServiceCycleStartedAt } from '../services/ticketQueueVisibility';
-import { resolveServiceDepartment, serviceDepartmentLabel } from '../services/reportFilterScope';
+import { resolveServiceDepartment, serviceDepartmentLabel, canSelectServiceDepartment } from '../services/reportFilterScope';
 
 const ticketsRouter = Router();
 
@@ -317,6 +317,8 @@ ticketsRouter.get('/', async (req: Request, res: Response) => {
     const date_to = req.query.date_to as string;
     const departmentFilter = req.query.department as string;
     const requester_id = req.query.requester_id as string;
+    // Chamados que ja passaram do prazo previsto para a propria prioridade.
+    const overdueOnly = String(req.query.overdue ?? '') === 'true';
     
     // Parâmetros de paginação
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
@@ -485,6 +487,21 @@ ticketsRouter.get('/', async (req: Request, res: Response) => {
           conditions.push(`t.priority = ANY($${paramCount})`);
           params.push(priority);
           paramCount++;
+        }
+
+        if (overdueOnly) {
+          conditions.push(`(
+            t.status IN ('open', 'in_progress', 'waiting_user', 'aguardando_confirmacao')
+            AND t.created_at < NOW() - (
+              CASE t.priority
+                WHEN 'critical' THEN INTERVAL '4 hours'
+                WHEN 'urgent' THEN INTERVAL '4 hours'
+                WHEN 'high' THEN INTERVAL '24 hours'
+                WHEN 'medium' THEN INTERVAL '72 hours'
+                ELSE INTERVAL '168 hours'
+              END
+            )
+          )`);
         }
 
         if (assigned_to && decoded.role !== UserRole.ADMIN_STAFF) {
@@ -697,6 +714,246 @@ ticketsRouter.get('/export/excel', authenticate, async (req: Request, res: Respo
   } catch (err) {
     console.error('Error exporting tickets:', err);
     res.status(500).json({ error: 'Falha ao exportar' });
+  }
+});
+
+/**
+ * GET /overview - Painel agregado da Central de Chamados
+ *
+ * Devolve, num pedido só, os números que a Central precisa para montar
+ * KPIs, insights, distribuições e carga da equipe. Tudo é calculado em
+ * SQL sobre o conjunto INTEIRO visível ao usuário — não sobre a página
+ * atual da lista —, porque um indicador que só enxerga 20 registros
+ * mente para quem está triando.
+ *
+ * O escopo de visibilidade é exatamente o do GET /: `resolveServiceDepartment`
+ * força o departamento do papel operacional (TI, RH, Administrativo) e só
+ * admin e gestor podem escolher. Auxiliar administrativo continua limitado
+ * a chamados dele ou sem responsável.
+ *
+ * Quando não há base para um número (nenhum chamado resolvido no período,
+ * por exemplo), o campo volta `null` — nunca zero maquiado de dado.
+ */
+ticketsRouter.get('/overview', authenticate, async (req: Request, res: Response) => {
+  try {
+    const decoded = (req as any).user;
+    if (!decoded || !canViewTicketsAsInternalRole(decoded.role)) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+
+    const requestedDepartment = req.query.department as string;
+    if (requestedDepartment && !['ti', 'rh', 'administrativo'].includes(requestedDepartment)) {
+      return res.status(400).json({ error: 'Departamento inválido' });
+    }
+
+    const scopedDepartment = resolveServiceDepartment(decoded.role, requestedDepartment);
+
+    // Escopo de visibilidade — idêntico ao da listagem.
+    const conditions: string[] = [];
+    const params: any[] = [];
+
+    if (scopedDepartment) {
+      params.push(scopedDepartment);
+      conditions.push(`COALESCE(t.department, 'ti') = $${params.length}`);
+    }
+
+    if (decoded.role === UserRole.ADMIN_STAFF) {
+      params.push(decoded.id);
+      conditions.push(`(t.assigned_to_id = $${params.length} OR t.assigned_to_id IS NULL)`);
+    }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const OPEN_STATUSES = `('open', 'in_progress', 'waiting_user', 'aguardando_confirmacao')`;
+
+    const [counts, byDepartment, byCategory, timing, workload, trend] = await Promise.all([
+      // Contagens por status e prioridade, mais os marcos do dia.
+      database.query(
+        `SELECT
+           COUNT(*)::int AS total,
+           COUNT(*) FILTER (WHERE t.status = 'open')::int AS open,
+           COUNT(*) FILTER (WHERE t.status = 'in_progress')::int AS in_progress,
+           COUNT(*) FILTER (WHERE t.status = 'waiting_user')::int AS waiting_user,
+           COUNT(*) FILTER (WHERE t.status = 'aguardando_confirmacao')::int AS awaiting_confirmation,
+           COUNT(*) FILTER (WHERE t.status = 'resolved')::int AS resolved,
+           COUNT(*) FILTER (WHERE t.status = 'closed')::int AS closed,
+           COUNT(*) FILTER (WHERE t.priority IN ('urgent', 'critical') AND t.status IN ${OPEN_STATUSES})::int AS urgent,
+           COUNT(*) FILTER (WHERE t.priority = 'high' AND t.status IN ${OPEN_STATUSES})::int AS high,
+           COUNT(*) FILTER (WHERE t.priority = 'medium' AND t.status IN ${OPEN_STATUSES})::int AS medium,
+           COUNT(*) FILTER (WHERE t.priority = 'low' AND t.status IN ${OPEN_STATUSES})::int AS low,
+           COUNT(*) FILTER (WHERE DATE(t.created_at) = CURRENT_DATE)::int AS created_today,
+           COUNT(*) FILTER (
+             WHERE t.status IN ('resolved', 'closed') AND DATE(t.updated_at) = CURRENT_DATE
+           )::int AS resolved_today,
+           COUNT(*) FILTER (
+             WHERE t.assigned_to_id IS NULL
+               AND t.status IN ${OPEN_STATUSES}
+               AND t.created_at < NOW() - INTERVAL '24 hours'
+           )::int AS unassigned_over_24h,
+           COUNT(*) FILTER (WHERE t.assigned_to_id IS NULL AND t.status IN ${OPEN_STATUSES})::int AS unassigned,
+           COUNT(*) FILTER (
+             WHERE t.status IN ${OPEN_STATUSES}
+               AND t.created_at < NOW() - (
+                 CASE t.priority
+                   WHEN 'critical' THEN INTERVAL '4 hours'
+                   WHEN 'urgent' THEN INTERVAL '4 hours'
+                   WHEN 'high' THEN INTERVAL '24 hours'
+                   WHEN 'medium' THEN INTERVAL '72 hours'
+                   ELSE INTERVAL '168 hours'
+                 END
+               )
+           )::int AS overdue
+         FROM tickets t
+         ${where}`,
+        params,
+      ),
+
+      // Distribuição por setor — só faz sentido para quem enxerga mais de um.
+      scopedDepartment
+        ? Promise.resolve({ rows: [] as any[] })
+        : database.query(
+            `SELECT COALESCE(t.department, 'ti') AS department,
+                    COUNT(*)::int AS total,
+                    COUNT(*) FILTER (WHERE t.status IN ${OPEN_STATUSES})::int AS open
+             FROM tickets t
+             ${where}
+             GROUP BY COALESCE(t.department, 'ti')
+             ORDER BY total DESC`,
+            params,
+          ),
+
+      // Assuntos mais recorrentes entre os chamados em aberto.
+      database.query(
+        `SELECT t.category, COUNT(*)::int AS total
+         FROM tickets t
+         ${where ? `${where} AND` : 'WHERE'} t.category IS NOT NULL
+           AND TRIM(t.category) <> ''
+           AND t.status IN ${OPEN_STATUSES}
+         GROUP BY t.category
+         ORDER BY total DESC
+         LIMIT 5`,
+        params,
+      ),
+
+      // Tempos médios, comparando os últimos 30 dias com os 30 anteriores.
+      database.query(
+        `SELECT
+           AVG(EXTRACT(EPOCH FROM (t.first_response_at - t.created_at)) / 60)
+             FILTER (WHERE t.first_response_at IS NOT NULL
+                       AND t.created_at >= NOW() - INTERVAL '30 days') AS first_response_minutes,
+           AVG(EXTRACT(EPOCH FROM (t.resolved_at - t.created_at)) / 60)
+             FILTER (WHERE t.resolved_at IS NOT NULL
+                       AND t.resolved_at >= NOW() - INTERVAL '30 days') AS resolution_minutes,
+           AVG(EXTRACT(EPOCH FROM (t.resolved_at - t.created_at)) / 60)
+             FILTER (WHERE t.resolved_at IS NOT NULL
+                       AND t.resolved_at >= NOW() - INTERVAL '60 days'
+                       AND t.resolved_at < NOW() - INTERVAL '30 days') AS resolution_minutes_previous
+         FROM tickets t
+         ${where}`,
+        params,
+      ),
+
+      // Carga da equipe: chamados em aberto por responsável.
+      database.query(
+        `SELECT u.id, u.name, COUNT(*)::int AS open
+         FROM tickets t
+         JOIN internal_users u ON u.id = t.assigned_to_id
+         ${where ? `${where} AND` : 'WHERE'} t.status IN ${OPEN_STATUSES}
+         GROUP BY u.id, u.name
+         ORDER BY open DESC
+         LIMIT 8`,
+        params,
+      ),
+
+      // Volume desta semana contra a semana anterior.
+      database.query(
+        `SELECT
+           COUNT(*) FILTER (WHERE t.created_at >= NOW() - INTERVAL '7 days')::int AS this_week,
+           COUNT(*) FILTER (
+             WHERE t.created_at >= NOW() - INTERVAL '14 days'
+               AND t.created_at < NOW() - INTERVAL '7 days'
+           )::int AS last_week
+         FROM tickets t
+         ${where}`,
+        params,
+      ),
+    ]);
+
+    const c = counts.rows[0] || {};
+    const tm = timing.rows[0] || {};
+    const tr = trend.rows[0] || {};
+
+    const toMinutes = (value: unknown) =>
+      value === null || value === undefined ? null : Math.round(Number(value));
+
+    const deltaPct = (current: number | null, previous: number | null) =>
+      current === null || previous === null || previous === 0
+        ? null
+        : Math.round(((current - previous) / previous) * 100);
+
+    const resolutionMinutes = toMinutes(tm.resolution_minutes);
+    const resolutionPrevious = toMinutes(tm.resolution_minutes_previous);
+    const thisWeek = Number(tr.this_week || 0);
+    const lastWeek = Number(tr.last_week || 0);
+
+    res.json({
+      scope: {
+        department: scopedDepartment,
+        canSelectDepartment: canSelectServiceDepartment(decoded.role),
+        label: scopedDepartment ? serviceDepartmentLabel(scopedDepartment) : 'Todos os setores',
+      },
+      status: {
+        total: c.total ?? 0,
+        open: c.open ?? 0,
+        inProgress: c.in_progress ?? 0,
+        waitingUser: c.waiting_user ?? 0,
+        awaitingConfirmation: c.awaiting_confirmation ?? 0,
+        resolved: c.resolved ?? 0,
+        closed: c.closed ?? 0,
+      },
+      priority: {
+        urgent: c.urgent ?? 0,
+        high: c.high ?? 0,
+        medium: c.medium ?? 0,
+        low: c.low ?? 0,
+      },
+      today: {
+        created: c.created_today ?? 0,
+        resolved: c.resolved_today ?? 0,
+      },
+      attention: {
+        unassigned: c.unassigned ?? 0,
+        unassignedOver24h: c.unassigned_over_24h ?? 0,
+        overdue: c.overdue ?? 0,
+      },
+      timing: {
+        firstResponseMinutes: toMinutes(tm.first_response_minutes),
+        resolutionMinutes,
+        resolutionDeltaPct: deltaPct(resolutionMinutes, resolutionPrevious),
+      },
+      trend: {
+        thisWeek,
+        lastWeek,
+        deltaPct: lastWeek === 0 ? null : Math.round(((thisWeek - lastWeek) / lastWeek) * 100),
+      },
+      byDepartment: byDepartment.rows.map((row: any) => ({
+        department: row.department,
+        label: serviceDepartmentLabel(row.department),
+        total: row.total,
+        open: row.open,
+      })),
+      topCategories: byCategory.rows.map((row: any) => ({
+        category: row.category,
+        total: row.total,
+      })),
+      workload: workload.rows.map((row: any) => ({
+        userId: row.id,
+        name: row.name,
+        open: row.open,
+      })),
+    });
+  } catch (err) {
+    console.error('Error building tickets overview:', err);
+    res.status(500).json({ error: 'Falha ao carregar o panorama de chamados' });
   }
 });
 
@@ -1677,6 +1934,7 @@ ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (r
     const existingTicket = existingTicketResult.rows[0];
     const oldStatus = existingTicket.status;
     const oldAssignedTo = existingTicket.assigned_to_id;
+    const oldPriority = existingTicket.priority;
     let nextStatus = status as string | undefined;
 
     // Construir query de update
@@ -1786,6 +2044,18 @@ ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (r
           status: updatedStatus,
         });
       }
+    }
+
+    // A prioridade muda o prazo do chamado, entao ela pertence ao historico
+    // tanto quanto status e responsavel. Passa a ser registrada aqui; chamados
+    // alterados antes desta versao nao terao esse evento.
+    if (priority !== undefined && oldPriority !== priority) {
+      await database.query(
+        `INSERT INTO ticket_history (
+          ticket_id, action, changed_by_type, changed_by_id, old_value, new_value, metadata
+        ) VALUES ($1, 'priority_changed', $2, $3, $4, $5, $6::jsonb)`,
+        [id, historyActorType, userId, oldPriority || null, priority, JSON.stringify({ priority })],
+      ).catch(() => undefined);
     }
 
     if (assigned_to_id !== undefined && oldAssignedTo !== assigned_to_id) {
@@ -2131,10 +2401,20 @@ ticketsRouter.get('/:id/history', async (req: Request, res: Response) => {
           WHEN h.changed_by_id IS NOT NULL THEN
             COALESCE(iu.name, pu.name, 'Sistema')
           ELSE 'Sistema'
-        END as changed_by_name
+        END as changed_by_name,
+        old_user.name AS old_value_name,
+        new_user.name AS new_value_name
        FROM ticket_history h
        LEFT JOIN internal_users iu ON iu.id = h.changed_by_id
        LEFT JOIN public_users pu ON pu.id = h.changed_by_id
+       LEFT JOIN internal_users old_user
+         ON h.action IN ('assigned', 'unassigned')
+        AND h.old_value ~ '^[0-9a-fA-F-]{36}$'
+        AND old_user.id = h.old_value::uuid
+       LEFT JOIN internal_users new_user
+         ON h.action IN ('assigned', 'unassigned')
+        AND h.new_value ~ '^[0-9a-fA-F-]{36}$'
+        AND new_user.id = h.new_value::uuid
        WHERE h.ticket_id = $1 
        ORDER BY h.created_at DESC`,
       [id]

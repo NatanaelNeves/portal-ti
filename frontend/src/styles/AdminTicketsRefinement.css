@@ -1,0 +1,1465 @@
+/* ─────────────────────────────────────────────────────────────
+   Central de Chamados — acabamento
+
+   Duas frentes:
+   1. Geometria. O ledger de filtros encaixava mal em três pontos —
+      linha vazia quando as abas de departamento não são renderizadas
+      (todo mundo que não é admin/gestor), rótulos "Departamento" e
+      "Prioridade" desalinhados em 10px, e o resumo do dia esticando
+      o conteúdo interno ao acompanhar a altura da coluna esquerda.
+   2. Movimento. Um sistema curto de transições ligado a estado real
+      — seleção, hover, entrada da fila, abertura do painel — dentro
+      do contrato do DESIGN.md: plano por padrão, seleção por filete
+      interno, nunca elevação dramática.
+───────────────────────────────────────────────────────────────── */
+
+.admin-tickets-dashboard {
+  --atd-ease-out: cubic-bezier(.22, .61, .36, 1);
+  --atd-ease-inout: cubic-bezier(.65, .05, .36, 1);
+  --atd-dur-1: 120ms;
+  --atd-dur-2: 200ms;
+  --atd-dur-3: 320ms;
+  --atd-rail: 3px;
+  /* Comporta "Departamento" (89px em 0.61rem/800) sem encostar no
+     primeiro controle, e serve de eixo comum para as duas faixas. */
+  --atd-label-col: 104px;
+  --atd-inset: 14px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   1. Ledger de filtros — geometria
+══════════════════════════════════════════════════════════════ */
+
+/* As abas de departamento só existem para admin e gestor. Sem elas o
+   grid ficava com a linha 1 vazia à esquerda enquanto o resumo do dia
+   continuava ocupando duas linhas. As linhas passam a ser declaradas
+   conforme a composição real. */
+/* A base repete a composição de admin/gestor, para que um navegador sem
+   :has() fique exatamente como está hoje em vez de regredir. */
+.admin-tickets-dashboard .ticket-filter-ledger {
+  grid-template-rows: auto auto;
+  gap: 0 14px;
+  align-items: stretch;
+}
+
+.admin-tickets-dashboard .ticket-filter-ledger:not(:has(.department-tabs)) {
+  grid-template-rows: auto;
+}
+
+.admin-tickets-dashboard .department-tabs,
+.admin-tickets-dashboard .priority-toolbar {
+  grid-column: 1;
+  grid-row: auto;
+}
+
+/* As abas carregavam um margin-top: 18px herdado do layout anterior. Num
+   grid ele empurrava a coluna esquerda para baixo enquanto o resumo do
+   dia continuava encostado no topo — a origem do desencaixe. */
+.admin-tickets-dashboard .department-tabs,
+.admin-tickets-dashboard .priority-toolbar,
+.admin-tickets-dashboard .day-summary-compact {
+  margin: 0;
+}
+
+.admin-tickets-dashboard .day-summary-compact {
+  grid-column: 2;
+  grid-row: 1 / -1;
+}
+
+/* Sem as abas, o resumo do dia é a única peça da direita: ele deixa de
+   herdar o canto reto que existia para encostar na aba de cima. */
+.admin-tickets-dashboard .ticket-filter-ledger:not(:has(.department-tabs)) .priority-toolbar {
+  border-top: 1px solid var(--ref-line, #dde5df);
+  border-radius: 10px;
+}
+
+/* Os dois rótulos do ledger passam a partir do mesmo eixo, para que as
+   abas e os chips formem duas colunas alinhadas em vez de dois blocos
+   soltos. */
+.admin-tickets-dashboard .department-tabs {
+  padding: 6px var(--atd-inset);
+  gap: 4px;
+}
+
+/* A faixa das abas tem gap de 4px; o rótulo desconta esse gap para que a
+   primeira aba caia no mesmo eixo do primeiro chip de prioridade. */
+.admin-tickets-dashboard .department-tabs::before {
+  flex: 0 0 auto;
+  width: calc(var(--atd-label-col) - 4px);
+  padding: 0;
+  line-height: 1.2;
+}
+
+.admin-tickets-dashboard .priority-toolbar {
+  padding: 8px var(--atd-inset);
+  gap: 0;
+}
+
+.admin-tickets-dashboard .priority-toolbar-label {
+  flex: 0 0 auto;
+  width: var(--atd-label-col);
+  line-height: 1.2;
+}
+
+/* Colunas fluidas: as larguras fixas somavam exatamente a largura
+   mínima do bloco e estouravam 2px por conta das bordas. */
+.admin-tickets-dashboard .day-summary-compact {
+  grid-template-columns: minmax(84px, .75fr) minmax(92px, .85fr) minmax(150px, 1.5fr);
+}
+
+.admin-tickets-dashboard .summary-pill {
+  min-height: 0;
+  padding: 14px 16px;
+  align-content: center;
+}
+
+.admin-tickets-dashboard .summary-pill:last-child { border-right: 0; }
+
+/* O progresso do dia acompanhava a altura esticada da coluna e
+   distribuía trilho e legenda pelas pontas. */
+.admin-tickets-dashboard .day-progress {
+  align-content: center;
+  gap: 8px;
+  padding: 14px 16px;
+}
+
+/* O trilho tinha largura fixa de 84px, de quando o resumo do dia era uma
+   linha horizontal. Empilhado, ele flutuava no meio da célula. */
+.admin-tickets-dashboard .day-progress-track {
+  width: auto;
+  min-width: 0;
+}
+
+/* A legenda somava um margin-top de 5px ao gap de 8px do grid. */
+.admin-tickets-dashboard .day-progress-label { margin: 0; }
+
+.admin-tickets-dashboard .day-progress-fill {
+  transition: width var(--atd-dur-3) var(--atd-ease-out);
+}
+
+/* Sem o bloco de progresso (nenhum chamado no dia), as duas métricas
+   restantes ocupam a largura toda em vez de deixarem um vão. */
+.admin-tickets-dashboard .day-summary-compact:not(:has(.day-progress)) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* ══════════════════════════════════════════════════════════════
+   2. Ledger de filtros — acabamento
+══════════════════════════════════════════════════════════════ */
+
+.admin-tickets-dashboard .department-tabs,
+.admin-tickets-dashboard .priority-toolbar,
+.admin-tickets-dashboard .day-summary-compact {
+  box-shadow: 0 10px 28px -27px rgba(15, 61, 44, .65);
+}
+
+.admin-tickets-dashboard .dept-tab {
+  position: relative;
+  transition:
+    color var(--atd-dur-2) var(--atd-ease-out),
+    background-color var(--atd-dur-2) var(--atd-ease-out),
+    border-color var(--atd-dur-2) var(--atd-ease-out);
+}
+
+.admin-tickets-dashboard .priority-chip {
+  transition:
+    color var(--atd-dur-2) var(--atd-ease-out),
+    background-color var(--atd-dur-2) var(--atd-ease-out),
+    border-color var(--atd-dur-2) var(--atd-ease-out);
+}
+
+.admin-tickets-dashboard .priority-chip-count {
+  transition: background-color var(--atd-dur-2) var(--atd-ease-out);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-tickets-dashboard .priority-chip:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+/* Números de operação nunca dançam durante a atualização. */
+.admin-tickets-dashboard :is(.summary-pill > :first-child, .queue-count,
+  .day-progress-label, .filter-counter, .bulk-count) {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   3. Fila — filete de prioridade, entrada e estados
+══════════════════════════════════════════════════════════════ */
+
+.admin-tickets-dashboard .ticket-card {
+  transition:
+    background-color var(--atd-dur-2) var(--atd-ease-out),
+    box-shadow var(--atd-dur-2) var(--atd-ease-out);
+}
+
+/* A prioridade vira um filete na borda da linha: legível de relance na
+   varredura da fila, sem transformar a linha num cartão colorido. */
+.admin-tickets-dashboard .ticket-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--atd-rail);
+  background: transparent;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--atd-dur-2) var(--atd-ease-out);
+}
+
+/* As cores por prioridade saíram daqui: o filete passou a medir prazo
+   (secao 14) e a prioridade permaneceu no badge. */
+
+.admin-tickets-dashboard .ticket-card:is(:hover, .active, .ticket-card--selected, .ticket-card--overdue)::before {
+  transform: scaleX(1);
+}
+
+.admin-tickets-dashboard .ticket-card.active {
+  background: #eef8f2;
+  box-shadow: inset 0 0 0 1px #6abb8d;
+}
+
+.admin-tickets-dashboard .ticket-card--selected {
+  background: #f2f9f5;
+}
+
+/* Entrada escalonada da fila — só nas primeiras linhas visíveis, para
+   que a lista assente sem virar uma cascata. */
+@keyframes atdQueueRowIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.admin-tickets-dashboard .tickets-list > .ticket-card:nth-child(-n + 10) {
+  animation: atdQueueRowIn var(--atd-dur-3) var(--atd-ease-out) backwards;
+}
+
+.admin-tickets-dashboard .tickets-list > .ticket-card:nth-child(1) { animation-delay: 0ms; }
+.admin-tickets-dashboard .tickets-list > .ticket-card:nth-child(2) { animation-delay: 24ms; }
+.admin-tickets-dashboard .tickets-list > .ticket-card:nth-child(3) { animation-delay: 48ms; }
+.admin-tickets-dashboard .tickets-list > .ticket-card:nth-child(4) { animation-delay: 72ms; }
+.admin-tickets-dashboard .tickets-list > .ticket-card:nth-child(5) { animation-delay: 96ms; }
+.admin-tickets-dashboard .tickets-list > .ticket-card:nth-child(6) { animation-delay: 120ms; }
+.admin-tickets-dashboard .tickets-list > .ticket-card:nth-child(7) { animation-delay: 144ms; }
+.admin-tickets-dashboard .tickets-list > .ticket-card:nth-child(8) { animation-delay: 168ms; }
+.admin-tickets-dashboard .tickets-list > .ticket-card:nth-child(9) { animation-delay: 192ms; }
+.admin-tickets-dashboard .tickets-list > .ticket-card:nth-child(10) { animation-delay: 216ms; }
+
+.admin-tickets-dashboard .ticket-card:last-child { border-bottom: 0; }
+
+/* A caixa de seleção só ganha peso quando a linha está sob o cursor ou
+   já faz parte de uma seleção. */
+.admin-tickets-dashboard .ticket-checkbox {
+  accent-color: #14945a;
+  opacity: .45;
+  transition: opacity var(--atd-dur-2) var(--atd-ease-out);
+}
+
+.admin-tickets-dashboard .ticket-card:is(:hover, .active, .ticket-card--selected) .ticket-checkbox,
+.admin-tickets-dashboard .ticket-checkbox:focus-visible {
+  opacity: 1;
+}
+
+/* Rolagem da fila com barra discreta, no tom do canvas. */
+.admin-tickets-dashboard .tickets-list {
+  scrollbar-width: thin;
+  scrollbar-color: #c3d2c8 transparent;
+  overscroll-behavior: contain;
+}
+
+.admin-tickets-dashboard .tickets-list::-webkit-scrollbar { width: 8px; }
+.admin-tickets-dashboard .tickets-list::-webkit-scrollbar-track { background: transparent; }
+.admin-tickets-dashboard .tickets-list::-webkit-scrollbar-thumb {
+  background: #cfdcd4;
+  border: 2px solid #fff;
+  border-radius: 999px;
+}
+.admin-tickets-dashboard .tickets-list::-webkit-scrollbar-thumb:hover { background: #b3c7bb; }
+
+/* O sinal de atraso ainda pulsava no vermelho antigo com um brilho
+   externo. Vira um anel contido, na cor de exceção do sistema. */
+.admin-tickets-dashboard .overdue-flag {
+  background: var(--atd-high);
+  box-shadow: 0 0 0 0 rgba(217, 70, 79, .28);
+  animation: atdOverdueRing 2.4s var(--atd-ease-inout) infinite;
+}
+
+@keyframes atdOverdueRing {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(217, 70, 79, .26); }
+  50% { box-shadow: 0 0 0 4px rgba(217, 70, 79, 0); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   4. Barra de ação em lote — entra como faixa, não como salto
+══════════════════════════════════════════════════════════════ */
+
+@keyframes atdBulkBarIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.admin-tickets-dashboard .bulk-action-bar {
+  animation: atdBulkBarIn var(--atd-dur-2) var(--atd-ease-out);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   5. Painel de contexto
+══════════════════════════════════════════════════════════════ */
+
+.admin-tickets-dashboard .panel-actions .btn,
+.admin-tickets-dashboard .close-panel,
+.admin-tickets-dashboard .queue-header .btn,
+.admin-tickets-dashboard .header-new-ticket,
+.admin-tickets-dashboard .filter-btn {
+  transition:
+    color var(--atd-dur-2) var(--atd-ease-out),
+    background-color var(--atd-dur-2) var(--atd-ease-out),
+    border-color var(--atd-dur-2) var(--atd-ease-out),
+    box-shadow var(--atd-dur-2) var(--atd-ease-out);
+}
+
+.admin-tickets-dashboard .close-panel:hover {
+  color: #0d5f42;
+  background: #f2f8f4;
+  border-color: #afc4b7;
+}
+
+.admin-tickets-dashboard .filter-btn.active {
+  box-shadow: inset 0 -2px 0 #14945a;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   6. Foco visível — um anel só, em toda a Central
+══════════════════════════════════════════════════════════════ */
+
+.admin-tickets-dashboard :is(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid #14945a;
+  outline-offset: 2px;
+  border-radius: 7px;
+}
+
+.admin-tickets-dashboard .ticket-card:focus-visible {
+  outline: 2px solid #14945a;
+  outline-offset: -2px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   7. Ledger em telas estreitas — empilha sem quebrar o encaixe
+══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 1180px) {
+  .admin-tickets-dashboard .ticket-filter-ledger,
+  .admin-tickets-dashboard .ticket-filter-ledger:has(.department-tabs) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    gap: 12px;
+  }
+
+  .admin-tickets-dashboard .department-tabs,
+  .admin-tickets-dashboard .priority-toolbar,
+  .admin-tickets-dashboard .day-summary-compact {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .admin-tickets-dashboard .department-tabs {
+    border-bottom: 0;
+    border-radius: 10px 10px 0 0;
+  }
+
+  .admin-tickets-dashboard .priority-toolbar { border-radius: 0 0 10px 10px; }
+}
+
+@media (max-width: 900px) {
+  .admin-tickets-dashboard .department-tabs,
+  .admin-tickets-dashboard .priority-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .admin-tickets-dashboard .department-tabs::before,
+  .admin-tickets-dashboard .priority-toolbar-label { width: auto; }
+
+  .admin-tickets-dashboard .department-tabs,
+  .admin-tickets-dashboard .priority-chip-row {
+    flex-wrap: wrap;
+  }
+
+  .admin-tickets-dashboard .day-summary-compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-tickets-dashboard .day-progress { grid-column: 1 / -1; border-top: 1px solid var(--ref-line, #dde5df); }
+  .admin-tickets-dashboard .summary-pill:nth-child(2) { border-right: 0; }
+}
+
+@media (max-width: 620px) {
+  .admin-tickets-dashboard :is(.dept-tab, .priority-chip, .filter-btn, .queue-header .btn) {
+    min-height: 44px;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   8. Movimento reduzido
+══════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-tickets-dashboard *,
+  .admin-tickets-dashboard *::before,
+  .admin-tickets-dashboard *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
+  }
+
+  .admin-tickets-dashboard .ticket-card::before { transform: scaleX(1); }
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   9. A fila, reconstruída como fila
+
+   O DESIGN.md pede uma fila contínua — "chamados são linhas de uma
+   fila contínua, separadas por divisores e estados de seleção; não
+   são cartões flutuantes independentes". A implementação fazia o
+   oposto: cartões soltos com gap, cada um carregando a própria
+   fileira de botões. Era isso que empurrava a largura da coluna,
+   cortava o título e tirava as linhas do eixo.
+
+   Aqui a linha vira uma grade estrita de três colunas, o texto passa
+   a truncar de verdade, e as ações saem do fluxo — aparecem sobre a
+   ponta direita da linha quando o cursor chega, sobre um véu que
+   evita colisão com o texto. Em repouso a fila é silenciosa; na
+   aproximação, ela é capaz.
+══════════════════════════════════════════════════════════════ */
+
+.admin-tickets-dashboard .tickets-list {
+  display: block;
+  gap: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+.admin-tickets-dashboard .ticket-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 11px;
+  row-gap: 9px;
+  min-width: 0;
+  margin: 0;
+  padding: 13px 16px 13px 19px;
+  border: 0;
+  border-bottom: 1px solid #e7ece9;
+  border-radius: 0;
+  overflow: hidden;
+}
+
+/* Linha 1: seleção, assunto e tempo — o eixo do texto é o mesmo em
+   todas as linhas, que é o que faltava para elas parecerem alinhadas. */
+.admin-tickets-dashboard .ticket-card-top {
+  display: contents;
+}
+
+.admin-tickets-dashboard .ticket-checkbox {
+  grid-column: 1;
+  grid-row: 1;
+  width: 15px;
+  height: 15px;
+  margin: 3px 0 0;
+  flex: none;
+}
+
+.admin-tickets-dashboard .ticket-card-main {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+}
+
+.admin-tickets-dashboard :is(.time-ago, .overdue-flag) {
+  grid-column: 3;
+  grid-row: 1;
+  margin-top: 1px;
+  justify-self: end;
+}
+
+.admin-tickets-dashboard .ticket-card-title {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  font-size: .82rem;
+  font-weight: 750;
+  line-height: 1.3;
+  letter-spacing: -.015em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-tickets-dashboard .ticket-card-requester {
+  display: block;
+  min-width: 0;
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-tickets-dashboard .requester-name {
+  color: #4b6055;
+  font-size: .68rem;
+  font-weight: 650;
+}
+
+/* Solicitante e lotação passam a ser uma linha só, separada por um
+   ponto — duas linhas empilhadas engordavam a fila sem informar mais. */
+.admin-tickets-dashboard .requester-meta {
+  color: #8b9c94;
+  font-size: .68rem;
+}
+
+.admin-tickets-dashboard .requester-meta::before {
+  content: ' · ';
+  color: #b9c8c0;
+}
+
+/* Linha 2: os estados. */
+.admin-tickets-dashboard .ticket-card-badges {
+  grid-column: 2 / -1;
+  grid-row: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  min-width: 0;
+}
+
+/* Linha 3: responsável e SLA à esquerda; as ações deixam o fluxo. */
+.admin-tickets-dashboard .ticket-card-footer {
+  grid-column: 2 / -1;
+  grid-row: 3;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 9px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border-top: 0;
+  overflow: hidden;
+}
+
+.admin-tickets-dashboard .assigned {
+  min-width: 0;
+  color: #64766e;
+  font-size: .63rem;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-tickets-dashboard .sla-chip {
+  flex: none;
+  color: #52655c;
+  background: #f2f5f3;
+  border: 0;
+}
+
+/* ── O filete de prioridade encosta na borda da linha ───────────── */
+.admin-tickets-dashboard .ticket-card::before {
+  inset: 0 auto 0 0;
+  width: var(--atd-rail);
+  border-radius: 0;
+}
+
+/* ── Estados da linha ───────────────────────────────────────────── */
+.admin-tickets-dashboard .ticket-card:hover { background: #f7fbf9; }
+
+.admin-tickets-dashboard .ticket-card.active {
+  background: #eef8f2;
+  box-shadow: inset 3px 0 0 #14945a;
+}
+
+
+/* A linha selecionada aponta para o painel: mestre e detalhe ficam
+   ligados no espaço, em vez de serem dois blocos que por acaso mudam
+   juntos. */
+.admin-tickets-dashboard .ticket-card.active::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -1px;
+  width: 9px;
+  height: 9px;
+  background: #eef8f2;
+  border-top: 1px solid #b7dcc7;
+  border-right: 1px solid #b7dcc7;
+  transform: translate(50%, -50%) rotate(45deg);
+  animation: atdNotchIn 220ms var(--atd-ease-out) backwards;
+}
+
+@keyframes atdNotchIn {
+  from { opacity: 0; transform: translate(20%, -50%) rotate(45deg); }
+  to { opacity: 1; transform: translate(50%, -50%) rotate(45deg); }
+}
+
+.admin-tickets-dashboard .ticket-card--selected { background: #f3faf6; }
+.admin-tickets-dashboard .ticket-card--overdue { background: #fffaf8; }
+.admin-tickets-dashboard .ticket-card--overdue:hover { background: #fff6f2; }
+
+/* ══════════════════════════════════════════════════════════════
+   10. Faixa de ações — fora do fluxo, sobre um véu
+══════════════════════════════════════════════════════════════ */
+
+.admin-tickets-dashboard .footer-actions {
+  position: absolute;
+  right: 14px;
+  bottom: 11px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  flex-wrap: nowrap;
+  opacity: 0;
+  transform: translateX(8px);
+  pointer-events: none;
+  transition:
+    opacity var(--atd-dur-2) var(--atd-ease-out),
+    transform var(--atd-dur-2) var(--atd-ease-out);
+}
+
+/* O véu impede que as ações caiam por cima do responsável e do SLA. */
+.admin-tickets-dashboard .footer-actions::before {
+  content: '';
+  position: absolute;
+  inset: -11px -14px -11px -44px;
+  z-index: -1;
+  background: linear-gradient(90deg, rgba(247, 251, 249, 0) 0%, #f7fbf9 38%);
+  pointer-events: none;
+}
+
+.admin-tickets-dashboard .ticket-card:is(:hover, :focus-within, .active) .footer-actions {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.admin-tickets-dashboard .ticket-card.active .footer-actions::before {
+  background: linear-gradient(90deg, rgba(238, 248, 242, 0) 0%, #eef8f2 38%);
+}
+
+.admin-tickets-dashboard .ticket-card--overdue .footer-actions::before {
+  background: linear-gradient(90deg, rgba(255, 246, 242, 0) 0%, #fff6f2 38%);
+}
+
+.admin-tickets-dashboard .card-quick-actions {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+}
+
+.admin-tickets-dashboard .footer-actions .btn {
+  min-height: 30px;
+  padding: 0 11px;
+  border-radius: 7px;
+  font-size: .66rem;
+  font-weight: 750;
+  white-space: nowrap;
+  box-shadow: none;
+  transform: none;
+  transition:
+    color var(--atd-dur-1) var(--atd-ease-out),
+    background-color var(--atd-dur-1) var(--atd-ease-out),
+    border-color var(--atd-dur-1) var(--atd-ease-out);
+}
+
+.admin-tickets-dashboard .footer-actions .btn-resolve,
+.admin-tickets-dashboard .footer-actions > .btn-resolve {
+  padding: 0 11px;
+  color: #fff;
+  background: #14945a;
+  border: 1px solid #14945a;
+  box-shadow: none;
+}
+
+.admin-tickets-dashboard .footer-actions .btn-resolve:hover {
+  background: #0d7c4a;
+  border-color: #0d7c4a;
+  transform: none;
+}
+
+/* "Assumir atendimento" era um gradiente indigo. */
+.admin-tickets-dashboard .footer-actions .btn-assume,
+.admin-tickets-dashboard .footer-actions > .btn-assume {
+  padding: 0 11px;
+  color: #075039;
+  background: #dff0e7;
+  border: 1px solid #bcdccb;
+  box-shadow: none;
+}
+
+.admin-tickets-dashboard .footer-actions .btn-assume:hover {
+  color: #063c2d;
+  background: #cfe8da;
+  border-color: #a5cdb8;
+}
+
+.admin-tickets-dashboard .footer-actions .btn-secondary {
+  color: #40564c;
+  background: #fff;
+  border: 1px solid var(--atd-border);
+}
+
+.admin-tickets-dashboard .footer-actions .btn-secondary:hover {
+  color: #075039;
+  background: #f2f8f5;
+  border-color: #afc4b7;
+}
+
+/* Sem cursor — toque — as ações não podem depender de hover. */
+@media (hover: none) {
+  .admin-tickets-dashboard .footer-actions {
+    position: static;
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+    flex-wrap: wrap;
+    margin-left: auto;
+  }
+  .admin-tickets-dashboard .footer-actions::before { display: none; }
+  .admin-tickets-dashboard .ticket-card-footer { flex-wrap: wrap; overflow: visible; }
+  .admin-tickets-dashboard .footer-actions .btn { min-height: 44px; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   11. Cabeçalho da fila
+══════════════════════════════════════════════════════════════ */
+
+.admin-tickets-dashboard .queue-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.admin-tickets-dashboard .queue-header h2 {
+  min-width: 0;
+  margin: 0;
+  margin-right: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-tickets-dashboard .queue-count { flex: none; }
+.admin-tickets-dashboard .queue-header .btn { flex: none; }
+
+/* ══════════════════════════════════════════════════════════════
+   12. Nada dentro da coluna da fila pode alargá-la
+══════════════════════════════════════════════════════════════ */
+
+.admin-tickets-dashboard .queue-column,
+.admin-tickets-dashboard .ticket-queue,
+.admin-tickets-dashboard .ticket-panel,
+.admin-tickets-dashboard .panel-content,
+.admin-tickets-dashboard .panel-header { min-width: 0; }
+
+.admin-tickets-dashboard .panel-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   13. Correções de cascata na linha da fila
+
+   A folha original pinta o fundo da linha selecionada com a cor da
+   PRIORIDADE (.ticket-card.active.ticket-priority-medium e irmãs, em
+   especificidade 0,4,0) e ainda aplica halo e translate. Isso disputa
+   com a seleção, porque a prioridade já é dita pelo filete — e um
+   fundo âmbar numa linha selecionada lê como alerta, não como foco.
+   A seleção volta a ser uma só: lavagem evergreen e filete interno.
+══════════════════════════════════════════════════════════════ */
+
+.admin-tickets-dashboard .ticket-card.active,
+.admin-tickets-dashboard .ticket-card.active:is(.ticket-priority-urgent,
+  .ticket-priority-high, .ticket-priority-medium, .ticket-priority-low,
+  .ticket-priority-neutral) {
+  background: #eef8f2;
+  border-color: transparent;
+  border-left-width: 0;
+  box-shadow: inset 3px 0 0 #14945a;
+  transform: none;
+}
+
+/* A linha não sobe nem encolhe ao ser clicada: numa fila contínua isso
+   desalinha a linha em relação às vizinhas. */
+.admin-tickets-dashboard .ticket-card,
+.admin-tickets-dashboard .ticket-card:active,
+.admin-tickets-dashboard .ticket-card:hover {
+  transform: none;
+}
+
+/* O filete lateral herdado (border-left colorido) sai de cena: quem diz
+   prioridade agora é o ::before, que não muda a caixa da linha. */
+.admin-tickets-dashboard .ticket-card:is(.ticket-priority-urgent,
+  .ticket-priority-high, .ticket-priority-medium, .ticket-priority-low,
+  .ticket-priority-neutral) {
+  border-left-width: 0;
+}
+
+/* Nada da linha pinta fora da própria caixa: qualquer margem de clipe
+   entra no scrollWidth da lista e devolve a rolagem horizontal. */
+.admin-tickets-dashboard .ticket-card { overflow: hidden; }
+
+/* ── Badges: o ponto de departamento estava por cima do texto ─────
+   A camada de redesign zerou o padding lateral do .badge, mas o ponto
+   continuou posicionado em left: 8px, contando com os 18px originais. */
+.admin-tickets-dashboard :is(.badge-dept-ti, .badge-dept-admin, .badge-dept-rh) {
+  padding-left: 17px;
+  padding-right: 8px;
+}
+
+.admin-tickets-dashboard :is(.badge-dept-ti, .badge-dept-admin, .badge-dept-rh)::before {
+  left: 7px;
+  width: 5px;
+  height: 5px;
+  box-shadow: none;
+}
+
+/* Badges de estado e prioridade ganham respiro proporcional. */
+.admin-tickets-dashboard .ticket-card-badges .badge {
+  min-height: 20px;
+  padding: 0 8px;
+  font-size: .55rem;
+  letter-spacing: .04em;
+}
+
+/* ── O véu das ações cobria a linha de badges ────────────────────
+   Ele deve cobrir apenas a faixa do rodapé da linha. */
+.admin-tickets-dashboard .footer-actions::before {
+  inset: -7px -16px -13px -40px;
+}
+
+
+/* ── O padding uniforme de badge (0,3,0) vencia a regra do badge com
+   ponto (0,2,0) e devolvia o ponto para cima da primeira letra. ── */
+.admin-tickets-dashboard .ticket-card-badges :is(.badge-dept-ti, .badge-dept-admin, .badge-dept-rh) {
+  padding-left: 18px;
+  padding-right: 8px;
+}
+
+/* A seta ficava fora da caixa e o overflow-x da lista a cortava. O elo
+   entre linha selecionada e painel passa a ser um filete na borda
+   direita — mesma leitura, dentro da geometria. */
+.admin-tickets-dashboard .ticket-card.active::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 0 auto;
+  top: 0;
+  right: 0;
+  width: 3px;
+  height: auto;
+  background: #14945a;
+  border: 0;
+  transform: none;
+  animation: atdEdgeIn 220ms var(--atd-ease-out) backwards;
+}
+
+@keyframes atdEdgeIn {
+  from { opacity: 0; transform: scaleY(.4); }
+  to { opacity: 1; transform: scaleY(1); }
+}
+
+/* O véu começa a desvanecer mais cedo, para que "0h em aberto" não
+   encoste no primeiro botão. */
+.admin-tickets-dashboard .footer-actions::before {
+  inset: -4px -16px -13px -56px;
+  background: linear-gradient(90deg, rgba(247, 251, 249, 0) 0%, #f7fbf9 46%);
+}
+
+.admin-tickets-dashboard .ticket-card.active .footer-actions::before {
+  background: linear-gradient(90deg, rgba(238, 248, 242, 0) 0%, #eef8f2 46%);
+}
+
+.admin-tickets-dashboard .ticket-card--overdue .footer-actions::before {
+  background: linear-gradient(90deg, rgba(255, 246, 242, 0) 0%, #fff6f2 46%);
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   14. O filete vira medidor de prazo
+
+   Antes o filete repetia a prioridade, que o badge já diz. Agora ele
+   carrega o dado que decide a triagem: quanto do prazo do chamado já
+   foi gasto. A altura é a fração consumida, a cor é o estado — então
+   uma varredura vertical da fila mostra, sem ler nada, quem está
+   perto de estourar. A prioridade continua no badge, onde ela é um
+   rótulo; aqui ela só define o tamanho do orçamento.
+══════════════════════════════════════════════════════════════ */
+
+.admin-tickets-dashboard .ticket-card {
+  --sla-tone: #14945a;
+  --sla-tone-soft: #dff0e7;
+}
+
+.admin-tickets-dashboard .ticket-card[data-sla='atencao'] {
+  --sla-tone: #ed8a22;
+  --sla-tone-soft: #f8e6d0;
+}
+
+.admin-tickets-dashboard .ticket-card[data-sla='critico'] {
+  --sla-tone: #d9464f;
+  --sla-tone-soft: #f6dcde;
+}
+
+.admin-tickets-dashboard .ticket-card[data-sla='estourado'] {
+  --sla-tone: #d9464f;
+  --sla-tone-soft: #f0b6b9;
+}
+
+/* O trilho ocupa a borda inteira; o preenchimento sobe do rodapé até a
+   fração gasta, como um nível. */
+.admin-tickets-dashboard .ticket-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--atd-rail);
+  background:
+    linear-gradient(to top,
+      var(--sla-tone) 0,
+      var(--sla-tone) var(--sla-pct, 0%),
+      var(--sla-tone-soft) var(--sla-pct, 0%),
+      var(--sla-tone-soft) 100%);
+  transform: none;
+  transition: background var(--atd-dur-3) var(--atd-ease-out);
+  animation: atdRailFill 520ms var(--atd-ease-out) backwards;
+}
+
+@keyframes atdRailFill {
+  from { clip-path: inset(100% 0 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+
+/* Prazo estourado: o nível está cheio e respira, o único movimento
+   contínuo da fila. */
+.admin-tickets-dashboard .ticket-card[data-sla='estourado']::before {
+  background: var(--sla-tone);
+  animation: atdRailFill 520ms var(--atd-ease-out) backwards,
+             atdRailBreach 2.6s var(--atd-ease-inout) 520ms infinite;
+}
+
+@keyframes atdRailBreach {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .55; }
+}
+
+
+/* ── A leitura numérica do prazo, no rodapé da linha ─────────────── */
+.admin-tickets-dashboard .sla-meter {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 20px;
+  padding: 0 8px;
+  color: #52655c;
+  background: #f2f5f3;
+  border-radius: 999px;
+  font-size: .61rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.admin-tickets-dashboard .sla-meter::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  flex: none;
+  background: var(--sla-tone);
+  border-radius: 50%;
+}
+
+.admin-tickets-dashboard .ticket-card[data-sla='critico'] .sla-meter,
+.admin-tickets-dashboard .ticket-card[data-sla='estourado'] .sla-meter {
+  color: #a83239;
+  background: #fbecec;
+}
+
+.admin-tickets-dashboard .ticket-card[data-sla='atencao'] .sla-meter {
+  color: #b3671a;
+  background: #fdf1e2;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   15. Estado vazio — o fim da fila merece um momento
+══════════════════════════════════════════════════════════════ */
+
+.admin-tickets-dashboard .empty-queue {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 4px;
+  min-height: 340px;
+  padding: 32px;
+  text-align: center;
+  background:
+    radial-gradient(120% 90% at 50% 0%, #f3faf6 0%, rgba(255, 255, 255, 0) 62%),
+    #fff;
+  border: 0;
+  animation: atdEmptyIn 420ms var(--atd-ease-out) backwards;
+}
+
+@keyframes atdEmptyIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.admin-tickets-dashboard .empty-queue .empty-icon {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 14px;
+  color: #14945a;
+  background: #eaf6ef;
+  border: 1px solid #cfe8da;
+  border-radius: 50%;
+  font-size: 1.5rem;
+}
+
+.admin-tickets-dashboard .empty-queue p {
+  margin: 0;
+  color: #102c22;
+  font-size: 1rem;
+  font-weight: 750;
+  letter-spacing: -.015em;
+}
+
+.admin-tickets-dashboard .empty-queue small {
+  color: #64766e;
+  font-size: .73rem;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   16. Esqueleto de carregamento — a forma da linha que vem
+══════════════════════════════════════════════════════════════ */
+
+.admin-tickets-dashboard .ticket-skeleton {
+  display: block;
+  padding: 15px 16px 15px 19px;
+  pointer-events: none;
+}
+
+.admin-tickets-dashboard .ticket-skeleton::before { display: none; }
+
+.admin-tickets-dashboard .skeleton-line {
+  height: 9px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #eef2f0 25%, #f7faf8 50%, #eef2f0 75%);
+  background-size: 240% 100%;
+  animation: atdSkeleton 1.5s var(--atd-ease-inout) infinite;
+}
+
+@keyframes atdSkeleton {
+  from { background-position: 120% 0; }
+  to { background-position: -120% 0; }
+}
+
+.admin-tickets-dashboard .skeleton-line--title { width: 62%; height: 11px; margin-bottom: 9px; }
+.admin-tickets-dashboard .skeleton-line--meta { width: 84%; margin-bottom: 11px; }
+.admin-tickets-dashboard .skeleton-line--badges { width: 46%; height: 16px; }
+
+.admin-tickets-dashboard .ticket-skeleton:nth-child(2) .skeleton-line { animation-delay: 90ms; }
+.admin-tickets-dashboard .ticket-skeleton:nth-child(3) .skeleton-line { animation-delay: 180ms; }
+.admin-tickets-dashboard .ticket-skeleton:nth-child(4) .skeleton-line { animation-delay: 270ms; }
+.admin-tickets-dashboard .ticket-skeleton:nth-child(5) .skeleton-line { animation-delay: 360ms; }
+
+/* ══════════════════════════════════════════════════════════════
+   17. Painel de contexto — hierarquia e entrada
+══════════════════════════════════════════════════════════════ */
+
+.admin-tickets-dashboard .ticket-panel {
+  animation: atdPanelIn 300ms var(--atd-ease-out);
+}
+
+@keyframes atdPanelIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* O cabeçalho do painel é a única superfície evergreen da coluna: ele
+   ancora o detalhe e ecoa a moldura da navegação. */
+.admin-tickets-dashboard .panel-header {
+  position: relative;
+  padding: 20px;
+  color: #eaf6ef;
+  background: #063c2d;
+  border-bottom: 0;
+}
+
+.admin-tickets-dashboard .panel-ticket-id {
+  color: #7ce0a4;
+  font-size: .61rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-tickets-dashboard .panel-title {
+  margin-top: 7px;
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 780;
+  line-height: 1.25;
+  letter-spacing: -.025em;
+}
+
+.admin-tickets-dashboard .close-panel {
+  color: #cfe8da;
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(255, 255, 255, .16);
+}
+
+.admin-tickets-dashboard .close-panel:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, .16);
+  border-color: rgba(255, 255, 255, .28);
+}
+
+.admin-tickets-dashboard .panel-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding-top: 14px;
+}
+
+/* Cada seção do painel entra em sequência curta, para que o olho
+   acompanhe a ordem de leitura em vez de receber tudo de uma vez. */
+.admin-tickets-dashboard .panel-content > * {
+  animation: atdPanelSection 300ms var(--atd-ease-out) backwards;
+}
+
+@keyframes atdPanelSection {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.admin-tickets-dashboard .panel-content > :nth-child(1) { animation-delay: 40ms; }
+.admin-tickets-dashboard .panel-content > :nth-child(2) { animation-delay: 80ms; }
+.admin-tickets-dashboard .panel-content > :nth-child(3) { animation-delay: 120ms; }
+.admin-tickets-dashboard .panel-content > :nth-child(4) { animation-delay: 160ms; }
+.admin-tickets-dashboard .panel-content > :nth-child(5) { animation-delay: 200ms; }
+.admin-tickets-dashboard .panel-content > :nth-child(n + 6) { animation-delay: 240ms; }
+
+.admin-tickets-dashboard .panel-section h4 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.admin-tickets-dashboard .panel-section h4::before {
+  content: '';
+  width: 3px;
+  height: 11px;
+  background: #cfe8da;
+  border-radius: 999px;
+}
+
+.admin-tickets-dashboard .info-row:last-child { border-bottom: 0; }
+
+/* ══════════════════════════════════════════════════════════════
+   18. Ações do painel
+══════════════════════════════════════════════════════════════ */
+
+.admin-tickets-dashboard .panel-actions .btn-primary:hover {
+  background: #0b6c44;
+  border-color: #0b6c44;
+}
+
+.admin-tickets-dashboard .panel-actions .btn-warning:hover {
+  background: #fdf1e2;
+  border-color: #e0bd85;
+}
+
+.admin-tickets-dashboard .panel-actions .btn-success:hover {
+  color: #fff;
+  background: #14945a;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   19. Contagem da fila — o número que muda precisa ser notado
+══════════════════════════════════════════════════════════════ */
+
+.admin-tickets-dashboard .queue-count {
+  transition: background-color var(--atd-dur-2) var(--atd-ease-out),
+              color var(--atd-dur-2) var(--atd-ease-out);
+}
+
+/* A confirmacao de filtro nao pode usar scale: as abas e os chips
+   definem o eixo de alinhamento do ledger, e um transform desloca esse
+   eixo em ~1px. O aviso vira um anel, que nao toca a geometria. */
+.admin-tickets-dashboard .dept-tab.active,
+.admin-tickets-dashboard .priority-chip.is-active {
+  animation: atdChipCommit 300ms var(--atd-ease-out);
+}
+
+@keyframes atdChipCommit {
+  0% { box-shadow: 0 0 0 0 rgba(20, 148, 90, .38); }
+  100% { box-shadow: 0 0 0 7px rgba(20, 148, 90, 0); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   20. Movimento reduzido — cobre também o que veio depois
+══════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-tickets-dashboard .ticket-card::before {
+    animation: none !important;
+    clip-path: none !important;
+  }
+  .admin-tickets-dashboard .skeleton-line { animation: none !important; }
+}
+
+/* O painel trazia padding: 24px e o cabecalho um margin-bottom: 20px,
+   entao a faixa evergreen flutuava dentro do cartao em vez de ancora-lo.
+   O respiro passa para o conteudo, que e quem precisa dele. */
+.admin-tickets-dashboard .ticket-panel { padding: 0; }
+.admin-tickets-dashboard .panel-header { margin: 0; }
+.admin-tickets-dashboard .panel-content { padding: 18px 20px 20px; }
+
+/* ══════════════════════════════════════════════════════════════
+   21. Cabeçalho da linha — referência e estado de entrada
+══════════════════════════════════════════════════════════════ */
+
+.admin-tickets-dashboard .ticket-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 3px;
+  min-width: 0;
+}
+
+/* Referência copiável. Em repouso é quase invisível — ela existe para ser
+   conferida, não para disputar com o assunto do chamado. */
+.tk-ref {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 5px 1px 3px;
+  color: #8b9c94;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  font: 800 .58rem/1.4 'DM Sans', system-ui, sans-serif;
+  letter-spacing: .04em;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition:
+    color .16s var(--atd-ease-out),
+    background-color .16s var(--atd-ease-out),
+    border-color .16s var(--atd-ease-out);
+}
+
+.tk-ref-hash { opacity: .6; }
+
+.tk-ref-icon {
+  font-size: 11px;
+  opacity: 0;
+  transform: translateX(-2px);
+  transition: opacity .16s var(--atd-ease-out), transform .16s var(--atd-ease-out);
+}
+
+.tk-ref:hover {
+  color: #0b6c44;
+  background: #eaf6ef;
+  border-color: #cfe8da;
+}
+
+.tk-ref:hover .tk-ref-icon { opacity: .85; transform: translateX(0); }
+.tk-ref.is-copied { color: #0b6c44; background: #dff0e7; border-color: #bcdccb; }
+.tk-ref.is-copied .tk-ref-icon { opacity: 1; transform: translateX(0); }
+
+/* A confirmação sai da própria referência, ancorada nela, e não numa faixa
+   global — a pessoa está olhando para o id, é ali que ela precisa ler. */
+.tk-ref-flash {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  z-index: 5;
+  padding: 3px 7px;
+  color: #eaf6ef;
+  background: #063c2d;
+  border-radius: 6px;
+  font-size: .56rem;
+  font-weight: 750;
+  letter-spacing: .03em;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: tkFlashIn 180ms var(--atd-ease-out);
+}
+
+@keyframes tkFlashIn {
+  from { opacity: 0; transform: translate(-50%, -3px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* ── Badge "Novo": chamado que ainda não teve primeira resposta ── */
+.tk-new-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 17px;
+  padding: 0 6px;
+  color: #1f56a4;
+  background: #eaf1fb;
+  border: 1px solid #cadcf5;
+  border-radius: 999px;
+  font-size: .54rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  animation: tkBadgeIn 320ms var(--atd-ease-out) backwards;
+}
+
+@keyframes tkBadgeIn {
+  from { opacity: 0; transform: scale(.82); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   22. Menu de ações da linha
+══════════════════════════════════════════════════════════════ */
+
+.tk-menu { position: relative; display: inline-flex; }
+
+.tk-menu-trigger {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  color: #5d7067;
+  background: #fff;
+  border: 1px solid var(--atd-border);
+  border-radius: 7px;
+  cursor: pointer;
+  transition:
+    color .16s var(--atd-ease-out),
+    background-color .16s var(--atd-ease-out),
+    border-color .16s var(--atd-ease-out);
+}
+
+.tk-menu-trigger i { font-size: 15px; }
+.tk-menu-trigger:hover { color: #075039; background: #f2f8f5; border-color: #afc4b7; }
+.tk-menu-trigger.is-open { color: #fff; background: #075039; border-color: #075039; }
+.tk-menu-trigger:disabled { cursor: wait; }
+.tk-menu-trigger:disabled i { animation: tkSpin .8s linear infinite; }
+
+.tk-menu-pop {
+  position: fixed;
+  z-index: 1400;
+  width: 232px;
+  /* `left` recebe a borda direita do gatilho; o menu cresce para a esquerda. */
+  transform: translateX(-100%);
+  padding: 5px;
+  background: #fff;
+  border: 1px solid var(--atd-border);
+  border-radius: 11px;
+  box-shadow: 0 28px 70px -28px rgba(5, 42, 30, .55), 0 2px 8px -4px rgba(5, 42, 30, .18);
+  animation: tkMenuIn 160ms var(--atd-ease-out);
+}
+
+.tk-menu-pop--up { transform: translate(-100%, -100%); transform-origin: bottom right; }
+.tk-menu-pop--down { transform-origin: top right; }
+
+/* A animação anima só a opacidade: o transform já carrega o posicionamento,
+   e sobrescrevê-lo faria o menu saltar para o canto da tela. */
+@keyframes tkMenuIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.tk-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 34px;
+  padding: 0 9px;
+  color: #33493f;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  font: 650 .71rem/1.2 'DM Sans', system-ui, sans-serif;
+  text-align: left;
+  cursor: pointer;
+  transition: color .14s var(--atd-ease-out), background-color .14s var(--atd-ease-out);
+}
+
+.tk-menu-item > i:first-child { font-size: 15px; color: #64766e; transition: color .14s var(--atd-ease-out); }
+.tk-menu-item:hover:not(:disabled) { color: #063c2d; background: #f2f8f5; }
+.tk-menu-item:hover:not(:disabled) > i:first-child { color: #14945a; }
+.tk-menu-item:disabled { cursor: default; opacity: .8; }
+.tk-menu-item.is-current { color: #0b6c44; background: #eaf6ef; }
+
+.tk-menu-more { margin-left: auto; font-size: 13px; opacity: .55; }
+
+.tk-menu-sep {
+  display: block;
+  height: 1px;
+  margin: 4px 7px;
+  background: var(--atd-border-lt);
+}
+
+.tk-menu-back {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  margin-bottom: 3px;
+  padding: 0 8px;
+  color: #64766e;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--atd-border-lt);
+  border-radius: 0;
+  font: 750 .62rem/1 'DM Sans', system-ui, sans-serif;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.tk-menu-back:hover { color: #075039; }
+
+.tk-menu-note {
+  margin: 4px 8px 6px;
+  color: #8b9c94;
+  font-size: .64rem;
+  line-height: 1.4;
+}
+
+.tk-menu-dot { width: 8px; height: 8px; flex: none; margin: 0 3px; border-radius: 50%; }
+
+.tk-menu-avatar {
+  display: grid;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  flex: none;
+  color: #0b6c44;
+  background: #eaf6ef;
+  border-radius: 50%;
+  font-size: .52rem;
+  font-weight: 800;
+}
+
+.tk-menu-scroll { max-height: 244px; overflow-y: auto; scrollbar-width: thin; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tk-menu-pop, .tk-new-badge, .tk-ref-flash { animation: none !important; }
+}

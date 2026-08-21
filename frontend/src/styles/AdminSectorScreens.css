@@ -1,0 +1,900 @@
+/* ─────────────────────────────────────────────────────────────
+   Sector screens — structural pass for the workspaces that the
+   token bridge alone cannot reach: detalhe do chamado, painel do
+   setor Administrativo, e as três telas do setor RH, mais o
+   workspace do Gestor.
+
+   These files hard-code colours instead of reading tokens, so the
+   rules below restate only what the palette bridge cannot fix:
+   gradients, literal violets/slates, and the surfaces that DESIGN.md
+   asks to be flat white on the mineral canvas.
+───────────────────────────────────────────────────────────────── */
+
+/* ══════════════════════════════════════════════════════════════
+   Detalhe do chamado — /admin/chamados/:id e /rh/chamados/:id
+══════════════════════════════════════════════════════════════ */
+
+.admin-ticket-detail {
+  width: min(1380px, calc(100% - 38px));
+  max-width: none;
+  min-height: calc(100vh - 72px);
+  margin: 0 auto;
+  padding: 22px 0 46px;
+  background: transparent;
+}
+
+/* Cabeçalho de contexto: voltar, identificador, estado, título. */
+.admin-ticket-detail .ticket-header {
+  border-bottom: 1px solid var(--pt-line);
+}
+
+.admin-ticket-detail .btn-back {
+  min-height: 36px;
+  color: #365148;
+  background: var(--pt-paper);
+  border: 1px solid var(--pt-line);
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.admin-ticket-detail .btn-back:hover {
+  color: var(--pt-ink);
+  background: #f5faf7;
+  border-color: #afc4b7;
+}
+
+.admin-ticket-detail .ticket-id-label {
+  color: var(--pt-ink-muted);
+  font-size: .61rem;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-ticket-detail .ticket-title-heading {
+  color: var(--pt-ink);
+  font-size: 1.35rem;
+  font-weight: 780;
+  line-height: 1.2;
+  letter-spacing: -.025em;
+}
+
+/* Superfícies: papel branco, filete de 1px, sem elevação fabricada. */
+.admin-ticket-detail :is(.stepper-card, .ticket-info-card, .messages-card, .sidebar-card) {
+  background: var(--pt-paper);
+  border: 1px solid var(--pt-line);
+  border-radius: 11px;
+  box-shadow: var(--pt-shadow-surface);
+}
+
+.admin-ticket-detail .card-header {
+  border-bottom: 1px solid var(--pt-line);
+}
+
+.admin-ticket-detail :is(.card-title, .sidebar-card-title, .form-title) {
+  color: var(--pt-ink);
+  font-size: 1rem;
+  font-weight: 750;
+  letter-spacing: -.015em;
+}
+
+.admin-ticket-detail .field-label {
+  color: var(--pt-ink-muted);
+  font-size: .61rem;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.admin-ticket-detail .field-value-title {
+  color: var(--pt-ink);
+  font-weight: 750;
+  letter-spacing: -.015em;
+}
+
+/* O filete indigo remanescente vira linha de ação verde. */
+.admin-ticket-detail :is(.select-input, .message-input, .rh-metadata-block, .internal-toggle-container),
+.admin-ticket-detail .messages-card .message-form {
+  border-color: var(--pt-line);
+}
+
+.admin-ticket-detail :is(.select-input, .message-input):focus {
+  border-color: #64ad84;
+  box-shadow: var(--pt-focus-ring);
+}
+
+.admin-ticket-detail :is(.btn-send, .btn-assign-inline) {
+  background: var(--pt-action);
+  border-color: var(--pt-action);
+  color: #fff;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.admin-ticket-detail :is(.btn-send, .btn-assign-inline):hover:not(:disabled) {
+  background: var(--pt-action-dark);
+  border-color: var(--pt-action-dark);
+}
+
+.admin-ticket-detail :is(.btn-edit, .btn-unassign) {
+  color: #365148;
+  background: var(--pt-paper);
+  border: 1px solid var(--pt-line);
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.admin-ticket-detail :is(.btn-edit, .btn-unassign):hover:not(:disabled) {
+  border-color: #afc4b7;
+  background: #f5faf7;
+}
+
+.admin-ticket-detail .assignee-avatar {
+  background: var(--pt-action-soft);
+  color: #0b6c44;
+}
+
+/* Resumo por IA — era um bloco violeta com gradiente. */
+.admin-ticket-detail .btn-ai-summary,
+.admin-ticket-detail .btn-ai-summary.active {
+  color: #fff;
+  background: var(--pt-evergreen-active);
+  border: 1px solid var(--pt-evergreen-active);
+  border-radius: 8px;
+  font-size: .68rem;
+  font-weight: 750;
+  box-shadow: none;
+}
+
+.admin-ticket-detail .btn-ai-summary:hover:not(:disabled) {
+  background: var(--pt-evergreen);
+  border-color: var(--pt-evergreen);
+  opacity: 1;
+  box-shadow: none;
+}
+
+.admin-ticket-detail .ai-summary-panel {
+  background: var(--pt-action-soft);
+  border: 1px solid var(--pt-action-line);
+  border-radius: 11px;
+}
+
+.admin-ticket-detail .ai-summary-header {
+  color: #0b6c44;
+  font-size: .61rem;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.admin-ticket-detail .ai-summary-text,
+.admin-ticket-detail .ai-summary-points { color: #29443a; }
+.admin-ticket-detail .ai-summary-next { border-top: 1px solid var(--pt-action-line); color: #155b3e; }
+.admin-ticket-detail .ai-summary-spinner { border-top-color: var(--pt-action); }
+
+.admin-ticket-detail .message-internal { border-left-color: var(--pt-warning); }
+.admin-ticket-detail .loading-spinner { border-top-color: var(--pt-action); }
+
+@media (max-width: 720px) {
+  .admin-ticket-detail {
+    width: min(100% - 22px, 1380px);
+    padding-top: 14px;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Setor Administrativo — /admin/auxiliar/dashboard
+   O bridge já reescreve os tokens; aqui ficam os gradientes que
+   estavam escritos à mão.
+══════════════════════════════════════════════════════════════ */
+
+.asd-page .asd-shell { max-width: 1380px; }
+
+.asd-page .asd-hero {
+  background: var(--pt-evergreen);
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 14px;
+  box-shadow: var(--pt-shadow-command);
+}
+
+.asd-page .asd-btn-solid {
+  color: #fff;
+  background: var(--pt-action);
+  border: 1px solid var(--pt-action);
+  box-shadow: none;
+}
+
+.asd-page .asd-btn-solid:hover:not(:disabled) {
+  background: var(--pt-action-dark);
+  border-color: var(--pt-action-dark);
+  box-shadow: none;
+  transform: translateY(-1px);
+}
+
+.asd-page .asd-btn-solid:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* Dentro do hero evergreen a ação principal usa o verde vivo. */
+.asd-page .asd-hero .asd-btn-solid,
+.asd-page .asd-topbar-actions .asd-btn-solid {
+  background: var(--pt-action-bright);
+  border-color: var(--pt-action-bright);
+  color: #06301f;
+}
+
+.asd-page .asd-hero .asd-btn-solid:hover:not(:disabled),
+.asd-page .asd-topbar-actions .asd-btn-solid:hover:not(:disabled) {
+  background: #64cd8a;
+  border-color: #64cd8a;
+  color: #06301f;
+}
+
+.asd-page .asd-panel:hover { box-shadow: var(--pt-shadow-surface); }
+
+/* ══════════════════════════════════════════════════════════════
+   Setor RH — painel, fila e relatórios
+   Toda a identidade era violeta (#7c3aed); passa a evergreen.
+══════════════════════════════════════════════════════════════ */
+
+/* ── Painel do RH ──────────────────────────────────────────── */
+.rhd-page .rhd-btn-primary {
+  color: #fff;
+  background: var(--pt-action);
+  border-color: var(--pt-action);
+  box-shadow: none;
+}
+
+.rhd-page .rhd-btn-primary:hover {
+  background: var(--pt-action-dark);
+  border-color: var(--pt-action-dark);
+  transform: translateY(-1px);
+}
+
+.rhd-page .rhd-btn-secondary {
+  color: #365148;
+  background: var(--pt-paper);
+  border-color: var(--pt-line);
+}
+.rhd-page .rhd-btn-secondary:hover { background: #f5faf7; border-color: #afc4b7; }
+
+/* Os KPIs eram quatro blocos de gradiente; viram superfícies de
+   papel com um filete de estado, conforme The White-Surface Rule. */
+.rhd-page :is(.rhd-kpi-open, .rhd-kpi-new, .rhd-kpi-resolved, .rhd-kpi-total) {
+  color: var(--pt-ink);
+  background: var(--pt-paper);
+  border: 1px solid var(--pt-line);
+  border-top-width: 3px;
+  border-radius: 11px;
+  box-shadow: var(--pt-shadow-surface);
+}
+
+.rhd-page .rhd-kpi-open { border-top-color: var(--pt-warning); }
+.rhd-page .rhd-kpi-new { border-top-color: var(--pt-info); }
+.rhd-page .rhd-kpi-resolved { border-top-color: var(--pt-action); }
+.rhd-page .rhd-kpi-total { border-top-color: var(--pt-evergreen-active); }
+
+.rhd-page .rhd-kpi-bg-icon { color: var(--pt-ink-muted); opacity: .12; }
+.rhd-page .rhd-kpi-bar-wrap { background: #eef3f0; }
+.rhd-page .rhd-kpi-bar { background: var(--pt-action); }
+
+.rhd-page .rhd-avatar {
+  background: var(--pt-action-soft);
+  color: #0b6c44;
+}
+
+.rhd-page .rhd-link { color: var(--pt-action); }
+.rhd-page .rhd-row:hover td { background: #f5faf7 !important; }
+.rhd-page .rhd-error { background: var(--pt-danger-soft); border-color: #f0b6b9; color: #a83239; }
+
+/* ── Fila do RH ────────────────────────────────────────────── */
+.rh-tickets-dashboard .rh-priority-chip--all.is-active {
+  border-color: var(--pt-action);
+  color: #0b6c44;
+  background: var(--pt-action-soft);
+}
+.rh-tickets-dashboard .rh-priority-chip--all.is-active .rh-priority-chip-count {
+  background: var(--pt-action-line);
+  color: #0b6c44;
+}
+.rh-tickets-dashboard .rh-priority-chip--high.is-active {
+  border-color: var(--pt-danger); color: #a83239; background: var(--pt-danger-soft);
+}
+.rh-tickets-dashboard .rh-priority-chip--high.is-active .rh-priority-chip-count {
+  background: #f5d3d5; color: #a83239;
+}
+.rh-tickets-dashboard .rh-priority-chip--medium.is-active {
+  border-color: var(--pt-warning); color: #b3671a; background: var(--pt-warning-soft);
+}
+.rh-tickets-dashboard .rh-priority-chip--medium.is-active .rh-priority-chip-count {
+  background: #f8e0c4; color: #b3671a;
+}
+.rh-tickets-dashboard .rh-priority-chip--low.is-active {
+  border-color: var(--pt-action); color: #0b6c44; background: var(--pt-action-soft);
+}
+.rh-tickets-dashboard .rh-priority-chip--low.is-active .rh-priority-chip-count {
+  background: var(--pt-action-line); color: #0b6c44;
+}
+.rh-tickets-dashboard .rh-priority-chip:hover:not(:disabled) {
+  border-color: #afc4b7;
+  background: #f5faf7;
+}
+
+/* Mesma escala de prioridade da Central de Chamados. */
+.rh-tickets-dashboard .rh-ticket-card.rh-priority-critical,
+.rh-tickets-dashboard .rh-ticket-card.rh-priority-urgent,
+.rh-tickets-dashboard .rh-ticket-card.rh-priority-high { border-left-color: var(--pt-danger); }
+.rh-tickets-dashboard .rh-ticket-card.rh-priority-medium { border-left-color: var(--pt-warning); }
+.rh-tickets-dashboard .rh-ticket-card.rh-priority-low { border-left-color: var(--pt-action); }
+.rh-tickets-dashboard .rh-ticket-card.rh-priority-neutral { border-left-color: #cdd9d1; }
+
+.rh-tickets-dashboard .rh-ticket-card {
+  border-color: var(--pt-line);
+  border-radius: 11px;
+  box-shadow: none;
+}
+.rh-tickets-dashboard .rh-ticket-card:hover { border-color: #afc4b7; background: #f9fcfa; }
+.rh-tickets-dashboard .rh-ticket-card.active {
+  border-color: var(--pt-action);
+  background: var(--pt-action-soft);
+  box-shadow: inset 3px 0 0 var(--pt-action);
+}
+
+.rh-tickets-dashboard :is(.rh-queue-header, .rh-panel-header) {
+  border-bottom: 1px solid var(--pt-line);
+  background: var(--pt-paper);
+}
+
+.rh-tickets-dashboard .rh-queue-header h2,
+.rh-tickets-dashboard .rh-panel-title {
+  color: var(--pt-ink);
+  font-weight: 750;
+  letter-spacing: -.015em;
+}
+
+.rh-tickets-dashboard .rh-filter-btn {
+  color: #52655c;
+  background: var(--pt-paper);
+  border-color: var(--pt-line);
+  border-radius: 999px;
+}
+.rh-tickets-dashboard .rh-filter-btn:hover { background: #f5faf7; border-color: #afc4b7; }
+.rh-tickets-dashboard .rh-filter-btn.active {
+  color: #fff;
+  background: var(--pt-evergreen-active);
+  border-color: var(--pt-evergreen-active);
+}
+
+.rh-tickets-dashboard :is(.rh-filter-input, .rh-closed-search-input) {
+  border-color: var(--pt-line);
+  border-radius: 8px;
+}
+.rh-tickets-dashboard :is(.rh-filter-input, .rh-closed-search-input):focus {
+  border-color: #64ad84;
+  box-shadow: var(--pt-focus-ring);
+}
+
+.rh-tickets-dashboard .rh-sla-chip--overdue { background: var(--pt-danger-soft); color: #a83239; }
+.rh-tickets-dashboard .rh-status-chip strong { color: var(--pt-ink); }
+.rh-tickets-dashboard .rh-empty-metric-card {
+  background: var(--pt-paper);
+  border: 1px solid var(--pt-line);
+  border-radius: 11px;
+}
+
+/* ── Relatórios do RH ──────────────────────────────────────── */
+.rhr-page .rhr-btn-export {
+  color: #fff;
+  background: var(--pt-action);
+  border-color: var(--pt-action);
+  box-shadow: none;
+}
+.rhr-page .rhr-btn-export:hover { background: var(--pt-action-dark); border-color: var(--pt-action-dark); }
+
+.rhr-page .rhr-btn-secondary {
+  color: #365148;
+  background: var(--pt-paper);
+  border-color: var(--pt-line);
+}
+.rhr-page .rhr-btn-secondary:hover { background: #f5faf7; border-color: #afc4b7; }
+
+.rhr-page .rhr-export-dropdown {
+  border-color: var(--pt-line);
+  border-radius: 11px;
+  box-shadow: var(--pt-shadow-overlay);
+}
+.rhr-page .rhr-export-item:hover { background: #f5faf7; }
+.rhr-page .rhr-export-item:not(:last-child) { border-bottom-color: var(--pt-line-soft); }
+
+.rhr-page .rhr-filter-select:focus {
+  border-color: #64ad84;
+  box-shadow: var(--pt-focus-ring);
+}
+
+.rhr-page .rhr-kpi-card {
+  border-color: var(--pt-line);
+  border-radius: 11px;
+  box-shadow: var(--pt-shadow-surface);
+}
+.rhr-page .rhr-kpi-card:hover { box-shadow: var(--pt-shadow-raised); }
+
+.rhr-page .rhr-kpi--total { border-top-color: var(--pt-evergreen-active); }
+.rhr-page .rhr-kpi--open { border-top-color: var(--pt-warning); }
+.rhr-page .rhr-kpi--resolved { border-top-color: var(--pt-action); }
+.rhr-page .rhr-kpi--rate { border-top-color: var(--pt-info); }
+.rhr-page .rhr-kpi--today { border-top-color: var(--pt-analysis); }
+.rhr-page .rhr-kpi--time { border-top-color: var(--pt-ink-muted); }
+
+.rhr-page .rhr-delta-up { color: var(--pt-action); }
+.rhr-page .rhr-delta-down { color: var(--pt-danger); }
+.rhr-page .rhr-delta-neu { color: var(--pt-ink-muted); }
+.rhr-page .rhr-loading-spinner { border-top-color: var(--pt-action); }
+
+/* ══════════════════════════════════════════════════════════════
+   Workspace do Gestor — era uma paleta slate/azul independente.
+══════════════════════════════════════════════════════════════ */
+
+.gestor-dashboard-page :is(.gd-header h1, .gd-section-title, .gd-kpi-value),
+.gestor-tickets-page :is(.gt-header h1, .gt-detail-title) { color: var(--pt-ink); }
+
+.gestor-dashboard-page :is(.gd-card, .gd-chart-card, .gd-table-card, .gd-section),
+.gestor-tickets-page :is(.gt-list, .gt-table-wrap, .gt-detail-panel) {
+  border-color: var(--pt-line);
+  border-radius: 11px;
+}
+
+.gestor-dashboard-page :is(.btn-primary, .gd-btn-primary),
+.gestor-tickets-page :is(.btn-primary, .gt-btn-primary) {
+  color: #fff;
+  background: var(--pt-action);
+  border-color: var(--pt-action);
+  box-shadow: none;
+}
+
+.gestor-dashboard-page :is(.btn-primary, .gd-btn-primary):hover,
+.gestor-tickets-page :is(.btn-primary, .gt-btn-primary):hover {
+  background: var(--pt-action-dark);
+  border-color: var(--pt-action-dark);
+}
+
+.gestor-dashboard-page .gd-link,
+.gestor-tickets-page .gt-link { color: var(--pt-action); }
+
+.gestor-tickets-page :is(.gt-search, .gt-select):focus {
+  border-color: #64ad84;
+  box-shadow: var(--pt-focus-ring);
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   Normalização de neutros — Gestor e RH escreviam a hierarquia em
+   cinzas frios (slate/zinc). O sistema usa neutros esverdeados:
+   ink #102c22, corpo #33493f, contexto #64766e, linha #dde5df.
+══════════════════════════════════════════════════════════════ */
+
+/* ── Gestor: painel ────────────────────────────────────────── */
+.gestor-dashboard-page :is(.gd-header-left h1, .gd-kpi-value, .gd-team-card-header h3,
+  .gd-team-stats strong, .gd-section-title, .gd-chart-card h3, .gd-issue-title,
+  .gd-table-header h3) { color: var(--pt-ink); }
+
+.gestor-dashboard-page :is(.gd-header-left p, .gd-update-chip, .gd-loading, .gd-kpi-label,
+  .gd-team-card-header p, .gd-team-stats span, .gd-table th, .gd-progress-label) { color: var(--pt-ink-muted); }
+
+.gestor-dashboard-page :is(.gd-kpi-sub, .gd-no-data, .gd-issue-rank) { color: #8b9c94; }
+.gestor-dashboard-page .gd-table td { color: #33493f; }
+
+.gestor-dashboard-page :is(.gd-section-title, .gd-table th) { border-bottom-color: var(--pt-line); }
+.gestor-dashboard-page :is(.gd-table td, .gd-issues-team-label) { border-bottom-color: var(--pt-line-soft); }
+.gestor-dashboard-page .gd-issues-team-block { border-color: var(--pt-line); }
+
+.gestor-dashboard-page :is(.gd-update-chip, .gd-team-chip, .gd-code) {
+  color: #486057;
+  background: #f2f5f3;
+}
+.gestor-dashboard-page :is(.gd-issue-item, .gd-issues-team-label, .gd-table tr:hover td) { background: #f5faf7; }
+
+.gestor-dashboard-page .gd-kpi-card { border-left-color: #cdd9d1; }
+.gestor-dashboard-page .gd-kpi-card.accent-blue { border-left-color: var(--pt-info); }
+.gestor-dashboard-page .gd-kpi-card.accent-purple { border-left-color: var(--pt-analysis); }
+.gestor-dashboard-page .gd-team-card { border-left-color: var(--pt-action); }
+
+.gestor-dashboard-page :is(.gd-issue-count, .gd-btn-link) { color: var(--pt-action); }
+.gestor-dashboard-page .gd-issue-count { background: var(--pt-action-soft); }
+.gestor-dashboard-page .gd-btn-link:hover { color: var(--pt-action-dark); }
+
+.gestor-dashboard-page .gd-spinner { border-color: var(--pt-line); border-top-color: var(--pt-action); }
+.gestor-dashboard-page .gd-progress-bar { background: #eef3f0; }
+.gestor-dashboard-page .gd-progress-fill { background: var(--pt-action); }
+.gestor-dashboard-page .gd-role-ti { color: #0b6c44; background: var(--pt-action-soft); }
+.gestor-dashboard-page .badge-info { background: var(--pt-info-soft); }
+.gestor-dashboard-page .badge-neutral { background: #f2f5f3; }
+
+.gestor-dashboard-page .btn-secondary,
+.gestor-tickets-page .btn-secondary {
+  color: #365148;
+  background: var(--pt-paper);
+  border: 1px solid var(--pt-line);
+}
+.gestor-dashboard-page .btn-secondary:hover,
+.gestor-tickets-page .btn-secondary:hover { background: #f5faf7; border-color: #afc4b7; }
+
+/* ── Gestor: solicitações ──────────────────────────────────── */
+.gestor-tickets-page :is(.gt-header h1, .gt-tab:hover, .gt-tab.active, .gt-stat-val,
+  .gt-search, .gt-select, .gt-ticket-title, .gt-panel-header h3, .gt-detail-title,
+  .gt-detail-section p, .gt-code) { color: var(--pt-ink); }
+
+.gestor-tickets-page :is(.gt-header p, .gt-tab, .gt-stat-lbl, .gt-loading,
+  .gt-ticket-meta, .gt-ticket-footer, .gt-table th) { color: var(--pt-ink-muted); }
+
+.gestor-tickets-page :is(.gt-empty, .gt-ticket-id, .gt-time, .gt-close, .gt-detail-id,
+  .gt-detail-section label, .gt-empty-cell, .gt-table-footer) { color: #8b9c94; }
+
+.gestor-tickets-page .gt-table td { color: #33493f; }
+.gestor-tickets-page :is(.gt-search, .gt-select, .gt-panel-header, .gt-table th) { border-color: var(--pt-line); }
+.gestor-tickets-page :is(.gt-table td, .gt-table-footer) { border-color: var(--pt-line-soft); }
+.gestor-tickets-page :is(.gt-tabs, .gt-code) { background: #f2f5f3; }
+.gestor-tickets-page :is(.gt-table th, .gt-table tr:hover td, .gt-close:hover) { background: #f5faf7; }
+
+.gestor-tickets-page .gt-stat-box { border-left-color: #cdd9d1; }
+.gestor-tickets-page .gt-stat-box.open { border-left-color: var(--pt-info); }
+.gestor-tickets-page :is(.gt-tab-count, .gt-tab.active .gt-tab-count) { background: var(--pt-action); }
+.gestor-tickets-page .gt-ticket-card.selected {
+  border-left-color: var(--pt-action);
+  background: var(--pt-action-soft);
+}
+.gestor-tickets-page :is(.badge-open, .badge-info) { background: var(--pt-info-soft); }
+.gestor-tickets-page :is(.badge-neutral, .badge-type) { background: #f2f5f3; color: var(--pt-ink-muted); }
+.gestor-tickets-page .badge-team-ti { color: #0b6c44; background: var(--pt-action-soft); }
+
+/* ── RH: painel ────────────────────────────────────────────── */
+.rhd-page { background: var(--pt-canvas); }
+.rhd-page :is(.rhd-title, .rhd-section-title, .rhd-ticket-title) { color: var(--pt-ink); }
+.rhd-page :is(.rhd-subtitle, .rhd-loading) { color: var(--pt-ink-muted); }
+.rhd-page :is(.rhd-section-subtitle, .rhd-empty, .rhd-cat-text, .rhd-elapsed) { color: #8b9c94; }
+.rhd-page .rhd-requester-name { color: #33493f; }
+
+.rhd-page :is(.rhd-section-header, .rhd-table thead th, .rhd-table tbody td) { border-bottom-color: var(--pt-line); }
+.rhd-page .rhd-table thead th { color: var(--pt-ink-muted); background: #f7f9f8; }
+.rhd-page .rhd-table tbody td { color: #334c43; }
+.rhd-page .rhd-row--alt td { background: #fbfcfb; }
+
+.rhd-page .rhd-badge-waiting { color: #b3671a; background: var(--pt-warning-soft); }
+.rhd-page .rhd-badge-resolved { color: #0b6c44; background: var(--pt-action-soft); }
+.rhd-page .rhd-badge-closed { color: var(--pt-ink-muted); background: #f2f5f3; }
+
+/* ── RH: relatórios ────────────────────────────────────────── */
+.rhr-page { background: var(--pt-canvas); }
+.rhr-page :is(.rhr-title, .rhr-kpi-value, .rhr-chart-title) { color: var(--pt-ink); }
+.rhr-page :is(.rhr-subtitle, .rhr-loading, .rhr-filter-label, .rhr-kpi-label) { color: var(--pt-ink-muted); }
+.rhr-page :is(.rhr-chart-empty, .rhr-delta-neu) { color: #8b9c94; }
+.rhr-page .rhr-export-item { color: #33493f; }
+.rhr-page .rhr-kpi-card { border-top-color: var(--pt-line); }
+.rhr-page .rhr-filter-select {
+  color: #29443a;
+  background: #fbfcfb;
+  border-color: var(--pt-line);
+}
+.rhr-page .rhr-loading-spinner { border-color: var(--pt-line); border-top-color: var(--pt-action); }
+
+/* ── RH: fila ──────────────────────────────────────────────── */
+.rh-tickets-dashboard :is(.rh-panel-title, .rh-panel-section p) { color: var(--pt-ink); }
+.rh-tickets-dashboard :is(.rh-panel-meta, .rh-panel-section h4, .rh-panel-ticket-id) { color: var(--pt-ink-muted); }
+.rh-tickets-dashboard :is(.card, .card-header, .rh-panel-section) { border-color: var(--pt-line); }
+.rh-tickets-dashboard :is(.card-header, .rh-panel-ticket-id) { background: #f7f9f8; }
+.rh-tickets-dashboard .rh-priority-chip { color: #52655c; border-color: var(--pt-line); }
+.rh-tickets-dashboard .rh-priority-chip-count { color: #52655c; background: #f2f5f3; }
+.rh-tickets-dashboard .rh-filter-input { color: #29443a; }
+.rh-tickets-dashboard :is(.rh-filter-input-icon, .rh-filter-input-clear) { color: #8b9c94; }
+.rh-tickets-dashboard .rh-filter-input-clear:hover { background: #f2f5f3; }
+.rh-tickets-dashboard .badge-status-progress { color: #1f56a4; background: var(--pt-info-soft); }
+.rh-tickets-dashboard .badge-status-warning { color: #b3671a; background: var(--pt-warning-soft); }
+.rh-tickets-dashboard .badge-category { color: var(--pt-ink-muted); background: #f2f5f3; border-color: var(--pt-line); }
+.rh-tickets-dashboard .btn-secondary {
+  color: #365148;
+  background: var(--pt-paper);
+  border-color: var(--pt-line);
+}
+.rh-tickets-dashboard .btn-secondary:hover:not(:disabled) { background: #f5faf7; }
+.rh-tickets-dashboard .rh-tickets-list::-webkit-scrollbar-track { background: #f4f7f5; }
+.rh-tickets-dashboard .rh-tickets-list::-webkit-scrollbar-thumb { background: #c3d2c8; }
+.rh-tickets-dashboard .rh-priority-feedback { color: #0b6c44; background: var(--pt-action-soft); }
+
+/* ══════════════════════════════════════════════════════════════
+   23. Linha do tempo do chamado
+
+   Uma coluna contínua com um filete ligando os marcos — a leitura é
+   de sequência, não de lista solta. Só entram eventos que o backend
+   registrou de fato em `ticket_history`.
+══════════════════════════════════════════════════════════════ */
+
+.tk-tl-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--pt-line-soft, #e9eeeb);
+}
+
+.tk-tl-summary span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #64766e;
+  font-size: .64rem;
+  font-weight: 650;
+}
+
+.tk-tl-summary i { font-size: 13px; color: #8b9c94; }
+
+.tk-tl {
+  position: relative;
+  margin: 0;
+  padding: 0 0 0 2px;
+  list-style: none;
+}
+
+.tk-tl-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  padding-bottom: 15px;
+  animation: tkRise 340ms cubic-bezier(.22, .61, .36, 1) backwards;
+}
+
+/* O filete de continuidade para no último marco. */
+.tk-tl-item::before {
+  content: '';
+  position: absolute;
+  top: 24px;
+  bottom: -2px;
+  left: 12px;
+  width: 1px;
+  background: #dde5df;
+}
+
+.tk-tl-item:last-child { padding-bottom: 0; }
+.tk-tl-item:last-child::before { display: none; }
+
+.tk-tl-day {
+  grid-column: 1 / -1;
+  display: block;
+  margin: 4px 0 10px;
+  color: #8b9c94;
+  font-size: .56rem;
+  font-weight: 800;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.tk-tl-item:first-child .tk-tl-day { margin-top: 0; }
+
+.tk-tl-mark {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  color: #64766e;
+  background: #fff;
+  border: 1px solid #dde5df;
+  border-radius: 50%;
+  font-size: 13px;
+}
+
+.tk-tl-mark--info { color: #1f56a4; background: #eaf1fb; border-color: #cadcf5; }
+.tk-tl-mark--positive { color: #0b6c44; background: #eaf6ef; border-color: #cfe8da; }
+.tk-tl-mark--warning { color: #b3671a; background: #fdf1e2; border-color: #f2d7b3; }
+.tk-tl-mark--danger { color: #a83239; background: #fbecec; border-color: #f0c9cb; }
+.tk-tl-mark--sk { background: #eef2f0; border-color: #e4ebe7; }
+
+.tk-tl-body { min-width: 0; padding-top: 3px; }
+
+.tk-tl-text {
+  margin: 0;
+  color: #29443a;
+  font-size: .73rem;
+  font-weight: 650;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.tk-tl-meta {
+  margin: 3px 0 0;
+  color: #8b9c94;
+  font-size: .62rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-tl-meta time { cursor: help; border-bottom: 1px dotted #cdd9d1; }
+
+.tk-tl-empty {
+  margin: 0;
+  padding: 16px 0;
+  color: #8b9c94;
+  font-size: .69rem;
+  text-align: center;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   24. Conversa do chamado
+
+   As mensagens deixam de ser blocos empilhados e passam a ler como
+   uma conversa: avatar, autor, hora, corpo. A nota interna é
+   visivelmente outra coisa — ela não é vista pelo solicitante, e
+   confundir as duas tem custo real.
+══════════════════════════════════════════════════════════════ */
+
+.admin-ticket-detail .messages-list { display: grid; gap: 12px; }
+
+.admin-ticket-detail .message {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 10px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.admin-ticket-detail .message-header {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 6px;
+}
+
+.admin-ticket-detail .message-avatar {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: .6rem;
+  font-weight: 800;
+}
+
+.admin-ticket-detail .avatar-staff { color: #0b6c44; background: #eaf6ef; border: 1px solid #cfe8da; }
+.admin-ticket-detail .avatar-user { color: #1f56a4; background: #eaf1fb; border: 1px solid #cadcf5; }
+
+.admin-ticket-detail .message-meta { min-width: 0; display: flex; align-items: baseline; gap: 8px; }
+.admin-ticket-detail .message-author { color: #102c22; font-size: .71rem; font-weight: 750; }
+.admin-ticket-detail .message-date { color: #8b9c94; font-size: .61rem; font-variant-numeric: tabular-nums; }
+
+.admin-ticket-detail .message-content {
+  grid-column: 2;
+  padding: 11px 13px;
+  color: #29443a;
+  background: #f7f9f8;
+  border: 1px solid var(--pt-line, #dde5df);
+  border-radius: 3px 11px 11px 11px;
+  font-size: .73rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.admin-ticket-detail .message-staff .message-content {
+  background: #f2f8f5;
+  border-color: #d7e8de;
+}
+
+/* Nota interna: fundo âmbar e faixa lateral — não sai para o solicitante. */
+.admin-ticket-detail .message-internal .message-content {
+  color: #6b4415;
+  background: #fdf1e2;
+  border-color: #f0d5ab;
+  border-left: 3px solid #ed8a22;
+}
+
+.admin-ticket-detail .internal-badge,
+.admin-ticket-detail .internal-badge-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  color: #8a5414;
+  background: #fbe5c8;
+  border-radius: 999px;
+  font-size: .54rem;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.admin-ticket-detail .no-messages {
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  padding: 34px 20px;
+  color: #8b9c94;
+  text-align: center;
+}
+
+.admin-ticket-detail .no-messages-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  margin-bottom: 4px;
+  color: #64766e;
+  background: #f2f5f3;
+  border: 1px solid var(--pt-line, #dde5df);
+  border-radius: 50%;
+  font-size: 1.2rem;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   25. Filtros avançados como bottom sheet no celular
+
+   Uma fileira de selects espremida não é usável com o polegar. Abaixo
+   de 760px o painel vira uma folha ancorada na base, com alvos de
+   44px e rolagem própria.
+══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 760px) {
+  .admin-tickets-dashboard .advanced-filters {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 1200;
+    max-height: min(78vh, 620px);
+    margin: 0;
+    padding: 8px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: #fff;
+    border: 0;
+    border-top: 1px solid var(--pt-line, #dde5df);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -18px 44px -22px rgba(5, 42, 30, .4);
+    animation: tkSheetUp 260ms cubic-bezier(.22, .61, .36, 1);
+  }
+
+  /* Alça: diz que a folha é arrastável/fechável antes de qualquer texto. */
+  .admin-tickets-dashboard .advanced-filters::before {
+    content: '';
+    display: block;
+    width: 38px;
+    height: 4px;
+    margin: 2px auto 12px;
+    background: #d3ded7;
+    border-radius: 999px;
+  }
+
+  @keyframes tkSheetUp {
+    from { transform: translateY(14%); opacity: .6; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  .admin-tickets-dashboard .advanced-filters-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .admin-tickets-dashboard .advanced-filters :is(.filter-input, select, input) {
+    min-height: 44px;
+  }
+
+  .admin-tickets-dashboard .advanced-filters-footer {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    gap: 8px;
+    margin-top: 14px;
+    padding: 12px 0 4px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, #fff 22%);
+  }
+
+  .admin-tickets-dashboard .advanced-filters-footer > * { flex: 1; min-height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tk-tl-item { animation: none !important; }
+  .admin-tickets-dashboard .advanced-filters { animation: none !important; }
+}

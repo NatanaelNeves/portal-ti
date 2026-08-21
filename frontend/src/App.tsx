@@ -69,6 +69,9 @@ import { NotificationProvider } from './contexts/NotificationContext';
 import './styles/AdminExperience.css';
 import './styles/AdminReferenceRedesign.css';
 import './styles/AdminUnifiedPages.css';
+import './styles/AdminPaletteBridge.css';
+import './styles/AdminSectorScreens.css';
+import './styles/AdminTicketsRefinement.css';
 
 function App() {
   const { loadStoredUser } = useAuthStore();

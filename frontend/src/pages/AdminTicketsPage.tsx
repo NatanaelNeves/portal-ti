@@ -1,36 +1,25 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import StatusTimeline from '../components/StatusTimeline';
+import { showToast } from '../utils/toast';
+import useAnimatedCount from '../hooks/useAnimatedCount';
+import useTicketsOverview from '../hooks/useTicketsOverview';
+import TicketsHero from '../components/tickets/TicketsHero';
+import SectorSwitch from '../components/tickets/SectorSwitch';
+import MetricCard from '../components/tickets/MetricCard';
+import MetricSkeleton from '../components/tickets/MetricSkeleton';
+import InsightStrip from '../components/tickets/InsightStrip';
+import SectorBreakdown from '../components/tickets/SectorBreakdown';
+import TeamWorkload from '../components/tickets/TeamWorkload';
+import QuickFilters from '../components/tickets/QuickFilters';
+import EmptyState from '../components/tickets/EmptyState';
+import TicketRef from '../components/tickets/TicketRef';
+import TicketRowMenu from '../components/tickets/TicketRowMenu';
+import { isUntouched } from '../components/tickets/ticketPermissions';
+import { profileForDepartment } from '../components/tickets/sectorProfiles';
 import '../styles/AdminTicketsPage.css';
-
-// Tweens a displayed integer toward `value` over `duration`ms whenever it
-// changes, instead of snapping — the small "counting" motion that makes a
-// dashboard feel alive rather than a static report.
-function useAnimatedCount(value: number, duration = 450): number {
-  const [display, setDisplay] = useState(value);
-  const fromRef = useRef(value);
-  useEffect(() => {
-    const from = fromRef.current;
-    const to = value;
-    if (from === to) return;
-    let raf = 0;
-    const start = performance.now();
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - t, 3);
-      setDisplay(Math.round(from + (to - from) * eased));
-      if (t < 1) {
-        raf = requestAnimationFrame(tick);
-      } else {
-        fromRef.current = to;
-      }
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [value, duration]);
-  return display;
-}
+import '../styles/TicketsExperience.css';
 
 interface Ticket {
   id: string;
@@ -115,9 +104,21 @@ export default function AdminTicketsPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [exportLoading, setExportLoading] = useState(false);
+  // Recortes rapidos da fila (chips do cabecalho).
+  const [todayOnly, setTodayOnly] = useState(false);
+  const [overdueOnly, setOverdueOnly] = useState(false);
   const [previewMessages, setPreviewMessages] = useState<TicketMessage[]>([]);
   const [previewMessagesLoading, setPreviewMessagesLoading] = useState(false);
   const [panelSwitching, setPanelSwitching] = useState(false);
+
+  // Panorama agregado: calculado no servidor sobre TODO o conjunto visivel,
+  // nao sobre a pagina atual da lista.
+  const {
+    overview,
+    loading: overviewLoading,
+    error: overviewError,
+    reload: reloadOverview,
+  } = useTicketsOverview(departmentFilter, isContextReady);
 
   useEffect(() => {
     const token = localStorage.getItem('internal_token');
@@ -145,8 +146,11 @@ export default function AdminTicketsPage() {
       }
 
       if (user.role === 'admin_staff') {
+        // O servidor ja limita o auxiliar administrativo aos chamados dele ou
+        // sem responsavel, e ignora `assigned_to` para esse papel. Marcar
+        // "meus chamados" aqui acenderia um filtro que nao filtra nada.
         setDepartmentFilter('administrativo');
-        setAssignmentFilter('mine');
+        setAssignmentFilter('all');
       } else if (user.role === 'it_staff') {
         setDepartmentFilter('ti');
         setAssignmentFilter('all');
@@ -184,7 +188,7 @@ export default function AdminTicketsPage() {
     if (!isContextReady) return;
     fetchTickets();
     fetchUsers();
-  }, [isContextReady, filterStatus, filterPriority, assignmentFilter, selectedStatuses, selectedPriorities, searchText, currentPage, departmentFilter, currentUserId, dateFrom, dateTo]);
+  }, [isContextReady, filterStatus, filterPriority, assignmentFilter, selectedStatuses, selectedPriorities, searchText, currentPage, departmentFilter, currentUserId, dateFrom, dateTo, todayOnly, overdueOnly]);
 
   useEffect(() => {
     if (!isContextReady) return;
@@ -288,9 +292,12 @@ export default function AdminTicketsPage() {
       // Recarregar tickets
       console.log('🔄 Recarregando lista de tickets...');
       fetchTickets();
+      reloadOverview();
+      showToast.success('Chamado atribuído a você');
     } catch (err: any) {
       console.error('❌ Erro ao assumir:', err);
       setError(err.message || 'Erro ao assumir chamado');
+      showToast.error('Não foi possível assumir o chamado');
     }
   };
 
@@ -314,11 +321,51 @@ export default function AdminTicketsPage() {
       // Recarregar tickets
       console.log('🔄 Recarregando lista de tickets...');
       fetchTickets();
+      reloadOverview();
+      showToast.success(
+        newStatus === 'resolved' ? 'Chamado resolvido' : 'Status atualizado',
+      );
     } catch (err: any) {
       console.error('❌ Erro ao atualizar status:', err);
       setError(err.message || 'Erro ao atualizar chamado');
+      showToast.error('Não foi possível atualizar o chamado');
     }
   };
+
+  // O backend e quem valida o escopo; aqui a interface so nao oferece o que
+  // sabe que voltaria 403, e traduz a recusa quando ela vier assim mesmo.
+  const [rowBusyId, setRowBusyId] = useState<string | null>(null);
+
+  const patchTicket = async (
+    ticketId: string,
+    payload: Record<string, unknown>,
+    successMessage: string,
+  ) => {
+    setRowBusyId(ticketId);
+    try {
+      await api.patch(`/tickets/${ticketId}`, payload);
+      await fetchTickets();
+      reloadOverview();
+      showToast.success(successMessage);
+    } catch (err: any) {
+      const message = err?.response?.data?.message
+        || err?.response?.data?.error
+        || 'Não foi possível atualizar o chamado';
+      showToast.error(message);
+    } finally {
+      setRowBusyId(null);
+    }
+  };
+
+  const handleRowPriority = (ticketId: string, priority: string) =>
+    patchTicket(ticketId, { priority }, 'Prioridade atualizada');
+
+  const handleRowAssign = (ticketId: string, assignedToId: string | null) =>
+    patchTicket(
+      ticketId,
+      { assigned_to_id: assignedToId },
+      assignedToId ? 'Responsável atribuído' : 'Responsável removido',
+    );
 
   const toggleSelect = (ticketId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -430,6 +477,14 @@ export default function AdminTicketsPage() {
       
       if (dateFrom) params.append('date_from', dateFrom);
       if (dateTo) params.append('date_to', new Date(dateTo + 'T23:59:59').toISOString());
+
+      // Recortes rapidos: "Hoje" e "Atrasados" convivem com os filtros avancados.
+      if (todayOnly && !dateFrom) {
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+        params.append('date_from', startOfDay.toISOString());
+      }
+      if (overdueOnly) params.append('overdue', 'true');
 
       // Paginação
       params.append('page', currentPage.toString());
@@ -682,6 +737,21 @@ export default function AdminTicketsPage() {
     return getSlaElapsedHours(ticket) > getSLAThresholdHours(ticket.priority);
   };
 
+  /**
+   * Quanto do prazo do chamado já foi consumido.
+   *
+   * "3h em aberto" sozinho não diz nada — 3h é tranquilo num chamado de
+   * prioridade baixa (168h) e é quase o limite num crítico (4h). O que a
+   * fila precisa mostrar é a fração gasta, que é comparável entre linhas.
+   */
+  const getSlaProgress = (ticket: Ticket) => {
+    const elapsed = getSlaElapsedHours(ticket);
+    const target = getSLAThresholdHours(ticket.priority);
+    const ratio = target > 0 ? elapsed / target : 0;
+    const state = ratio >= 1 ? 'estourado' : ratio >= 0.75 ? 'critico' : ratio >= 0.5 ? 'atencao' : 'folga';
+    return { elapsed, target, state, pct: Math.min(100, Math.round(ratio * 100)) };
+  };
+
   const canQuickResolve = (ticket: Ticket) => {
     if (!ticket.assigned_to) return false;
     if (ticket.assigned_to !== currentUserId) return false;
@@ -729,9 +799,6 @@ export default function AdminTicketsPage() {
   const animatedPriorityLow = useAnimatedCount(getPriorityCount('low'));
 
   const activeFiltersCount = selectedStatuses.length + selectedPriorities.length + (searchText.trim() ? 1 : 0);
-  const formattedLastUpdate = lastUpdate
-    ? `${lastUpdate.toLocaleDateString('pt-BR')} às ${lastUpdate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
-    : 'Ainda sem atualização';
   const priorityOptions: Array<{ value: 'high' | 'medium' | 'low' | null; label: string; count: number }> = [
     { value: null, label: 'Todas', count: animatedPriorityAll },
     { value: 'high', label: 'Alta', count: animatedPriorityHigh },
@@ -745,58 +812,132 @@ export default function AdminTicketsPage() {
     return null;
   }
 
+  // O servidor e quem decide o setor; o cliente so reflete a decisao.
+  const sectorProfile = profileForDepartment(overview?.scope.department ?? (departmentFilter || null));
+  const canPickSector = overview?.scope.canSelectDepartment ?? (userRole === 'admin' || userRole === 'manager');
+
+  const quickFilterState = {
+    assignment: assignmentFilter,
+    priority: filterPriority,
+    today: todayOnly,
+    overdue: overdueOnly,
+  };
+
+  const activeQuickFilters =
+    (assignmentFilter !== 'all' ? 1 : 0) +
+    (filterPriority ? 1 : 0) +
+    (todayOnly ? 1 : 0) +
+    (overdueOnly ? 1 : 0) +
+    (searchText.trim() ? 1 : 0) +
+    (selectedStatuses.length > 0 ? 1 : 0) +
+    (selectedPriorities.length > 0 ? 1 : 0) +
+    (dateFrom || dateTo ? 1 : 0);
+
+  const clearAllFilters = () => {
+    setAssignmentFilter('all');
+    setFilterPriority(null);
+    setTodayOnly(false);
+    setOverdueOnly(false);
+    setSearchText('');
+    setSelectedStatuses([]);
+    setSelectedPriorities([]);
+    setDateFrom('');
+    setDateTo('');
+    setCurrentPage(1);
+  };
+
+  const handleSectorChange = (department: string) => {
+    setDepartmentFilter(department);
+    setCurrentPage(1);
+  };
+
+  const departmentCounts = (overview?.byDepartment ?? []).reduce<Record<string, number>>(
+    (acc, entry) => ({ ...acc, [entry.department]: entry.open }),
+    {},
+  );
+
   return (
     <div className="admin-tickets-dashboard">
-      <header className="dashboard-header card">
-        <div className="dashboard-header-main">
-          <h1>Central de Chamados</h1>
-          <p className="dashboard-greeting">
-            Gerencie e acompanhe os chamados da equipe
-            {departmentFilter ? ` de ${departmentFilter === 'rh' ? 'RH' : departmentFilter === 'ti' ? 'TI' : 'Administrativo'}` : ''}.
-          </p>
-        </div>
-        <div className="dashboard-header-status">
-          <span className="status-chip">
-            <span className="status-dot" aria-hidden="true"></span>
-            <span>{formattedLastUpdate}</span>
-          </span>
-          <button type="button" className="header-new-ticket" onClick={() => navigate('/abrir-chamado')}>
-            <i className="ti ti-plus" aria-hidden="true" /> Novo chamado
-          </button>
-        </div>
-      </header>
+      <TicketsHero
+        profile={sectorProfile}
+        scopeLabel={overview?.scope.label ?? sectorProfile.label}
+        lastUpdate={lastUpdate}
+        searchValue={searchText}
+        onSearchChange={(value) => { setSearchText(value); setCurrentPage(1); }}
+        onRefresh={() => { fetchTickets(); reloadOverview(); }}
+        onNewTicket={() => navigate('/abrir-chamado')}
+        onToggleFilters={() => setShowFilters(!showFilters)}
+        filtersOpen={showFilters}
+        activeFilterCount={activeQuickFilters}
+        refreshing={loading}
+      />
 
-      <section className="ticket-filter-ledger" aria-label="Filtros e resumo da fila">
-        {/* Department Tabs - visible for admin and manager */}
-        {(userRole === 'admin' || userRole === 'manager') && (
-          <div className="department-tabs">
-          <button
-            className={`dept-tab dept-tab--all ${departmentFilter === '' ? 'active' : ''}`}
-            onClick={() => { setDepartmentFilter(''); setCurrentPage(1); }}
-          >
-            <i className="ti ti-layout-grid" /> Todos
-          </button>
-          <button
-            className={`dept-tab dept-tab--ti ${departmentFilter === 'ti' ? 'active' : ''}`}
-            onClick={() => { setDepartmentFilter('ti'); setCurrentPage(1); }}
-          >
-            <i className="ti ti-device-desktop" /> TI
-          </button>
-          <button
-            className={`dept-tab dept-tab--admin ${departmentFilter === 'administrativo' ? 'active' : ''}`}
-            onClick={() => { setDepartmentFilter('administrativo'); setCurrentPage(1); }}
-          >
-            <i className="ti ti-building" /> Administrativo
-          </button>
-          <button
-            className={`dept-tab dept-tab--rh ${departmentFilter === 'rh' ? 'active' : ''}`}
-            onClick={() => { setDepartmentFilter('rh'); setCurrentPage(1); }}
-          >
-            <i className="ti ti-users" /> RH
-          </button>
+      {canPickSector && (
+        <SectorSwitch
+          value={departmentFilter}
+          onChange={handleSectorChange}
+          counts={departmentCounts}
+          disabled={loading}
+        />
+      )}
+
+      <QuickFilters
+        showAssignmentChips={userRole !== 'admin_staff'}
+        state={quickFilterState}
+        counts={{
+          unassigned: overview?.attention.unassigned,
+          urgent: overview ? overview.priority.urgent + overview.priority.high : undefined,
+          overdue: overview?.attention.overdue,
+        }}
+        onChange={(next) => {
+          if (next.assignment !== undefined) setAssignmentFilter(next.assignment);
+          if (next.priority !== undefined) setFilterPriority(next.priority);
+          if (next.today !== undefined) setTodayOnly(next.today);
+          if (next.overdue !== undefined) setOverdueOnly(next.overdue);
+          setCurrentPage(1);
+        }}
+        onClear={clearAllFilters}
+        activeCount={activeQuickFilters}
+      />
+
+      {/* Falha no panorama nao derruba a fila: a lista continua utilizavel e o
+          usuario ganha um caminho para tentar de novo. */}
+      {overviewError && !overview && (
+        <div className="tk-panorama-error" role="alert">
+          <i className="ti ti-alert-circle" aria-hidden="true" />
+          <span>{overviewError}</span>
+          <button type="button" onClick={reloadOverview}>Tentar novamente</button>
         </div>
       )}
 
+      {overviewLoading && !overview ? (
+        <MetricSkeleton count={5} />
+      ) : overview ? (
+        <div className="tk-metrics" key={overview.scope.department ?? 'todos'}>
+          {sectorProfile.metrics(overview).map((metric, index) => (
+            <MetricCard key={metric.key} metric={metric} index={index} />
+          ))}
+        </div>
+      ) : null}
+
+      {overview && <InsightStrip overview={overview} />}
+
+      {overview && (
+        <SectorBreakdown overview={overview} onPickDepartment={handleSectorChange} />
+      )}
+
+      {overview && overview.workload.length > 0 && (
+        <TeamWorkload
+          workload={overview.workload}
+          activeUserId={assignmentFilter === 'mine' ? currentUserId : undefined}
+          onSelect={(userId) => {
+            setAssignmentFilter(userId === currentUserId ? 'mine' : 'all');
+            setCurrentPage(1);
+          }}
+        />
+      )}
+
+      <section className="ticket-filter-ledger" aria-label="Filtros e resumo da fila">
       {error && (
         <div className="alert alert-error" role="alert">
           <div>
@@ -1042,6 +1183,13 @@ export default function AdminTicketsPage() {
             >
               Limpar filtros
             </button>
+            <button
+              type="button"
+              className="advanced-close-btn"
+              onClick={() => setShowFilters(false)}
+            >
+              Aplicar
+            </button>
           </div>
         </div>
       )}
@@ -1216,19 +1364,34 @@ export default function AdminTicketsPage() {
                 ))}
               </div>
             ) : sortedTickets.length === 0 ? (
-              <div className="empty-queue">
-                <span className="empty-icon"><i className="ti ti-inbox-off" /></span>
-                <p>Nenhum chamado na fila!</p>
-                <small>Voce esta em dia com o atendimento</small>
-              </div>
+              activeQuickFilters > 0 ? (
+                <EmptyState
+                  tone="filtered"
+                  icon="ti-filter-off"
+                  title="Nenhum chamado com esses filtros"
+                  description="Nada na fila corresponde à combinação atual. Reveja os recortes ou volte para a fila inteira."
+                  actionLabel="Limpar filtros"
+                  onAction={clearAllFilters}
+                />
+              ) : (
+                <EmptyState
+                  tone="calm"
+                  icon="ti-checks"
+                  title="Tudo tranquilo por aqui"
+                  description="Nenhum chamado em aberto neste escopo. A fila está em dia."
+                />
+              )
             ) : (
               <div className="tickets-list">
                 {sortedTickets.map((ticket) => {
                   const overdue = isTicketOverdue(ticket);
                   const ageTone = getAgeToneClass(ticket.created_at);
+                  const sla = getSlaProgress(ticket);
                   return (
                   <div
                     key={ticket.id}
+                    data-sla={sla.state}
+                    style={{ ['--sla-pct' as string]: `${sla.pct}%` }}
                     className={`ticket-card ticket-status-${ticket.status} ${selectedTicket?.id === ticket.id ? 'active' : ''} ticket-priority-${ticket.priority || 'neutral'} ${selectedIds.has(ticket.id) ? 'ticket-card--selected' : ''} ${overdue ? 'ticket-card--overdue' : ''}`}
                     onClick={() => setSelectedTicket(ticket)}
                   >
@@ -1242,6 +1405,12 @@ export default function AdminTicketsPage() {
                         title="Selecionar chamado"
                       />
                       <div className="ticket-card-main">
+                        <div className="ticket-card-heading">
+                          <TicketRef id={ticket.id} />
+                          {isUntouched(ticket) && (
+                            <span className="tk-new-badge" title="Ainda sem primeira resposta">Novo</span>
+                          )}
+                        </div>
                         <div className="ticket-card-title">{ticket.title}</div>
                         <div className="ticket-card-requester">
                           {ticket.requester_type === 'public' && ticket.requester_name ? (
@@ -1261,9 +1430,19 @@ export default function AdminTicketsPage() {
                         </div>
                       </div>
                       {overdue ? (
-                        <span className="overdue-flag">{getSlaElapsedHours(ticket)}h atrasado</span>
+                        <span
+                          className="overdue-flag"
+                          title={`Aberto em ${new Date(ticket.created_at).toLocaleString('pt-BR')}`}
+                        >
+                          {getSlaElapsedHours(ticket)}h atrasado
+                        </span>
                       ) : (
-                        <span className={`time-ago ${ageTone}`}>{getTimeAgo(ticket.created_at)}</span>
+                        <span
+                          className={`time-ago ${ageTone}`}
+                          title={`Aberto em ${new Date(ticket.created_at).toLocaleString('pt-BR')}`}
+                        >
+                          {getTimeAgo(ticket.created_at)}
+                        </span>
                       )}
                     </div>
 
@@ -1294,9 +1473,14 @@ export default function AdminTicketsPage() {
                       <span className="assigned">
                         {getUserName(ticket.assigned_to)}
                       </span>
-                      {!overdue && (
-                        <span className="sla-chip">{getSlaElapsedHours(ticket)}h em aberto</span>
-                      )}
+                      <span
+                        className="sla-meter"
+                        title={`${sla.elapsed}h de ${sla.target}h do prazo (${sla.pct}%)`}
+                      >
+                        <span className="sla-meter-text">
+                          {overdue ? `${sla.elapsed}h · prazo estourado` : `${sla.elapsed}h de ${sla.target}h`}
+                        </span>
+                      </span>
                       <div className="footer-actions">
                         {!ticket.assigned_to && ticket.status === 'open' && (
                           <button
@@ -1330,6 +1514,22 @@ export default function AdminTicketsPage() {
                           >
                             Detalhes
                           </button>
+                          <TicketRowMenu
+                            ticket={ticket}
+                            role={userRole}
+                            userId={currentUserId}
+                            users={users}
+                            busy={rowBusyId === ticket.id}
+                            onOpen={() => navigate(`/admin/chamados/${ticket.id}`)}
+                            onAssume={() => patchTicket(
+                              ticket.id,
+                              { status: 'in_progress', assigned_to_id: currentUserId },
+                              'Chamado atribuído a você',
+                            )}
+                            onStatus={(status) => patchTicket(ticket.id, { status }, 'Status atualizado')}
+                            onPriority={(priority) => handleRowPriority(ticket.id, priority)}
+                            onAssign={(assignee) => handleRowAssign(ticket.id, assignee)}
+                          />
                         </div>
                       </div>
                     </div>

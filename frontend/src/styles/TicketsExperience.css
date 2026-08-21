@@ -1,0 +1,1068 @@
+/* ─────────────────────────────────────────────────────────────
+   Central de Chamados — camada de experiência
+
+   Estilos dos componentes novos: cabeçalho, seletor de setor,
+   recortes rápidos, indicadores, leituras, composição da fila e
+   carga da equipe. Segue o contrato do DESIGN.md — plano por
+   padrão, papel branco sobre canvas mineral, cor reservada a
+   estado real, movimento curto e ligado a mudança de dado.
+───────────────────────────────────────────────────────────────── */
+
+.admin-tickets-dashboard {
+  --tk-ink: #102c22;
+  --tk-body: #33493f;
+  --tk-muted: #64766e;
+  --tk-soft: #8b9c94;
+  --tk-line: #dde5df;
+  --tk-line-soft: #e9eeeb;
+  --tk-paper: #fff;
+  --tk-wash: #f5faf7;
+  --tk-green: #14945a;
+  --tk-green-dk: #0b6c44;
+  --tk-green-soft: #eaf6ef;
+  --tk-green-line: #cfe8da;
+  --tk-evergreen: #063c2d;
+  --tk-evergreen-2: #075039;
+  --tk-info: #2d73d2;
+  --tk-info-soft: #eaf1fb;
+  --tk-analysis: #7f56c5;
+  --tk-analysis-soft: #f1ecfa;
+  --tk-warning: #ed8a22;
+  --tk-warning-soft: #fdf1e2;
+  --tk-danger: #d9464f;
+  --tk-danger-soft: #fbecec;
+  --tk-ease: cubic-bezier(.22, .61, .36, 1);
+}
+
+@keyframes tkRise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Cabeçalho
+══════════════════════════════════════════════════════════════ */
+
+.tk-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 22px;
+  margin-bottom: 16px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--tk-line);
+}
+
+.tk-hero-context { min-width: 0; }
+
+.tk-hero-scope {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 9px;
+  color: var(--tk-green-dk);
+  background: var(--tk-green-soft);
+  border: 1px solid var(--tk-green-line);
+  border-radius: 999px;
+  font-size: .61rem;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.tk-hero-scope i { font-size: 13px; }
+
+.tk-hero-title {
+  margin: 10px 0 0;
+  color: var(--tk-ink);
+  font-size: clamp(1.5rem, 2.2vw, 2rem);
+  font-weight: 800;
+  line-height: 1.12;
+  letter-spacing: -.035em;
+}
+
+.tk-hero-tagline {
+  margin: 6px 0 0;
+  max-width: 62ch;
+  color: var(--tk-muted);
+  font-size: .86rem;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.tk-hero-pulse {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 12px;
+  color: var(--tk-soft);
+  font-size: .66rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-pulse-dot {
+  width: 6px;
+  height: 6px;
+  background: #25a860;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(37, 168, 96, .35);
+  animation: tkPulse 2.6s var(--tk-ease) infinite;
+}
+
+@keyframes tkPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(37, 168, 96, .32); }
+  55% { box-shadow: 0 0 0 5px rgba(37, 168, 96, 0); }
+}
+
+.tk-hero-tools {
+  display: grid;
+  gap: 10px;
+  justify-items: end;
+}
+
+/* ── Busca em forma de command bar ─────────────────────────────── */
+.tk-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: min(420px, 40vw);
+  min-width: 260px;
+  height: 42px;
+  padding: 0 11px;
+  background: var(--tk-paper);
+  border: 1px solid var(--tk-line);
+  border-radius: 10px;
+  transition: border-color .18s var(--tk-ease), box-shadow .18s var(--tk-ease);
+}
+
+.tk-search:focus-within {
+  border-color: #64ad84;
+  box-shadow: 0 0 0 3px rgba(20, 148, 90, .13);
+}
+
+.tk-search > i { color: var(--tk-soft); font-size: 16px; }
+
+.tk-search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  color: var(--tk-ink);
+  background: transparent;
+  border: 0;
+  outline: none;
+  font: 600 .78rem/1 'DM Sans', system-ui, sans-serif;
+}
+
+.tk-search input::placeholder { color: var(--tk-soft); font-weight: 500; }
+.tk-search input::-webkit-search-cancel-button { display: none; }
+
+.tk-search-kbd {
+  flex: none;
+  padding: 3px 6px;
+  color: var(--tk-soft);
+  background: #f2f5f3;
+  border: 1px solid var(--tk-line);
+  border-radius: 5px;
+  font: 700 .58rem/1 'DM Sans', system-ui, sans-serif;
+  letter-spacing: .04em;
+}
+
+.tk-search-clear {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  color: var(--tk-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.tk-search-clear:hover { color: var(--tk-ink); background: #f2f5f3; }
+
+/* ── Ações do cabeçalho ────────────────────────────────────────── */
+.tk-hero-actions { display: flex; align-items: center; gap: 8px; }
+
+.tk-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 13px;
+  border-radius: 9px;
+  font: 750 .72rem/1 'DM Sans', system-ui, sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color .18s var(--tk-ease),
+    background-color .18s var(--tk-ease),
+    border-color .18s var(--tk-ease);
+}
+
+.tk-btn i { font-size: 15px; }
+
+.tk-btn--ghost {
+  color: #365148;
+  background: var(--tk-paper);
+  border: 1px solid var(--tk-line);
+}
+
+.tk-btn--ghost:hover { color: var(--tk-evergreen-2); background: var(--tk-wash); border-color: #afc4b7; }
+.tk-btn--ghost.is-on { color: var(--tk-green-dk); background: var(--tk-green-soft); border-color: var(--tk-green-line); }
+
+.tk-btn--icon { width: 38px; padding: 0; justify-content: center; }
+.tk-btn--icon.is-spinning i { animation: tkSpin .9s linear infinite; }
+
+@keyframes tkSpin { to { transform: rotate(360deg); } }
+
+.tk-btn--primary {
+  color: #fff;
+  background: var(--tk-green);
+  border: 1px solid var(--tk-green);
+}
+
+.tk-btn--primary:hover { background: var(--tk-green-dk); border-color: var(--tk-green-dk); }
+
+.tk-btn-count {
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  color: #fff;
+  background: var(--tk-green);
+  border-radius: 999px;
+  font-size: .58rem;
+  font-weight: 800;
+}
+
+.tk-btn--ghost.is-on .tk-btn-count { background: var(--tk-green-dk); }
+
+/* ══════════════════════════════════════════════════════════════
+   Seletor de setor — só para admin e gestor
+══════════════════════════════════════════════════════════════ */
+
+.tk-sector-switch {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+  padding: 5px;
+  background: var(--tk-paper);
+  border: 1px solid var(--tk-line);
+  border-radius: 11px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tk-sector-switch::-webkit-scrollbar { display: none; }
+
+.tk-sector-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 13px;
+  color: #54675f;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  font: 700 .73rem/1 'DM Sans', system-ui, sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color .2s var(--tk-ease), background-color .2s var(--tk-ease);
+}
+
+.tk-sector-tab i { font-size: 15px; opacity: .85; }
+.tk-sector-tab:hover:not(.is-active) { color: var(--tk-evergreen-2); background: var(--tk-wash); }
+
+.tk-sector-tab.is-active {
+  color: #fff;
+  background: var(--tk-evergreen-2);
+}
+
+.tk-sector-tab:disabled { opacity: .55; cursor: not-allowed; }
+
+.tk-sector-count {
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 19px;
+  padding: 0 6px;
+  background: #eef3f0;
+  border-radius: 999px;
+  font-size: .6rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-sector-tab.is-active .tk-sector-count { color: #d6ede0; background: rgba(255, 255, 255, .16); }
+
+/* ══════════════════════════════════════════════════════════════
+   Recortes rápidos
+══════════════════════════════════════════════════════════════ */
+
+.tk-quick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.tk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 11px;
+  color: #52655c;
+  background: var(--tk-paper);
+  border: 1px solid var(--tk-line);
+  border-radius: 999px;
+  font: 680 .69rem/1 'DM Sans', system-ui, sans-serif;
+  cursor: pointer;
+  transition:
+    color .18s var(--tk-ease),
+    background-color .18s var(--tk-ease),
+    border-color .18s var(--tk-ease);
+}
+
+.tk-chip i { font-size: 14px; opacity: .8; }
+.tk-chip:hover { color: var(--tk-evergreen-2); background: var(--tk-wash); border-color: #afc4b7; }
+
+.tk-chip.is-active {
+  color: #fff;
+  background: var(--tk-evergreen-2);
+  border-color: var(--tk-evergreen-2);
+  animation: tkChipOn 300ms var(--tk-ease);
+}
+
+@keyframes tkChipOn {
+  0% { box-shadow: 0 0 0 0 rgba(20, 148, 90, .35); }
+  100% { box-shadow: 0 0 0 7px rgba(20, 148, 90, 0); }
+}
+
+.tk-chip.is-active i { opacity: 1; }
+
+.tk-chip-count {
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: #eef3f0;
+  border-radius: 999px;
+  font-size: .58rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-chip.is-active .tk-chip-count { color: #d6ede0; background: rgba(255, 255, 255, .18); }
+
+.tk-chip-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  margin-left: 4px;
+  padding: 0 10px;
+  color: #a2504f;
+  background: transparent;
+  border: 1px dashed #e3c3c4;
+  border-radius: 999px;
+  font: 700 .67rem/1 'DM Sans', system-ui, sans-serif;
+  cursor: pointer;
+  transition: color .18s var(--tk-ease), background-color .18s var(--tk-ease);
+}
+
+.tk-chip-clear:hover { color: #8d3f3f; background: var(--tk-danger-soft); }
+
+/* ══════════════════════════════════════════════════════════════
+   Indicadores
+══════════════════════════════════════════════════════════════ */
+
+.tk-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.tk-metric {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 0;
+  min-height: 138px;
+  padding: 15px 16px;
+  background: var(--tk-paper);
+  border: 1px solid var(--tk-line);
+  border-radius: 12px;
+  box-shadow: 0 10px 28px -27px rgba(15, 61, 44, .65);
+  animation: tkRise 380ms var(--tk-ease) backwards;
+  transition: border-color .2s var(--tk-ease), box-shadow .2s var(--tk-ease);
+}
+
+.tk-metric:hover {
+  border-color: #afc4b7;
+  box-shadow: 0 16px 34px -28px rgba(6, 60, 45, .75);
+}
+
+/* Um filete no topo carrega o tom do indicador — a única cor em repouso. */
+.tk-metric::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--tk-line);
+  /* O cartao nao recorta mais (o tooltip precisa sair), entao o filete
+     acompanha o raio superior por conta propria. */
+  border-radius: 12px 12px 0 0;
+}
+
+.tk-metric--info::before { background: var(--tk-info); }
+.tk-metric--warning::before { background: var(--tk-warning); }
+.tk-metric--danger::before { background: var(--tk-danger); }
+.tk-metric--positive::before { background: var(--tk-green); }
+
+.tk-metric-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-bottom: 11px;
+  color: var(--tk-green-dk);
+  background: var(--tk-green-soft);
+  border-radius: 9px;
+  font-size: 16px;
+}
+
+.tk-metric--info .tk-metric-icon { color: #1f56a4; background: var(--tk-info-soft); }
+.tk-metric--warning .tk-metric-icon { color: #b3671a; background: var(--tk-warning-soft); }
+.tk-metric--danger .tk-metric-icon { color: #a83239; background: var(--tk-danger-soft); }
+
+.tk-metric-label {
+  margin: 0;
+  color: var(--tk-muted);
+  font-size: .63rem;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.tk-metric-value {
+  margin: 5px 0 0;
+  color: var(--tk-ink);
+  font-size: 1.85rem;
+  font-weight: 790;
+  line-height: 1.05;
+  letter-spacing: -.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-metric-empty {
+  color: var(--tk-soft);
+  font-size: .8rem;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.tk-metric-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-top: 9px;
+  min-height: 18px;
+}
+
+.tk-metric-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: .61rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-metric-delta i { font-size: 12px; }
+.tk-metric-delta.is-good { color: #0b6c44; background: var(--tk-green-soft); }
+.tk-metric-delta.is-bad { color: #a83239; background: var(--tk-danger-soft); }
+
+.tk-metric-detail {
+  color: var(--tk-soft);
+  font-size: .64rem;
+  font-weight: 600;
+}
+
+/* ── Esqueleto dos indicadores ─────────────────────────────────── */
+.tk-metric--skeleton { pointer-events: none; }
+.tk-metric--skeleton::before { background: var(--tk-line-soft); }
+
+.tk-sk {
+  display: block;
+  border-radius: 7px;
+  background: linear-gradient(90deg, #eef2f0 25%, #f7faf8 50%, #eef2f0 75%);
+  background-size: 240% 100%;
+  animation: tkShimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes tkShimmer {
+  from { background-position: 120% 0; }
+  to { background-position: -120% 0; }
+}
+
+.tk-sk-mark { width: 32px; height: 32px; margin-bottom: 11px; border-radius: 9px; }
+.tk-sk-label { width: 58%; height: 9px; }
+.tk-sk-value { width: 42%; height: 24px; margin-top: 8px; }
+.tk-sk-foot { width: 68%; height: 9px; margin-top: 12px; }
+
+/* ══════════════════════════════════════════════════════════════
+   Leituras da operação
+══════════════════════════════════════════════════════════════ */
+
+.tk-insights {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.tk-insight {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--tk-paper);
+  border: 1px solid var(--tk-line);
+  border-left-width: 3px;
+  border-radius: 10px;
+  animation: tkRise 380ms var(--tk-ease) backwards;
+}
+
+.tk-insight i { flex: none; margin-top: 1px; font-size: 16px; }
+.tk-insight p { margin: 0; color: var(--tk-body); font-size: .74rem; line-height: 1.45; text-wrap: pretty; }
+
+.tk-insight--info { border-left-color: var(--tk-info); }
+.tk-insight--info i { color: var(--tk-info); }
+.tk-insight--warning { border-left-color: var(--tk-warning); }
+.tk-insight--warning i { color: #b3671a; }
+.tk-insight--positive { border-left-color: var(--tk-green); }
+.tk-insight--positive i { color: var(--tk-green-dk); }
+
+/* ══════════════════════════════════════════════════════════════
+   Composição da fila
+══════════════════════════════════════════════════════════════ */
+
+.tk-breakdown {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.tk-panel {
+  padding: 15px 16px;
+  background: var(--tk-paper);
+  border: 1px solid var(--tk-line);
+  border-radius: 12px;
+}
+
+.tk-panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 13px;
+}
+
+.tk-panel-head h3 {
+  margin: 0;
+  color: var(--tk-ink);
+  font-size: .8rem;
+  font-weight: 750;
+  letter-spacing: -.015em;
+}
+
+.tk-panel-head span {
+  color: var(--tk-soft);
+  font-size: .63rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-bar-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.tk-bar-list > li { animation: tkRise 340ms var(--tk-ease) backwards; }
+
+.tk-bar-row {
+  width: 100%;
+  display: grid;
+  /* Comporta "Recursos Humanos" sem reticencias. */
+  grid-template-columns: 124px minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 0;
+  background: transparent;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background-color .16s var(--tk-ease);
+}
+
+.tk-bar-row:hover { background: var(--tk-wash); }
+.tk-bar-row--static { cursor: default; }
+.tk-bar-row--static:hover { background: transparent; }
+
+.tk-bar-label {
+  min-width: 0;
+  color: var(--tk-body);
+  font-size: .69rem;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tk-bar-track {
+  height: 7px;
+  background: #eef3f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.tk-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--tk-green);
+  border-radius: 999px;
+  transform-origin: left center;
+  animation: tkBarGrow 520ms var(--tk-ease) backwards;
+}
+
+@keyframes tkBarGrow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+.tk-bar-value {
+  color: var(--tk-ink);
+  font-size: .72rem;
+  font-weight: 780;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tons compartilhados entre barras, segmentos e legendas. */
+.tk-tone-ti, .tk-tone-positive { background: var(--tk-green); }
+.tk-tone-rh, .tk-tone-analysis { background: var(--tk-analysis); }
+.tk-tone-administrativo, .tk-tone-info { background: var(--tk-info); }
+.tk-tone-warning { background: var(--tk-warning); }
+.tk-tone-danger { background: var(--tk-danger); }
+.tk-tone-neutral { background: #9fb0a7; }
+
+/* ── Barra segmentada de status ────────────────────────────────── */
+.tk-stack {
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  margin-bottom: 13px;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.tk-stack-seg {
+  flex-basis: 0;
+  min-width: 3px;
+  animation: tkBarGrow 520ms var(--tk-ease) backwards;
+  transform-origin: left center;
+}
+
+.tk-legend {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tk-legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--tk-body);
+  font-size: .69rem;
+  font-weight: 600;
+}
+
+.tk-legend strong {
+  margin-left: auto;
+  color: var(--tk-ink);
+  font-weight: 780;
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; }
+
+/* ══════════════════════════════════════════════════════════════
+   Carga da equipe
+══════════════════════════════════════════════════════════════ */
+
+.tk-workload {
+  margin-bottom: 16px;
+  padding: 15px 16px;
+  background: var(--tk-paper);
+  border: 1px solid var(--tk-line);
+  border-radius: 12px;
+}
+
+.tk-workload-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.tk-workload-head h3 {
+  margin: 0;
+  color: var(--tk-ink);
+  font-size: .8rem;
+  font-weight: 750;
+  letter-spacing: -.015em;
+}
+
+.tk-workload-head span { color: var(--tk-soft); font-size: .63rem; font-weight: 700; }
+
+.tk-workload-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 6px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tk-workload-list > li { animation: tkRise 340ms var(--tk-ease) backwards; }
+
+.tk-workload-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) 84px 26px;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 6px;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color .16s var(--tk-ease);
+}
+
+.tk-workload-row:hover { background: var(--tk-wash); }
+.tk-workload-row.is-active { background: var(--tk-green-soft); }
+
+.tk-avatar {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  color: var(--tk-green-dk);
+  background: var(--tk-green-soft);
+  border: 1px solid var(--tk-green-line);
+  border-radius: 50%;
+  font-size: .58rem;
+  font-weight: 800;
+}
+
+.tk-workload-name {
+  min-width: 0;
+  color: var(--tk-body);
+  font-size: .71rem;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tk-workload-track {
+  height: 6px;
+  background: #eef3f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.tk-workload-fill {
+  display: block;
+  height: 100%;
+  background: var(--tk-green);
+  border-radius: 999px;
+  transform-origin: left center;
+  animation: tkBarGrow 520ms var(--tk-ease) backwards;
+}
+
+.tk-workload-count {
+  color: var(--tk-ink);
+  font-size: .71rem;
+  font-weight: 780;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Estado vazio
+══════════════════════════════════════════════════════════════ */
+
+.tk-empty {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 3px;
+  min-height: 320px;
+  padding: 32px 24px;
+  text-align: center;
+  background:
+    radial-gradient(120% 90% at 50% 0%, var(--tk-wash) 0%, rgba(255, 255, 255, 0) 62%),
+    var(--tk-paper);
+  animation: tkRise 400ms var(--tk-ease) backwards;
+}
+
+.tk-empty-mark {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  margin-bottom: 14px;
+  font-size: 1.4rem;
+  border-radius: 50%;
+}
+
+.tk-empty--calm .tk-empty-mark {
+  color: var(--tk-green-dk);
+  background: var(--tk-green-soft);
+  border: 1px solid var(--tk-green-line);
+}
+
+.tk-empty--filtered .tk-empty-mark {
+  color: var(--tk-muted);
+  background: #f2f5f3;
+  border: 1px solid var(--tk-line);
+}
+
+.tk-empty-title {
+  margin: 0;
+  color: var(--tk-ink);
+  font-size: 1rem;
+  font-weight: 750;
+  letter-spacing: -.015em;
+}
+
+.tk-empty-text {
+  margin: 0;
+  max-width: 42ch;
+  color: var(--tk-muted);
+  font-size: .74rem;
+  line-height: 1.5;
+}
+
+.tk-empty-action {
+  margin-top: 15px;
+  height: 36px;
+  padding: 0 14px;
+  color: #fff;
+  background: var(--tk-green);
+  border: 1px solid var(--tk-green);
+  border-radius: 8px;
+  font: 750 .71rem/1 'DM Sans', system-ui, sans-serif;
+  cursor: pointer;
+  transition: background-color .18s var(--tk-ease);
+}
+
+.tk-empty-action:hover { background: var(--tk-green-dk); }
+
+/* ══════════════════════════════════════════════════════════════
+   Foco visível
+══════════════════════════════════════════════════════════════ */
+
+.admin-tickets-dashboard :is(.tk-chip, .tk-btn, .tk-sector-tab, .tk-bar-row,
+  .tk-workload-row, .tk-empty-action, .tk-search input):focus-visible {
+  outline: 2px solid var(--tk-green);
+  outline-offset: 2px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Responsivo
+══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 1280px) {
+  .tk-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 1080px) {
+  .tk-hero { grid-template-columns: minmax(0, 1fr); align-items: start; }
+  .tk-hero-tools { justify-items: stretch; }
+  .tk-search { width: 100%; min-width: 0; }
+  .tk-hero-actions { flex-wrap: wrap; }
+}
+
+@media (max-width: 760px) {
+  .tk-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tk-metric { min-height: 122px; padding: 13px 14px; }
+  .tk-metric-value { font-size: 1.5rem; }
+
+  /* Os recortes rápidos viram uma faixa rolável em vez de quebrarem em
+     quatro linhas e empurrarem a fila para fora da primeira tela. */
+  .tk-quick {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .tk-quick::-webkit-scrollbar { display: none; }
+  .tk-chip, .tk-chip-clear { flex: none; height: 38px; }
+
+  .tk-workload-list { grid-template-columns: 1fr; }
+  .tk-bar-row { grid-template-columns: 96px minmax(0, 1fr) 30px; }
+}
+
+@media (max-width: 480px) {
+  .tk-metrics { grid-template-columns: 1fr; }
+  .tk-hero-actions .tk-btn--primary { flex: 1; justify-content: center; }
+  .tk-btn { height: 44px; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Movimento reduzido
+══════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-tickets-dashboard :is(.tk-metric, .tk-insight, .tk-bar-list > li,
+    .tk-workload-list > li, .tk-empty, .tk-bar-fill, .tk-workload-fill,
+    .tk-stack-seg, .tk-sk, .tk-pulse-dot, .tk-chip.is-active) {
+    animation: none !important;
+  }
+  .admin-tickets-dashboard .tk-btn--icon.is-spinning i { animation: none !important; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Tooltip do sistema
+
+   O `title` nativo leva cerca de um segundo para surgir, usa a fonte
+   do sistema operacional e nao acompanha o tema. Este aparece rapido,
+   segue a tipografia da interface e some junto com o cursor.
+══════════════════════════════════════════════════════════════ */
+
+.tk-metric { position: relative; }
+
+.tk-hint {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: calc(100% - 6px);
+  z-index: 30;
+  padding: 8px 10px;
+  color: #e6f2ea;
+  background: #0b3225;
+  border-radius: 9px;
+  font-size: .64rem;
+  font-weight: 550;
+  line-height: 1.45;
+  text-align: left;
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(4px);
+  transition:
+    opacity .16s var(--tk-ease),
+    transform .16s var(--tk-ease),
+    visibility .16s var(--tk-ease);
+  pointer-events: none;
+  box-shadow: 0 18px 38px -22px rgba(5, 42, 30, .8);
+}
+
+.tk-hint::after {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 20px;
+  border: 5px solid transparent;
+  border-bottom-color: #0b3225;
+}
+
+/* Atraso curto para nao piscar durante a varredura do mouse pela grade. */
+.tk-metric:hover .tk-hint,
+.tk-metric:focus-within .tk-hint {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  transition-delay: .32s;
+}
+
+@media (hover: none) {
+  .tk-hint { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tk-hint { transition-duration: 1ms !important; transition-delay: 0ms !important; }
+}
+
+/* Falha ao carregar o panorama — a fila continua funcionando abaixo. */
+.tk-panorama-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  color: #a83239;
+  background: var(--tk-danger-soft);
+  border: 1px solid #f0c9cb;
+  border-radius: 11px;
+  font-size: .74rem;
+  font-weight: 600;
+}
+
+.tk-panorama-error i { font-size: 17px; flex: none; }
+
+.tk-panorama-error button {
+  margin-left: auto;
+  flex: none;
+  height: 30px;
+  padding: 0 11px;
+  color: #fff;
+  background: #a83239;
+  border: 0;
+  border-radius: 7px;
+  font: 750 .68rem/1 'DM Sans', system-ui, sans-serif;
+  cursor: pointer;
+  transition: background-color .16s var(--tk-ease);
+}
+
+.tk-panorama-error button:hover { background: #8d3f3f; }
+
+/* "Aplicar" so faz sentido na folha do celular; no desktop o painel e
+   inline e fecha pelo proprio botao de Filtros. */
+.admin-tickets-dashboard .advanced-close-btn { display: none; }
+
+@media (max-width: 760px) {
+  .admin-tickets-dashboard .advanced-close-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    color: #fff;
+    background: var(--tk-green);
+    border: 1px solid var(--tk-green);
+    border-radius: 9px;
+    font: 750 .74rem/1 'DM Sans', system-ui, sans-serif;
+    cursor: pointer;
+  }
+}

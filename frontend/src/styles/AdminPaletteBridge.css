@@ -1,0 +1,273 @@
+/* ─────────────────────────────────────────────────────────────
+   Palette bridge — remaps the token blocks that individual pages
+   declare for themselves onto the evergreen system in DESIGN.md.
+
+   Several screens (detalhe de chamado, painel administrativo, fila
+   do RH, inventário) shipped with their own indigo / violet / teal /
+   navy scales. Rather than restating every rule those tokens feed,
+   this layer redefines the tokens themselves, so a single mapping
+   recolours the whole screen and later structural overrides stay
+   small. Semantic slots keep their meaning: warning stays orange,
+   danger stays red, informação stays azul, análise stays violeta.
+───────────────────────────────────────────────────────────────── */
+
+/* Canonical palette, available to every bridged scope. */
+:root {
+  --pt-ink: #102c22;
+  --pt-ink-muted: #64766e;
+  --pt-evergreen: #063c2d;
+  --pt-evergreen-active: #075039;
+  --pt-action: #14945a;
+  --pt-action-dark: #0d7c4a;
+  --pt-action-bright: #46bd73;
+  --pt-action-soft: #eaf6ef;
+  --pt-action-line: #cfe8da;
+  --pt-canvas: #f4f7f5;
+  --pt-paper: #ffffff;
+  --pt-line: #dde5df;
+  --pt-line-soft: #e9eeeb;
+  --pt-info: #2d73d2;
+  --pt-info-soft: #eaf1fb;
+  --pt-analysis: #7f56c5;
+  --pt-analysis-soft: #f1ecfa;
+  --pt-warning: #ed8a22;
+  --pt-warning-soft: #fdf1e2;
+  --pt-danger: #d9464f;
+  --pt-danger-soft: #fbecec;
+
+  /* Flat-by-default elevation (DESIGN.md → Elevation & Depth). */
+  --pt-shadow-none: none;
+  --pt-shadow-surface: 0 10px 28px -26px rgba(15, 61, 44, .55);
+  --pt-shadow-raised: 0 16px 34px -28px rgba(6, 60, 45, .75);
+  --pt-shadow-command: 0 18px 42px -34px rgba(6, 60, 45, .95);
+  --pt-shadow-overlay: 0 28px 70px -28px rgba(5, 42, 30, .55);
+  --pt-focus-ring: 0 0 0 3px rgba(20, 148, 90, .18);
+}
+
+/* ── Central de Chamados (admin) — was indigo/slate ────────────── */
+.admin-tickets-dashboard {
+  --atd-bg: var(--pt-canvas);
+  --atd-surface: var(--pt-paper);
+  --atd-border: var(--pt-line);
+  --atd-border-lt: var(--pt-line-soft);
+  --atd-text: var(--pt-ink);
+  --atd-muted: var(--pt-ink-muted);
+  --atd-soft: #8b9c94;
+
+  --atd-indigo: var(--pt-action);
+  --atd-indigo-dk: var(--pt-evergreen-active);
+  --atd-indigo-lt: var(--pt-action-soft);
+  --atd-indigo-md: var(--pt-action-line);
+
+  /* Fila responsável: TI verde, Administrativo azul, RH violeta. */
+  --atd-ti: var(--pt-action);
+  --atd-ti-dk: #0b6c44;
+  --atd-ti-bg: var(--pt-action-soft);
+  --atd-admin: var(--pt-info);
+  --atd-admin-dk: #1f56a4;
+  --atd-admin-bg: var(--pt-info-soft);
+  --atd-rh: var(--pt-analysis);
+  --atd-rh-dk: #63409f;
+  --atd-rh-bg: var(--pt-analysis-soft);
+
+  --atd-high: var(--pt-danger);
+  --atd-high-dk: #a83239;
+  --atd-high-bg: var(--pt-danger-soft);
+  --atd-high-b: #f0b6b9;
+  --atd-med: var(--pt-warning);
+  --atd-med-dk: #b3671a;
+  --atd-med-bg: var(--pt-warning-soft);
+  --atd-med-b: #f4cb98;
+  --atd-low: var(--pt-action);
+  --atd-low-dk: #0b6c44;
+  --atd-low-bg: var(--pt-action-soft);
+  --atd-low-b: var(--pt-action-line);
+
+  --atd-status-open: var(--pt-info);
+  --atd-status-open-dk: #1f56a4;
+  --atd-status-prog: var(--pt-analysis);
+  --atd-status-prog-dk: #63409f;
+  --atd-status-wait: var(--pt-warning);
+  --atd-status-wait-dk: #b3671a;
+  --atd-status-done: var(--pt-action);
+  --atd-status-done-dk: #0b6c44;
+  --atd-status-closed: var(--pt-ink-muted);
+
+  --atd-radius-sm: 8px;
+  --atd-radius: 11px;
+  --atd-radius-lg: 12px;
+  --atd-elev-1: var(--pt-shadow-none);
+  --atd-elev-2: var(--pt-shadow-surface);
+  --atd-elev-3: var(--pt-shadow-raised);
+}
+
+/* ── Detalhe do chamado (admin, TI, administrativo e RH) ────────
+   Alcançado por /admin/chamados/:id e /rh/chamados/:id.          */
+.admin-ticket-detail {
+  --c-bg: var(--pt-canvas);
+  --c-card: var(--pt-paper);
+  --c-border: var(--pt-line);
+  --c-border-light: var(--pt-line-soft);
+
+  --c-primary: var(--pt-action);
+  --c-primary-mid: var(--pt-action-bright);
+  --c-primary-lite: var(--pt-action-soft);
+
+  --c-text-1: var(--pt-ink);
+  --c-text-2: #486057;
+  --c-text-3: var(--pt-ink-muted);
+
+  --c-success: var(--pt-action);
+  --c-success-lite: var(--pt-action-soft);
+  --c-success-mid: #7fd0a4;
+
+  --c-warning: var(--pt-warning);
+  --c-warning-lite: var(--pt-warning-soft);
+  --c-warning-mid: #f4cb98;
+
+  --c-danger: var(--pt-danger);
+  --c-danger-lite: var(--pt-danger-soft);
+
+  --c-amber: #b3671a;
+  --c-amber-lite: var(--pt-warning-soft);
+
+  --shadow-sm: var(--pt-shadow-none);
+  --shadow-md: var(--pt-shadow-surface);
+  --shadow-focus: var(--pt-focus-ring);
+
+  --r-sm: 7px;
+  --r-md: 8px;
+  --r-lg: 11px;
+}
+
+/* ── Painel do setor administrativo — was navy/indigo ──────────── */
+.asd-page {
+  --bg: var(--pt-canvas);
+  --surface: var(--pt-paper);
+  --border: var(--pt-line);
+  --border-lt: var(--pt-line-soft);
+
+  --ink: var(--pt-ink);
+  --ink-2: #486057;
+  --ink-3: var(--pt-ink-muted);
+  --ink-4: #8b9c94;
+
+  /* As faixas escuras do painel passam a usar a moldura evergreen. */
+  --slate: var(--pt-evergreen);
+  --slate-2: var(--pt-evergreen-active);
+  --on-slate: #e2f0e8;
+  --on-slate-2: #a8c8b7;
+  --slate-line: rgba(255, 255, 255, .1);
+
+  --indigo: var(--pt-action);
+  --indigo-dk: var(--pt-evergreen-active);
+  --indigo-lt: var(--pt-action-soft);
+  --indigo-md: var(--pt-action-line);
+
+  --elev-1: var(--pt-shadow-none);
+  --elev-2: var(--pt-shadow-surface);
+  --elev-3: var(--pt-shadow-raised);
+  --lip: none;
+
+  --r-sm: 8px;
+  --r: 11px;
+  --r-lg: 12px;
+}
+
+/* ── Fila do RH — was violeta ──────────────────────────────────── */
+.rh-tickets-dashboard {
+  --rh-primary: var(--pt-action);
+  --rh-primary-dark: var(--pt-action-dark);
+  --rh-primary-faint: rgba(20, 148, 90, .12);
+}
+
+/* ── Painel administrativo (TI) e Inventário — declarados em :root
+   pelos CSS de origem, portanto remapeados aqui no mesmo escopo. */
+:root {
+  --bg-page: var(--pt-canvas);
+  --bg-surface: var(--pt-paper);
+  --bg-raised: #f8faf9;
+  --bg-sunken: #f1f5f2;
+  --border: var(--pt-line);
+  --border-light: var(--pt-line-soft);
+
+  --tx-1: var(--pt-ink);
+  --tx-2: #33493f;
+  --tx-3: var(--pt-ink-muted);
+  --tx-4: #8b9c94;
+
+  --indigo: var(--pt-action);
+  --indigo-mid: var(--pt-action-bright);
+  --indigo-lite: var(--pt-action-soft);
+  --indigo-glow: rgba(20, 148, 90, .22);
+
+  --green: var(--pt-action);
+  --teal: var(--pt-action);
+  --violet: var(--pt-analysis);
+  --blue: var(--pt-info);
+  --orange: var(--pt-warning);
+  --red: var(--pt-danger);
+
+  --shadow-sm: var(--pt-shadow-none);
+  --shadow-md: var(--pt-shadow-surface);
+  --shadow-lg: var(--pt-shadow-raised);
+  --shadow-hover: var(--pt-shadow-raised);
+  --shadow-focus: var(--pt-focus-ring);
+
+  --r-sm: 7px;
+  --r-md: 9px;
+  --r-lg: 11px;
+  --r-xl: 12px;
+
+  /* Inventário */
+  --inv-bg-page: var(--pt-canvas);
+  --inv-bg-surface: var(--pt-paper);
+  --inv-bg-raised: #f8faf9;
+  --inv-border: var(--pt-line);
+  --inv-border-light: var(--pt-line-soft);
+
+  --inv-tx-1: var(--pt-ink);
+  --inv-tx-2: #33493f;
+  --inv-tx-3: var(--pt-ink-muted);
+  --inv-tx-4: #8b9c94;
+
+  --inv-teal: var(--pt-action);
+  --inv-teal-mid: var(--pt-action-bright);
+  --inv-teal-lite: var(--pt-action-soft);
+  --inv-teal-border: var(--pt-action-line);
+
+  --inv-green: var(--pt-action);
+  --inv-green-lite: var(--pt-action-soft);
+  --inv-green-border: var(--pt-action-line);
+
+  --inv-blue: var(--pt-info);
+  --inv-blue-lite: var(--pt-info-soft);
+  --inv-violet: var(--pt-analysis);
+  --inv-amber: #b3671a;
+  --inv-amber-lite: var(--pt-warning-soft);
+  --inv-red: var(--pt-danger);
+  --inv-red-lite: var(--pt-danger-soft);
+  --inv-red-border: #f0b6b9;
+
+  --inv-shadow-sm: var(--pt-shadow-none);
+  --inv-shadow-md: var(--pt-shadow-surface);
+  --inv-shadow-hover: var(--pt-shadow-raised);
+
+  --inv-r-sm: 7px;
+  --inv-r-md: 9px;
+  --inv-r-lg: 11px;
+  --inv-r-xl: 12px;
+}
+
+/* ── Escala de tom do painel Administrativo ────────────────────
+   .asd-tone-* já é um conjunto de tokens por estado; aqui ele
+   passa a apontar para as cores semânticas do DESIGN.md.       */
+.asd-page .asd-tone-sev1 { --solid: #d9464f; --vivid: #e08b8f; --tint: #fbecec; --edge: #f0b6b9; --fg: #a83239; }
+.asd-page .asd-tone-sev2,
+.asd-page .asd-tone-wait { --solid: #ed8a22; --vivid: #f0ab63; --tint: #fdf1e2; --edge: #f4cb98; --fg: #b3671a; }
+.asd-page .asd-tone-sev3,
+.asd-page .asd-tone-active { --solid: #2d73d2; --vivid: #7ba3e0; --tint: #eaf1fb; --edge: #b7cef0; --fg: #1f56a4; }
+.asd-page .asd-tone-blocked { --solid: #7f56c5; --vivid: #a98fd8; --tint: #f1ecfa; --edge: #d0c1ec; --fg: #63409f; }
+.asd-page .asd-tone-sev4,
+.asd-page .asd-tone-done { --solid: #7d9087; --vivid: #9fb0a7; --tint: #f2f5f3; --edge: #cdd9d1; --fg: #486057; }
+.asd-page .asd-tone-ok { --solid: #14945a; --vivid: #6cc493; --tint: #eaf6ef; --edge: #cfe8da; --fg: #0b6c44; }
