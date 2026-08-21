@@ -122,7 +122,7 @@ function App() {
             <Route path="/admin/usuarios" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff']}><UsersManagementPage /></InternalProtectedRoute>} />
             <Route path="/admin/estoque" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff']}><InventoryPage /></InternalProtectedRoute>} />
             <Route path="/admin/documentos" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff']}><DocumentsPage /></InternalProtectedRoute>} />
-            <Route path="/admin/relatorios" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff', 'manager']}><ReportsPage /></InternalProtectedRoute>} />
+            <Route path="/admin/relatorios" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff', 'admin_staff', 'manager']}><ReportsPage /></InternalProtectedRoute>} />
             <Route path="/admin/kpis" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff', 'admin_staff', 'rh_staff', 'manager']}><KpiDashboardPage /></InternalProtectedRoute>} />
             <Route path="/admin/recorrentes" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff']}><RecurringTicketsPage /></InternalProtectedRoute>} />
 

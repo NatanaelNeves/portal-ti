@@ -303,6 +303,7 @@
     radial-gradient(ellipse 620px 340px at 88% -30%, rgba(99, 102, 241, 0.30), transparent 66%),
     radial-gradient(ellipse 480px 300px at 8% 118%, rgba(139, 92, 246, 0.17), transparent 62%),
     linear-gradient(160deg, var(--slate-2) 0%, var(--slate) 58%);
+  background-color: var(--slate);
   box-shadow:
     0 2px 6px rgba(16, 24, 40, 0.14),
     0 16px 40px rgba(16, 24, 40, 0.26),
@@ -624,6 +625,21 @@
   font-weight: 500;
   color: var(--ink);
   letter-spacing: -0.025em;
+}
+
+/* Em telas intermediárias o trilho vira uma grade; o ritmo acompanha essa
+   mudança para manter rótulos e números alinhados, sem colunas estreitas. */
+@media (min-width: 769px) and (max-width: 1180px) {
+  .asd-rail-col > .asd-panel:last-child { grid-column: 1 / -1; }
+  .asd-rail-col > .asd-panel:last-child .asd-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 28px;
+  }
+  .asd-rail-col > .asd-panel:last-child .asd-stats > div:nth-child(2) {
+    border-top: none;
+    padding-top: 0;
+  }
 }
 
 /* ═══ ESQUELETO ═══════════════════════════════════════════════════════════ */

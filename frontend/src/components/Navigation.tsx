@@ -93,7 +93,7 @@ export default function Navigation() {
   const showUsersLink = userRole === 'admin' || userRole === 'it_staff';
   const showKnowledgeLink = userRole === 'admin' || userRole === 'it_staff';
   const showDocumentsLink = userRole === 'admin' || userRole === 'it_staff';
-  const showReportsLink = userRole === 'admin' || userRole === 'it_staff' || userRole === 'manager' || userRole === 'gestor';
+  const showReportsLink = userRole === 'admin' || userRole === 'it_staff' || userRole === 'admin_staff' || userRole === 'manager' || userRole === 'gestor';
   const showRhReportsLink = userRole === 'rh_staff';
 
   // Definir rota do dashboard baseado no papel
@@ -160,7 +160,7 @@ export default function Navigation() {
     .slice(0, 2)
     .map((part: string) => part[0]?.toUpperCase())
     .join('');
-  const roleLabel = userRole === 'admin' ? 'Administrador' : userRole === 'it_staff' ? 'Equipe de TI' : userRole === 'rh_staff' ? 'Recursos Humanos' : 'Área interna';
+  const roleLabel = userRole === 'admin' ? 'Administrador' : userRole === 'it_staff' ? 'Equipe de TI' : userRole === 'admin_staff' ? 'Administrativo' : userRole === 'rh_staff' ? 'Recursos Humanos' : 'Área interna';
   const todayLabel = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date());
 
   return (
