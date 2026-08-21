@@ -1,0 +1,247 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-21T09:01:07.8836593-03:00",
+  "title": "Design System: Portal de Serviços Internos — Operação Administrativa",
+  "extensions": {
+    "colorMeta": {
+      "ink": {
+        "role": "neutral",
+        "displayName": "Tinta Florestal",
+        "canonical": "#132a21",
+        "tonalRamp": ["oklch(15% 0.035 155)", "oklch(26% 0.035 155)", "oklch(38% 0.035 155)", "oklch(50% 0.035 155)", "oklch(62% 0.035 155)", "oklch(74% 0.035 155)", "oklch(86% 0.035 155)", "oklch(95% 0.035 155)"]
+      },
+      "ink-soft": {
+        "role": "neutral",
+        "displayName": "Tinta Suave",
+        "canonical": "#52645d",
+        "tonalRamp": ["oklch(15% 0.018 155)", "oklch(26% 0.018 155)", "oklch(38% 0.018 155)", "oklch(50% 0.018 155)", "oklch(62% 0.018 155)", "oklch(74% 0.018 155)", "oklch(86% 0.018 155)", "oklch(95% 0.018 155)"]
+      },
+      "command-deep": {
+        "role": "primary",
+        "displayName": "Verde Comando Profundo",
+        "canonical": "#09271b",
+        "tonalRamp": ["oklch(15% 0.055 155)", "oklch(26% 0.055 155)", "oklch(38% 0.055 155)", "oklch(50% 0.055 155)", "oklch(62% 0.055 155)", "oklch(74% 0.055 155)", "oklch(86% 0.055 155)", "oklch(95% 0.055 155)"]
+      },
+      "command": {
+        "role": "primary",
+        "displayName": "Verde Comando",
+        "canonical": "#103c2a",
+        "tonalRamp": ["oklch(15% 0.07 155)", "oklch(26% 0.07 155)", "oklch(38% 0.07 155)", "oklch(50% 0.07 155)", "oklch(62% 0.07 155)", "oklch(74% 0.07 155)", "oklch(86% 0.07 155)", "oklch(95% 0.07 155)"]
+      },
+      "evergreen": {
+        "role": "primary",
+        "displayName": "Verde Sempre-vivo",
+        "canonical": "#15553a",
+        "tonalRamp": ["oklch(15% 0.085 155)", "oklch(26% 0.085 155)", "oklch(38% 0.085 155)", "oklch(50% 0.085 155)", "oklch(62% 0.085 155)", "oklch(74% 0.085 155)", "oklch(86% 0.085 155)", "oklch(95% 0.085 155)"]
+      },
+      "action-green": {
+        "role": "primary",
+        "displayName": "Verde Operacional",
+        "canonical": "#1d6b48",
+        "tonalRamp": ["oklch(15% 0.095 155)", "oklch(26% 0.095 155)", "oklch(38% 0.095 155)", "oklch(50% 0.095 155)", "oklch(62% 0.095 155)", "oklch(74% 0.095 155)", "oklch(86% 0.095 155)", "oklch(95% 0.095 155)"]
+      },
+      "mist-green": {
+        "role": "primary",
+        "displayName": "Névoa Verde",
+        "canonical": "#dcebe2",
+        "tonalRamp": ["oklch(15% 0.025 155)", "oklch(26% 0.025 155)", "oklch(38% 0.025 155)", "oklch(50% 0.025 155)", "oklch(62% 0.025 155)", "oklch(74% 0.025 155)", "oklch(86% 0.025 155)", "oklch(95% 0.025 155)"]
+      },
+      "wash-green": {
+        "role": "primary",
+        "displayName": "Lavagem Verde",
+        "canonical": "#edf5f0",
+        "tonalRamp": ["oklch(15% 0.014 155)", "oklch(26% 0.014 155)", "oklch(38% 0.014 155)", "oklch(50% 0.014 155)", "oklch(62% 0.014 155)", "oklch(74% 0.014 155)", "oklch(86% 0.014 155)", "oklch(95% 0.014 155)"]
+      },
+      "action-mint": {
+        "role": "primary",
+        "displayName": "Menta de Ação",
+        "canonical": "#a7d9b6",
+        "tonalRamp": ["oklch(15% 0.065 150)", "oklch(26% 0.065 150)", "oklch(38% 0.065 150)", "oklch(50% 0.065 150)", "oklch(62% 0.065 150)", "oklch(74% 0.065 150)", "oklch(86% 0.065 150)", "oklch(95% 0.065 150)"]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Papel Operacional",
+        "canonical": "#fffefa",
+        "tonalRamp": ["oklch(15% 0.008 95)", "oklch(26% 0.008 95)", "oklch(38% 0.008 95)", "oklch(50% 0.008 95)", "oklch(62% 0.008 95)", "oklch(74% 0.008 95)", "oklch(86% 0.008 95)", "oklch(95% 0.008 95)"]
+      },
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Canvas Mineral",
+        "canonical": "#f3f6f2",
+        "tonalRamp": ["oklch(15% 0.008 145)", "oklch(26% 0.008 145)", "oklch(38% 0.008 145)", "oklch(50% 0.008 145)", "oklch(62% 0.008 145)", "oklch(74% 0.008 145)", "oklch(86% 0.008 145)", "oklch(95% 0.008 145)"]
+      },
+      "divider": {
+        "role": "neutral",
+        "displayName": "Linha de Ledger",
+        "canonical": "#d8e0da",
+        "tonalRamp": ["oklch(15% 0.01 150)", "oklch(26% 0.01 150)", "oklch(38% 0.01 150)", "oklch(50% 0.01 150)", "oklch(62% 0.01 150)", "oklch(74% 0.01 150)", "oklch(86% 0.01 150)", "oklch(95% 0.01 150)"]
+      },
+      "divider-strong": {
+        "role": "neutral",
+        "displayName": "Linha de Ledger Forte",
+        "canonical": "#bdc9c0",
+        "tonalRamp": ["oklch(15% 0.016 150)", "oklch(26% 0.016 150)", "oklch(38% 0.016 150)", "oklch(50% 0.016 150)", "oklch(62% 0.016 150)", "oklch(74% 0.016 150)", "oklch(86% 0.016 150)", "oklch(95% 0.016 150)"]
+      },
+      "info": {
+        "role": "secondary",
+        "displayName": "Azul Informativo",
+        "canonical": "#245d8f",
+        "tonalRamp": ["oklch(15% 0.09 250)", "oklch(26% 0.09 250)", "oklch(38% 0.09 250)", "oklch(50% 0.09 250)", "oklch(62% 0.09 250)", "oklch(74% 0.09 250)", "oklch(86% 0.09 250)", "oklch(95% 0.09 250)"]
+      },
+      "info-soft": {
+        "role": "secondary",
+        "displayName": "Azul Informativo Suave",
+        "canonical": "#e8f1f8",
+        "tonalRamp": ["oklch(15% 0.025 250)", "oklch(26% 0.025 250)", "oklch(38% 0.025 250)", "oklch(50% 0.025 250)", "oklch(62% 0.025 250)", "oklch(74% 0.025 250)", "oklch(86% 0.025 250)", "oklch(95% 0.025 250)"]
+      },
+      "warning": {
+        "role": "tertiary",
+        "displayName": "Âmbar de Atenção",
+        "canonical": "#a45c12",
+        "tonalRamp": ["oklch(15% 0.11 65)", "oklch(26% 0.11 65)", "oklch(38% 0.11 65)", "oklch(50% 0.11 65)", "oklch(62% 0.11 65)", "oklch(74% 0.11 65)", "oklch(86% 0.11 65)", "oklch(95% 0.11 65)"]
+      },
+      "warning-soft": {
+        "role": "tertiary",
+        "displayName": "Âmbar de Atenção Suave",
+        "canonical": "#fff2dd",
+        "tonalRamp": ["oklch(15% 0.035 65)", "oklch(26% 0.035 65)", "oklch(38% 0.035 65)", "oklch(50% 0.035 65)", "oklch(62% 0.035 65)", "oklch(74% 0.035 65)", "oklch(86% 0.035 65)", "oklch(95% 0.035 65)"]
+      },
+      "danger": {
+        "role": "tertiary",
+        "displayName": "Vermelho de Exceção",
+        "canonical": "#a33b35",
+        "tonalRamp": ["oklch(15% 0.105 25)", "oklch(26% 0.105 25)", "oklch(38% 0.105 25)", "oklch(50% 0.105 25)", "oklch(62% 0.105 25)", "oklch(74% 0.105 25)", "oklch(86% 0.105 25)", "oklch(95% 0.105 25)"]
+      },
+      "danger-soft": {
+        "role": "tertiary",
+        "displayName": "Vermelho de Exceção Suave",
+        "canonical": "#fbeae8",
+        "tonalRamp": ["oklch(15% 0.025 25)", "oklch(26% 0.025 25)", "oklch(38% 0.025 25)", "oklch(50% 0.025 25)", "oklch(62% 0.025 25)", "oklch(74% 0.025 25)", "oklch(86% 0.025 25)", "oklch(95% 0.025 25)"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Títulos de página e mensagens executivas." },
+      "headline": { "displayName": "Headline", "purpose": "Narrativas de impacto dentro de blocos executivos." },
+      "title": { "displayName": "Title", "purpose": "Títulos de seção e agrupamento analítico." },
+      "body": { "displayName": "Body", "purpose": "Contexto, descrições e leitura contínua." },
+      "label": { "displayName": "Label", "purpose": "Estados, filtros, metadados e cabeçalhos de tabela." }
+    },
+    "shadows": [
+      { "name": "command-ambient", "value": "0 18px 48px -36px rgba(9, 39, 27, 0.9)", "purpose": "Halo baixo sob cabeçalhos de comando." },
+      { "name": "selection-low", "value": "0 4px 12px -10px rgba(19, 42, 33, 0.7)", "purpose": "Confirma tabs e filtros selecionados." },
+      { "name": "cell-outline", "value": "inset 0 0 0 1px #1d6b48", "purpose": "Hover estrutural sem deslocar células de KPI." }
+    ],
+    "motion": [
+      { "name": "state-standard", "value": "150ms ease", "purpose": "Mudanças discretas de hover, foco e seleção." },
+      { "name": "status-pulse", "value": "1.4s ease-in-out infinite", "purpose": "Somente para indicar sincronização em andamento." },
+      { "name": "count-update", "value": "450ms cubic ease-out", "purpose": "Transição de contagens operacionais quando os dados mudam." },
+      { "name": "reduced-motion", "value": "0.01ms", "purpose": "Desativa movimento quando prefers-reduced-motion está ativo." }
+    ],
+    "breakpoints": [
+      { "name": "wide-density", "value": "1500px" },
+      { "name": "stack-primary", "value": "1180px" },
+      { "name": "stack-header", "value": "900px" },
+      { "name": "mobile-command", "value": "620px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Command Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Ação principal sobre cabeçalhos verde-profundo.",
+      "html": "<button class=\"ds-btn-primary\">EXPORTAR RELATÓRIO</button>",
+      "css": ".ds-btn-primary { display:inline-flex; align-items:center; justify-content:center; min-height:43px; padding:0 16px; color:#09271b; background:#a7d9b6; border:1px solid #a7d9b6; border-radius:9px; font:700 .76rem/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; transition:transform 150ms ease,box-shadow 150ms ease; } .ds-btn-primary:hover { transform:translateY(-1px); box-shadow:0 8px 20px -14px rgba(0,0,0,.8); } .ds-btn-primary:focus-visible { outline:3px solid rgba(36,93,143,.32); outline-offset:2px; } .ds-btn-primary:active { transform:translateY(0); }"
+    },
+    {
+      "name": "Secondary Command Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Ação auxiliar discreta dentro de um cabeçalho escuro.",
+      "html": "<button class=\"ds-btn-secondary\">ATUALIZAR DADOS</button>",
+      "css": ".ds-btn-secondary { display:inline-flex; align-items:center; justify-content:center; min-height:42px; padding:0 14px; color:#edf6f0; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.16); border-radius:9px; font:700 .76rem/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; transition:background 150ms ease,border-color 150ms ease; } .ds-btn-secondary:hover { background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.25); } .ds-btn-secondary:focus-visible { outline:3px solid rgba(36,93,143,.55); outline-offset:2px; } .ds-btn-secondary:active { background:rgba(255,255,255,.16); }"
+    },
+    {
+      "name": "Operational Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Campo claro para período, filtro ou busca administrativa.",
+      "html": "<label class=\"ds-field-label\">PERÍODO<input class=\"ds-field\" type=\"date\"></label>",
+      "css": ".ds-field-label { display:grid; gap:7px; color:#52645d; font:700 .7rem/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; letter-spacing:.04em; } .ds-field { width:100%; min-height:41px; padding:0 11px; color:#132a21; background:#fff; border:1px solid #bdc9c0; border-radius:9px; font:400 .78rem/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; transition:border-color 150ms ease,outline-color 150ms ease; } .ds-field:hover { border-color:#8fa196; } .ds-field:focus-visible { outline:3px solid rgba(36,93,143,.32); outline-offset:2px; border-color:#245d8f; }"
+    },
+    {
+      "name": "Selected Priority Chip",
+      "kind": "chip",
+      "refersTo": "chip-selected",
+      "description": "Filtro ativo com contagem embutida e estado textual.",
+      "html": "<button class=\"ds-chip-selected\">URGENTES <span>4</span></button>",
+      "css": ".ds-chip-selected { display:inline-flex; align-items:center; gap:9px; min-height:34px; padding:0 10px; color:#fff; background:#103c2a; border:1px solid #103c2a; border-radius:999px; font:700 .72rem/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; transition:background 150ms ease; } .ds-chip-selected span { min-width:22px; padding:2px 6px; background:rgba(255,255,255,.16); border-radius:999px; text-align:center; } .ds-chip-selected:hover { background:#15553a; } .ds-chip-selected:focus-visible { outline:3px solid rgba(36,93,143,.32); outline-offset:2px; } .ds-chip-selected:active { background:#09271b; }"
+    },
+    {
+      "name": "KPI Ledger Cell",
+      "kind": "card",
+      "refersTo": "card-ledger",
+      "description": "Célula compacta que liga rótulo, número e evidência secundária.",
+      "html": "<article class=\"ds-kpi-cell\"><span class=\"ds-kpi-label\">CHAMADOS RESOLVIDOS</span><strong>148</strong><small>+12% em relação ao período anterior</small></article>",
+      "css": ".ds-kpi-cell { display:grid; gap:12px; min-height:150px; padding:22px; color:#132a21; background:#fffefa; border:1px solid #d8e0da; border-radius:14px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-variant-numeric:tabular-nums; transition:background 150ms ease,box-shadow 150ms ease; } .ds-kpi-label { color:#52645d; font-size:.68rem; font-weight:750; letter-spacing:.06em; } .ds-kpi-cell strong { font-size:3rem; line-height:1; letter-spacing:-.04em; } .ds-kpi-cell small { padding-top:11px; color:#52645d; border-top:1px solid #d8e0da; font-size:.76rem; } .ds-kpi-cell:hover { background:#fff; box-shadow:inset 0 0 0 1px #1d6b48; } .ds-kpi-cell:focus-within { outline:3px solid rgba(36,93,143,.32); outline-offset:2px; }"
+    },
+    {
+      "name": "Impact Ledger",
+      "kind": "custom",
+      "refersTo": "card-ledger",
+      "description": "Bloco assinatura que traduz operação em narrativa executiva e quatro evidências.",
+      "html": "<section class=\"ds-impact\"><div class=\"ds-impact-copy\"><h2>O trabalho da equipe, traduzido em resultado</h2><p>Volume, velocidade e qualidade no período selecionado.</p></div><div class=\"ds-impact-grid\"><div><span>RESOLVIDOS</span><strong>148</strong></div><div><span>PENDENTES</span><strong>21</strong></div><div><span>TEMPO MÉDIO</span><strong>3,2h</strong></div><div><span>SATISFAÇÃO</span><strong>94%</strong></div></div></section>",
+      "css": ".ds-impact { display:grid; grid-template-columns:.85fr 1.15fr; overflow:hidden; color:#fff; background:#103c2a; border-radius:14px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; } .ds-impact-copy { display:flex; flex-direction:column; justify-content:center; min-height:288px; padding:30px; } .ds-impact h2 { margin:0; max-width:480px; font-size:clamp(1.7rem,3vw,2.65rem); line-height:1.08; letter-spacing:-.035em; } .ds-impact p { margin:18px 0 0; color:#c8d8ce; line-height:1.6; } .ds-impact-grid { display:grid; grid-template-columns:repeat(2,1fr); background:rgba(255,255,255,.055); border-left:1px solid rgba(255,255,255,.11); } .ds-impact-grid div { display:flex; flex-direction:column; justify-content:space-between; gap:18px; min-height:144px; padding:25px; border-bottom:1px solid rgba(255,255,255,.11); } .ds-impact-grid div:nth-child(odd) { border-right:1px solid rgba(255,255,255,.11); } .ds-impact-grid span { color:#bcd0c3; font-size:.72rem; } .ds-impact-grid strong { font-size:clamp(2rem,3.4vw,3.2rem); line-height:1; letter-spacing:-.04em; font-variant-numeric:tabular-nums; } @media(max-width:700px){.ds-impact{grid-template-columns:1fr}.ds-impact-grid{border-left:0;border-top:1px solid rgba(255,255,255,.11)}}"
+    },
+    {
+      "name": "Active Navigation Item",
+      "kind": "nav",
+      "refersTo": "navigation-active",
+      "description": "Rota atual claramente marcada na navegação administrativa.",
+      "html": "<nav class=\"ds-nav\"><button class=\"ds-nav-item\">Painel</button><button class=\"ds-nav-item ds-nav-active\" aria-current=\"page\">Relatórios</button></nav>",
+      "css": ".ds-nav { display:flex; gap:4px; padding:8px; background:#0d1625; border-radius:12px; } .ds-nav-item { min-height:34px; padding:4px 10px; color:rgba(203,213,225,.8); background:transparent; border:1px solid transparent; border-radius:8px; font:600 .74rem/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; transition:background 150ms ease,color 150ms ease; } .ds-nav-item:hover { color:#fff; background:rgba(167,217,182,.08); } .ds-nav-item:focus-visible { outline:3px solid rgba(36,93,143,.55); outline-offset:2px; } .ds-nav-active { color:#fff; background:rgba(167,217,182,.13); border-color:rgba(167,217,182,.22); }"
+    },
+    {
+      "name": "Recoverable Error",
+      "kind": "custom",
+      "description": "Falha operacional textual com uma próxima ação clara.",
+      "html": "<div class=\"ds-error\" role=\"alert\"><div><strong>Não foi possível atualizar os dados</strong><span>Os números exibidos podem estar desatualizados.</span></div><button>TENTAR NOVAMENTE</button></div>",
+      "css": ".ds-error { display:flex; align-items:center; justify-content:space-between; gap:18px; padding:14px 16px; color:#7f2d28; background:#fbeae8; border:1px solid #edc4bf; border-radius:10px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; } .ds-error div { display:grid; gap:3px; } .ds-error span { font-size:.74rem; } .ds-error button { min-height:38px; padding:0 12px; color:#7f2d28; background:#fff; border:1px solid #dca6a0; border-radius:8px; font-size:.72rem; font-weight:720; } .ds-error button:hover { background:#fff7f6; } .ds-error button:focus-visible { outline:3px solid rgba(36,93,143,.32); outline-offset:2px; } .ds-error button:active { background:#fbeae8; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Operational Impact Ledger",
+    "overview": "O sistema visual trata a operação de TI como um livro de evidências vivo: sóbrio, confiável e rápido de ler. O verde-esmeralda institucional cria o mundo de comando; superfícies de papel levemente aquecido organizam métricas, filas e relatos sem parecer uma coleção genérica de cartões. A densidade é alta, mas cada bloco tem hierarquia explícita, números tabulares e divisões regradas que favorecem leitura em varredura.\n\nA experiência deve conduzir uma narrativa operacional completa: primeiro mostrar onde há atenção e qual é o ritmo atual, depois permitir executar a fila e, por fim, traduzir o trabalho em impacto para a liderança. O cabeçalho da primeira viewport sempre estabelece contexto e estado; a informação priorizada vem imediatamente abaixo. Estados de carregamento, falha e sucesso são parte do sistema, não acabamento opcional.",
+    "keyCharacteristics": [
+      "Verde profundo para contexto de comando; papel e canvas quentes para trabalho prolongado.",
+      "Divisões de ledger, tabelas e listas contínuas no lugar de mosaicos soltos.",
+      "Tipografia de sistema precisa, números tabulares e títulos compactos de alto contraste.",
+      "Cor semântica reservada para prioridade, SLA, risco e estado real.",
+      "Responsividade que reorganiza a hierarquia sem esconder controles essenciais."
+    ],
+    "rules": [
+      { "name": "The Evidence Color Rule", "body": "Verde, azul, âmbar e vermelho devem comunicar significado operacional; não decorar áreas sem estado.", "section": "colors" },
+      { "name": "The Paper-and-Ink Rule", "body": "Conteúdo denso vive em papel quente com tinta florestal. Branco puro aparece apenas em controles, realces e estados ativos.", "section": "colors" },
+      { "name": "The Number-Is-Evidence Rule", "body": "Valores operacionais importantes usam alinhamento e numerais tabulares; nunca variam de posição durante atualização.", "section": "typography" },
+      { "name": "The Two-Level Scan Rule", "body": "Cada região começa com uma decisão ou número e termina com contexto; evite mais de dois níveis de texto competindo dentro da mesma célula.", "section": "typography" },
+      { "name": "The Priority-First Rule", "body": "A primeira viewport contém estado atual e resumo priorizado; gráficos exploratórios e histórico vêm depois.", "section": "layout" },
+      { "name": "The Ledger Continuity Rule", "body": "Métricas relacionadas compartilham uma moldura e divisores de 1px; não as fragmente em cartões flutuantes sem relação visual.", "section": "layout" },
+      { "name": "The Flat-by-Default Rule", "body": "Superfícies de trabalho ficam planas em repouso; sombra não substitui borda, contraste ou hierarquia.", "section": "elevation" },
+      { "name": "The Outer-Silhouette Rule", "body": "Arredonde a moldura do conjunto, não cada célula de uma grade. A continuidade visual é parte da linguagem de ledger.", "section": "shapes" }
+    ],
+    "dos": [
+      "Do começar páginas administrativas com um cabeçalho de comando que declare contexto, estado e ação principal.",
+      "Do agrupar métricas comparáveis em ledgers contínuos com divisores de 1px.",
+      "Do manter carregamento, erro, vazio, sucesso e atualização visíveis e honestos.",
+      "Do preservar rótulos explícitos junto a cor, especialmente em prioridade, SLA e falha.",
+      "Do manter 44px como mínimo de alvo interativo em telas de até 620px."
+    ],
+    "donts": [
+      "Don't usar gradientes coloridos, ícones decorativos ou sombras pesadas para fabricar importância.",
+      "Don't inventar métricas ou apresentar dados antigos como atualizados.",
+      "Don't transformar todo dado em cartão arredondado independente; preserve relações em grades, listas e tabelas.",
+      "Don't esconder navegação ou ações essenciais no mobile sem um controle de abertura explícito.",
+      "Don't depender só de cor para comunicar estado, prioridade ou resultado de exportação."
+    ]
+  }
+}

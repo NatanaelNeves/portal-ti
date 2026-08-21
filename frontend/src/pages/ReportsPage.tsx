@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import '../styles/ReportsPage.css';
 import { BACKEND_URL } from '../services/api';
 import {
@@ -168,6 +168,14 @@ const getComplianceTone = (value: number): 'good' | 'warning' | 'bad' => {
   return 'bad';
 };
 
+const DownloadIcon = () => (
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 3v12" />
+    <path d="m7 10 5 5 5-5" />
+    <path d="M5 21h14" />
+  </svg>
+);
+
 const ReportsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'technicians' | 'sla' | 'trends'>('overview');
   const [loading, setLoading] = useState(true);
@@ -181,6 +189,8 @@ const ReportsPage: React.FC = () => {
   const [trendsData, setTrendsData] = useState<TrendsData | null>(null);
   const [satisfactionData, setSatisfactionData] = useState<SatisfactionData | null>(null);
   const [trendsPeriod, setTrendsPeriod] = useState<'7days' | '30days' | '90days' | '12months'>('30days');
+  const [exporting, setExporting] = useState<'tickets' | 'technicians' | 'consolidated' | null>(null);
+  const [exportFeedback, setExportFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
     loadData();
@@ -273,6 +283,8 @@ const ReportsPage: React.FC = () => {
     if (dateFrom) params.append('date_from', dateFrom);
     if (dateTo) params.append('date_to', dateTo);
     
+    setExporting('tickets');
+    setExportFeedback(null);
     try {
       const response = await fetch(
         `${BACKEND_URL}/api/reports/export/excel/tickets?${params.toString()}`,
@@ -286,8 +298,12 @@ const ReportsPage: React.FC = () => {
       a.download = `tickets_${new Date().toISOString().slice(0,10)}.xlsx`;
       a.click();
       window.URL.revokeObjectURL(url);
+      setExportFeedback({ tone: 'success', message: 'Planilha de chamados exportada com sucesso.' });
     } catch (err) {
       console.error('Export error:', err);
+      setExportFeedback({ tone: 'error', message: 'Não foi possível exportar os chamados. Tente novamente.' });
+    } finally {
+      setExporting(null);
     }
   };
 
@@ -297,6 +313,8 @@ const ReportsPage: React.FC = () => {
     if (dateFrom) params.append('date_from', dateFrom);
     if (dateTo) params.append('date_to', dateTo);
     
+    setExporting('technicians');
+    setExportFeedback(null);
     try {
       const response = await fetch(
         `${BACKEND_URL}/api/reports/export/excel/technicians?${params.toString()}`,
@@ -310,16 +328,26 @@ const ReportsPage: React.FC = () => {
       a.download = `technicians_${new Date().toISOString().slice(0,10)}.xlsx`;
       a.click();
       window.URL.revokeObjectURL(url);
+      setExportFeedback({ tone: 'success', message: 'Planilha da equipe exportada com sucesso.' });
     } catch (err) {
       console.error('Export error:', err);
+      setExportFeedback({ tone: 'error', message: 'Não foi possível exportar os dados da equipe. Tente novamente.' });
+    } finally {
+      setExporting(null);
     }
   };
 
   const handleExportConsolidated = async () => {
     const token = localStorage.getItem('internal_token') || localStorage.getItem('token');
+    const params = new URLSearchParams();
+    if (dateFrom) params.append('date_from', dateFrom);
+    if (dateTo) params.append('date_to', dateTo);
+    const query = params.toString();
+    setExporting('consolidated');
+    setExportFeedback(null);
     try {
       const response = await fetch(
-        `${BACKEND_URL}/api/reports/export/excel/consolidated`,
+        `${BACKEND_URL}/api/reports/export/excel/consolidated${query ? `?${query}` : ''}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (!response.ok) throw new Error('Export failed');
@@ -330,8 +358,12 @@ const ReportsPage: React.FC = () => {
       a.download = `consolidated_${new Date().toISOString().slice(0,10)}.xlsx`;
       a.click();
       window.URL.revokeObjectURL(url);
+      setExportFeedback({ tone: 'success', message: 'Relatório completo exportado com sucesso.' });
     } catch (err) {
       console.error('Export error:', err);
+      setExportFeedback({ tone: 'error', message: 'Não foi possível gerar o relatório completo. Tente novamente.' });
+    } finally {
+      setExporting(null);
     }
   };
 
@@ -413,29 +445,60 @@ const ReportsPage: React.FC = () => {
 
   const orderedTeams = ['ti', 'administrativo'].filter((team) => groupedTeamStats[team]?.length > 0);
 
+  const reportPeriodLabel = useMemo(() => {
+    if (dateFrom && dateTo) {
+      return `${new Date(`${dateFrom}T12:00:00`).toLocaleDateString('pt-BR')} a ${new Date(`${dateTo}T12:00:00`).toLocaleDateString('pt-BR')}`;
+    }
+    if (dateFrom) return `Desde ${new Date(`${dateFrom}T12:00:00`).toLocaleDateString('pt-BR')}`;
+    if (dateTo) return `Até ${new Date(`${dateTo}T12:00:00`).toLocaleDateString('pt-BR')}`;
+    return 'Todo o período disponível';
+  }, [dateFrom, dateTo]);
+
+  const executiveImpact = useMemo(() => {
+    if (!overviewStats) {
+      return { resolved: 0, pending: 0, resolutionRate: 0, satisfaction: '0.00' };
+    }
+
+    const resolved = overviewStats.resolutionRate.resolved || 0;
+    return {
+      resolved,
+      pending: Math.max(overviewStats.total - resolved, 0),
+      resolutionRate: overviewStats.resolutionRate.percentage || 0,
+      satisfaction: satisfactionData?.averageRating?.toFixed(2) ?? '0.00',
+    };
+  }, [overviewStats, satisfactionData]);
+
   return (
     <div className="reports-page">
       <div className="reports-header">
-        <h1 className="page-title">Relatórios e Análises</h1>
+        <div>
+          <h1 className="page-title">Impacto da operação</h1>
+          <p className="reports-subtitle">Uma leitura executiva do volume entregue, da velocidade do atendimento e da qualidade percebida.</p>
+        </div>
         <div className="export-buttons">
-          <button onClick={handleExportTickets} className="export-btn" title="Exportar Tickets" aria-label="Exportar Tickets">
-            <span className="export-btn-icon" aria-hidden="true">📥</span>
-            <span className="export-btn-label">Exportar Tickets</span>
+          <button onClick={handleExportTickets} className="export-btn" title="Exportar Tickets" aria-label="Exportar Tickets" disabled={exporting !== null}>
+            <span className="export-btn-icon"><DownloadIcon /></span>
+            <span className="export-btn-label">{exporting === 'tickets' ? 'Gerando...' : 'Exportar Tickets'}</span>
           </button>
-          <button onClick={handleExportTechnicians} className="export-btn" title="Exportar Equipe" aria-label="Exportar Equipe">
-            <span className="export-btn-icon" aria-hidden="true">📥</span>
-            <span className="export-btn-label">Exportar Equipe</span>
+          <button onClick={handleExportTechnicians} className="export-btn" title="Exportar Equipe" aria-label="Exportar Equipe" disabled={exporting !== null}>
+            <span className="export-btn-icon"><DownloadIcon /></span>
+            <span className="export-btn-label">{exporting === 'technicians' ? 'Gerando...' : 'Exportar Equipe'}</span>
           </button>
-          <button onClick={handleExportConsolidated} className="export-btn primary" title="Relatório Completo" aria-label="Relatório Completo">
-            <span className="export-btn-icon" aria-hidden="true">📥</span>
-            <span className="export-btn-label">Relatório Completo</span>
+          <button onClick={handleExportConsolidated} className="export-btn primary" title="Relatório Completo" aria-label="Relatório Completo" disabled={exporting !== null}>
+            <span className="export-btn-icon"><DownloadIcon /></span>
+            <span className="export-btn-label">{exporting === 'consolidated' ? 'Gerando...' : 'Relatório Completo'}</span>
           </button>
         </div>
+        {exportFeedback && (
+          <div className={`export-feedback export-feedback--${exportFeedback.tone}`} role="status">
+            {exportFeedback.message}
+          </div>
+        )}
       </div>
 
       <div className="date-filters filter-card">
         <label>
-          Data Início:
+          Início do período
           <input
             type="date"
             value={dateFrom}
@@ -443,7 +506,7 @@ const ReportsPage: React.FC = () => {
           />
         </label>
         <label>
-          Data Fim:
+          Fim do período
           <input
             type="date"
             value={dateTo}
@@ -451,7 +514,7 @@ const ReportsPage: React.FC = () => {
           />
         </label>
         <label>
-          Departamento (Satisfação):
+          Departamento da satisfação
           <select
             value={satisfactionDepartment}
             onChange={(e) => setSatisfactionDepartment(e.target.value as 'all' | 'ti' | 'administrativo')}
@@ -474,25 +537,25 @@ const ReportsPage: React.FC = () => {
           className={activeTab === 'overview' ? 'active' : ''}
           onClick={() => setActiveTab('overview')}
         >
-          Visão Geral
+          Resumo executivo
         </button>
         <button
           className={activeTab === 'technicians' ? 'active' : ''}
           onClick={() => setActiveTab('technicians')}
         >
-          Equipe
+          Equipe e contribuição
         </button>
         <button
           className={activeTab === 'sla' ? 'active' : ''}
           onClick={() => setActiveTab('sla')}
         >
-          SLA
+          Qualidade e SLA
         </button>
         <button
           className={activeTab === 'trends' ? 'active' : ''}
           onClick={() => setActiveTab('trends')}
         >
-          Tendências
+          Evolução
         </button>
       </div>
 
@@ -503,6 +566,37 @@ const ReportsPage: React.FC = () => {
           <>
             {activeTab === 'overview' && overviewStats && (
               <div className="overview-section">
+                <section className="executive-brief" aria-labelledby="executive-brief-title">
+                  <div className="executive-brief-copy">
+                    <div>
+                      <h2 id="executive-brief-title">O trabalho da equipe, traduzido em resultado.</h2>
+                      <p>
+                        No período selecionado, a operação resolveu <strong>{executiveImpact.resolved} chamados</strong> e alcançou{' '}
+                        <strong>{executiveImpact.resolutionRate}% de resolução</strong>. Os indicadores abaixo mostram o que foi entregue,
+                        o que segue em andamento e como o atendimento foi percebido.
+                      </p>
+                    </div>
+                    <span className="executive-period">{reportPeriodLabel}</span>
+                  </div>
+                  <div className="impact-ledger" aria-label="Principais resultados do período">
+                    <div className="impact-ledger-item">
+                      <span>Chamados resolvidos</span>
+                      <strong>{executiveImpact.resolved}</strong>
+                    </div>
+                    <div className="impact-ledger-item">
+                      <span>Pendências no período</span>
+                      <strong>{executiveImpact.pending}</strong>
+                    </div>
+                    <div className="impact-ledger-item">
+                      <span>Tempo médio de resolução</span>
+                      <strong>{overviewStats.avgResolutionHours}h</strong>
+                    </div>
+                    <div className="impact-ledger-item">
+                      <span>Satisfação média</span>
+                      <strong>{executiveImpact.satisfaction}</strong>
+                    </div>
+                  </div>
+                </section>
                 <div className="stats-grid">
                   <div className="stat-card stat-card--default">
                     <h3>Total de Tickets</h3>
@@ -686,7 +780,7 @@ const ReportsPage: React.FC = () => {
 
                 {orderedTeams.length === 0 ? (
                   <div className="empty-state">
-                    <p>📊 Nenhum atendimento encontrado para a equipe no período selecionado.</p>
+                    <p>Nenhum atendimento encontrado para a equipe no período selecionado.</p>
                   </div>
                 ) : (
                   <div className="team-staff-grid">
@@ -755,7 +849,7 @@ const ReportsPage: React.FC = () => {
                 
                 {slaStats.overall.total === 0 ? (
                   <div className="empty-state">
-                    <p>📊 Nenhum ticket encontrado para análise de SLA no período selecionado.</p>
+                    <p>Nenhum ticket encontrado para análise de SLA no período selecionado.</p>
                     <p>Ajuste os filtros de data ou aguarde a criação de novos tickets.</p>
                   </div>
                 ) : (
@@ -816,7 +910,7 @@ const ReportsPage: React.FC = () => {
             
             {activeTab === 'sla' && !loading && !slaStats && (
               <div className="empty-state">
-                <p>❌ Erro ao carregar dados de SLA.</p>
+                <p>Não foi possível carregar os dados de SLA. Tente novamente.</p>
               </div>
             )}
 

@@ -251,7 +251,7 @@ export default function AdminTicketsPage() {
 
   const fetchUsers = async () => {
     try {
-      const response = await api.get('/internal-auth/users');
+      const response = await api.get('/internal-auth/users', { timeout: 15000 });
       console.log('Usuários carregados:', response.data);
       setUsers(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
@@ -449,8 +449,8 @@ export default function AdminTicketsPage() {
       summaryParams.append('order', 'desc');
 
       const [response, summaryResponse] = await Promise.all([
-        api.get(`/tickets?${params.toString()}`),
-        api.get(`/tickets?${summaryParams.toString()}`)
+        api.get(`/tickets?${params.toString()}`, { timeout: 15000 }),
+        api.get(`/tickets?${summaryParams.toString()}`, { timeout: 15000 })
       ]);
 
       const responseData = response.data;
@@ -740,7 +740,7 @@ export default function AdminTicketsPage() {
   const priorityOptions: Array<{ value: 'high' | 'medium' | 'low' | null; label: string; count: number }> = [
     { value: null, label: 'Todas', count: animatedPriorityAll },
     { value: 'high', label: 'Alta', count: animatedPriorityHigh },
-    { value: 'medium', label: 'Media', count: animatedPriorityMedium },
+    { value: 'medium', label: 'Média', count: animatedPriorityMedium },
     { value: 'low', label: 'Baixa', count: animatedPriorityLow },
   ];
   const panelCanResolve = selectedTicket ? canQuickResolve(selectedTicket) : false;
@@ -809,7 +809,15 @@ export default function AdminTicketsPage() {
         </div>
       )}
 
-      {error && <div className="alert alert-error">{error}</div>}
+      {error && (
+        <div className="alert alert-error" role="alert">
+          <div>
+            <strong>Não foi possível atualizar a fila.</strong>
+            <span>{error}</span>
+          </div>
+          <button type="button" onClick={fetchTickets}>Tentar novamente</button>
+        </div>
+      )}
 
       {hasAdvancedFilters && (
         <div className="filters-warning">
@@ -1147,7 +1155,7 @@ export default function AdminTicketsPage() {
                   }}
                   title="Exportar chamados filtrados para Excel"
                 >
-                  {exportLoading ? <span className="btn-spinner" aria-label="Exportando..." /> : '⬇ Excel'}
+                  {exportLoading ? <span className="btn-spinner" aria-label="Exportando..." /> : 'Exportar Excel'}
                 </button>
               </div>
             </div>
@@ -1212,7 +1220,6 @@ export default function AdminTicketsPage() {
                 {sortedTickets.map((ticket) => {
                   const overdue = isTicketOverdue(ticket);
                   const ageTone = getAgeToneClass(ticket.created_at);
-                  const ageEmoji = ageTone === 'time-ago--critical' ? '🟠' : ageTone === 'time-ago--warning' ? '🟡' : '🟢';
                   return (
                   <div
                     key={ticket.id}
@@ -1248,9 +1255,9 @@ export default function AdminTicketsPage() {
                         </div>
                       </div>
                       {overdue ? (
-                        <span className="overdue-flag">🔴 {getSlaElapsedHours(ticket)}h atrasado</span>
+                        <span className="overdue-flag">{getSlaElapsedHours(ticket)}h atrasado</span>
                       ) : (
-                        <span className={`time-ago ${ageTone}`}>{ageEmoji} {getTimeAgo(ticket.created_at)}</span>
+                        <span className={`time-ago ${ageTone}`}>{getTimeAgo(ticket.created_at)}</span>
                       )}
                     </div>
 
@@ -1292,7 +1299,7 @@ export default function AdminTicketsPage() {
                             onClick={(e) => handleQuickAssume(ticket.id, e)}
                             title="Assumir atendimento"
                           >
-                            ⚡ Assumir atendimento
+                            Assumir atendimento
                           </button>
                         )}
                         {canQuickResolve(ticket) && (
@@ -1302,7 +1309,7 @@ export default function AdminTicketsPage() {
                             onClick={(e) => handleQuickStatusChange(ticket.id, 'resolved', e)}
                             title="Resolver chamado"
                           >
-                            ✓ Resolver chamado
+                            Resolver chamado
                           </button>
                         )}
                         <div className="card-quick-actions">
@@ -1334,7 +1341,7 @@ export default function AdminTicketsPage() {
                   onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
                 >
-                  ◀ Anterior
+                  Anterior
                 </button>
 
                 <span className="pagination-info">
@@ -1350,7 +1357,7 @@ export default function AdminTicketsPage() {
                   onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                   disabled={currentPage === totalPages}
                 >
-                  Proxima ▶
+                  Próxima
                 </button>
               </div>
             )}

@@ -1,4 +1,5 @@
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import GlobalSearch from './GlobalSearch';
 import ChatWidget from './ChatWidget';
@@ -7,6 +8,8 @@ import '../styles/Navigation.css';
 
 export default function Navigation() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { logout } = useAuthStore();
   const { unseenCount, clearUnseen } = useNotifications();
   const isInternalUser = !!localStorage.getItem('internal_token');
@@ -81,11 +84,12 @@ export default function Navigation() {
   const dashboardRoute = getDashboardRoute();
 
   // Todos os links em uma única lista (sem dropdown)
-  const navLinks: Array<{ label: string; action: () => void; badge?: number }> = [
-    { label: 'Painel', action: () => navigate(dashboardRoute) },
+  const navLinks: Array<{ label: string; action: () => void; badge?: number; active: boolean }> = [
+    { label: 'Painel', active: location.pathname === dashboardRoute, action: () => navigate(dashboardRoute) },
     {
       label: 'Solicitações',
       badge: unseenCount > 0 ? unseenCount : undefined,
+      active: location.pathname.includes('/chamados') || location.pathname.includes('/solicitacoes'),
       action: () => {
         clearUnseen();
         if (userRole === 'manager' || userRole === 'gestor') navigate('/gestor/solicitacoes');
@@ -96,48 +100,65 @@ export default function Navigation() {
   ];
 
   if (showKnowledgeLink) {
-    navLinks.push({ label: 'Central de Dúvidas', action: () => navigate('/admin/conhecimento') });
+    navLinks.push({ label: 'Central de Dúvidas', active: location.pathname.startsWith('/admin/conhecimento'), action: () => navigate('/admin/conhecimento') });
   }
 
   if (showReservationsLink) {
-    navLinks.push({ label: 'Reservas', action: () => navigate(showAdminReservationsLink ? '/admin/reservas' : '/reservas') });
+    navLinks.push({ label: 'Reservas', active: location.pathname.includes('/reservas'), action: () => navigate(showAdminReservationsLink ? '/admin/reservas' : '/reservas') });
   }
 
   if (showAssetsLink) {
-    navLinks.push({ label: 'Inventário', action: () => navigate('/inventario') });
-    navLinks.push({ label: 'Recorrentes', action: () => navigate('/admin/recorrentes') });
+    navLinks.push({ label: 'Inventário', active: location.pathname.startsWith('/inventario'), action: () => navigate('/inventario') });
+    navLinks.push({ label: 'Recorrentes', active: location.pathname.startsWith('/admin/recorrentes'), action: () => navigate('/admin/recorrentes') });
   }
 
   if (showDocumentsLink) {
-    navLinks.push({ label: 'Documentos', action: () => navigate('/admin/documentos') });
+    navLinks.push({ label: 'Documentos', active: location.pathname.startsWith('/admin/documentos'), action: () => navigate('/admin/documentos') });
   }
 
   if (showReportsLink) {
-    navLinks.push({ label: 'Relatórios', action: () => navigate('/admin/relatorios') });
-    navLinks.push({ label: 'KPIs', action: () => navigate('/admin/kpis') });
+    navLinks.push({ label: 'Relatórios', active: location.pathname.startsWith('/admin/relatorios'), action: () => navigate('/admin/relatorios') });
+    navLinks.push({ label: 'KPIs', active: location.pathname.startsWith('/admin/kpis'), action: () => navigate('/admin/kpis') });
   }
 
   if (showRhReportsLink) {
-    navLinks.push({ label: 'Relatórios', action: () => navigate('/rh/relatorios') });
+    navLinks.push({ label: 'Relatórios', active: location.pathname.startsWith('/rh/relatorios'), action: () => navigate('/rh/relatorios') });
   }
 
   if (showUsersLink) {
-    navLinks.push({ label: 'Equipe', action: () => navigate('/admin/usuarios') });
+    navLinks.push({ label: 'Equipe', active: location.pathname.startsWith('/admin/usuarios'), action: () => navigate('/admin/usuarios') });
   }
 
   return (
-    <nav className="navbar navbar-internal">
+    <nav className={`navbar navbar-internal ${mobileMenuOpen ? 'mobile-menu-open' : ''}`}>
       <div className="navbar-brand" onClick={() => navigate(dashboardRoute)} style={{ cursor: 'pointer' }}>
         <h1>Portal de Serviços Internos</h1>
         <small style={{ fontSize: '0.75rem', opacity: 0.9 }}>Área Interna</small>
       </div>
 
-      <div className="navbar-menu">
+      <button
+        type="button"
+        className="mobile-menu-toggle"
+        aria-expanded={mobileMenuOpen}
+        aria-controls="internal-navigation-menu"
+        aria-label={mobileMenuOpen ? 'Fechar menu de navegação' : 'Abrir menu de navegação'}
+        onClick={() => setMobileMenuOpen((isOpen) => !isOpen)}
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+          {mobileMenuOpen ? <><path d="M6 6l12 12" /><path d="M18 6 6 18" /></> : <><path d="M4 7h16" /><path d="M4 12h16" /><path d="M4 17h16" /></>}
+        </svg>
+        <span>Menu</span>
+      </button>
+
+      <div className="navbar-menu" id="internal-navigation-menu">
         {navLinks.map((link) => (
           <button
             key={link.label}
-            onClick={link.action}
-            className="nav-link"
+            onClick={() => {
+              link.action();
+              setMobileMenuOpen(false);
+            }}
+            className={`nav-link ${link.active ? 'active' : ''}`}
           >
             {link.label}
             {link.badge !== undefined && (

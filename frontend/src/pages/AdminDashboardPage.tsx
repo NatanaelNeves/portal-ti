@@ -285,7 +285,7 @@ export default function AdminDashboardPage() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const response = await api.get<Partial<DashboardData>>('/dashboard/admin');
+      const response = await api.get<Partial<DashboardData>>('/dashboard/admin', { timeout: 15000 });
       setData(normalizeDashboardData(response.data ?? {}));
       setError('');
     } catch (err: any) {
@@ -546,9 +546,9 @@ export default function AdminDashboardPage() {
         <div className="ops-header-content">
           <h1 className="ops-greeting">{getGreeting()}, <span className="ops-greeting-accent">{userName}</span></h1>
           <p className="ops-subtitle">Painel operacional da TI — chamados, ativos e movimentações.</p>
-          <div className="ops-live-badge">
+          <div className={`ops-live-badge ${loading ? 'is-syncing' : error ? 'is-offline' : 'is-live'}`}>
             <span className="ops-live-dot" />
-            Ao vivo
+            {loading ? 'Sincronizando' : error ? 'Dados indisponíveis' : 'Atualizado agora'}
           </div>
         </div>
         <nav className="ops-header-actions">
@@ -575,7 +575,11 @@ export default function AdminDashboardPage() {
 
       {error && (
         <div className="alert alert-error" role="alert">
-          <strong>Erro:</strong> {error}
+          <div>
+            <strong>Não foi possível atualizar o painel.</strong>
+            <span>{error}</span>
+          </div>
+          <button type="button" onClick={fetchDashboardData}>Tentar novamente</button>
         </div>
       )}
 
@@ -589,7 +593,7 @@ export default function AdminDashboardPage() {
 
           {/* ── KPI metrics ── */}
           <section className="kpi-metrics-section">
-            <div className="ops-section-label">Indicadores Operacionais</div>
+            <h2 className="ops-section-title">Indicadores operacionais</h2>
 
             <div className="kpi-group">
               <h3 className="kpi-group-title">Chamados</h3>
@@ -604,7 +608,7 @@ export default function AdminDashboardPage() {
 
           {/* ── SLA / Performance ── */}
           <section className="performance-metrics-section">
-            <div className="ops-section-label">Desempenho</div>
+            <h2 className="ops-section-title">Ritmo e desempenho</h2>
             <div className="performance-card">
               <div className="performance-header">
                 <div className="performance-header-left">
@@ -650,7 +654,7 @@ export default function AdminDashboardPage() {
 
           {/* ── Assets overview ── */}
           <section className="asset-overview-section">
-            <div className="ops-section-label">Visão de Ativos</div>
+            <h2 className="ops-section-title">Ativos sob responsabilidade da TI</h2>
             <div className="asset-overview-grid">
               <div className="ops-card ops-chart-card">
                 <div className="ops-card-header">
@@ -694,7 +698,7 @@ export default function AdminDashboardPage() {
 
           {/* ── Tickets overview ── */}
           <section className="ticket-overview-section">
-            <div className="ops-section-label">Visão de Chamados</div>
+            <h2 className="ops-section-title">Composição da fila de chamados</h2>
             <div className="ticket-charts-grid">
               <div className="ops-card ops-chart-card">
                 <div className="ops-card-header">
@@ -736,7 +740,7 @@ export default function AdminDashboardPage() {
 
           {/* ── Recent activity ── */}
           <section className="recent-activity-section">
-            <div className="ops-section-label">Atividade Recente</div>
+            <h2 className="ops-section-title">Últimas movimentações</h2>
             <div className="ops-card recent-activity-card">
               {data.recentActivity.length === 0 ? (
                 <div className="empty-state compact-empty-state">
@@ -788,7 +792,7 @@ export default function AdminDashboardPage() {
 
           {/* ── Quick actions ── */}
           <section className="quick-actions-section">
-            <div className="ops-section-label">Ações Rápidas</div>
+            <h2 className="ops-section-title">Continuar trabalhando</h2>
             <div className="actions-grid">
               {[
                 { icon: QA_ICONS.chamados,     title: 'Central de Chamados',    desc: 'Gerenciar chamados em fila',      route: '/admin/chamados',    label: 'Central de atendimento de chamados' },
