@@ -46,6 +46,9 @@ export const canResolve = (ticket: TicketLike, role: Role, userId: string): bool
 export const canChangeStatus = (ticket: TicketLike, role: Role, userId: string): boolean =>
   canEditTicket(ticket, role, userId) && !CLOSED.includes(ticket.status);
 
+export const canClose = (ticket: TicketLike, role: Role, userId: string): boolean =>
+  canEditTicket(ticket, role, userId) && ['resolved', 'aguardando_confirmacao'].includes(ticket.status);
+
 export const canChangePriority = canChangeStatus;
 
 /**

@@ -306,6 +306,28 @@ export default function AdminTicketDetailPage() {
     });
 
   const handleQuickAction = async (action: 'assume' | 'waiting' | 'resolve' | 'close' | 'resume') => {
+    if (action === 'close') {
+      if (!id || !internalToken) return;
+      try {
+        setSubmitting(true);
+        const response = await fetch(`${BACKEND_URL}/api/tickets/${id}/manual-close`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${internalToken}` },
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'Erro ao encerrar chamado');
+        await fetchTicket(id);
+        await fetchHistory(id);
+        showToast.success('Chamado encerrado com sucesso');
+      } catch (err: any) {
+        setError(err.message || 'Erro ao encerrar chamado');
+        showToast.error(err.message || 'Erro ao encerrar chamado');
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
     const statusMap = { assume: 'in_progress', waiting: 'waiting_user', resolve: 'resolved', close: 'closed', resume: 'in_progress' };
     const updates: any = { status: statusMap[action] };
     if (action === 'assume') {

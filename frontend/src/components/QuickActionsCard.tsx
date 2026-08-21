@@ -99,12 +99,14 @@ export default function QuickActionsCard({
           title="Fechar"
           description="Encerrar definitivamente"
           onClick={onClose}
-          disabled={isSubmitting}
+          disabled={isSubmitting || !['resolved', 'aguardando_confirmacao'].includes(status)}
           variant="danger"
           title_attr={
             isSubmitting
               ? 'Processando ação anterior...'
-              : 'Fechar este chamado definitivamente. Esta ação não pode ser desfeita.'
+              : ['resolved', 'aguardando_confirmacao'].includes(status)
+                ? 'Fechar este chamado definitivamente. Esta ação não pode ser desfeita.'
+                : 'Resolva o chamado primeiro para poder fechá-lo'
           }
         />
       </div>

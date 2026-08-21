@@ -5,6 +5,7 @@ import {
   STATUS_OPTIONS,
   canAssignToOthers,
   canAssume,
+  canClose,
   canChangePriority,
   canChangeStatus,
   type Role,
@@ -118,6 +119,7 @@ export default function TicketRowMenu({
   };
 
   const mayStatus = canChangeStatus(ticket, role, userId);
+  const mayClose = canClose(ticket, role, userId);
   const mayPriority = canChangePriority(ticket, role, userId);
   const mayAssume = canAssume(ticket, role, userId);
   const mayAssignOthers = canAssignToOthers(role) && mayStatus;
@@ -161,13 +163,20 @@ export default function TicketRowMenu({
                 </button>
               )}
 
-              {(mayStatus || mayPriority || mayAssignOthers) && <span className="tk-menu-sep" />}
+              {(mayStatus || mayClose || mayPriority || mayAssignOthers) && <span className="tk-menu-sep" />}
 
               {mayStatus && (
                 <button type="button" className="tk-menu-item" onClick={(e) => { e.stopPropagation(); setPanel('status'); }}>
                   <i className="ti ti-progress-check" aria-hidden="true" />
                   Alterar status
                   <i className="ti ti-chevron-right tk-menu-more" aria-hidden="true" />
+                </button>
+              )}
+
+              {mayClose && (
+                <button type="button" className="tk-menu-item" onClick={run(() => onStatus('closed'))}>
+                  <i className="ti ti-lock" aria-hidden="true" />
+                  Fechar chamado
                 </button>
               )}
 
