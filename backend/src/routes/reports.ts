@@ -394,8 +394,8 @@ reportsRouter.get('/auxadmin', async (req: Request, res: Response) => {
            COUNT(t.id) FILTER (WHERE DATE(t.resolved_at) = DATE(d.day))::int AS resolved
          FROM (
            SELECT generate_series(
-             COALESCE($${params.length + 1}::date, CURRENT_DATE - INTERVAL '29 days'),
-             COALESCE($${params.length + 2}::date, CURRENT_DATE),
+             COALESCE($1::date, CURRENT_DATE - INTERVAL '29 days'),
+             COALESCE($2::date, CURRENT_DATE),
              INTERVAL '1 day'
            ) AS day
          ) d
@@ -404,7 +404,7 @@ reportsRouter.get('/auxadmin', async (req: Request, res: Response) => {
           AND (DATE(t.created_at) = DATE(d.day) OR DATE(t.resolved_at) = DATE(d.day))
          GROUP BY DATE(d.day)
          ORDER BY DATE(d.day) ASC`,
-        [...params, dateFrom, dateTo],
+        [dateFrom, dateTo],
       ),
 
       // Assuntos mais frequentes — vem de `category`, que é o campo real.

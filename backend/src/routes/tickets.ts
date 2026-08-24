@@ -2542,12 +2542,10 @@ ticketsRouter.get('/:id/history', async (req: Request, res: Response) => {
        LEFT JOIN public_users pu ON pu.id = h.changed_by_id
        LEFT JOIN internal_users old_user
          ON h.action IN ('assigned', 'unassigned')
-        AND h.old_value ~ '^[0-9a-fA-F-]{36}$'
-        AND old_user.id = h.old_value::uuid
+        AND old_user.id::text = h.old_value
        LEFT JOIN internal_users new_user
          ON h.action IN ('assigned', 'unassigned')
-        AND h.new_value ~ '^[0-9a-fA-F-]{36}$'
-        AND new_user.id = h.new_value::uuid
+        AND new_user.id::text = h.new_value
        WHERE h.ticket_id = $1 
        ORDER BY h.created_at DESC`,
       [id]
