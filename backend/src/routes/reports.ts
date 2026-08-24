@@ -318,8 +318,10 @@ reportsRouter.get('/auxadmin', async (req: Request, res: Response) => {
       conditions.push(`t.created_at >= $${params.length}`);
     }
     if (dateTo) {
+      // Inclusivo: o usuario escolheu um DIA, nao um instante. Comparar com
+      // <= a meia-noite descartaria tudo o que aconteceu naquele dia.
       params.push(dateTo);
-      conditions.push(`t.created_at <= $${params.length}`);
+      conditions.push(`t.created_at < ($${params.length}::date + INTERVAL '1 day')`);
     }
     if (status) {
       params.push(status);

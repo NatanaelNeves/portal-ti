@@ -4,6 +4,7 @@ import { showToast } from '../utils/toast';
 import { aiService, type TicketSummary } from '../services/aiService';
 import StatusTimeline from '../components/StatusTimeline';
 import TicketTimeline, { type HistoryEvent } from '../components/tickets/TicketTimeline';
+import { canUseExternalWaitStatuses } from '../components/tickets/ticketPermissions';
 import TicketAttachments from '../components/TicketAttachments';
 import QuickActionsCard from '../components/QuickActionsCard';
 import '../styles/AdminTicketDetailPage.css';
@@ -91,6 +92,16 @@ export default function AdminTicketDetailPage() {
   const [copied, setCopied] = useState(false);
 
   const internalToken = localStorage.getItem('internal_token');
+
+  /** Papel do usuario logado — decide quais acoes sequer sao oferecidas. */
+  const currentUserRole = (() => {
+    try {
+      const raw = localStorage.getItem('internal_user');
+      return raw ? (JSON.parse(raw)?.role ?? '') : '';
+    } catch {
+      return '';
+    }
+  })();
 
   const getBackRoute = () => {
     const raw = localStorage.getItem('internal_user');
@@ -197,6 +208,7 @@ export default function AdminTicketDetailPage() {
       const payload: any = {};
       if ('status' in updates && updates.status !== undefined && updates.status !== '') payload.status = updates.status;
       if ('priority' in updates && updates.priority !== undefined && updates.priority !== '') payload.priority = updates.priority;
+      if ('pause_reason' in updates && updates.pause_reason) payload.pause_reason = updates.pause_reason;
       if ('assigned_to' in updates) {
         const value = updates.assigned_to;
         payload.assigned_to_id = (value === '' || value === null || value === undefined) ? null : value;
@@ -335,6 +347,19 @@ export default function AdminTicketDetailPage() {
       if (userData) updates.assigned_to = JSON.parse(userData).id;
     }
     await handleUpdateTicket(updates);
+  };
+
+  /**
+   * Coloca o chamado em espera externa, registrando o motivo.
+   *
+   * O backend valida papel e setor de novo; aqui so evitamos oferecer a acao
+   * a quem receberia 403.
+   */
+  const handleExternalWait = async (
+    waitStatus: 'aguardando_aquisicao' | 'aguardando_terceiros',
+    reason: string,
+  ) => {
+    await handleUpdateTicket({ status: waitStatus, pause_reason: reason } as any);
   };
 
   const handleAssignToMe = async () => {
@@ -855,13 +880,18 @@ export default function AdminTicketDetailPage() {
 
           {/* Quick Actions */}
           <QuickActionsCard
-            status={ticket.status as 'open' | 'in_progress' | 'waiting_user' | 'aguardando_confirmacao' | 'resolved' | 'closed'}
+            status={ticket.status as any}
             isSubmitting={submitting}
             onAssume={() => handleQuickAction('assume')}
             onWaitingUser={() => handleQuickAction('waiting')}
             onResolve={() => handleQuickAction('resolve')}
             onClose={() => handleQuickAction('close')}
             onResume={() => handleQuickAction('resume')}
+            onExternalWait={
+              canUseExternalWaitStatuses(currentUserRole) && (ticket.department || 'ti') === 'ti'
+                ? handleExternalWait
+                : undefined
+            }
           />
 
           {/* Requester Info */}

@@ -128,7 +128,9 @@ export default function AuxAdminReportsPage() {
       setError('');
       const params = new URLSearchParams();
       if (range.from) params.append('date_from', range.from);
-      if (range.to) params.append('date_to', `${range.to}T23:59:59`);
+      // O middleware do reports exige AAAA-MM-DD estrito; o fim do dia e
+      // resolvido no servidor, que soma um dia na comparacao.
+      if (range.to) params.append('date_to', range.to);
       if (status) params.append('status', status);
       if (priority) params.append('priority', priority);
       if (category) params.append('category', category);

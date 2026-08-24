@@ -1081,3 +1081,146 @@
   .asd-page .asd-row-age { order: 3; margin-left: auto; text-align: right; }
   .asd-page .asd-row-go { flex: none; order: 4; }
 }
+
+/* ── Painel do auxiliar: dois blocos que a camada unificada havia
+   classificado errado. ──────────────────────────────────────────
+   `.asd-brief` e a frase de saudacao DENTRO do hero escuro — com fundo
+   branco de cartao, o texto claro ficava invisivel e o numero (branco)
+   sumia por completo. `.asd-stats` e uma <dl> de quatro LINHAS, nao uma
+   grade de quatro colunas: forcada a 4 colunas, rotulo e valor se
+   sobrepunham. Ambas voltam ao comportamento proprio. */
+.asd-page .asd-brief {
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.asd-page .asd-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 28px;
+  gap: 0 28px;
+  margin: 0;
+}
+
+.asd-page .asd-stats > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 0;
+  padding: 11px 0;
+}
+
+.asd-page .asd-stats dt {
+  min-width: 0;
+  color: var(--pt-ink-muted);
+  font-size: .72rem;
+  line-height: 1.3;
+}
+
+.asd-page .asd-stats dd {
+  flex: none;
+  color: var(--pt-ink);
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .asd-page .asd-stats { grid-template-columns: 1fr; }
+}
+
+/* ── Motivo da espera nas Acoes Rapidas ──────────────────────────
+   Aparece no lugar de um modal: uma linha, dentro do proprio cartao.
+   Pedir justificativa de 40 caracteres numa janela separada seria
+   burocracia para uma acao que precisa ser de dois cliques. */
+.qa-wait-form {
+  display: grid;
+  gap: 7px;
+  margin-top: 8px;
+  padding: 12px;
+  background: var(--pt-warning-soft, #fdf1e2);
+  border: 1px solid #f0d5ab;
+  border-radius: 10px;
+  animation: qaWaitIn 180ms cubic-bezier(.22, .61, .36, 1);
+}
+
+@keyframes qaWaitIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.qa-wait-form label {
+  color: #8a5414;
+  font-size: .62rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.qa-wait-form input {
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  padding: 0 10px;
+  color: #5c3a0e;
+  background: #fff;
+  border: 1px solid #ecd0a6;
+  border-radius: 8px;
+  font: 600 .74rem/1 'DM Sans', system-ui, sans-serif;
+  outline: none;
+}
+
+.qa-wait-form input:focus {
+  border-color: #d79a45;
+  box-shadow: 0 0 0 3px rgba(237, 138, 34, .16);
+}
+
+.qa-wait-hint {
+  margin: 0;
+  color: #a4741f;
+  font-size: .62rem;
+  line-height: 1.35;
+}
+
+.qa-wait-actions { display: flex; gap: 6px; }
+
+.qa-wait-actions button {
+  flex: 1;
+  min-height: 34px;
+  border-radius: 8px;
+  font: 750 .68rem/1 'DM Sans', system-ui, sans-serif;
+  cursor: pointer;
+  transition: background-color .16s ease, border-color .16s ease, color .16s ease;
+}
+
+.qa-wait-actions button[type='button'] {
+  color: #8a5414;
+  background: transparent;
+  border: 1px solid #ecd0a6;
+}
+
+.qa-wait-actions button[type='button']:hover { background: #fbe5c8; }
+
+.qa-wait-actions button[type='submit'] {
+  color: #fff;
+  background: #b3671a;
+  border: 1px solid #b3671a;
+}
+
+.qa-wait-actions button[type='submit']:hover:not(:disabled) { background: #96560f; border-color: #96560f; }
+.qa-wait-actions button[type='submit']:disabled { opacity: .6; cursor: not-allowed; }
+
+.qa-wait-form :is(input, button):focus-visible {
+  outline: 2px solid #b3671a;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qa-wait-form { animation: none !important; }
+}

@@ -1525,3 +1525,32 @@
 }
 
 .tk-sla-paused i { font-size: 11px; }
+
+/* ── A faixa de acoes nao pode ESCONDER o rodape da linha ──────────
+   Ela flutua sobre a ponta direita com um veu. Em hover isso e
+   aceitavel — o texto reaparece quando o cursor sai. Mas na linha
+   SELECIONADA as acoes ficam permanentemente visiveis, e o
+   responsavel/SLA ficavam cobertos o tempo todo.
+
+   Com espaco reservado, o conteudo do rodape encolhe e trunca com
+   reticencias em vez de desaparecer atras dos botoes. */
+.admin-tickets-dashboard .ticket-card:is(:hover, :focus-within, .active) .ticket-card-footer {
+  padding-right: 172px;
+}
+
+/* Com "Assumir" + "Resolver" + "Detalhes" + menu a faixa e mais larga. */
+.admin-tickets-dashboard .ticket-card:is(:hover, :focus-within, .active):has(.btn-assume):has(.btn-resolve)
+  .ticket-card-footer {
+  padding-right: 250px;
+}
+
+@media (hover: none) {
+  /* No toque as acoes voltam ao fluxo; nao ha o que reservar. */
+  .admin-tickets-dashboard .ticket-card:is(:hover, :focus-within, .active) .ticket-card-footer {
+    padding-right: 0;
+  }
+}
+
+/* Pontos dos novos status no filtro avancado, no mesmo tom dos badges. */
+.admin-tickets-dashboard .advanced-chip-dot--procurement { background: #7f56c5; }
+.admin-tickets-dashboard .advanced-chip-dot--external { background: #5d7f8f; }
