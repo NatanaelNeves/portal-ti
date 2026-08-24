@@ -47,6 +47,8 @@ const STATUS_LABEL: Record<string, string> = {
   in_progress:           'Em Atendimento',
   waiting_user:          'Aguardando',
   aguardando_confirmacao:'Ag. Confirmação',
+  aguardando_aquisicao:'Ag. Aquisição',
+  aguardando_terceiros:'Ag. Terceiros',
   resolved:              'Resolvido',
   closed:                'Fechado',
   cancelled:             'Cancelado',
@@ -57,13 +59,16 @@ const STATUS_CLASS: Record<string, string> = {
   in_progress:           'rhd-badge rhd-badge-progress',
   waiting_user:          'rhd-badge rhd-badge-waiting',
   aguardando_confirmacao:'rhd-badge rhd-badge-waiting',
+  aguardando_aquisicao:'rhd-badge rhd-badge-waiting',
+  aguardando_terceiros:'rhd-badge rhd-badge-waiting',
   resolved:              'rhd-badge rhd-badge-resolved',
   closed:                'rhd-badge rhd-badge-closed',
 };
 
 const STATUS_ICON: Record<string, string> = {
   open: '🔴', in_progress: '🟡', waiting_user: '🟣',
-  aguardando_confirmacao: '🟣', resolved: '🟢', closed: '⚪',
+  aguardando_confirmacao: '🟣', aguardando_aquisicao: '🟣', aguardando_terceiros: '🔵',
+  resolved: '🟢', closed: '⚪',
 };
 
 const PRIORITY_LABEL: Record<string, string> = {

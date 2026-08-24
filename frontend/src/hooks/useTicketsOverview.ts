@@ -19,6 +19,15 @@ export interface TicketsOverview {
   priority: { urgent: number; high: number; medium: number; low: number };
   today: { created: number; resolved: number };
   attention: { unassigned: number; unassignedOver24h: number; overdue: number };
+  /** Chamados parados por dependência externa — SLA congelado. */
+  paused: {
+    procurement: number;
+    thirdParty: number;
+    total: number;
+    avgProcurementMinutes: number | null;
+    avgThirdPartyMinutes: number | null;
+    longestMinutes: number | null;
+  };
   timing: {
     firstResponseMinutes: number | null;
     resolutionMinutes: number | null;

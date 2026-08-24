@@ -15,6 +15,10 @@ export enum TicketStatus {
   RESOLVED = 'resolved',
   CLOSED = 'closed',
   CANCELLED = 'cancelled',
+  // Esperas por dependencia externa: enquanto o chamado esta num destes
+  // estados o SLA fica pausado.
+  AWAITING_PROCUREMENT = 'aguardando_aquisicao',
+  AWAITING_THIRD_PARTY = 'aguardando_terceiros',
 }
 
 export enum TicketDepartment {

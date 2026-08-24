@@ -112,7 +112,9 @@ export const createTicketSchema = z.object({
 });
 
 export const updateTicketSchema = z.object({
-  status: z.enum(['open', 'in_progress', 'waiting_user', 'aguardando_confirmacao', 'resolved', 'closed']).optional(),
+  status: z.enum(['open', 'in_progress', 'waiting_user', 'aguardando_confirmacao', 'aguardando_aquisicao', 'aguardando_terceiros', 'resolved', 'closed']).optional(),
+  // Motivo da espera — só faz sentido nos dois estados pausados.
+  pause_reason: z.string().trim().max(280).optional(),
   priority: z.enum(['low', 'medium', 'high']).optional(),
   assigned_to_id: z.string().uuid().nullable().optional(),
 }).refine((data) => Object.keys(data).length > 0, {

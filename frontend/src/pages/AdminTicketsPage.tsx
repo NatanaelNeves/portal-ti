@@ -16,7 +16,7 @@ import QuickFilters from '../components/tickets/QuickFilters';
 import EmptyState from '../components/tickets/EmptyState';
 import TicketRef from '../components/tickets/TicketRef';
 import TicketRowMenu from '../components/tickets/TicketRowMenu';
-import { isUntouched } from '../components/tickets/ticketPermissions';
+import { isUntouched, isSlaPaused } from '../components/tickets/ticketPermissions';
 import { profileForDepartment } from '../components/tickets/sectorProfiles';
 import '../styles/AdminTicketsPage.css';
 import '../styles/TicketsExperience.css';
@@ -578,6 +578,10 @@ export default function AdminTicketsPage() {
         return 'Aguardando usuário';
       case 'aguardando_confirmacao':
         return 'Aguardando confirmação';
+      case 'aguardando_aquisicao':
+        return 'Aguardando aquisição';
+      case 'aguardando_terceiros':
+        return 'Aguardando terceiros';
       case 'resolved':
         return 'Resolvido';
       case 'closed':
@@ -626,6 +630,12 @@ export default function AdminTicketsPage() {
         return 'badge-status-warning';
       case 'aguardando_confirmacao':
         return 'badge-status-warning';
+      // Tom proprio: nao pode ser confundido com resolvido, cancelado, erro
+      // nem prioridade critica.
+      case 'aguardando_aquisicao':
+        return 'badge-status-procurement';
+      case 'aguardando_terceiros':
+        return 'badge-status-external';
       case 'resolved':
         return 'badge-status-success';
       case 'closed':
@@ -734,6 +744,8 @@ export default function AdminTicketsPage() {
 
   const isTicketOverdue = (ticket: Ticket) => {
     if (ticket.status === 'closed' || ticket.status === 'resolved') return false;
+    // Espera externa congela o prazo: nao ha atraso atribuivel a equipe.
+    if (isSlaPaused(ticket.status)) return false;
     return getSlaElapsedHours(ticket) > getSLAThresholdHours(ticket.priority);
   };
 
@@ -748,8 +760,13 @@ export default function AdminTicketsPage() {
     const elapsed = getSlaElapsedHours(ticket);
     const target = getSLAThresholdHours(ticket.priority);
     const ratio = target > 0 ? elapsed / target : 0;
+    // Em espera externa o relogio congela: o backend nao conta esse periodo no
+    // SLA, e a fila precisa dizer a mesma coisa.
+    if (isSlaPaused(ticket.status)) {
+      return { elapsed, target, state: 'pausado', pct: Math.min(100, Math.round(ratio * 100)), paused: true };
+    }
     const state = ratio >= 1 ? 'estourado' : ratio >= 0.75 ? 'critico' : ratio >= 0.5 ? 'atencao' : 'folga';
-    return { elapsed, target, state, pct: Math.min(100, Math.round(ratio * 100)) };
+    return { elapsed, target, state, pct: Math.min(100, Math.round(ratio * 100)), paused: false };
   };
 
   const canQuickResolve = (ticket: Ticket) => {
@@ -1478,7 +1495,11 @@ export default function AdminTicketsPage() {
                         title={`${sla.elapsed}h de ${sla.target}h do prazo (${sla.pct}%)`}
                       >
                         <span className="sla-meter-text">
-                          {overdue ? `${sla.elapsed}h · prazo estourado` : `${sla.elapsed}h de ${sla.target}h`}
+                          {sla.paused
+                            ? `${sla.elapsed}h · SLA pausado`
+                            : overdue
+                              ? `${sla.elapsed}h · prazo estourado`
+                              : `${sla.elapsed}h de ${sla.target}h`}
                         </span>
                       </span>
                       <div className="footer-actions">
@@ -1526,7 +1547,16 @@ export default function AdminTicketsPage() {
                               { status: 'in_progress', assigned_to_id: currentUserId },
                               'Chamado atribuído a você',
                             )}
-                            onStatus={(status) => patchTicket(ticket.id, { status }, 'Status atualizado')}
+                            onStatus={(status) => patchTicket(
+                              ticket.id,
+                              { status },
+                              status === 'in_progress' ? 'Atendimento retomado' : 'Status atualizado',
+                            )}
+                            onPause={(status, reason) => patchTicket(
+                              ticket.id,
+                              { status, pause_reason: reason || undefined },
+                              'Chamado em espera · SLA pausado',
+                            )}
                             onPriority={(priority) => handleRowPriority(ticket.id, priority)}
                             onAssign={(assignee) => handleRowAssign(ticket.id, assignee)}
                           />

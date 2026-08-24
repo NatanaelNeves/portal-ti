@@ -14,6 +14,11 @@ export enum TicketStatus {
   IN_PROGRESS = 'in_progress',    // Em andamento
   WAITING = 'waiting',            // Aguardando
   AWAITING_CONFIRMATION = 'aguardando_confirmacao', // Aguardando confirmação do solicitante
+  // Estados de espera por dependência externa. Enquanto o chamado está em um
+  // deles o SLA fica pausado: a equipe não tem o que fazer, e contar esse
+  // tempo penalizaria o setor por algo fora do seu alcance.
+  AWAITING_PROCUREMENT = 'aguardando_aquisicao', // Aguardando compra/orçamento/material
+  AWAITING_THIRD_PARTY = 'aguardando_terceiros', // Aguardando assistência/fornecedor/externo
   RESOLVED = 'resolved',          // Resolvido
   CLOSED = 'closed',              // Fechado
   CANCELLED = 'cancelled',        // Cancelado

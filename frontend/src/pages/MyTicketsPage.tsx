@@ -284,6 +284,10 @@ export default function MyTicketsPage() {
         return 'status-progress';
       case 'waiting_user':
         return 'status-waiting';
+      case 'aguardando_aquisicao':
+        return 'status-waiting';
+      case 'aguardando_terceiros':
+        return 'status-waiting';
       case 'aguardando_confirmacao':
         return 'status-awaiting-confirmation';
       case 'resolved':

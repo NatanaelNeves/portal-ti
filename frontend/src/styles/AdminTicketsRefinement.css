@@ -1463,3 +1463,65 @@
 @media (prefers-reduced-motion: reduce) {
   .tk-menu-pop, .tk-new-badge, .tk-ref-flash { animation: none !important; }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   27. Estados de espera externa
+
+   Aguardando aquisicao e Aguardando terceiros usam tons proprios,
+   deliberadamente longe de resolvido (verde), excecao (vermelho) e
+   prioridade critica. Ambos sao frios e dessaturados, para dizer
+   "parado, mas sob controle" — nao "problema".
+══════════════════════════════════════════════════════════════ */
+
+.admin-tickets-dashboard .badge-status-procurement,
+.badge-status-procurement {
+  color: #6b4f9e;
+  background: #f1ecfa;
+  border: 1px solid #ddd0f0;
+}
+
+.admin-tickets-dashboard .badge-status-external,
+.badge-status-external {
+  color: #3f5c6b;
+  background: #eaf1f4;
+  border: 1px solid #cfdde3;
+}
+
+/* Aviso de SLA congelado, ao lado do medidor de prazo. Aparece so quando
+   o chamado esta de fato pausado. */
+.admin-tickets-dashboard .ticket-card[data-sla='pausado'] .sla-meter {
+  color: #4a5f6b;
+  background: #eaf1f4;
+}
+
+.admin-tickets-dashboard .ticket-card[data-sla='pausado'] .sla-meter::before {
+  background: #7d97a4;
+}
+
+/* O filete de prazo para de "encher" e vira uma faixa neutra. */
+.admin-tickets-dashboard .ticket-card[data-sla='pausado']::before {
+  background: repeating-linear-gradient(
+    135deg,
+    #b9cbd4 0 3px,
+    #d6e2e7 3px 6px
+  );
+  animation: none;
+}
+
+.tk-sla-paused {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  color: #3f5c6b;
+  background: #eaf1f4;
+  border: 1px solid #cfdde3;
+  border-radius: 999px;
+  font-size: .55rem;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.tk-sla-paused i { font-size: 11px; }

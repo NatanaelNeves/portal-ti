@@ -1,0 +1,326 @@
+/* ─────────────────────────────────────────────────────────────
+   Relatórios Administrativos
+
+   Reaproveita o vocabulário visual da Central (tk-*) e acrescenta só
+   o que é próprio desta tela: presets de período, filtros, o gráfico
+   de recebidas x concluídas e a tabela de exceções.
+───────────────────────────────────────────────────────────────── */
+
+.axr-page {
+  width: min(1380px, calc(100% - 38px));
+  min-height: calc(100vh - 72px);
+  margin: 0 auto;
+  padding: 22px 0 46px;
+}
+
+.axr-scope-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 4px 10px;
+  color: #1f56a4;
+  background: #eaf1fb;
+  border: 1px solid #cadcf5;
+  border-radius: 999px;
+  font-size: .66rem;
+  font-weight: 650;
+}
+
+.axr-scope-note i { font-size: 13px; }
+
+/* ── Período ─────────────────────────────────────────────────── */
+.axr-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  background: var(--tk-paper);
+  border: 1px solid var(--tk-line);
+  border-radius: 10px;
+}
+
+.axr-preset {
+  height: 32px;
+  padding: 0 11px;
+  color: #54675f;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  font: 700 .69rem/1 'DM Sans', system-ui, sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color .18s var(--tk-ease), background-color .18s var(--tk-ease);
+}
+
+.axr-preset:hover:not(.is-active) { color: var(--tk-evergreen-2); background: var(--tk-wash); }
+.axr-preset.is-active { color: #fff; background: var(--tk-evergreen-2); }
+
+.axr-custom-range { display: flex; gap: 8px; }
+
+.axr-custom-range label,
+.axr-filters label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.axr-custom-range span,
+.axr-filters span {
+  color: var(--tk-muted);
+  font-size: .58rem;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.axr-custom-range input,
+.axr-filters select {
+  min-width: 0;
+  height: 38px;
+  padding: 0 10px;
+  color: #29443a;
+  background: #fbfcfb;
+  border: 1px solid var(--tk-line);
+  border-radius: 8px;
+  font: 600 .72rem/1 'DM Sans', system-ui, sans-serif;
+  outline: none;
+}
+
+.axr-custom-range input:focus,
+.axr-filters select:focus {
+  border-color: #64ad84;
+  box-shadow: 0 0 0 3px rgba(20, 148, 90, .13);
+}
+
+/* ── Filtros ─────────────────────────────────────────────────── */
+.axr-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  background: var(--tk-paper);
+  border: 1px solid var(--tk-line);
+  border-radius: 12px;
+}
+
+.axr-filters .axr-clear { align-self: end; height: 38px; }
+
+/* ── Composição ──────────────────────────────────────────────── */
+.axr-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.axr-panel--wide { grid-column: 1 / -1; }
+
+.axr-legend-inline { display: flex; gap: 12px; }
+.axr-legend-inline > span { display: inline-flex; align-items: center; gap: 5px; }
+
+.axr-key { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
+.axr-key--in { background: #9fb0a7; }
+.axr-key--out { background: var(--tk-green); }
+
+/* Recebidas x concluídas — duas barras por dia, mesma escala. */
+.axr-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 148px;
+  padding-top: 6px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.axr-chart-col {
+  flex: 1 1 auto;
+  min-width: 10px;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+}
+
+.axr-bar {
+  flex: 1 1 auto;
+  min-height: 2px;
+  max-width: 9px;
+  border-radius: 3px 3px 0 0;
+  transform-origin: bottom center;
+  animation: tkBarGrow 520ms var(--tk-ease) backwards;
+}
+
+.axr-bar--in { background: #cbd6d0; }
+.axr-bar--out { background: var(--tk-green); }
+
+.axr-empty-inline {
+  margin: 0;
+  padding: 26px 8px;
+  color: var(--tk-soft);
+  font-size: .72rem;
+  text-align: center;
+}
+
+/* ── Tons por situação. Deliberadamente sem os estados da TI:
+      aquisição e terceiros não pertencem a este fluxo. ─────────── */
+.axr-status-open { background: var(--tk-info); }
+.axr-status-in_progress { background: var(--tk-analysis); }
+.axr-status-waiting_user,
+.axr-status-aguardando_confirmacao { background: var(--tk-warning); }
+.axr-status-resolved,
+.axr-status-closed { background: var(--tk-green); }
+
+.axr-pill.axr-status-open { color: #1f56a4; background: var(--tk-info-soft); }
+.axr-pill.axr-status-in_progress { color: #63409f; background: var(--tk-analysis-soft); }
+.axr-pill.axr-status-waiting_user,
+.axr-pill.axr-status-aguardando_confirmacao { color: #b3671a; background: var(--tk-warning-soft); }
+.axr-pill.axr-status-resolved,
+.axr-pill.axr-status-closed { color: #0b6c44; background: var(--tk-green-soft); }
+
+.axr-pill {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: .6rem;
+  font-weight: 750;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.axr-prio-urgent, .axr-prio-critical, .axr-prio-high { color: #a83239; background: var(--tk-danger-soft); }
+.axr-prio-medium { color: #b3671a; background: var(--tk-warning-soft); }
+.axr-prio-low { color: #0b6c44; background: var(--tk-green-soft); }
+
+/* ── Tabela de exceções ──────────────────────────────────────── */
+.axr-attention { padding: 15px 16px 6px; }
+
+.axr-table-wrap {
+  margin: 0 -16px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.axr-table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+}
+
+.axr-table th {
+  height: 36px;
+  padding: 0 12px;
+  color: var(--tk-muted);
+  background: #f7f9f8;
+  border-bottom: 1px solid var(--tk-line);
+  font-size: .58rem;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.axr-table td {
+  max-width: 240px;
+  padding: 11px 12px;
+  color: #33493f;
+  border-bottom: 1px solid var(--tk-line-soft);
+  font-size: .71rem;
+  vertical-align: top;
+}
+
+.axr-table tbody tr:hover td { background: var(--tk-wash); }
+.axr-table tbody tr:last-child td { border-bottom: 0; }
+
+.axr-cell-title {
+  display: block;
+  max-width: 100%;
+  color: var(--tk-ink);
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.axr-cell-sub {
+  display: block;
+  margin-top: 2px;
+  color: var(--tk-soft);
+  font-size: .62rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.axr-num { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+
+.axr-open {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: #5d7067;
+  background: #fff;
+  border: 1px solid var(--tk-line);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: color .16s var(--tk-ease), background-color .16s var(--tk-ease), border-color .16s var(--tk-ease);
+}
+
+.axr-open:hover { color: var(--tk-evergreen-2); background: var(--tk-wash); border-color: #afc4b7; }
+
+.axr-page :is(button, select, input):focus-visible {
+  outline: 2px solid var(--tk-green);
+  outline-offset: 2px;
+}
+
+/* ── Responsivo ──────────────────────────────────────────────── */
+@media (max-width: 1080px) {
+  .axr-page .tk-hero { grid-template-columns: minmax(0, 1fr); }
+  .axr-page .tk-hero-tools { justify-items: stretch; }
+}
+
+@media (max-width: 760px) {
+  .axr-page { width: min(100% - 22px, 1380px); padding-top: 14px; }
+  .axr-filters { grid-template-columns: 1fr; }
+  .axr-presets { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
+  .axr-presets::-webkit-scrollbar { display: none; }
+  .axr-preset { flex: none; height: 38px; }
+  .axr-custom-range { flex-direction: column; }
+  .axr-chart { height: 120px; }
+}
+
+@media (max-width: 480px) {
+  .axr-table-wrap { margin: 0 -12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .axr-bar { animation: none !important; }
+}
+
+/* ── Contencao em telas muito estreitas ──────────────────────────
+   Em 400px o conjunto ainda estourava 37px: a faixa de presets e as
+   30 colunas do grafico somavam mais que o viewport. Cada um deles
+   rola dentro da propria caixa, e nada empurra a pagina. */
+.axr-page { overflow-x: clip; }
+.axr-page .tk-hero-tools { min-width: 0; max-width: 100%; }
+.axr-page .axr-presets { max-width: 100%; }
+.axr-page .tk-panel { min-width: 0; max-width: 100%; }
+.axr-page .tk-panel-head { min-width: 0; flex-wrap: wrap; }
+.axr-page .tk-panel-head h3 { min-width: 0; overflow-wrap: anywhere; }
+.axr-page .axr-chart { max-width: 100%; }
+
+@media (max-width: 520px) {
+  /* Menos colunas visiveis de uma vez, porem legiveis, em vez de 30
+     barras de 2px que nao informam nada. */
+  .axr-page .axr-chart-col { min-width: 14px; }
+  .axr-page .axr-legend-inline { width: 100%; }
+}

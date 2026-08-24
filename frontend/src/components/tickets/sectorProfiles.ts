@@ -107,7 +107,26 @@ export const SECTOR_PROFILES: Record<SectorKey, SectorProfile> = {
         tone: o.priority.urgent > 0 ? 'danger' : 'neutral',
         hint: 'Chamados em aberto com prioridade urgente ou alta.',
       },
-      inProgress(o),
+      {
+        key: 'in_progress_ti',
+        icon: 'ti-progress',
+        label: 'Em atendimento',
+        value: o.status.inProgress,
+        detail: o.status.waitingUser > 0 ? `${o.status.waitingUser} aguardando usuário` : null,
+        tone: 'info',
+        hint: 'Chamados com atendimento em curso. Não inclui os que estão parados aguardando aquisição ou terceiros.',
+      },
+      {
+        key: 'paused',
+        icon: 'ti-player-pause',
+        label: 'Em espera externa',
+        value: o.paused?.total ?? 0,
+        detail: o.paused
+          ? `${o.paused.procurement} aquisição · ${o.paused.thirdParty} terceiros`
+          : null,
+        tone: 'neutral',
+        hint: 'Chamados parados por dependência externa. O SLA deles está pausado — não estão atrasados por falta de atuação da equipe.',
+      },
       resolvedToday(o),
       avgResolution(o),
     ],

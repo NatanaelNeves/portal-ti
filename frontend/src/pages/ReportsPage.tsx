@@ -456,6 +456,8 @@ const ReportsPage: React.FC = () => {
       waiting_user: 'Aguardando Usuário',
       awaiting_user: 'Aguardando Usuário',
       aguardando_confirmacao: 'Aguardando Confirmação',
+      aguardando_aquisicao: 'Aguardando Aquisição',
+      aguardando_terceiros: 'Aguardando Terceiros',
       resolved: 'Resolvido',
       closed: 'Concluído'
     };

@@ -52,6 +52,20 @@ export const canClose = (ticket: TicketLike, role: Role, userId: string): boolea
 export const canChangePriority = canChangeStatus;
 
 /**
+ * Os estados de espera externa pertencem ao fluxo de TI (compra de peça,
+ * assistência técnica, fornecedor). Liberá-los para todo perfil só porque
+ * existem no banco poluiria a fila do RH e do Administrativo com um vocabulário
+ * que não é deles. O backend continua sendo o gate final.
+ */
+export const canUseExternalWaitStatuses = (role: Role): boolean =>
+  ['admin', 'manager', 'it_staff'].includes(role);
+
+export const SLA_PAUSED_STATUSES = ['aguardando_aquisicao', 'aguardando_terceiros'];
+
+export const isSlaPaused = (status: string): boolean =>
+  SLA_PAUSED_STATUSES.includes(status);
+
+/**
  * "Novo" é o chamado que ainda não recebeu a primeira resposta — não é uma
  * janela de tempo arbitrária, é o estado real de nunca ter sido tocado.
  */
@@ -62,6 +76,8 @@ export const STATUS_OPTIONS: Array<{ value: string; label: string; icon: string 
   { value: 'open', label: 'Aberto', icon: 'ti-circle-dot' },
   { value: 'in_progress', label: 'Em atendimento', icon: 'ti-progress' },
   { value: 'waiting_user', label: 'Aguardando usuário', icon: 'ti-hourglass' },
+  { value: 'aguardando_aquisicao', label: 'Aguardando aquisição', icon: 'ti-shopping-cart' },
+  { value: 'aguardando_terceiros', label: 'Aguardando terceiros', icon: 'ti-building-store' },
   { value: 'resolved', label: 'Resolvido', icon: 'ti-circle-check' },
 ];
 

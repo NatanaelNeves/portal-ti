@@ -150,6 +150,37 @@ export async function initializeDatabase(): Promise<void> {
       )
     `);
 
+    // Periodos em que o SLA do chamado ficou pausado por dependencia externa
+    // (aguardando aquisicao ou terceiros). Cada entrada em um desses estados
+    // abre uma linha; a saida fecha a linha preenchendo `ended_at`. Um chamado
+    // pode entrar e sair varias vezes — por isso e uma tabela, e nao um par de
+    // colunas em `tickets`, que sobrescreveria o periodo anterior.
+    await database.query(`
+      CREATE TABLE IF NOT EXISTS ticket_sla_pauses (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        ticket_id UUID NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+        status VARCHAR(50) NOT NULL,
+        reason TEXT,
+        started_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        ended_at TIMESTAMP,
+        started_by_id UUID,
+        ended_by_id UUID,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await database.query(`
+      CREATE INDEX IF NOT EXISTS idx_ticket_sla_pauses_ticket
+        ON ticket_sla_pauses (ticket_id)
+    `);
+
+    // Garante no maximo uma pausa aberta por chamado.
+    await database.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_ticket_sla_pauses_open
+        ON ticket_sla_pauses (ticket_id)
+        WHERE ended_at IS NULL
+    `);
+
     await database.query(`
       CREATE TABLE IF NOT EXISTS ticket_history (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

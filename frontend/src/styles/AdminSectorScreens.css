@@ -910,3 +910,174 @@
   .tk-tl-item { animation: none !important; }
   .admin-tickets-dashboard .advanced-filters { animation: none !important; }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   26. Painel do Auxiliar Administrativo — correção de container
+
+   CAUSA RAIZ dos dois bugs relatados: `.asd-page` traz `margin: -2rem`,
+   herdado de quando o layout dava `padding: 2rem` ao conteúdo. Hoje
+   `.navbar-internal + .main-content` usa `padding: 72px 0 0` — zero na
+   horizontal. Com isso a página:
+
+     • sobe 32px e o cabeçalho de saudação desliza para DEBAIXO da
+       topbar branca, o que aparece como "a tela do bom dia está branca";
+     • fica 64px mais larga que o container, empurrando as linhas da
+       fila para fora e criando rolagem horizontal.
+
+   A correção é abandonar o sangramento e adotar o mesmo contrato de
+   largura das demais telas internas.
+══════════════════════════════════════════════════════════════ */
+
+.asd-page {
+  width: min(1380px, calc(100% - 38px));
+  margin: 0 auto;
+  padding: 22px 0 46px;
+  min-height: calc(100vh - 72px);
+  background: var(--pt-canvas);
+}
+
+.asd-page .asd-shell {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+/* O board não pode encolher abaixo do conteúdo: sem `minmax(0, …)` as
+   colunas do grid adotam min-content e a fila estoura. */
+.asd-page .asd-board {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 320px);
+  align-items: start;
+  gap: 18px;
+}
+
+.asd-page :is(.asd-col, .asd-rail-col, .asd-panel, .asd-hero) { min-width: 0; }
+
+/* ── Linha da fila ────────────────────────────────────────────
+   A linha sangrava 12px para cada lado (`margin: 0 -12px` +
+   `width: calc(100% + 24px)`). Dentro de um painel com padding isso
+   ainda cabia; em telas estreitas, não. Ela passa a respeitar a caixa
+   e a área de clique vem do próprio padding. */
+.asd-page .asd-row {
+  width: 100%;
+  margin: 0;
+  padding: 13px 12px;
+  grid-template-columns: minmax(0, 1fr) auto auto minmax(38px, auto) 16px;
+  gap: 10px;
+}
+
+.asd-page .asd-row-main { min-width: 0; }
+
+/* Título longo: uma linha com reticências. O texto inteiro fica no
+   `title`, e a linha continua com altura previsível na varredura. */
+.asd-page .asd-row-title {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asd-page .asd-row-meta {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Etiquetas nunca encolhem a ponto de quebrar, nem crescem sem limite. */
+.asd-page .asd-tag {
+  flex: none;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asd-page .asd-row-age {
+  min-width: 38px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.asd-page .asd-queue { min-width: 0; }
+.asd-page .asd-queue > li { min-width: 0; }
+
+/* ── Saudação ────────────────────────────────────────────────── */
+.asd-page .asd-brief {
+  max-width: 34ch;
+  font-size: clamp(1.35rem, 2.1vw, 1.85rem);
+  line-height: 1.3;
+  color: #dbeee3;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+.asd-page .asd-brief .asd-n { color: #fff; }
+
+/* ── Painéis ─────────────────────────────────────────────────── */
+.asd-page .asd-panel {
+  min-width: 0;
+  background: var(--pt-paper);
+  border: 1px solid var(--pt-line);
+  border-radius: 12px;
+  box-shadow: var(--pt-shadow-surface);
+}
+
+.asd-page .asd-panel-hd h2 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asd-page .asd-topbar-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Nada dentro da página pode gerar rolagem horizontal no documento. */
+.asd-page, .asd-page * { max-width: 100%; }
+.asd-page .asd-load-track { min-width: 0; overflow: hidden; }
+
+/* ── Resoluções menores ──────────────────────────────────────── */
+@media (max-width: 1080px) {
+  .asd-page .asd-board { grid-template-columns: minmax(0, 1fr); }
+  .asd-page .asd-rail-col { position: static; }
+}
+
+@media (max-width: 760px) {
+  .asd-page {
+    width: min(100% - 22px, 1380px);
+    padding-top: 14px;
+  }
+
+  .asd-page .asd-topbar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .asd-page .asd-topbar-actions > .asd-btn { flex: 1; justify-content: center; min-height: 44px; }
+
+  .asd-page .asd-hero { padding: 22px 18px 20px; }
+
+  /* Em telas estreitas a linha vira fluxo: o assunto ocupa a largura toda
+     e as etiquetas quebram naturalmente abaixo. Grade de cinco colunas
+     nao cabe no polegar, e posicionar etiqueta com margem fixa as empurra
+     para fora em larguras que nao previmos. */
+  .asd-page .asd-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 10px;
+  }
+
+  .asd-page .asd-row-main { flex: 1 1 100%; order: 1; }
+  .asd-page .asd-row > .asd-tag { flex: 0 1 auto; order: 2; min-width: 0; }
+  .asd-page .asd-row-age { order: 3; margin-left: auto; text-align: right; }
+  .asd-page .asd-row-go { flex: none; order: 4; }
+}

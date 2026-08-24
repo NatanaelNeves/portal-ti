@@ -4,6 +4,7 @@ import { database } from '../database/connection';
 import { config } from '../config/environment';
 import { UserRole } from '../types/enums';
 import { ExcelReportService } from '../services/excelReportService';
+import { ACTIVE_STATUSES, sqlStatusList, STATUS_LABELS } from '../services/ticketSlaClock';
 import {
   appendTicketReportFilters,
   canSelectServiceDepartment,
@@ -67,6 +68,45 @@ const ensureReportsAccess = (req: Request, res: Response): InternalUserClaims | 
 
   return user;
 };
+
+/*
+ * Tempo OPERACIONAL: duracao menos os periodos em que o SLA esteve pausado
+ * (aguardando aquisicao / terceiros).
+ *
+ * Toda metrica que avalia DESEMPENHO da equipe passa por aqui. Um chamado que
+ * ficou 5 dias na assistencia tecnica nao pode elevar a media de atendimento
+ * da TI em 5 dias — o setor nao tinha o que fazer naquele periodo.
+ *
+ * As metricas que descrevem a EXPERIENCIA DO SOLICITANTE continuam usando
+ * tempo corrido, porque para quem abriu o chamado a espera existiu.
+ */
+const pausedHoursExpr = (alias = 't') => `
+  COALESCE((
+    SELECT SUM(EXTRACT(EPOCH FROM (COALESCE(p.ended_at, NOW()) - p.started_at)) / 3600)
+    FROM ticket_sla_pauses p
+    WHERE p.ticket_id = ${alias}.id
+  ), 0)`;
+
+/** Horas operacionais entre abertura e resolucao. */
+const operationalHoursExpr = (alias = 't') => `
+  GREATEST(0,
+    EXTRACT(EPOCH FROM (${alias}.resolved_at - ${alias}.created_at)) / 3600
+    - ${pausedHoursExpr(alias)}
+  )`;
+
+/** Minutos operacionais entre abertura e resolucao. */
+const operationalMinutesExpr = (alias = 't') => `
+  GREATEST(0,
+    EXTRACT(EPOCH FROM (${alias}.resolved_at - ${alias}.created_at)) / 60
+    - ${pausedHoursExpr(alias)} * 60
+  )`;
+
+/** Horas operacionais ate a primeira resposta. */
+const operationalFirstResponseHoursExpr = (alias = 't') => `
+  GREATEST(0,
+    EXTRACT(EPOCH FROM (${alias}.first_response_at - ${alias}.created_at)) / 3600
+    - ${pausedHoursExpr(alias)}
+  )`;
 
 const formatTeamLabel = serviceDepartmentLabel;
 
@@ -232,6 +272,262 @@ reportsRouter.use((req: Request, res: Response, next) => {
   }
 
   next();
+});
+
+/**
+ * GET /auxadmin - Relatório do Auxiliar Administrativo
+ *
+ * Fonte de dados PRÓPRIA, não o relatório da TI com cards escondidos. O que
+ * interessa a uma coordenação aqui é: o que o setor está atendendo, quanto
+ * está atendendo, de onde vem a demanda e o que continua pendente. Nada de
+ * infraestrutura, equipamento, inventário ou vocabulário técnico.
+ *
+ * O escopo é sempre `department = 'administrativo'`, e para o próprio
+ * auxiliar administrativo é adicionalmente limitado aos chamados dele ou sem
+ * responsável — o mesmo recorte que ele enxerga na fila. Admin e gestor veem
+ * o setor inteiro.
+ */
+reportsRouter.get('/auxadmin', async (req: Request, res: Response) => {
+  const user = getInternalUserFromToken(req, res);
+  if (!user) return;
+
+  // AUTORIZAÇÃO: este relatório é do fluxo administrativo. Um usuário de TI
+  // ou de RH não tem por que consultar a produtividade deste setor por aqui.
+  if (![UserRole.ADMIN_STAFF, UserRole.ADMIN, UserRole.MANAGER].includes(user.role)) {
+    return res.status(403).json({ error: 'Acesso negado' });
+  }
+
+  try {
+    const conditions: string[] = [`COALESCE(t.department, 'ti') = 'administrativo'`];
+    const params: any[] = [];
+
+    if (user.role === UserRole.ADMIN_STAFF) {
+      params.push(user.id);
+      conditions.push(`(t.assigned_to_id = $${params.length} OR t.assigned_to_id IS NULL)`);
+    }
+
+    const dateFrom = typeof req.query.date_from === 'string' ? req.query.date_from : null;
+    const dateTo = typeof req.query.date_to === 'string' ? req.query.date_to : null;
+    const status = typeof req.query.status === 'string' && req.query.status ? req.query.status : null;
+    const priority = typeof req.query.priority === 'string' && req.query.priority ? req.query.priority : null;
+    const category = typeof req.query.category === 'string' && req.query.category ? req.query.category : null;
+    const requesterDepartment = normalizeRequesterDepartment(req.query.requester_department);
+
+    if (dateFrom) {
+      params.push(dateFrom);
+      conditions.push(`t.created_at >= $${params.length}`);
+    }
+    if (dateTo) {
+      params.push(dateTo);
+      conditions.push(`t.created_at <= $${params.length}`);
+    }
+    if (status) {
+      params.push(status);
+      conditions.push(`t.status = $${params.length}`);
+    }
+    if (priority) {
+      params.push(priority);
+      conditions.push(`t.priority = $${params.length}`);
+    }
+    if (category) {
+      params.push(category);
+      conditions.push(`t.category = $${params.length}`);
+    }
+    if (requesterDepartment) {
+      params.push(requesterDepartment);
+      conditions.push(`LOWER(TRIM(COALESCE(t.requester_department, ''))) = LOWER(TRIM($${params.length}))`);
+    }
+
+    const where = `WHERE ${conditions.join(' AND ')}`;
+    const ACTIVE = sqlStatusList(ACTIVE_STATUSES);
+
+    const [summary, businessDaysRow, volume, categories, requesters, statusRows, attention] = await Promise.all([
+      // Resumo do período + comparação com a janela anterior de mesmo tamanho.
+      database.query(
+        `SELECT
+           COUNT(*)::int AS total,
+           COUNT(*) FILTER (WHERE t.status IN ('resolved', 'closed'))::int AS resolved,
+           COUNT(*) FILTER (WHERE t.status = 'in_progress')::int AS in_progress,
+           COUNT(*) FILTER (WHERE t.status = 'open')::int AS pending,
+           COUNT(*) FILTER (WHERE t.status IN ('waiting_user', 'aguardando_confirmacao'))::int AS waiting,
+           COUNT(*) FILTER (WHERE t.priority IN ('urgent', 'critical', 'high') AND t.status IN ${ACTIVE})::int AS high_priority_open,
+           AVG(${operationalMinutesExpr('t')})
+             FILTER (WHERE t.resolved_at IS NOT NULL) AS avg_resolution_minutes,
+           AVG(EXTRACT(EPOCH FROM (t.first_response_at - t.created_at)) / 60)
+             FILTER (WHERE t.first_response_at IS NOT NULL) AS avg_first_response_minutes,
+           AVG(EXTRACT(EPOCH FROM (t.resolved_at - t.created_at)) / 60)
+             FILTER (WHERE t.resolved_at IS NOT NULL) AS avg_total_minutes,
+           COUNT(DISTINCT DATE(t.resolved_at)) FILTER (WHERE t.resolved_at IS NOT NULL)::int AS days_with_resolution
+         FROM tickets t
+         ${where}`,
+        params,
+      ),
+
+      // Dias uteis do periodo (seg-sex). Sem calendario de feriados no
+      // sistema, feriados contam como uteis — a tela informa isso.
+      database.query(
+        `SELECT COUNT(*)::int AS business_days
+         FROM generate_series(
+           COALESCE($1::date, CURRENT_DATE - INTERVAL '29 days'),
+           COALESCE($2::date, CURRENT_DATE),
+           INTERVAL '1 day'
+         ) AS d
+         WHERE EXTRACT(ISODOW FROM d) < 6`,
+        [dateFrom, dateTo],
+      ),
+
+      // Recebidos x resolvidos por dia — a leitura de capacidade.
+      database.query(
+        `SELECT
+           DATE(d.day) AS day,
+           COUNT(*) FILTER (WHERE DATE(t.created_at) = DATE(d.day))::int AS received,
+           COUNT(*) FILTER (WHERE DATE(t.resolved_at) = DATE(d.day))::int AS resolved
+         FROM (
+           SELECT generate_series(
+             COALESCE($${params.length + 1}::date, CURRENT_DATE - INTERVAL '29 days'),
+             COALESCE($${params.length + 2}::date, CURRENT_DATE),
+             INTERVAL '1 day'
+           ) AS day
+         ) d
+         LEFT JOIN tickets t
+           ON COALESCE(t.department, 'ti') = 'administrativo'
+          AND (DATE(t.created_at) = DATE(d.day) OR DATE(t.resolved_at) = DATE(d.day))
+         GROUP BY DATE(d.day)
+         ORDER BY DATE(d.day) ASC`,
+        [...params, dateFrom, dateTo],
+      ),
+
+      // Assuntos mais frequentes — vem de `category`, que é o campo real.
+      database.query(
+        `SELECT t.category, COUNT(*)::int AS total
+         FROM tickets t
+         ${where} AND t.category IS NOT NULL AND TRIM(t.category) <> ''
+         GROUP BY t.category
+         ORDER BY total DESC
+         LIMIT 8`,
+        params,
+      ),
+
+      // De onde vem a demanda: setor do SOLICITANTE, não da fila.
+      database.query(
+        `SELECT
+           COALESCE(NULLIF(TRIM(t.requester_department), ''), 'Não informado') AS sector,
+           COUNT(*)::int AS total
+         FROM tickets t
+         ${where}
+         GROUP BY 1
+         ORDER BY total DESC
+         LIMIT 8`,
+        params,
+      ),
+
+      // Distribuição por status — só os estados que este setor usa.
+      database.query(
+        `SELECT t.status, COUNT(*)::int AS total
+         FROM tickets t
+         ${where}
+         GROUP BY t.status
+         ORDER BY total DESC`,
+        params,
+      ),
+
+      // Exceções que precisam de atenção: abertas há mais tempo primeiro.
+      database.query(
+        `SELECT
+           t.id, t.title, t.status, t.priority, t.category,
+           t.created_at,
+           COALESCE(NULLIF(TRIM(t.requester_name), ''), 'Solicitante interno') AS requester_name,
+           COALESCE(NULLIF(TRIM(t.requester_department), ''), 'Não informado') AS requester_department,
+           u.name AS assigned_to_name,
+           ROUND(EXTRACT(EPOCH FROM (NOW() - t.created_at)) / 3600)::int AS open_hours
+         FROM tickets t
+         LEFT JOIN internal_users u ON u.id = t.assigned_to_id
+         ${where} AND t.status IN ${ACTIVE}
+         ORDER BY
+           (t.priority IN ('urgent', 'critical', 'high')) DESC,
+           (t.assigned_to_id IS NULL) DESC,
+           t.created_at ASC
+         LIMIT 8`,
+        params,
+      ),
+    ]);
+
+    const s = summary.rows[0] || {};
+    const toMin = (value: unknown) =>
+      value === null || value === undefined ? null : Math.round(Number(value));
+
+    const total = s.total ?? 0;
+    const resolved = s.resolved ?? 0;
+    const days = s.days_with_resolution ?? 0;
+    const businessDays = businessDaysRow.rows[0]?.business_days ?? 0;
+
+    res.json({
+      scope: {
+        department: 'administrativo',
+        label: 'Administrativo',
+        // O auxiliar vê o próprio recorte; coordenação vê o setor inteiro.
+        restrictedToOwn: user.role === UserRole.ADMIN_STAFF,
+      },
+      summary: {
+        total,
+        resolved,
+        inProgress: s.in_progress ?? 0,
+        pending: s.pending ?? 0,
+        waiting: s.waiting ?? 0,
+        highPriorityOpen: s.high_priority_open ?? 0,
+        resolutionRate: total > 0 ? Math.round((resolved / total) * 100) : null,
+        // Operacional: desempenho da equipe, ja sem os periodos pausados.
+        avgResolutionMinutes: toMin(s.avg_resolution_minutes),
+        avgFirstResponseMinutes: toMin(s.avg_first_response_minutes),
+        // Corrido: duracao total vivida pelo solicitante.
+        avgTotalMinutes: toMin(s.avg_total_minutes),
+        /*
+         * Duas leituras, porque a pergunta e ambigua e uma so enganaria:
+         *
+         *  • perDayWithResolutions — 20 conclusoes em 2 dias = 10. Diz o ritmo
+         *    quando o setor esta trabalhando, mas NAO e a media do periodo.
+         *  • perBusinessDay — as mesmas 20 conclusoes sobre os dias UTEIS do
+         *    intervalo. E a leitura gerencial de volume.
+         *
+         * Dias uteis sao contados por dia da semana, com . O
+         * sistema nao tem calendario de feriados, entao feriados contam como
+         * dias uteis — a rotulagem no frontend diz isso.
+         */
+        perDayWithResolutions: days > 0 ? Number((resolved / days).toFixed(1)) : null,
+        daysWithResolutions: days,
+        businessDays: businessDays > 0 ? businessDays : null,
+        perBusinessDay: businessDays > 0 ? Number((resolved / businessDays).toFixed(1)) : null,
+      },
+      volume: volume.rows.map((row: any) => ({
+        day: row.day,
+        received: row.received,
+        resolved: row.resolved,
+      })),
+      categories: categories.rows.map((row: any) => ({ label: row.category, total: row.total })),
+      requesterSectors: requesters.rows.map((row: any) => ({ label: row.sector, total: row.total })),
+      byStatus: statusRows.rows.map((row: any) => ({
+        status: row.status,
+        label: STATUS_LABELS[row.status] ?? row.status,
+        total: row.total,
+      })),
+      attention: attention.rows.map((row: any) => ({
+        id: row.id,
+        title: row.title,
+        status: row.status,
+        statusLabel: STATUS_LABELS[row.status] ?? row.status,
+        priority: row.priority,
+        category: row.category,
+        requesterName: row.requester_name,
+        requesterDepartment: row.requester_department,
+        assignedToName: row.assigned_to_name,
+        openHours: row.open_hours,
+        createdAt: row.created_at,
+      })),
+    });
+  } catch (err) {
+    console.error('Error building auxadmin report:', err);
+    res.status(500).json({ error: 'Falha ao carregar o relatório administrativo' });
+  }
 });
 
 reportsRouter.get('/filters', async (req: Request, res: Response) => {
@@ -439,7 +735,7 @@ reportsRouter.get('/stats/overview', async (req: Request, res: Response) => {
            COALESCE(department, 'ti') as team,
            COUNT(*) as total_tickets,
            COUNT(*) FILTER (WHERE status IN ('resolved', 'closed')) as resolved_tickets,
-           COUNT(*) FILTER (WHERE status IN ('open', 'in_progress', 'waiting_user', 'aguardando_confirmacao')) as pending_tickets,
+           COUNT(*) FILTER (WHERE status IN ('open', 'in_progress', 'waiting_user', 'aguardando_confirmacao', 'aguardando_aquisicao', 'aguardando_terceiros')) as pending_tickets,
            COALESCE(
              AVG(EXTRACT(EPOCH FROM (COALESCE(resolved_at, updated_at) - created_at)) / 3600)
              FILTER (WHERE status IN ('resolved', 'closed')),
@@ -455,7 +751,7 @@ reportsRouter.get('/stats/overview', async (req: Request, res: Response) => {
       ),
       database.query(
         `${filtered.sql}
-         SELECT AVG(EXTRACT(EPOCH FROM (t.first_response_at - t.created_at)) / 3600) as avg_hours
+         SELECT AVG(${operationalFirstResponseHoursExpr('t')}) as avg_hours
          FROM filtered_tickets t
          WHERE t.first_response_at IS NOT NULL`,
         filtered.params,
@@ -630,7 +926,7 @@ reportsRouter.get('/stats/sla', async (req: Request, res: Response) => {
          p.priority,
          COUNT(t.id) as total,
          COUNT(CASE 
-           WHEN t.first_response_at IS NOT NULL AND EXTRACT(EPOCH FROM (t.first_response_at - t.created_at)) / 3600 <= 
+           WHEN t.first_response_at IS NOT NULL AND ${operationalFirstResponseHoursExpr('t')} <= 
              CASE p.priority
                WHEN 'critical' THEN 1
                WHEN 'high' THEN 4
@@ -641,7 +937,7 @@ reportsRouter.get('/stats/sla', async (req: Request, res: Response) => {
          END) as within_sla_response,
          COUNT(CASE 
            WHEN t.resolved_at IS NOT NULL AND 
-                EXTRACT(EPOCH FROM (t.resolved_at - t.created_at)) / 3600 <= 
+                ${operationalHoursExpr('t')} <= 
              CASE p.priority
                WHEN 'critical' THEN 4
                WHEN 'high' THEN 24
@@ -650,8 +946,8 @@ reportsRouter.get('/stats/sla', async (req: Request, res: Response) => {
              END
            THEN 1 
          END) as within_sla_resolution,
-         AVG(EXTRACT(EPOCH FROM (t.first_response_at - t.created_at)) / 3600) as avg_response_hours,
-         AVG(EXTRACT(EPOCH FROM (t.resolved_at - t.created_at)) / 3600) as avg_resolution_hours
+         AVG(${operationalFirstResponseHoursExpr('t')}) as avg_response_hours,
+         AVG(${operationalHoursExpr('t')}) as avg_resolution_hours
        FROM priorities p
        LEFT JOIN filtered_tickets t
          ON CASE WHEN t.priority = 'urgent' THEN 'critical' ELSE t.priority END = p.priority
@@ -942,14 +1238,30 @@ reportsRouter.get('/export/excel/consolidated', async (req: Request, res: Respon
       database.query(`${filtered.sql} SELECT priority, COUNT(*) as count FROM filtered_tickets GROUP BY priority`, filtered.params),
       database.query(
         `${filtered.sql}
-         SELECT AVG(EXTRACT(EPOCH FROM (first_response_at - created_at)) / 3600) as avg_hours
+         SELECT AVG(
+           GREATEST(0,
+             EXTRACT(EPOCH FROM (first_response_at - created_at)) / 3600
+             - COALESCE((
+                 SELECT SUM(EXTRACT(EPOCH FROM (COALESCE(p.ended_at, NOW()) - p.started_at)) / 3600)
+                 FROM ticket_sla_pauses p WHERE p.ticket_id = tickets.id
+               ), 0)
+           )
+         ) as avg_hours
          FROM filtered_tickets
          WHERE first_response_at IS NOT NULL`,
         filtered.params,
       ),
       database.query(
         `${filtered.sql}
-         SELECT AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 3600) as avg_hours
+         SELECT AVG(
+           GREATEST(0,
+             EXTRACT(EPOCH FROM (resolved_at - created_at)) / 3600
+             - COALESCE((
+                 SELECT SUM(EXTRACT(EPOCH FROM (COALESCE(p.ended_at, NOW()) - p.started_at)) / 3600)
+                 FROM ticket_sla_pauses p WHERE p.ticket_id = filtered_tickets.id
+               ), 0)
+           )
+         ) as avg_hours
          FROM filtered_tickets WHERE resolved_at IS NOT NULL`,
         filtered.params,
       ),

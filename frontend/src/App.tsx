@@ -24,6 +24,7 @@ import DocumentsPage from './pages/DocumentsPage';
 import KnowledgeManagementPage from './pages/KnowledgeManagementPage';
 import UsersManagementPage from './pages/UsersManagementPage';
 import ReportsPage from './pages/ReportsPage';
+import AuxAdminReportsPage from './pages/AuxAdminReportsPage';
 
 // Inventory Module Pages
 import InventoryDashboardPage from './pages/InventoryDashboardPage';
@@ -72,6 +73,18 @@ import './styles/AdminUnifiedPages.css';
 import './styles/AdminPaletteBridge.css';
 import './styles/AdminSectorScreens.css';
 import './styles/AdminTicketsRefinement.css';
+
+/**
+ * Escolhe o relatorio conforme o perfil. A protecao real esta no backend
+ * (`GET /reports/auxadmin` recusa TI e RH; os endpoints da TI mantem o proprio
+ * gate) — aqui e so a experiencia certa para cada um.
+ */
+function ReportsRouter() {
+  const stored = localStorage.getItem('internal_user');
+  let role = '';
+  try { role = stored ? JSON.parse(stored).role || '' : ''; } catch { role = ''; }
+  return role === 'admin_staff' ? <AuxAdminReportsPage /> : <ReportsPage />;
+}
 
 function App() {
   const { loadStoredUser } = useAuthStore();
@@ -122,7 +135,13 @@ function App() {
             <Route path="/admin/usuarios" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff']}><UsersManagementPage /></InternalProtectedRoute>} />
             <Route path="/admin/estoque" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff']}><InventoryPage /></InternalProtectedRoute>} />
             <Route path="/admin/documentos" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff']}><DocumentsPage /></InternalProtectedRoute>} />
-            <Route path="/admin/relatorios" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff', 'admin_staff', 'manager']}><ReportsPage /></InternalProtectedRoute>} />
+            {/* O auxiliar administrativo tem relatorio proprio: o da TI fala de
+                infraestrutura e tecnicos, que nao descrevem o trabalho dele. */}
+            <Route path="/admin/relatorios" element={
+              <InternalProtectedRoute allowedRoles={['admin', 'it_staff', 'admin_staff', 'manager']}>
+                <ReportsRouter />
+              </InternalProtectedRoute>
+            } />
             <Route path="/admin/kpis" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff', 'admin_staff', 'rh_staff', 'manager']}><KpiDashboardPage /></InternalProtectedRoute>} />
             <Route path="/admin/recorrentes" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff']}><RecurringTicketsPage /></InternalProtectedRoute>} />
 

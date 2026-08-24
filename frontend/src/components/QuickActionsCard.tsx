@@ -1,7 +1,8 @@
 import ActionButton from './ActionButton';
 
 interface QuickActionsCardProps {
-  status: 'open' | 'in_progress' | 'waiting_user' | 'aguardando_confirmacao' | 'resolved' | 'closed';
+  status: 'open' | 'in_progress' | 'waiting_user' | 'aguardando_confirmacao'
+    | 'aguardando_aquisicao' | 'aguardando_terceiros' | 'resolved' | 'closed';
   isSubmitting: boolean;
   onAssume: () => void;
   onWaitingUser: () => void;
@@ -21,7 +22,9 @@ export default function QuickActionsCard({
 }: QuickActionsCardProps) {
   // Determinar se o chamado foi assumido
   const isAssumed = status !== 'open';
-  const canResume = status === 'waiting_user' || status === 'resolved' || status === 'aguardando_confirmacao';
+  // Espera externa tambem e um estado do qual se "retoma" o atendimento.
+  const canResume = ['waiting_user', 'resolved', 'aguardando_confirmacao',
+    'aguardando_aquisicao', 'aguardando_terceiros'].includes(status);
 
   return (
     <div className="quick-actions-card">

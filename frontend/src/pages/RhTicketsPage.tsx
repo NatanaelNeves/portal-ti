@@ -60,6 +60,8 @@ const STATUS_LABELS: Record<string, string> = {
   in_progress:           'Em Atendimento',
   waiting_user:          'Aguardando',
   aguardando_confirmacao:'Ag. Confirmação',
+  aguardando_aquisicao:'Ag. Aquisição',
+  aguardando_terceiros:'Ag. Terceiros',
   resolved:              'Resolvido',
   closed:                'Fechado',
 };
@@ -142,7 +144,7 @@ export default function RhTicketsPage() {
     }
 
     const hasAdv = selectedStatuses.length > 0 || selectedPriorities.length > 0 || searchText.trim() !== '';
-    const active = ['open', 'in_progress', 'waiting_user', 'aguardando_confirmacao'];
+    const active = ['open', 'in_progress', 'waiting_user', 'aguardando_confirmacao', 'aguardando_aquisicao', 'aguardando_terceiros'];
 
     if (selectedStatuses.length > 0) {
       selectedStatuses.forEach(s => params.append('status', s));
@@ -293,6 +295,8 @@ export default function RhTicketsPage() {
       in_progress:           'badge badge-status-progress',
       waiting_user:          'badge badge-status-warning',
       aguardando_confirmacao:'badge badge-status-warning',
+      aguardando_aquisicao:'badge badge-status-procurement',
+      aguardando_terceiros:'badge badge-status-external',
       resolved:              'badge badge-status-success',
       closed:                'badge badge-status-neutral',
     };
@@ -352,7 +356,7 @@ export default function RhTicketsPage() {
   const isPriorityMatch = (ticket: Ticket, p: 'high' | 'medium' | 'low') =>
     p === 'high' ? ticket.priority === 'high' || ticket.priority === 'urgent' : ticket.priority === p;
 
-  const activeStatuses = ['open','in_progress','waiting','waiting_user','aguardando_confirmacao'];
+  const activeStatuses = ['open','in_progress','waiting','waiting_user','aguardando_confirmacao','aguardando_aquisicao','aguardando_terceiros'];
   const getPriorityCount = (p: 'high' | 'medium' | 'low') =>
     tickets.filter(t => activeStatuses.includes(t.status) && isPriorityMatch(t, p)).length;
 

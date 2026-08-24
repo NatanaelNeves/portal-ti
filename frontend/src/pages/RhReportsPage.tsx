@@ -39,6 +39,10 @@ const STATUS_LABELS: Record<string, string> = {
   in_progress:           'Em Atendimento',
   waiting_user:          'Aguardando',
   aguardando_confirmacao:'Ag. Confirmação',
+  // O RH nao aplica estes estados, mas precisa saber apresenta-los caso um
+  // chamado compartilhado apareca com eles.
+  aguardando_aquisicao:'Ag. Aquisição',
+  aguardando_terceiros:'Ag. Terceiros',
   resolved:              'Resolvido',
   closed:                'Fechado',
 };
@@ -48,6 +52,8 @@ const STATUS_COLORS: Record<string, string> = {
   in_progress:           '#f59e0b',
   waiting_user:          '#8b5cf6',
   aguardando_confirmacao:'#6366f1',
+  aguardando_aquisicao:'#7f56c5',
+  aguardando_terceiros:'#5d7f8f',
   resolved:              '#10b981',
   closed:                '#6b7280',
 };
@@ -139,7 +145,7 @@ export default function RhReportsPage() {
 
   // --- KPIs ---
   const total    = tickets.length;
-  const open     = tickets.filter(t => ['open','in_progress','waiting_user','aguardando_confirmacao'].includes(t.status)).length;
+  const open     = tickets.filter(t => ['open','in_progress','waiting_user','aguardando_confirmacao','aguardando_aquisicao','aguardando_terceiros'].includes(t.status)).length;
   const resolved = tickets.filter(t => ['resolved','closed'].includes(t.status)).length;
   const resRate  = total > 0 ? Math.round((resolved / total) * 100) : 0;
   const today    = new Date().toDateString();

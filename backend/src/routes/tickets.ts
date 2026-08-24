@@ -18,6 +18,18 @@ import { getWebSocketService } from '../services/websocketService';
 import path from 'path';
 import { getQueuePriorityRank, getTicketServiceCycleStartedAt } from '../services/ticketQueueVisibility';
 import { resolveServiceDepartment, serviceDepartmentLabel, canSelectServiceDepartment } from '../services/reportFilterScope';
+import {
+  ACTIVE_STATUSES,
+  SLA_PAUSED_STATUSES,
+  applySlaPauseTransition,
+  reconcileSlaPause,
+  canPauseTicketDepartment,
+  canUseExternalWaitStatuses,
+  isSlaPausedStatus,
+  overdueConditionSql,
+  sqlStatusList,
+  STATUS_LABELS,
+} from '../services/ticketSlaClock';
 
 const ticketsRouter = Router();
 
@@ -490,18 +502,9 @@ ticketsRouter.get('/', async (req: Request, res: Response) => {
         }
 
         if (overdueOnly) {
-          conditions.push(`(
-            t.status IN ('open', 'in_progress', 'waiting_user', 'aguardando_confirmacao')
-            AND t.created_at < NOW() - (
-              CASE t.priority
-                WHEN 'critical' THEN INTERVAL '4 hours'
-                WHEN 'urgent' THEN INTERVAL '4 hours'
-                WHEN 'high' THEN INTERVAL '24 hours'
-                WHEN 'medium' THEN INTERVAL '72 hours'
-                ELSE INTERVAL '168 hours'
-              END
-            )
-          )`);
+          // Desconta os periodos pausados: um chamado que passou dias na
+          // assistencia tecnica nao esta atrasado por culpa da equipe.
+          conditions.push(overdueConditionSql('t'));
         }
 
         if (assigned_to && decoded.role !== UserRole.ADMIN_STAFF) {
@@ -763,9 +766,10 @@ ticketsRouter.get('/overview', authenticate, async (req: Request, res: Response)
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-    const OPEN_STATUSES = `('open', 'in_progress', 'waiting_user', 'aguardando_confirmacao')`;
+    const OPEN_STATUSES = sqlStatusList(ACTIVE_STATUSES);
+    const PAUSED_STATUSES = sqlStatusList(SLA_PAUSED_STATUSES);
 
-    const [counts, byDepartment, byCategory, timing, workload, trend] = await Promise.all([
+    const [counts, byDepartment, byCategory, timing, workload, pausing, trend] = await Promise.all([
       // Contagens por status e prioridade, mais os marcos do dia.
       database.query(
         `SELECT
@@ -790,18 +794,9 @@ ticketsRouter.get('/overview', authenticate, async (req: Request, res: Response)
                AND t.created_at < NOW() - INTERVAL '24 hours'
            )::int AS unassigned_over_24h,
            COUNT(*) FILTER (WHERE t.assigned_to_id IS NULL AND t.status IN ${OPEN_STATUSES})::int AS unassigned,
-           COUNT(*) FILTER (
-             WHERE t.status IN ${OPEN_STATUSES}
-               AND t.created_at < NOW() - (
-                 CASE t.priority
-                   WHEN 'critical' THEN INTERVAL '4 hours'
-                   WHEN 'urgent' THEN INTERVAL '4 hours'
-                   WHEN 'high' THEN INTERVAL '24 hours'
-                   WHEN 'medium' THEN INTERVAL '72 hours'
-                   ELSE INTERVAL '168 hours'
-                 END
-               )
-           )::int AS overdue
+           COUNT(*) FILTER (WHERE ${overdueConditionSql('t')})::int AS overdue,
+           COUNT(*) FILTER (WHERE t.status = 'aguardando_aquisicao')::int AS awaiting_procurement,
+           COUNT(*) FILTER (WHERE t.status = 'aguardando_terceiros')::int AS awaiting_third_party
          FROM tickets t
          ${where}`,
         params,
@@ -861,6 +856,21 @@ ticketsRouter.get('/overview', authenticate, async (req: Request, res: Response)
          GROUP BY u.id, u.name
          ORDER BY open DESC
          LIMIT 8`,
+        params,
+      ),
+
+      // Tempo de espera por dependencia externa.
+      database.query(
+        `SELECT
+           AVG(EXTRACT(EPOCH FROM (COALESCE(p.ended_at, NOW()) - p.started_at)) / 60)
+             FILTER (WHERE p.status = 'aguardando_aquisicao') AS avg_procurement,
+           AVG(EXTRACT(EPOCH FROM (COALESCE(p.ended_at, NOW()) - p.started_at)) / 60)
+             FILTER (WHERE p.status = 'aguardando_terceiros') AS avg_third_party,
+           MAX(EXTRACT(EPOCH FROM (NOW() - p.started_at)) / 60)
+             FILTER (WHERE p.ended_at IS NULL) AS longest_open
+         FROM ticket_sla_pauses p
+         JOIN tickets t ON t.id = p.ticket_id
+         ${where}`,
         params,
       ),
 
@@ -924,6 +934,17 @@ ticketsRouter.get('/overview', authenticate, async (req: Request, res: Response)
         unassigned: c.unassigned ?? 0,
         unassignedOver24h: c.unassigned_over_24h ?? 0,
         overdue: c.overdue ?? 0,
+      },
+      // Chamados parados por dependencia externa. Eles continuam em aberto,
+      // mas nao estao parados por falta de atuacao da equipe — e o SLA deles
+      // esta congelado.
+      paused: {
+        procurement: c.awaiting_procurement ?? 0,
+        thirdParty: c.awaiting_third_party ?? 0,
+        total: (c.awaiting_procurement ?? 0) + (c.awaiting_third_party ?? 0),
+        avgProcurementMinutes: toMinutes(pausing.rows[0]?.avg_procurement),
+        avgThirdPartyMinutes: toMinutes(pausing.rows[0]?.avg_third_party),
+        longestMinutes: toMinutes(pausing.rows[0]?.longest_open),
       },
       timing: {
         firstResponseMinutes: toMinutes(tm.first_response_minutes),
@@ -1837,7 +1858,7 @@ ticketsRouter.post('/:id/manual-close', authenticate, async (req: Request, res: 
 ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { status, assigned_to_id, priority, linked_equipment_id } = req.body;
+    const { status, assigned_to_id, priority, linked_equipment_id, pause_reason } = req.body;
 
     console.log('🔧 PATCH /tickets/:id - Iniciando atualização');
     console.log('Ticket ID:', id);
@@ -1872,6 +1893,31 @@ ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (r
       console.log('Usuário autenticado:', decoded.name, '(', decoded.role, ')');
     } catch (err) {
       return res.status(401).json({ error: 'Token inválido' });
+    }
+
+    // GATE dos estados de espera externa. Roda antes de qualquer escrita: a
+    // interface ja evita oferecer a acao, mas a protecao de verdade e aqui.
+    if (status !== undefined && isSlaPausedStatus(status)) {
+      if (!canUseExternalWaitStatuses(userRole)) {
+        return res.status(403).json({
+          error: 'Acesso negado',
+          message: 'Apenas a equipe de TI pode colocar um chamado em espera por aquisição ou terceiros.',
+        });
+      }
+
+      const departmentCheck = await database.query(
+        'SELECT department FROM tickets WHERE id = $1',
+        [id],
+      );
+      if (!departmentCheck.rows.length) {
+        return res.status(404).json({ error: 'Chamado não encontrado' });
+      }
+      if (!canPauseTicketDepartment(departmentCheck.rows[0].department)) {
+        return res.status(403).json({
+          error: 'Acesso negado',
+          message: 'Espera por aquisição ou terceiros só se aplica a chamados de TI.',
+        });
+      }
     }
 
     if (userRole === UserRole.ADMIN_STAFF) {
@@ -2006,89 +2052,176 @@ ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (r
     values.push(id);
 
     const query = `UPDATE tickets SET ${fields.join(', ')} WHERE id = $${paramCount} RETURNING *, assigned_to_id as assigned_to`;
-    console.log('Query SQL:', query);
-    console.log('Valores:', values);
-    
-    const result = await database.query(query, values);
 
-    if (!result.rows.length) {
-      console.log('❌ Ticket não encontrado no banco');
-      return res.status(404).json({ error: 'Chamado não encontrado' });
-    }
-
-    console.log('✅ Ticket atualizado com sucesso!');
-    console.log('Dados atualizados:', result.rows[0]);
-
-    const updatedStatus = result.rows[0].status;
+    /*
+     * TRANSACAO: status, relogio de SLA e historico de estado sao um fato so.
+     *
+     * Antes, o UPDATE do chamado e a escrita em `ticket_sla_pauses` eram duas
+     * operacoes independentes: se a segunda falhasse, o chamado ficava em
+     * espera com o SLA correndo. Agora ou tudo persiste, ou nada.
+     *
+     * Efeitos externos (websocket, e-mail) NAO entram aqui — eles nao fazem
+     * rollback. Sao enfileirados e disparados depois do COMMIT.
+     */
+    const client = await database.getClient();
+    const afterCommit: Array<() => void> = [];
+    let result: any;
     const historyActorType = getHistoryInternalActorType(userRole);
+    let updatedStatus: string;
 
-    if (status !== undefined && oldStatus !== updatedStatus) {
-      await database.query(
-        `INSERT INTO ticket_history (
-          ticket_id, action, changed_by_type, changed_by_id, old_value, new_value, metadata
-        ) VALUES ($1, 'status_changed', $2, $3, $4, $5, $6::jsonb)`,
-        [id, historyActorType, userId, oldStatus, updatedStatus, JSON.stringify({ requested_status: status })],
-      ).catch(() => undefined);
+    try {
+      await client.query('BEGIN');
 
-      emitTicketUpdatedEvent({
-        ticketId: id,
-        action: updatedStatus === STATUS_AWAITING_CONFIRMATION ? 'marked_resolved_pending_confirmation' : 'status_changed',
-        oldStatus,
-        status: updatedStatus,
-      });
+      // Trava a linha ate o fim da transacao: duas alteracoes simultaneas no
+      // mesmo chamado passam a ser serializadas, em vez de correrem juntas e
+      // produzirem duas pausas abertas ou uma sequencia incoerente.
+      const locked = await client.query(
+        'SELECT id, status FROM tickets WHERE id = $1 FOR UPDATE',
+        [id],
+      );
 
-      if (updatedStatus === STATUS_AWAITING_CONFIRMATION) {
-        emitTicketEvent('ticket:resolved', {
-          ticketId: id,
-          title: result.rows[0].title,
-          status: updatedStatus,
-        });
+      if (!locked.rows.length) {
+        await client.query('ROLLBACK');
+        client.release();
+        return res.status(404).json({ error: 'Chamado não encontrado' });
       }
-    }
+
+      // Revalida com o estado REAL sob o lock: entre a leitura inicial e aqui
+      // outra requisicao pode ter mudado o chamado.
+      const lockedStatus = locked.rows[0].status;
+
+      result = await client.query(query, values);
+
+      if (!result.rows.length) {
+        await client.query('ROLLBACK');
+        client.release();
+        return res.status(404).json({ error: 'Chamado não encontrado' });
+      }
+
+      updatedStatus = result.rows[0].status;
+
+      if (status !== undefined && lockedStatus !== updatedStatus) {
+        // Sem `.catch` silencioso: dentro da transacao, uma falha aqui deve
+        // derrubar a operacao inteira, nao passar despercebida.
+        await client.query(
+          `INSERT INTO ticket_history (
+            ticket_id, action, changed_by_type, changed_by_id, old_value, new_value, metadata
+          ) VALUES ($1, 'status_changed', $2, $3, $4, $5, $6::jsonb)`,
+          [id, historyActorType, userId, lockedStatus, updatedStatus, JSON.stringify({ requested_status: status })],
+        );
+
+        afterCommit.push(() => emitTicketUpdatedEvent({
+          ticketId: id,
+          action: updatedStatus === STATUS_AWAITING_CONFIRMATION ? 'marked_resolved_pending_confirmation' : 'status_changed',
+          oldStatus: lockedStatus,
+          status: updatedStatus,
+        }));
+
+        if (updatedStatus === STATUS_AWAITING_CONFIRMATION) {
+          afterCommit.push(() => emitTicketEvent('ticket:resolved', {
+            ticketId: id,
+            title: result.rows[0].title,
+            status: updatedStatus,
+          }));
+        }
+      }
 
     // A prioridade muda o prazo do chamado, entao ela pertence ao historico
     // tanto quanto status e responsavel. Passa a ser registrada aqui; chamados
     // alterados antes desta versao nao terao esse evento.
-    if (priority !== undefined && oldPriority !== priority) {
-      await database.query(
-        `INSERT INTO ticket_history (
-          ticket_id, action, changed_by_type, changed_by_id, old_value, new_value, metadata
-        ) VALUES ($1, 'priority_changed', $2, $3, $4, $5, $6::jsonb)`,
-        [id, historyActorType, userId, oldPriority || null, priority, JSON.stringify({ priority })],
-      ).catch(() => undefined);
-    }
-
-    if (assigned_to_id !== undefined && oldAssignedTo !== assigned_to_id) {
-      await database.query(
-        `INSERT INTO ticket_history (
-          ticket_id, action, changed_by_type, changed_by_id, old_value, new_value, metadata
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
-        [
+    // Pausa/retomada do SLA. Fica antes do historico de prioridade para que o
+    // periodo ja esteja aberto/fechado quando a timeline for lida.
+      if (status !== undefined && lockedStatus !== status) {
+        // Mesma transacao e mesmo client: se isto falhar, o status nao persiste.
+        await reconcileSlaPause(
           id,
-          assigned_to_id ? 'assigned' : 'unassigned',
-          historyActorType,
-          userId,
-          oldAssignedTo || null,
-          assigned_to_id || null,
-          JSON.stringify({ assigned_to_id }),
-        ],
-      ).catch(() => undefined);
+          status,
+          typeof pause_reason === 'string' && pause_reason.trim() ? pause_reason.trim() : null,
+          userId || null,
+          client,
+        );
 
-      emitTicketUpdatedEvent({
-        ticketId: id,
-        action: assigned_to_id ? 'assigned' : 'unassigned',
-        assigned_to_id,
+        // O motivo da espera entra na timeline como evento proprio, para que o
+        // chamado deixe claro O QUE esta sendo aguardado.
+        if (isSlaPausedStatus(status) && typeof pause_reason === 'string' && pause_reason.trim()) {
+          await client.query(
+            `INSERT INTO ticket_history (
+              ticket_id, action, changed_by_type, changed_by_id, old_value, new_value, metadata
+            ) VALUES ($1, 'pause_reason_added', $2, $3, NULL, $4, $5::jsonb)`,
+            [
+              id,
+              historyActorType,
+              userId,
+              pause_reason.trim().slice(0, 280),
+              JSON.stringify({ status, label: STATUS_LABELS[status] }),
+            ],
+          );
+        }
+      }
+
+      if (priority !== undefined && oldPriority !== priority) {
+        await client.query(
+          `INSERT INTO ticket_history (
+            ticket_id, action, changed_by_type, changed_by_id, old_value, new_value, metadata
+          ) VALUES ($1, 'priority_changed', $2, $3, $4, $5, $6::jsonb)`,
+          [id, historyActorType, userId, oldPriority || null, priority, JSON.stringify({ priority })],
+        );
+      }
+
+      if (assigned_to_id !== undefined && oldAssignedTo !== assigned_to_id) {
+        await client.query(
+          `INSERT INTO ticket_history (
+            ticket_id, action, changed_by_type, changed_by_id, old_value, new_value, metadata
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
+          [
+            id,
+            assigned_to_id ? 'assigned' : 'unassigned',
+            historyActorType,
+            userId,
+            oldAssignedTo || null,
+            assigned_to_id || null,
+            JSON.stringify({ assigned_to_id }),
+          ],
+        );
+
+        afterCommit.push(() => emitTicketUpdatedEvent({
+          ticketId: id,
+          action: assigned_to_id ? 'assigned' : 'unassigned',
+          assigned_to_id,
+        }));
+      }
+
+      // AUDITORIA. Fica fora da garantia de atomicidade porque a tabela pode
+      // nao existir em instalacoes antigas — um savepoint isola a falha sem
+      // abortar a transacao inteira.
+      try {
+        await client.query('SAVEPOINT audit_log');
+        await client.query(
+          `INSERT INTO ticket_audit_log (ticket_id, user_id, action, changes, created_at)
+           VALUES ($1, $2, $3, $4, NOW())`,
+          [id, userId, 'update', JSON.stringify({ status: nextStatus, assigned_to_id, priority })],
+        );
+        await client.query('RELEASE SAVEPOINT audit_log');
+      } catch {
+        await client.query('ROLLBACK TO SAVEPOINT audit_log').catch(() => undefined);
+        console.log('Audit log not available');
+      }
+
+      await client.query('COMMIT');
+    } catch (txError) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      console.error('Transacao de atualizacao do chamado revertida:', txError);
+      return res.status(500).json({
+        error: 'Falha ao atualizar chamado',
+        message: 'A alteracao foi revertida por completo; nada foi gravado.',
       });
+    } finally {
+      client.release();
     }
 
-    // AUDITORIA: Registrar alteração
-    await database.query(
-      `INSERT INTO ticket_audit_log (ticket_id, user_id, action, changes, created_at)
-       VALUES ($1, $2, $3, $4, NOW())`,
-      [id, userId, 'update', JSON.stringify({ status: nextStatus, assigned_to_id, priority })]
-    ).catch(() => {
-      // Log de auditoria é opcional se a tabela não existir ainda
-      console.log('Audit log not available');
+    // ── Somente apos o COMMIT: efeitos que nao fazem rollback. ──
+    afterCommit.forEach((emit) => {
+      try { emit(); } catch (err) { console.error('Falha ao emitir evento pos-commit:', err); }
     });
 
     // 📧 NOTIFICAÇÕES: Atribuição ou mudança de status

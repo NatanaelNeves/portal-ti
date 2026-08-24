@@ -16,6 +16,8 @@ const STATUS_LABEL: Record<string, string> = {
   in_progress: 'Em atendimento',
   waiting_user: 'Aguardando usuário',
   aguardando_confirmacao: 'Aguardando confirmação',
+  aguardando_aquisicao: 'Aguardando aquisição',
+  aguardando_terceiros: 'Aguardando terceiros',
   resolved: 'Resolvido',
   closed: 'Fechado',
 };
@@ -83,6 +85,13 @@ function describe(event: HistoryEvent): Rendered {
         text: before ? `Prioridade: ${before} → ${after}` : `Prioridade definida como ${after}`,
       };
     }
+
+    case 'pause_reason_added':
+      return {
+        icon: 'ti-note',
+        tone: 'warning',
+        text: `Motivo da espera: ${event.new_value ?? '—'}`,
+      };
 
     case 'message_added':
       return { icon: 'ti-message-2', tone: 'neutral', text: 'Mensagem adicionada' };

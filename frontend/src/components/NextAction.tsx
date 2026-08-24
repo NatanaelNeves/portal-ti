@@ -60,6 +60,18 @@ export default function NextAction({ status, department, lastUpdate, estimatedTi
           message: 'Precisamos de uma informação sua para continuar o atendimento.',
           type: 'warning'
         };
+      case 'aguardando_aquisicao':
+        return {
+          title: 'Aguardando você',
+          message: 'Precisamos de uma informação sua para continuar o atendimento.',
+          type: 'warning'
+        };
+      case 'aguardando_terceiros':
+        return {
+          title: 'Aguardando você',
+          message: 'Precisamos de uma informação sua para continuar o atendimento.',
+          type: 'warning'
+        };
       case 'aguardando_confirmacao':
         return {
           title: 'Confirme a resolução',
