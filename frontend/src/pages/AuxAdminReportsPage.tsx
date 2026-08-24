@@ -139,7 +139,11 @@ export default function AuxAdminReportsPage() {
       const { data } = await api.get(`/reports/auxadmin?${params.toString()}`, { timeout: 20000 });
       setReport(data);
     } catch (err: any) {
-      setError(err?.response?.data?.error || 'Não foi possível carregar o relatório');
+      // O detalhe vem do backend quando o erro e do Postgres; mostra-lo evita
+      // que "erro ao carregar" seja a unica informacao disponivel.
+      const data = err?.response?.data;
+      setError([data?.error || 'Não foi possível carregar o relatório', data?.detail]
+        .filter(Boolean).join(' · '));
     } finally {
       setLoading(false);
     }

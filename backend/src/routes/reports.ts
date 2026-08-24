@@ -363,12 +363,10 @@ reportsRouter.get('/auxadmin', async (req: Request, res: Response) => {
            COUNT(*) FILTER (WHERE t.status = 'open')::int AS pending,
            COUNT(*) FILTER (WHERE t.status IN ('waiting_user', 'aguardando_confirmacao'))::int AS waiting,
            COUNT(*) FILTER (WHERE t.priority IN ('urgent', 'critical', 'high') AND t.status IN ${ACTIVE})::int AS high_priority_open,
-           AVG(${operationalMinutesExpr('t')})
+           AVG(EXTRACT(EPOCH FROM (t.resolved_at - t.created_at)) / 60)
              FILTER (WHERE t.resolved_at IS NOT NULL) AS avg_resolution_minutes,
            AVG(EXTRACT(EPOCH FROM (t.first_response_at - t.created_at)) / 60)
              FILTER (WHERE t.first_response_at IS NOT NULL) AS avg_first_response_minutes,
-           AVG(EXTRACT(EPOCH FROM (t.resolved_at - t.created_at)) / 60)
-             FILTER (WHERE t.resolved_at IS NOT NULL) AS avg_total_minutes,
            COUNT(DISTINCT DATE(t.resolved_at)) FILTER (WHERE t.resolved_at IS NOT NULL)::int AS days_with_resolution
          ${FROM_TICKETS}
          ${where}`,
@@ -383,8 +381,8 @@ reportsRouter.get('/auxadmin', async (req: Request, res: Response) => {
            COALESCE($1::date, CURRENT_DATE - INTERVAL '29 days'),
            COALESCE($2::date, CURRENT_DATE),
            INTERVAL '1 day'
-         ) AS d
-         WHERE EXTRACT(ISODOW FROM d) < 6`,
+         ) AS d(day)
+         WHERE EXTRACT(ISODOW FROM d.day) < 6`,
         [dateFrom, dateTo],
       ),
 
@@ -490,7 +488,6 @@ reportsRouter.get('/auxadmin', async (req: Request, res: Response) => {
         avgResolutionMinutes: toMin(s.avg_resolution_minutes),
         avgFirstResponseMinutes: toMin(s.avg_first_response_minutes),
         // Corrido: duracao total vivida pelo solicitante.
-        avgTotalMinutes: toMin(s.avg_total_minutes),
         /*
          * Duas leituras, porque a pergunta e ambigua e uma so enganaria:
          *
@@ -534,9 +531,22 @@ reportsRouter.get('/auxadmin', async (req: Request, res: Response) => {
         createdAt: row.created_at,
       })),
     });
-  } catch (err) {
-    console.error('Error building auxadmin report:', err);
-    res.status(500).json({ error: 'Falha ao carregar o relatório administrativo' });
+  } catch (err: any) {
+    // Erros do Postgres trazem `code`, `message` e a posicao no SQL. Sem
+    // devolver isso, um 500 aqui vira adivinhacao: o relatorio e interno e
+    // so admin/gestor/auxiliar alcancam este endpoint, entao o detalhe ajuda
+    // muito mais do que expoe.
+    console.error('Error building auxadmin report:', {
+      code: err?.code,
+      message: err?.message,
+      detail: err?.detail,
+      position: err?.position,
+      where: err?.where,
+    });
+    res.status(500).json({
+      error: 'Falha ao carregar o relatório administrativo',
+      detail: err?.code ? `[${err.code}] ${err.message}` : (err?.message ?? null),
+    });
   }
 });
 
