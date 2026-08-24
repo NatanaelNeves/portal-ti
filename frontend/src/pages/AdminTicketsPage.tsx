@@ -17,6 +17,7 @@ import EmptyState from '../components/tickets/EmptyState';
 import TicketRef from '../components/tickets/TicketRef';
 import TicketRowMenu from '../components/tickets/TicketRowMenu';
 import { isUntouched, isSlaPaused } from '../components/tickets/ticketPermissions';
+import { ACTIVE_TICKET_STATUSES } from '../utils/ticketStatus';
 import { profileForDepartment } from '../components/tickets/sectorProfiles';
 import '../styles/AdminTicketsPage.css';
 import '../styles/TicketsExperience.css';
@@ -425,7 +426,7 @@ export default function AdminTicketsPage() {
       setLoading(true);
       const params = new URLSearchParams();
       const hasAdvancedFilters = selectedStatuses.length > 0 || selectedPriorities.length > 0 || searchText.trim() !== '';
-      const activeStatuses = ['open', 'in_progress', 'waiting_user', 'aguardando_confirmacao'];
+      const activeStatuses = [...ACTIVE_TICKET_STATUSES];
       const normalizePriorityValues = (priorities: string[]) => {
         return Array.from(
           new Set(
@@ -687,7 +688,7 @@ export default function AdminTicketsPage() {
   const getPriorityCount = (priority: 'high' | 'medium' | 'low') => {
     return tickets.filter(ticket => {
       // Só conta chamados ativos (open, in_progress ou waiting)
-      const activeStatuses = ['open', 'in_progress', 'waiting', 'waiting_user', 'aguardando_confirmacao'];
+      const activeStatuses = [...ACTIVE_TICKET_STATUSES, 'waiting'];
       if (!activeStatuses.includes(ticket.status)) {
         return false;
       }
@@ -1108,6 +1109,8 @@ export default function AdminTicketsPage() {
                   { value: 'in_progress', label: 'Em atendimento', dotClass: 'advanced-chip-dot--in-progress' },
                   { value: 'waiting_user', label: 'Aguardando usuário', dotClass: 'advanced-chip-dot--waiting' },
                   { value: 'aguardando_confirmacao', label: 'Aguardando confirmação', dotClass: 'advanced-chip-dot--confirm' },
+                  { value: 'aguardando_aquisicao', label: 'Aguardando aquisição', dotClass: 'advanced-chip-dot--procurement' },
+                  { value: 'aguardando_terceiros', label: 'Aguardando terceiros', dotClass: 'advanced-chip-dot--external' },
                   { value: 'resolved', label: 'Resolvido', dotClass: 'advanced-chip-dot--resolved' },
                   { value: 'closed', label: 'Fechado', dotClass: 'advanced-chip-dot--closed' }
                 ].map(status => (
@@ -1284,7 +1287,7 @@ export default function AdminTicketsPage() {
                       const token = localStorage.getItem('internal_token');
                       const p = new URLSearchParams();
                       const hasAdvancedFilters = selectedStatuses.length > 0 || selectedPriorities.length > 0 || searchText.trim() !== '';
-                      const activeStatuses = ['open', 'in_progress', 'waiting_user', 'aguardando_confirmacao'];
+                      const activeStatuses = [...ACTIVE_TICKET_STATUSES];
                       const deptForExport = userRole === 'admin_staff' ? 'administrativo' : userRole === 'it_staff' ? 'ti' : departmentFilter;
                       const assignmentForExport = userRole === 'admin_staff' ? 'mine' : assignmentFilter;
                       if (deptForExport) p.append('department', deptForExport);
