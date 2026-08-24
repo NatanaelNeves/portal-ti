@@ -413,18 +413,29 @@ export class EmailService {
       in_progress: 'Em Atendimento',
       waiting_user: 'Aguardando Resposta',
       aguardando_confirmacao: 'Aguardando Confirmação',
+      aguardando_aquisicao: 'Aguardando Aquisição',
+      aguardando_terceiros: 'Aguardando Terceiros',
       resolved: 'Resolvido',
       closed: 'Fechado',
     };
+
+    // Um status sem rotulo no mapa virava 'undefined' no assunto e no corpo do
+    // e-mail. O proprio codigo e uma saida ruim, mas legivel e diagnosticavel —
+    // 'undefined' nao e nem uma coisa nem outra.
+    const labelOf = (value: string) => statusLabels[value] ?? value;
 
     const statusColors: Record<string, string> = {
       open: '#9e9e9e',
       in_progress: '#4A90E2',
       waiting_user: '#F28C38',
       aguardando_confirmacao: '#2563eb',
+      aguardando_aquisicao: '#7f56c5',
+      aguardando_terceiros: '#5d7f8f',
       resolved: '#007A33',
       closed: '#666',
     };
+
+    const colorOf = (value: string) => statusColors[value] ?? '#666';
 
     const ticketLink = buildPublicTicketLink(ticketId, publicToken);
     const html = `
@@ -456,9 +467,9 @@ export class EmailService {
             <div class="ticket-info">
               <h3>${title}</h3>
               <p><strong>Status:</strong> 
-                <span class="status" style="background: ${statusColors[oldStatus]};">${statusLabels[oldStatus]}</span>
+                <span class="status" style="background: ${colorOf(oldStatus)};">${labelOf(oldStatus)}</span>
                 → 
-                <span class="status" style="background: ${statusColors[newStatus]};">${statusLabels[newStatus]}</span>
+                <span class="status" style="background: ${colorOf(newStatus)};">${labelOf(newStatus)}</span>
               </p>
               ${message ? `<div class="message-box"><strong>Mensagem da equipe:</strong><br>${message}</div>` : ''}
             </div>
@@ -470,6 +481,8 @@ export class EmailService {
             ${newStatus === 'waiting_user' ? '<p style="color: #F28C38; font-weight: bold;">⏳ A equipe de TI aguarda sua resposta.</p>' : ''}
             ${newStatus === 'resolved' ? '<p style="color: #007A33; font-weight: bold;">✅ Seu chamado foi marcado como resolvido. Se o problema persistir, responda no chamado.</p>' : ''}
             ${newStatus === 'aguardando_confirmacao' ? '<p style="color: #2563eb; font-weight: bold;">🔎 Seu chamado aguarda confirmação de resolução.</p>' : ''}
+            ${newStatus === 'aguardando_aquisicao' ? '<p style="color: #7f56c5; font-weight: bold;">🛒 A equipe aguarda a compra ou a chegada do material necessário. Você não precisa fazer nada; avisaremos quando o atendimento voltar.</p>' : ''}
+            ${newStatus === 'aguardando_terceiros' ? '<p style="color: #5d7f8f; font-weight: bold;">🏢 A equipe aguarda o retorno de um fornecedor ou assistência externa. Você não precisa fazer nada; avisaremos quando o atendimento voltar.</p>' : ''}
           </div>
           
           <div class="footer">
@@ -483,9 +496,9 @@ export class EmailService {
 
     await this.sendEmail({
       to: requesterEmail,
-      subject: `📢 Atualização: ${title} - ${statusLabels[newStatus]}`,
+      subject: `📢 Atualização: ${title} - ${labelOf(newStatus)}`,
       html,
-      text: `Atualização do Chamado\n\nTítulo: ${title}\nStatus: ${statusLabels[oldStatus]} → ${statusLabels[newStatus]}\n\nAcesse: ${ticketLink}`,
+      text: `Atualização do Chamado\n\nTítulo: ${title}\nStatus: ${labelOf(oldStatus)} → ${labelOf(newStatus)}\n\nAcesse: ${ticketLink}`,
     });
   }
 

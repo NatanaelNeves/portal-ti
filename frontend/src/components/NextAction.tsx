@@ -60,17 +60,20 @@ export default function NextAction({ status, department, lastUpdate, estimatedTi
           message: 'Precisamos de uma informação sua para continuar o atendimento.',
           type: 'warning'
         };
+      // Nestes dois estados quem espera e a EQUIPE, nao o solicitante. Dizer
+      // "precisamos de uma informacao sua" faria a pessoa procurar uma acao
+      // que nao existe — e o chamado ficaria parado por mal-entendido.
       case 'aguardando_aquisicao':
         return {
-          title: 'Aguardando você',
-          message: 'Precisamos de uma informação sua para continuar o atendimento.',
-          type: 'warning'
+          title: 'Aguardando aquisição',
+          message: `A ${teamLabel} está aguardando a compra ou a chegada do material necessário. Você não precisa fazer nada — avisaremos assim que o atendimento voltar.`,
+          type: 'info'
         };
       case 'aguardando_terceiros':
         return {
-          title: 'Aguardando você',
-          message: 'Precisamos de uma informação sua para continuar o atendimento.',
-          type: 'warning'
+          title: 'Aguardando terceiros',
+          message: `A ${teamLabel} está aguardando o retorno de um fornecedor ou assistência externa. Você não precisa fazer nada — avisaremos assim que o atendimento voltar.`,
+          type: 'info'
         };
       case 'aguardando_confirmacao':
         return {

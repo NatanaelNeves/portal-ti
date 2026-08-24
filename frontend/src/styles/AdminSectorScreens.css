@@ -1224,3 +1224,17 @@
 @media (prefers-reduced-motion: reduce) {
   .qa-wait-form { animation: none !important; }
 }
+
+/* Os badges dos estados de espera tambem no detalhe do chamado, que usa o
+   proprio conjunto de classes (`badge-open`, `badge-waiting`, ...). */
+.admin-ticket-detail .badge-status-procurement {
+  color: #6b4f9e;
+  background: #f1ecfa;
+  border: 1px solid #ddd0f0;
+}
+
+.admin-ticket-detail .badge-status-external {
+  color: #3f5c6b;
+  background: #eaf1f4;
+  border: 1px solid #cfdde3;
+}

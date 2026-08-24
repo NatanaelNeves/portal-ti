@@ -297,6 +297,13 @@ reportsRouter.get('/auxadmin', async (req: Request, res: Response) => {
     return res.status(403).json({ error: 'Acesso negado' });
   }
 
+  // O setor do solicitante nao e coluna de `tickets`: vem de public_users
+  // (solicitante externo) ou do departamento do usuario interno.
+  const JOINS = `         LEFT JOIN public_users pu ON t.requester_type = 'public' AND t.requester_id = pu.id
+         LEFT JOIN internal_users iu_req ON t.requester_type = 'internal' AND t.requester_id = iu_req.id
+         LEFT JOIN departments d_req ON d_req.id = iu_req.department_id`;
+  const DEPT = "COALESCE(NULLIF(TRIM(pu.department), ''), NULLIF(TRIM(d_req.name), ''), 'Não informado')";
+
   try {
     const conditions: string[] = [`COALESCE(t.department, 'ti') = 'administrativo'`];
     const params: any[] = [];
@@ -337,10 +344,13 @@ reportsRouter.get('/auxadmin', async (req: Request, res: Response) => {
     }
     if (requesterDepartment) {
       params.push(requesterDepartment);
-      conditions.push(`LOWER(TRIM(COALESCE(t.requester_department, ''))) = LOWER(TRIM($${params.length}))`);
+      conditions.push(`LOWER(TRIM(${DEPT})) = LOWER(TRIM($${params.length}))`);
     }
 
     const where = `WHERE ${conditions.join(' AND ')}`;
+    // O setor do solicitante mora em public_users / departments, nao em
+    // tickets: as consultas que o leem ou filtram precisam destes joins.
+    const FROM_TICKETS = `FROM tickets t\n${JOINS}`;
     const ACTIVE = sqlStatusList(ACTIVE_STATUSES);
 
     const [summary, businessDaysRow, volume, categories, requesters, statusRows, attention] = await Promise.all([
@@ -360,7 +370,7 @@ reportsRouter.get('/auxadmin', async (req: Request, res: Response) => {
            AVG(EXTRACT(EPOCH FROM (t.resolved_at - t.created_at)) / 60)
              FILTER (WHERE t.resolved_at IS NOT NULL) AS avg_total_minutes,
            COUNT(DISTINCT DATE(t.resolved_at)) FILTER (WHERE t.resolved_at IS NOT NULL)::int AS days_with_resolution
-         FROM tickets t
+         ${FROM_TICKETS}
          ${where}`,
         params,
       ),
@@ -382,8 +392,8 @@ reportsRouter.get('/auxadmin', async (req: Request, res: Response) => {
       database.query(
         `SELECT
            DATE(d.day) AS day,
-           COUNT(*) FILTER (WHERE DATE(t.created_at) = DATE(d.day))::int AS received,
-           COUNT(*) FILTER (WHERE DATE(t.resolved_at) = DATE(d.day))::int AS resolved
+           COUNT(t.id) FILTER (WHERE DATE(t.created_at) = DATE(d.day))::int AS received,
+           COUNT(t.id) FILTER (WHERE DATE(t.resolved_at) = DATE(d.day))::int AS resolved
          FROM (
            SELECT generate_series(
              COALESCE($${params.length + 1}::date, CURRENT_DATE - INTERVAL '29 days'),
@@ -402,7 +412,7 @@ reportsRouter.get('/auxadmin', async (req: Request, res: Response) => {
       // Assuntos mais frequentes — vem de `category`, que é o campo real.
       database.query(
         `SELECT t.category, COUNT(*)::int AS total
-         FROM tickets t
+         ${FROM_TICKETS}
          ${where} AND t.category IS NOT NULL AND TRIM(t.category) <> ''
          GROUP BY t.category
          ORDER BY total DESC
@@ -412,10 +422,8 @@ reportsRouter.get('/auxadmin', async (req: Request, res: Response) => {
 
       // De onde vem a demanda: setor do SOLICITANTE, não da fila.
       database.query(
-        `SELECT
-           COALESCE(NULLIF(TRIM(t.requester_department), ''), 'Não informado') AS sector,
-           COUNT(*)::int AS total
-         FROM tickets t
+        `SELECT ${DEPT} AS sector, COUNT(*)::int AS total
+         ${FROM_TICKETS}
          ${where}
          GROUP BY 1
          ORDER BY total DESC
@@ -426,7 +434,7 @@ reportsRouter.get('/auxadmin', async (req: Request, res: Response) => {
       // Distribuição por status — só os estados que este setor usa.
       database.query(
         `SELECT t.status, COUNT(*)::int AS total
-         FROM tickets t
+         ${FROM_TICKETS}
          ${where}
          GROUP BY t.status
          ORDER BY total DESC`,
@@ -438,11 +446,11 @@ reportsRouter.get('/auxadmin', async (req: Request, res: Response) => {
         `SELECT
            t.id, t.title, t.status, t.priority, t.category,
            t.created_at,
-           COALESCE(NULLIF(TRIM(t.requester_name), ''), 'Solicitante interno') AS requester_name,
-           COALESCE(NULLIF(TRIM(t.requester_department), ''), 'Não informado') AS requester_department,
+           COALESCE(NULLIF(TRIM(t.requester_name), ''), pu.name, iu_req.name, 'Solicitante interno') AS requester_name,
+           ${DEPT} AS requester_department,
            u.name AS assigned_to_name,
            ROUND(EXTRACT(EPOCH FROM (NOW() - t.created_at)) / 3600)::int AS open_hours
-         FROM tickets t
+         ${FROM_TICKETS}
          LEFT JOIN internal_users u ON u.id = t.assigned_to_id
          ${where} AND t.status IN ${ACTIVE}
          ORDER BY

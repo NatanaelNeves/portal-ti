@@ -280,6 +280,8 @@ export default function AdminTicketDetailPage() {
       in_progress: { label: 'Em Progresso', className: 'badge-progress' },
       waiting_user: { label: 'Aguardando Usuário', className: 'badge-waiting' },
       aguardando_confirmacao: { label: 'Aguardando Confirmação', className: 'badge-waiting' },
+      aguardando_aquisicao: { label: 'Aguardando Aquisição', className: 'badge-status-procurement' },
+      aguardando_terceiros: { label: 'Aguardando Terceiros', className: 'badge-status-external' },
       resolved: { label: 'Resolvido', className: 'badge-resolved' },
       closed: { label: 'Concluído', className: 'badge-closed' },
     };
@@ -570,6 +572,12 @@ export default function AdminTicketDetailPage() {
                     <option value="in_progress">Em Progresso</option>
                     <option value="waiting_user">Aguardando Usuário</option>
                     <option value="aguardando_confirmacao">Aguardando Confirmação</option>
+                    {canUseExternalWaitStatuses(currentUserRole) && (ticket.department || 'ti') === 'ti' && (
+                      <>
+                        <option value="aguardando_aquisicao">Aguardando Aquisição</option>
+                        <option value="aguardando_terceiros">Aguardando Terceiros</option>
+                      </>
+                    )}
                     <option value="resolved">Resolvido</option>
                     <option value="closed">Fechado</option>
                   </select>
