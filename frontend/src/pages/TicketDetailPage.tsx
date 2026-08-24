@@ -437,6 +437,8 @@ export default function TicketDetailPage() {
       auto_close_warning_sent: 'Aviso de encerramento automático enviado',
       auto_closed_after_confirmation_timeout: 'Encerrado automaticamente',
       message_added: 'Nova mensagem',
+      priority_changed: 'Prioridade alterada',
+      pause_reason_added: 'Motivo da espera registrado',
     };
     return labels[action] || action;
   };
@@ -494,6 +496,12 @@ export default function TicketDetailPage() {
         return 'Aguardando Você';
       case 'aguardando_confirmacao':
         return 'Aguardando Confirmação';
+      // A espera aqui e da equipe, nao do solicitante — por isso "Aguardando
+      // aquisicao", e nao "Aguardando voce".
+      case 'aguardando_aquisicao':
+        return 'Aguardando Aquisição';
+      case 'aguardando_terceiros':
+        return 'Aguardando Terceiros';
       case 'resolved':
         return 'Resolvido';
       case 'closed':
@@ -749,6 +757,9 @@ export default function TicketDetailPage() {
                     <div className="history-meta">
                       {item.changed_by_name || 'Sistema'} · {new Date(item.created_at).toLocaleString('pt-BR')}
                     </div>
+                    {item.action === 'pause_reason_added' && item.new_value && (
+                      <div className="history-detail">Aguardando: {String(item.new_value)}</div>
+                    )}
                     {item.metadata?.reason && (
                       <div className="history-detail">Motivo: {String(item.metadata.reason)}</div>
                     )}

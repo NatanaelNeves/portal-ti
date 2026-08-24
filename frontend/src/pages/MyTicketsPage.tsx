@@ -309,6 +309,10 @@ export default function MyTicketsPage() {
         return '⏳ Aguardando Você';
       case 'aguardando_confirmacao':
         return '🔎 Aguardando Confirmação';
+      case 'aguardando_aquisicao':
+        return '🛒 Aguardando Aquisição';
+      case 'aguardando_terceiros':
+        return '🏢 Aguardando Terceiros';
       case 'resolved':
         return '✅ Resolvido';
       case 'closed':

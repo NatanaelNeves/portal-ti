@@ -13,10 +13,21 @@ export default function StatusTimeline({ currentStatus }: StatusTimelineProps) {
     { key: 'closed',                  label: 'Concluído' },
   ];
 
-  const resolvedAsClosed = currentStatus === 'resolved' ? 'closed' : currentStatus;
+  // Espera externa nao e uma etapa do fluxo: o chamado continua EM
+  // ATENDIMENTO, so que parado por algo fora da equipe. Sem este mapeamento
+  // o findIndex devolvia -1, caia no indice 0 e o stepper dizia ao usuario
+  // que o chamado tinha voltado para "Aberto".
+  const PAUSED = ['aguardando_aquisicao', 'aguardando_terceiros'];
+  const isPaused = PAUSED.includes(currentStatus);
+
+  const positional = currentStatus === 'resolved'
+    ? 'closed'
+    : isPaused
+      ? 'in_progress'
+      : currentStatus;
 
   const currentIndex = (() => {
-    const idx = statuses.findIndex(s => s.key === resolvedAsClosed);
+    const idx = statuses.findIndex(s => s.key === positional);
     return idx !== -1 ? idx : 0;
   })();
 
@@ -26,6 +37,10 @@ export default function StatusTimeline({ currentStatus }: StatusTimelineProps) {
         const isCompleted = index < currentIndex;
         const isCurrent   = index === currentIndex;
         const stepState   = isCompleted ? 'completed' : isCurrent ? 'current' : 'pending';
+        // Na etapa atual, se houver espera externa, o rotulo diz isso.
+        const label = isCurrent && isPaused
+          ? (currentStatus === 'aguardando_aquisicao' ? 'Aguardando aquisição' : 'Aguardando terceiros')
+          : status.label;
 
         return (
           <div
@@ -56,7 +71,7 @@ export default function StatusTimeline({ currentStatus }: StatusTimelineProps) {
               </div>
             </div>
 
-            <span className="step-label">{status.label}</span>
+            <span className="step-label">{label}</span>
           </div>
         );
       })}
