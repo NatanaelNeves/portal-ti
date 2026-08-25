@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import GlobalSearch from './GlobalSearch';
 import ChatWidget from './ChatWidget';
-import { useNotifications } from '../contexts/NotificationContext';
+import { useNotifications, type AppNotification, type NotificationKind } from '../contexts/NotificationContext';
 import '../styles/Navigation.css';
 import '../styles/AdminNavigationShell.css';
 
@@ -30,13 +30,71 @@ const NavIcon = ({ name }: { name: NavIconName }) => {
   );
 };
 
+const NOTIFICATION_KIND_LABEL: Record<NotificationKind, string> = {
+  new: 'Novo',
+  updated: 'Atualização',
+  resolved: 'Resolvido',
+  reopened: 'Reaberto',
+  warning: 'Prazo',
+};
+
+const NotificationKindIcon = ({ kind }: { kind: NotificationKind }) => {
+  const paths: Record<NotificationKind, JSX.Element> = {
+    new: <><path d="M5 5h14v4a2 2 0 0 0 0 4v6H5v-6a2 2 0 0 0 0-4z" /><path d="M9 8h6M9 12h4" /></>,
+    updated: <><path d="M20 7h-9a5 5 0 0 0-5 5v1" /><path d="m17 4 3 3-3 3M4 17h9a5 5 0 0 0 5-5v-1" /><path d="m7 20-3-3 3-3" /></>,
+    resolved: <><circle cx="12" cy="12" r="9" /><path d="m8.5 12.5 2.5 2.5 4.5-5" /></>,
+    reopened: <><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /></>,
+    warning: <><circle cx="12" cy="12" r="9" /><path d="M12 7.5V13M12 16.2h.01" /></>,
+  };
+
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {paths[kind]}
+    </svg>
+  );
+};
+
+const formatRelativeTime = (isoDate: string) => {
+  const timestamp = new Date(isoDate).getTime();
+  if (Number.isNaN(timestamp)) return '';
+
+  const diffSeconds = Math.round((Date.now() - timestamp) / 1000);
+  if (diffSeconds < 60) return 'agora mesmo';
+  if (diffSeconds < 3600) return `há ${Math.floor(diffSeconds / 60)} min`;
+  if (diffSeconds < 86400) return `há ${Math.floor(diffSeconds / 3600)} h`;
+  if (diffSeconds < 604800) return `há ${Math.floor(diffSeconds / 86400)} d`;
+
+  return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit' }).format(timestamp);
+};
+
 export default function Navigation() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const notificationsRef = useRef<HTMLDivElement | null>(null);
   const { logout } = useAuthStore();
-  const { unseenCount, clearUnseen } = useNotifications();
+  const { notifications, unseenCount, markAllRead, markRead, dismiss, clearAll } = useNotifications();
   const isInternalUser = !!localStorage.getItem('internal_token');
+
+  // Fechar o painel ao clicar fora ou pressionar Esc.
+  useEffect(() => {
+    if (!notificationsOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!notificationsRef.current?.contains(event.target as Node)) setNotificationsOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setNotificationsOpen(false);
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [notificationsOpen]);
 
   const handleLogout = () => {
     logout();
@@ -107,6 +165,25 @@ export default function Navigation() {
 
   const dashboardRoute = getDashboardRoute();
 
+  // Destino ao clicar numa notificação — nem todo papel tem rota de detalhe por id.
+  const ticketsListRoute =
+    userRole === 'manager' || userRole === 'gestor' ? '/gestor/solicitacoes'
+    : userRole === 'rh_staff' ? '/rh/chamados'
+    : '/admin/chamados';
+
+  const notificationRoute = (notification: AppNotification) => {
+    if (!notification.ticketId) return ticketsListRoute;
+    if (userRole === 'manager' || userRole === 'gestor') return ticketsListRoute;
+    if (userRole === 'rh_staff') return `/rh/chamados/${notification.ticketId}`;
+    return `/admin/chamados/${notification.ticketId}`;
+  };
+
+  const openNotification = (notification: AppNotification) => {
+    markRead(notification.id);
+    setNotificationsOpen(false);
+    navigate(notificationRoute(notification));
+  };
+
   // Todos os links em uma única lista (sem dropdown)
   const navLinks: Array<{ label: string; icon: NavIconName; action: () => void; badge?: number; active: boolean }> = [
     { label: 'Painel', icon: 'panel', active: location.pathname === dashboardRoute, action: () => navigate(dashboardRoute) },
@@ -116,7 +193,7 @@ export default function Navigation() {
       badge: unseenCount > 0 ? unseenCount : undefined,
       active: location.pathname.includes('/chamados') || location.pathname.includes('/solicitacoes'),
       action: () => {
-        clearUnseen();
+        markAllRead();
         if (userRole === 'manager' || userRole === 'gestor') navigate('/gestor/solicitacoes');
         else if (userRole === 'rh_staff') navigate('/rh/chamados');
         else navigate('/admin/chamados');
@@ -221,10 +298,93 @@ export default function Navigation() {
           <strong>{todayLabel}</strong>
           <span>Portal de Serviços Internos</span>
         </div>
-        <button type="button" className="topbar-notifications" aria-label={`${unseenCount} notificações não vistas`} onClick={clearUnseen}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
-          {unseenCount > 0 && <span>{unseenCount > 9 ? '9+' : unseenCount}</span>}
-        </button>
+        <div className="topbar-notifications-wrap" ref={notificationsRef}>
+          <button
+            type="button"
+            className={`topbar-notifications ${notificationsOpen ? 'is-open' : ''}`}
+            aria-label={`Notificações: ${unseenCount} não vistas`}
+            aria-expanded={notificationsOpen}
+            aria-haspopup="dialog"
+            aria-controls="topbar-notifications-panel"
+            onClick={() => setNotificationsOpen((isOpen) => !isOpen)}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
+            {unseenCount > 0 && <span>{unseenCount > 9 ? '9+' : unseenCount}</span>}
+          </button>
+
+          {notificationsOpen && (
+            <div className="notifications-panel" id="topbar-notifications-panel" role="dialog" aria-label="Notificações">
+              <header className="notifications-panel__head">
+                <div>
+                  <strong>Notificações</strong>
+                  <small>{unseenCount > 0 ? `${unseenCount} não lida${unseenCount > 1 ? 's' : ''}` : 'Tudo em dia'}</small>
+                </div>
+                {unseenCount > 0 && (
+                  <button type="button" className="notifications-panel__action" onClick={markAllRead}>
+                    Marcar todas como lidas
+                  </button>
+                )}
+              </header>
+
+              {notifications.length === 0 ? (
+                <div className="notifications-panel__empty">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
+                  <strong>Nenhuma notificação</strong>
+                  <span>Novos chamados e atualizações aparecem aqui.</span>
+                </div>
+              ) : (
+                <>
+                  <ul className="notifications-panel__list">
+                    {notifications.map((notification) => (
+                      <li key={notification.id} className={`notifications-item ${notification.read ? '' : 'is-unread'}`}>
+                        <button
+                          type="button"
+                          className="notifications-item__main"
+                          onClick={() => openNotification(notification)}
+                        >
+                          <span className={`notifications-item__icon kind-${notification.kind}`}>
+                            <NotificationKindIcon kind={notification.kind} />
+                          </span>
+                          <span className="notifications-item__copy">
+                            <strong>{notification.title}</strong>
+                            {notification.body && <span>{notification.body}</span>}
+                            <small>
+                              {NOTIFICATION_KIND_LABEL[notification.kind]} · {formatRelativeTime(notification.createdAt)}
+                            </small>
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          className="notifications-item__dismiss"
+                          aria-label={`Remover notificação: ${notification.title}`}
+                          onClick={() => dismiss(notification.id)}
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <footer className="notifications-panel__foot">
+                    <button
+                      type="button"
+                      className="notifications-panel__action"
+                      onClick={() => {
+                        setNotificationsOpen(false);
+                        navigate(ticketsListRoute);
+                      }}
+                    >
+                      Ver todas as solicitações
+                    </button>
+                    <button type="button" className="notifications-panel__action is-danger" onClick={clearAll}>
+                      Limpar
+                    </button>
+                  </footer>
+                </>
+              )}
+            </div>
+          )}
+        </div>
         <div className="navbar-user">
           <span className="user-avatar" aria-hidden="true">{initials || 'PS'}</span>
           <span className="user-copy"><strong>{userData?.name || 'Equipe'}</strong><small>{roleLabel}</small></span>

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef, ReactNode } from 'react';
 import toast from 'react-hot-toast';
 import { BACKEND_URL } from '../services/api';
 
@@ -10,14 +10,37 @@ interface NewTicket {
   created_at: string;
 }
 
+export type NotificationKind = 'new' | 'updated' | 'resolved' | 'reopened' | 'warning';
+
+export interface AppNotification {
+  id: string;
+  kind: NotificationKind;
+  title: string;
+  body?: string;
+  ticketId?: string;
+  createdAt: string;
+  read: boolean;
+}
+
 interface NotificationContextValue {
+  notifications: AppNotification[];
   unseenCount: number;
+  markAllRead: () => void;
+  markRead: (id: string) => void;
+  dismiss: (id: string) => void;
+  clearAll: () => void;
+  /** Mantido por compatibilidade — equivale a markAllRead. */
   clearUnseen: () => void;
 }
 
 // ─── context ──────────────────────────────────────────────────────────────────
 const NotificationContext = createContext<NotificationContextValue>({
+  notifications: [],
   unseenCount: 0,
+  markAllRead: () => {},
+  markRead: () => {},
+  dismiss: () => {},
+  clearAll: () => {},
   clearUnseen: () => {},
 });
 
@@ -96,18 +119,78 @@ function saveSeenIds(ids: Set<string>) {
   localStorage.setItem(SEEN_KEY, JSON.stringify(arr));
 }
 
+// ─── localStorage: histórico exibido no sino ──────────────────────────────────
+const ITEMS_KEY = 'notif_items_v1';
+const MAX_ITEMS = 40;
+
+function loadStoredNotifications(): AppNotification[] {
+  try {
+    const raw = localStorage.getItem(ITEMS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((item: any): item is AppNotification => !!item && typeof item.id === 'string' && typeof item.title === 'string')
+      .slice(0, MAX_ITEMS);
+  } catch {
+    return [];
+  }
+}
+
+function saveStoredNotifications(items: AppNotification[]) {
+  try {
+    localStorage.setItem(ITEMS_KEY, JSON.stringify(items.slice(0, MAX_ITEMS)));
+  } catch {
+    // cota cheia ou modo privado — ignorar
+  }
+}
+
+let notificationSeq = 0;
+function makeNotificationId(prefix: string) {
+  notificationSeq += 1;
+  return `${prefix}-${Date.now()}-${notificationSeq}`;
+}
+
 // ─── POLL_INTERVAL ────────────────────────────────────────────────────────────
 // 30 s is enough for near-real-time notifications and stays well under rate limits.
 const POLL_MS = 30_000;
 
 // ─── Provider ────────────────────────────────────────────────────────────────
 export function NotificationProvider({ children }: { children: ReactNode }) {
-  const [unseenCount, setUnseenCount] = useState(0);
+  const [notifications, setNotifications] = useState<AppNotification[]>(loadStoredNotifications);
   const sinceRef = useRef<string>(new Date().toISOString());
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const clearUnseen = useCallback(() => {
-    setUnseenCount(0);
+  const unseenCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
+
+  useEffect(() => {
+    saveStoredNotifications(notifications);
+  }, [notifications]);
+
+  const pushNotifications = useCallback((items: AppNotification[]) => {
+    if (items.length === 0) return;
+    setNotifications((prev) => {
+      const existing = new Set(prev.map((n) => n.id));
+      const fresh = items.filter((n) => !existing.has(n.id));
+      if (fresh.length === 0) return prev;
+      return [...fresh, ...prev].slice(0, MAX_ITEMS);
+    });
+  }, []);
+
+  const markAllRead = useCallback(() => {
+    setNotifications((prev) => (prev.some((n) => !n.read) ? prev.map((n) => ({ ...n, read: true })) : prev));
+  }, []);
+
+  const markRead = useCallback((id: string) => {
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+  }, []);
+
+  const dismiss = useCallback((id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  }, []);
+
+  const clearAll = useCallback(() => {
+    setNotifications([]);
   }, []);
 
   const poll = useCallback(async () => {
@@ -176,12 +259,22 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         sendBrowserNotification('Novo chamado recebido', ticket.title);
       });
 
-      // ── badge counter ──
-      setUnseenCount((prev) => prev + unseen.length);
+      // ── lista do sino ──
+      pushNotifications(
+        unseen.map((ticket) => ({
+          id: `new-${ticket.id}`,
+          kind: 'new' as const,
+          title: 'Novo chamado recebido',
+          body: ticket.title,
+          ticketId: ticket.id,
+          createdAt: ticket.created_at || new Date().toISOString(),
+          read: false,
+        }))
+      );
     } catch (_) {
       // network error — silent fail, will retry
     }
-  }, []);
+  }, [pushNotifications]);
 
   useEffect(() => {
     // Request browser notification permission on mount (non-blocking)
@@ -202,29 +295,74 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
     schedule();
 
-    const incrementFromRealtime = () => {
-      setUnseenCount((prev) => prev + 1);
+    // ── eventos em tempo real (websocket) viram itens da lista do sino ──
+    const describe = (kind: NotificationKind, detail: any): { title: string; body?: string } => {
+      const ticketTitle = detail?.title
+        || (detail?.ticketId ? `Chamado ${String(detail.ticketId).slice(0, 8)}` : undefined);
+
+      switch (kind) {
+        case 'resolved':
+          return { title: 'Chamado marcado como resolvido', body: ticketTitle };
+        case 'reopened':
+          return { title: 'Chamado reaberto pelo solicitante', body: detail?.reopen_reason || ticketTitle };
+        case 'warning':
+          return { title: 'Chamado perto do encerramento automático', body: ticketTitle };
+        default: {
+          const action = detail?.action;
+          if (action === 'reopened_by_requester') return { title: 'Chamado reaberto pelo usuário', body: ticketTitle };
+          if (action === 'marked_resolved_pending_confirmation') return { title: 'Chamado aguardando confirmação do usuário', body: ticketTitle };
+          if (action === 'auto_closed') return { title: 'Chamado encerrado automaticamente por prazo', body: ticketTitle };
+          if (action === 'manual_closed') return { title: 'Chamado encerrado manualmente', body: ticketTitle };
+          return { title: 'Um chamado foi atualizado', body: ticketTitle };
+        }
+      }
     };
 
-    window.addEventListener('ticket:updated', incrementFromRealtime);
-    window.addEventListener('ticket:resolved', incrementFromRealtime);
-    window.addEventListener('ticket:reopened', incrementFromRealtime);
-    window.addEventListener('ticket:auto_close_warning', incrementFromRealtime);
+    const makeHandler = (kind: NotificationKind) => (event: Event) => {
+      const detail = (event as CustomEvent).detail ?? {};
+      const { title, body } = describe(kind, detail);
+      pushNotifications([
+        {
+          id: makeNotificationId(kind),
+          kind,
+          title,
+          body,
+          ticketId: detail?.ticketId ? String(detail.ticketId) : undefined,
+          createdAt: detail?.timestamp || new Date().toISOString(),
+          read: false,
+        },
+      ]);
+    };
+
+    const handlers: Array<[string, EventListener]> = [
+      ['ticket:updated', makeHandler('updated')],
+      ['ticket:resolved', makeHandler('resolved')],
+      ['ticket:reopened', makeHandler('reopened')],
+      ['ticket:auto_close_warning', makeHandler('warning')],
+    ];
+
+    handlers.forEach(([name, handler]) => window.addEventListener(name, handler));
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       document.removeEventListener('click', unlockAudioCtx);
       document.removeEventListener('keydown', unlockAudioCtx);
-      window.removeEventListener('ticket:updated', incrementFromRealtime);
-      window.removeEventListener('ticket:resolved', incrementFromRealtime);
-      window.removeEventListener('ticket:reopened', incrementFromRealtime);
-      window.removeEventListener('ticket:auto_close_warning', incrementFromRealtime);
+      handlers.forEach(([name, handler]) => window.removeEventListener(name, handler));
     };
-  }, [poll]);
+  }, [poll, pushNotifications]);
 
-  return (
-    <NotificationContext.Provider value={{ unseenCount, clearUnseen }}>
-      {children}
-    </NotificationContext.Provider>
+  const value = useMemo<NotificationContextValue>(
+    () => ({
+      notifications,
+      unseenCount,
+      markAllRead,
+      markRead,
+      dismiss,
+      clearAll,
+      clearUnseen: markAllRead,
+    }),
+    [notifications, unseenCount, markAllRead, markRead, dismiss, clearAll]
   );
+
+  return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;
 }

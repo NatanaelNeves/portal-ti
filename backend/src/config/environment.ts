@@ -10,7 +10,7 @@ const parseBooleanEnv = (value?: string): boolean => {
 
 const parseFromAddress = (rawFrom?: string): { fromEmail: string; fromName: string } => {
   const fallback = {
-    fromEmail: process.env.EMAIL_FROM || 'noreply@pequenonazareno.org',
+    fromEmail: process.env.EMAIL_FROM || 'portalti@opequenonazareno.org.br',
     fromName: process.env.EMAIL_FROM_NAME || 'Portal TI - O Pequeno Nazareno',
   };
 
