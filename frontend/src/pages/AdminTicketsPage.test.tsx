@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import api from '../services/api';
@@ -25,8 +25,6 @@ async function mount() {
 describe('continuidade da fila de chamados', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
-    HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
     localStorage.setItem('internal_token', 'test-only');
     localStorage.setItem('internal_user', JSON.stringify({ id: 'staff', role: 'it_staff' }));
     vi.mocked(api.get).mockImplementation(async (url) => {
@@ -106,4 +104,87 @@ describe('continuidade da fila de chamados', () => {
     expect(params.getAll('priority')).toEqual(['high', 'urgent']);
     expect(params.getAll('status')).toContain('open');
   }, 15000);
+
+  it('expande na própria linha, separa a seleção e recolhe com foco no assunto', async () => {
+    await mount();
+    const trigger = screen.getByRole('button', { name: tickets[0].title });
+    const row = trigger.closest('.ticket-card')!;
+    fireEvent.click(within(row as HTMLElement).getByRole('checkbox'));
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('region', { name: `Detalhes de ${tickets[0].title}` })).not.toBeInTheDocument();
+    await act(async () => { fireEvent.click(row); });
+    const details = screen.getByRole('region', { name: `Detalhes de ${tickets[0].title}` });
+    expect(row).toContainElement(details);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(within(details).getByText('Descrição do problema')).toBeVisible();
+    expect(within(details).getByRole('link', { name: 'Abrir atendimento' })).toHaveAttribute('href', '/admin/chamados/ticket-0');
+    fireEvent.click(within(details).getByText('Descrição do problema'));
+    expect(details).toBeInTheDocument();
+    fireEvent.click(within(details).getByRole('button', { name: 'Recolher detalhes' }));
+    expect(trigger).toHaveFocus();
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    await act(async () => { fireEvent.click(trigger); });
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Recolher detalhes' }), { key: 'Escape' });
+    expect(trigger).toHaveFocus();
+    expect(screen.queryByRole('region', { name: `Detalhes de ${tickets[0].title}` })).not.toBeInTheDocument();
+  });
+
+  it('mantém os detalhes abertos e a seleção quando uma atualização chega', async () => {
+    await mount();
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: tickets[15].title })); });
+    const details = screen.getByRole('region', { name: `Detalhes de ${tickets[15].title}` });
+    vi.mocked(api.get).mockResolvedValue(response([{ ...tickets[0], id: 'new-ticket', title: 'Novidade' }, ...tickets]));
+    await act(async () => { window.dispatchEvent(new Event('ticket:updated')); vi.advanceTimersByTime(400); });
+    expect(details.isConnected).toBe(true);
+    expect(screen.getByRole('button', { name: tickets[15].title })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.queryByText('Novidade')).not.toBeInTheDocument();
+  });
+
+  it('troca o chamado expandido sem misturar históricos e permite tentar novamente', async () => {
+    await mount();
+    let finishOldHistory!: (value: { data: { messages: unknown[] } }) => void;
+    vi.mocked(api.get).mockImplementationOnce(() => new Promise(resolve => { finishOldHistory = resolve; }));
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: tickets[0].title })); });
+    vi.mocked(api.get).mockRejectedValueOnce(new Error('Falha no histórico'));
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: tickets[1].title })); });
+    await act(async () => { finishOldHistory({ data: { messages: [{ id: 'old', message: 'Mensagem do chamado anterior' }] } }); });
+    expect(screen.queryByText('Mensagem do chamado anterior')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: tickets[0].title })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('alert')).toHaveTextContent('Não foi possível carregar o histórico');
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { messages: [] } });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' })); });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByText('As respostas e notas deste chamado aparecerão aqui.')).toBeVisible();
+  });
+
+  it('assume o chamado pelas ações rápidas sem fechar os detalhes', async () => {
+    await mount();
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: tickets[0].title })); });
+    const details = screen.getByRole('region', { name: `Detalhes de ${tickets[0].title}` });
+    let finishPatch!: (value: unknown) => void;
+    vi.mocked(api.patch).mockImplementationOnce(() => new Promise(resolve => { finishPatch = resolve; }));
+    const assume = within(details).getByRole('button', { name: 'Assumir chamado' });
+    fireEvent.click(assume);
+    expect(assume).toBeDisabled();
+    expect(api.patch).toHaveBeenCalledWith('/tickets/ticket-0', { status: 'in_progress', assigned_to_id: 'staff' });
+    const ownedTicket = { ...tickets[0], status: 'in_progress', assigned_to: 'staff' };
+    vi.mocked(api.get).mockImplementation(async url => url.startsWith('/tickets/') ? { data: { messages: [] } } : response([ownedTicket, ...tickets.slice(1)]));
+    await act(async () => { finishPatch({ data: ownedTicket }); });
+    expect(details.isConnected).toBe(true);
+    expect(within(details).getByRole('button', { name: 'Resolver chamado' })).toBeEnabled();
+    expect(within(details).getByRole('button', { name: 'Aguardar resposta' })).toBeEnabled();
+    expect(within(details).queryByRole('button', { name: 'Assumir chamado' })).not.toBeInTheDocument();
+  });
+
+  it('não oferece ações de responsável para um chamado de outra pessoa', async () => {
+    const someoneElsesTicket = { ...tickets[0], status: 'in_progress', assigned_to: 'other-staff' };
+    vi.mocked(api.get).mockImplementation(async url => url.includes('internal-auth') ? { data: [] } : url.startsWith('/tickets/') ? { data: { messages: [] } } : response([someoneElsesTicket]));
+    await mount();
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: tickets[0].title })); });
+    const details = screen.getByRole('region', { name: `Detalhes de ${tickets[0].title}` });
+    expect(within(details).queryByRole('button', { name: 'Resolver chamado' })).not.toBeInTheDocument();
+    expect(within(details).queryByRole('button', { name: 'Aguardar resposta' })).not.toBeInTheDocument();
+    expect(within(details).queryByRole('button', { name: 'Assumir chamado' })).not.toBeInTheDocument();
+    expect(within(details).getByRole('link', { name: 'Abrir atendimento' })).toBeVisible();
+  });
 });

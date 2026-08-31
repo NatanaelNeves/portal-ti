@@ -202,7 +202,7 @@ A paleta combina verdes institucionais firmes com papel branco e canvas mineral;
 
 Em `AdminTicketsPage.tsx`, DM Sans permanece, mas o assunto do chamado usa leitura de corpo (16px, peso 650, linha 1.45), e solicitante e contexto próximo usam 14px, linha 1.5. O assunto cresce para 17px em telas a partir de 1700px; não há corte que impeça a leitura de títulos longos. Referência e responsável usam 13px; prioridade, estado e idade usam 12px, sem caixa alta obrigatória. O token global `label` de 0.61rem não rege esses papéis nesta rota.
 
-O título da página usa 30px no desktop, reduzindo conforme o espaço; a busca usa 16px e os filtros rápidos, 14px. No drawer, o assunto usa 22px e a descrição, 15px com linha 1.65. Esses valores pertencem à implementação local em `frontend/src/styles/TicketsWorkspace.css`.
+O título da página usa 30px no desktop, reduzindo conforme o espaço; a busca usa 16px e os filtros rápidos, 14px. Nos detalhes expandidos, os títulos e a descrição usam 16px, com linha 1.7 no texto; histórico usa 15px e informações complementares, 13–14px. Esses valores pertencem à implementação local em `frontend/src/styles/TicketsWorkspace.css`.
 
 ## Layout
 
@@ -214,9 +214,9 @@ As páginas usam largura central de até 1380–1420px, margens laterais de 17�
 
 Somente em `AdminTicketsPage.tsx`, o conteúdo ocupa até 1560px, com 32px de margem lateral e 32px de respiro superior no desktop. A primeira viewport ordena título e “Novo chamado”, uma única busca de chamados com ações de filtro e atualização, seletor “Atendimento” / “Panorama” e equipe responsável, filtros rápidos e fila. A busca global do shell não muda. Indicadores, insights e distribuição da equipe aparecem apenas em “Panorama”; a fila não precisa disputar espaço com métricas ou com um detalhe vazio.
 
-“Atendimento” é a visão inicial. A lista usa toda a largura disponível, sem coluna lateral permanente ou rolagem interna da fila. Linhas contínuas organizam seleção, assunto e solicitante, situação, responsável e menu; divisores preservam o conjunto. O detalhe aparece em um diálogo nativo contextual na borda direita, com até 580px e altura da viewport, sem recompor a lista em duas colunas. O cabeçalho do diálogo permanece visível enquanto seu conteúdo rola.
+“Atendimento” é a visão inicial. A lista usa toda a largura disponível, sem coluna lateral permanente ou rolagem interna da fila. Linhas contínuas organizam seleção, assunto e solicitante, situação, responsável e menu; divisores preservam o conjunto. Clicar no chamado expande os detalhes logo abaixo do resumo, dentro da mesma linha. Apenas um chamado fica expandido por vez; o restante da fila continua acessível, sem sobreposição ou bloqueio da página.
 
-Até 1280px, margens laterais passam a 20px e colunas ficam mais estreitas; até 1080px, o responsável passa para uma linha abaixo do assunto. Até 760px, margens laterais passam a 16px, busca e ações empilham, equipe responsável ocupa sua própria faixa, filtros rápidos permitem rolagem horizontal, e as linhas acomodam situação e responsável abaixo do assunto. O drawer ocupa no máximo a largura da tela. Até 420px, “Novo chamado” passa para baixo do título. Filtros e ações principais mantêm controles explícitos; o layout não depende de uma tabela larga no celular.
+Até 1280px, margens laterais passam a 20px e colunas ficam mais estreitas; até 1080px, o responsável passa para uma linha abaixo do assunto. Até 760px, margens laterais passam a 16px, busca e ações empilham, equipe responsável ocupa sua própria faixa, filtros rápidos permitem rolagem horizontal, e as linhas acomodam situação e responsável abaixo do assunto. Os detalhes expandidos passam a uma coluna; ações rápidas usam dois botões por linha e o acesso ao atendimento completo ocupa a largura disponível. Até 420px, “Novo chamado” passa para baixo do título. Filtros e ações principais mantêm controles explícitos; o layout não depende de uma tabela larga no celular.
 
 Relatórios preservam “Equipe responsável” e “Setor solicitante” como dimensões distintas e mostram um resumo do escopo ativo. No dashboard, a dimensão operacional correspondente é nomeada “Fila responsável”. A interface nunca faz o usuário inferir qual universo de dados está lendo.
 
@@ -305,11 +305,15 @@ A superfície da fila usa borda fina, raio externo de 12px e linhas planas com d
 - **OWN-WORLD:** verde institucional, DM Sans e superfícies brancas do produto existente; shell preservado.
 - **STORY:** encontrar, ler, abrir o contexto e retornar sem interrupção.
 - **FIRST VIEWPORT:** título e ação, busca, visões e escopo, filtros rápidos, fila.
-- **FORM:** inbox com drawer contextual; referência de direção `fcbc1f1c`.
+- **FORM:** inbox com detalhes expansíveis na própria linha; referência de direção `fcbc1f1c`.
 
 ### Central de Chamados — detalhe contextual
 
-O detalhe usa `<dialog>` aberto por `showModal()`, com fundo de contenção e superfície branca de até 580px. ID, assunto, estados, responsável, linha do tempo, ações, descrição, histórico e informações ficam no contexto do chamado escolhido. “Ver detalhes completos” mantém o acesso à rota completa; “Aguardar” e “Resolver” respeitam as permissões existentes. Fechar pelo controle explícito, Escape ou fundo devolve o foco ao assunto que abriu a prévia, sem pedir uma nova busca nem forçar rolagem. Descrições longas quebram linha; a prévia não usa animação de entrada contínua e respeita redução de movimento.
+O detalhe usa uma região nomeada dentro da própria linha. O botão do assunto expõe `aria-expanded` e `aria-controls`; a seta gira ao expandir, e a superfície verde conecta resumo e ações. Cliques no resumo também alternam a abertura, sem interferir no checkbox, na cópia do identificador, no menu ou no conteúdo expandido. Não há modal nem rolagem interna.
+
+A faixa superior reúne ações rápidas: assumir um chamado livre, aguardar resposta, retomar uma espera e resolver um chamado próprio, conforme as permissões existentes. Alterações bloqueiam os botões enquanto são salvas e preservam a expansão se o chamado continuar na fila. “Abrir atendimento” mantém o acesso à rota completa. Abaixo, descrição e três últimas interações ficam à esquerda; solicitante, localização, responsável, equipe, tipo, categoria e abertura ficam à direita. No celular, os grupos empilham na ordem do documento. Falhas de histórico têm mensagem e nova tentativa, distintas do estado sem mensagens; respostas de um chamado anterior são descartadas.
+
+Clicar novamente no assunto recolhe o conteúdo; “Recolher detalhes” ou Escape dentro da região também devolve o foco ao assunto sem forçar rolagem. Textos extensos quebram linha, e a entrada discreta de 180ms respeita redução de movimento. A implementação está em `TicketInlineDetails.tsx` e nos estilos locais de `TicketsWorkspace.css`.
 
 ### Central de Chamados — atualização sem interrupção
 

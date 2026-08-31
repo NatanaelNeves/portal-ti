@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import StatusTimeline from '../components/StatusTimeline';
+import TicketInlineDetails from '../components/tickets/TicketInlineDetails';
 import { showToast } from '../utils/toast';
 import useTicketsOverview from '../hooks/useTicketsOverview';
 import TicketsHero from '../components/tickets/TicketsHero';
@@ -50,15 +50,6 @@ interface InternalUser {
   email: string;
 }
 
-interface TicketMessage {
-  id: string;
-  message: string;
-  author_type: string;
-  author_name?: string;
-  created_at: string;
-  is_internal: boolean;
-}
-
 const FILTER_PRIORITY_STORAGE_KEY = 'adminTickets.filterPriority';
 
 export default function AdminTicketsPage() {
@@ -75,8 +66,6 @@ export default function AdminTicketsPage() {
   const hasLoaded = useRef(false);
   const queueSnapshot = useRef('');
   const refreshRef = useRef<() => void>(() => {});
-  const previewDialog = useRef<HTMLDialogElement>(null);
-  const previewTrigger = useRef<HTMLElement | null>(null);
   const [error, setError] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterPriority, setFilterPriority] = useState<'high' | 'medium' | 'low' | null>(null);
@@ -103,8 +92,6 @@ export default function AdminTicketsPage() {
   // Recortes rapidos da fila (chips do cabecalho).
   const [todayOnly, setTodayOnly] = useState(false);
   const [overdueOnly, setOverdueOnly] = useState(false);
-  const [previewMessages, setPreviewMessages] = useState<TicketMessage[]>([]);
-  const [previewMessagesLoading, setPreviewMessagesLoading] = useState(false);
 
   // Panorama agregado: calculado no servidor sobre TODO o conjunto visivel,
   // nao sobre a pagina atual da lista.
@@ -177,14 +164,6 @@ export default function AdminTicketsPage() {
   useEffect(() => () => { requestVersion.current += 1; }, []);
 
   useEffect(() => {
-    if (selectedTicket) previewDialog.current?.showModal();
-    else {
-      previewDialog.current?.close();
-      previewTrigger.current?.focus({ preventScroll: true });
-    }
-  }, [selectedTicket?.id]);
-
-  useEffect(() => {
     if (!isContextReady) return;
     setHasUpdates(false);
     setSelectedIds(new Set());
@@ -226,27 +205,6 @@ export default function AdminTicketsPage() {
     };
   }, [isContextReady]);
 
-  // Load the activity history for whichever ticket is previewed, so the panel
-  // reads like a real workspace instead of a static summary card.
-  useEffect(() => {
-    if (!selectedTicket) {
-      setPreviewMessages([]);
-      return;
-    }
-    let cancelled = false;
-    setPreviewMessagesLoading(true);
-    api.get(`/tickets/${selectedTicket.id}`)
-      .then((res) => {
-        if (!cancelled) setPreviewMessages(res.data?.messages || []);
-      })
-      .catch(() => {
-        if (!cancelled) setPreviewMessages([]);
-      })
-      .finally(() => {
-        if (!cancelled) setPreviewMessagesLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [selectedTicket?.id]);
 
   const fetchUsers = async () => {
     try {
@@ -255,37 +213,6 @@ export default function AdminTicketsPage() {
       setUsers(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
       console.error('Erro ao carregar usuários:', err);
-    }
-  };
-
-  const handleQuickStatusChange = async (ticketId: string, newStatus: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    
-    console.log(`🔄 Mudando status do ticket ${ticketId} para:`, newStatus);
-    
-    try {
-      const payload = { status: newStatus };
-      console.log('📤 Enviando para backend:', payload);
-      
-      const response = await api.patch(`/tickets/${ticketId}`, payload);
-      
-      console.log('📥 Resposta do backend - Status:', response.status);
-      console.log('✅ Ticket atualizado:', response.data);
-      
-      // Fechar painel lateral se estava aberto
-      setSelectedTicket(null);
-      
-      // Recarregar tickets
-      console.log('🔄 Recarregando lista de tickets...');
-      fetchTickets();
-      reloadOverview();
-      showToast.success(
-        newStatus === 'resolved' ? 'Chamado resolvido' : 'Status atualizado',
-      );
-    } catch (err: any) {
-      console.error('❌ Erro ao atualizar status:', err);
-      setError(err.message || 'Erro ao atualizar chamado');
-      showToast.error('Não foi possível atualizar o chamado');
     }
   };
 
@@ -578,28 +505,6 @@ export default function AdminTicketsPage() {
     }
   };
 
-  const getPriorityBadgeClass = (priority: string) => {
-    switch (priority) {
-      case 'urgent':
-      case 'high':
-        return 'badge-priority-high';
-      case 'medium':
-        return 'badge-priority-medium';
-      case 'low':
-        return 'badge-priority-low';
-      default:
-        return 'badge-priority-neutral';
-    }
-  };
-
-  const getTypeBadgeClass = (type?: string) => {
-    if (type === 'incident') {
-      return 'badge-type-incident';
-    }
-
-    return 'badge-type-neutral';
-  };
-
   const getUserName = (userId?: string) => {
     if (!userId) return 'Sem responsável';
     const user = users.find(u => u.id === userId);
@@ -659,22 +564,7 @@ export default function AdminTicketsPage() {
     return { elapsed, target, state, pct: Math.min(100, Math.round(ratio * 100)), paused: false };
   };
 
-  const canQuickResolve = (ticket: Ticket) => {
-    if (!ticket.assigned_to) return false;
-    if (ticket.assigned_to !== currentUserId) return false;
-    return ticket.status !== 'closed' && ticket.status !== 'resolved';
-  };
-
-  const canMoveToWaiting = (ticket: Ticket) => {
-    if (!ticket.assigned_to) return false;
-    if (ticket.assigned_to !== currentUserId) return false;
-    return ticket.status !== 'closed' && ticket.status !== 'open';
-  };
-
   const sortedTickets = tickets;
-
-  const panelCanResolve = selectedTicket ? canQuickResolve(selectedTicket) : false;
-  const panelCanWait = selectedTicket ? canMoveToWaiting(selectedTicket) : false;
 
   if (!localStorage.getItem('internal_token')) {
     return null;
@@ -1066,12 +956,20 @@ export default function AdminTicketsPage() {
                 {sortedTickets.map((ticket) => {
                   const overdue = isTicketOverdue(ticket);
                   const sla = getSlaProgress(ticket);
+                  const expanded = selectedTicket?.id === ticket.id;
+                  const toggleDetails = () => setSelectedTicket(current => current?.id === ticket.id ? null : ticket);
+                  const collapseDetails = () => {
+                    setSelectedTicket(null);
+                    document.getElementById(`ticket-toggle-${ticket.id}`)?.focus({ preventScroll: true });
+                  };
                   return (
-                    <article key={ticket.id} role="listitem" className={`ticket-card tk-ticket-row ${selectedTicket?.id === ticket.id ? 'active' : ''} ${selectedIds.has(ticket.id) ? 'ticket-card--selected' : ''}`}>
+                    <article key={ticket.id} role="listitem" className={`ticket-card tk-ticket-row ${expanded ? 'active' : ''} ${selectedIds.has(ticket.id) ? 'ticket-card--selected' : ''}`} onClick={event => {
+                      if (!(event.target as HTMLElement).closest('button, input, a, [role="menu"], .tk-inline-details')) toggleDetails();
+                    }}>
                       <input type="checkbox" className="ticket-checkbox" checked={selectedIds.has(ticket.id)} onChange={() => {}} onClick={(e) => toggleSelect(ticket.id, e)} aria-label={`Selecionar ${ticket.title}`} />
                       <div className="tk-ticket-subject">
                         <div className="tk-ticket-reference"><TicketRef id={ticket.id} /><span className={`tk-priority-label tk-priority-label--${ticket.priority}`}><span aria-hidden="true" />{getPriorityLabel(ticket.priority)}</span>{isUntouched(ticket) && <span className="tk-unread-dot" title="Ainda sem primeira resposta" aria-label="Novo chamado" />}</div>
-                        <button type="button" className="tk-ticket-title" onClick={(event) => { previewTrigger.current = event.currentTarget; setSelectedTicket(ticket); }}>{ticket.title}</button>
+                        <button type="button" id={`ticket-toggle-${ticket.id}`} className="tk-ticket-title" aria-expanded={expanded} aria-controls={`ticket-details-${ticket.id}`} onClick={toggleDetails}><span>{ticket.title}</span><i className="ti ti-chevron-down tk-ticket-chevron" aria-hidden="true" /></button>
                         <p className="tk-ticket-requester">{ticket.requester_name || 'Solicitante interno'}{ticket.requester_department && <span> · {ticket.requester_department}</span>}{ticket.category && <span className="tk-ticket-category"> · {ticket.category.replace(/_/g, ' ')}</span>}</p>
                       </div>
                       <div className="tk-ticket-state">
@@ -1107,6 +1005,18 @@ export default function AdminTicketsPage() {
                             onPriority={(priority) => handleRowPriority(ticket.id, priority)}
                             onAssign={(assignee) => handleRowAssign(ticket.id, assignee)}
                           /></div>
+                      {expanded && <TicketInlineDetails
+                        key={ticket.id}
+                        ticket={ticket}
+                        role={userRole}
+                        userId={currentUserId}
+                        ownerName={getUserName(ticket.assigned_to)}
+                        typeLabel={getTypeLabel(ticket.type)}
+                        busy={rowBusyId === ticket.id}
+                        onAssume={() => patchTicket(ticket.id, { status: 'in_progress', assigned_to_id: currentUserId }, 'Chamado atribuído a você')}
+                        onStatus={status => patchTicket(ticket.id, { status }, status === 'resolved' ? 'Chamado resolvido' : status === 'in_progress' ? 'Atendimento retomado' : 'Aguardando resposta do usuário')}
+                        onCollapse={collapseDetails}
+                      />}
                     </article>
                   );
                 })}
@@ -1145,150 +1055,6 @@ export default function AdminTicketsPage() {
           </section>
         </div>
 
-        {/* Painel Lateral do Ticket Selecionado */}
-        <dialog ref={previewDialog} className="tk-preview-dialog" aria-labelledby="ticket-preview-title" onCancel={() => setSelectedTicket(null)} onClose={() => setSelectedTicket(null)} onClick={(event) => { if (event.target === event.currentTarget) setSelectedTicket(null); }}>
-        {selectedTicket && (
-          <aside className="ticket-panel card">
-            <div className="panel-header card-header">
-              <div className="panel-header-main">
-                <span className="panel-ticket-id">#{selectedTicket.id.substring(0, 8).toUpperCase()}</span>
-                <h3 id="ticket-preview-title" className="panel-title">{selectedTicket.title}</h3>
-              </div>
-              <button 
-                className="close-panel"
-                onClick={() => setSelectedTicket(null)}
-                aria-label="Fechar detalhes"
-              >
-                <i className="ti ti-x" />
-              </button>
-            </div>
-
-            <div className="panel-content card-body">
-              <div key={selectedTicket.id} className="panel-fade-in">
-              <div className="panel-badges">
-                <span className={`badge ${getStatusBadgeClass(selectedTicket.status)}`}>
-                  {getStatusLabel(selectedTicket.status)}
-                </span>
-                <span className={`badge ${getPriorityBadgeClass(selectedTicket.priority)}`}>
-                  {getPriorityLabel(selectedTicket.priority)}
-                </span>
-                <span className={`badge ${getTypeBadgeClass(selectedTicket.type)}`}>
-                  {getTypeLabel(selectedTicket.type)}
-                </span>
-              </div>
-
-              <div className="panel-meta">
-                Aberto há {getTimeAgo(selectedTicket.created_at)} • Responsável: {getUserName(selectedTicket.assigned_to)}
-              </div>
-
-              <div className="panel-timeline-wrap">
-                <StatusTimeline currentStatus={selectedTicket.status} />
-              </div>
-
-              <div className="panel-actions">
-                <button 
-                  className="btn btn-primary btn-block"
-                  onClick={() => navigate(`/admin/chamados/${selectedTicket.id}`)}
-                >
-                  Ver detalhes completos
-                </button>
-                <button 
-                  className="btn btn-warning"
-                  onClick={() => handleQuickStatusChange(selectedTicket.id, 'waiting_user')}
-                  disabled={!panelCanWait}
-                  title={panelCanWait ? 'Marcar como aguardando resposta do usuário' : 'Somente o responsável atual pode usar esta ação.'}
-                >
-                  Aguardar
-                </button>
-                <button 
-                  className="btn btn-success"
-                  onClick={() => handleQuickStatusChange(selectedTicket.id, 'resolved')}
-                  disabled={!panelCanResolve}
-                  title={panelCanResolve ? 'Marcar ticket como resolvido' : 'Somente o responsável atual pode usar esta ação.'}
-                >
-                  Resolver
-                </button>
-              </div>
-
-              <section className="panel-section panel-section--description">
-                <h4>Descrição</h4>
-                <p>{selectedTicket.description}</p>
-              </section>
-
-              <section className="panel-section">
-                <h4>Histórico</h4>
-                {previewMessagesLoading ? (
-                  <p className="panel-history-empty">Carregando histórico...</p>
-                ) : previewMessages.length === 0 ? (
-                  <p className="panel-history-empty">Nenhuma mensagem registrada ainda.</p>
-                ) : (
-                  <ul className="panel-history-list">
-                    {previewMessages.slice(-6).map((msg) => (
-                      <li key={msg.id} className={`panel-history-item ${msg.is_internal ? 'is-internal' : ''}`}>
-                        <span className="panel-history-time">
-                          {new Date(msg.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                        <span className="panel-history-author">
-                          {msg.author_name || (msg.author_type === 'system' ? 'Sistema' : 'Solicitante')}
-                          {msg.is_internal ? ' · nota interna' : ''}
-                        </span>
-                        <p className="panel-history-text">{msg.message}</p>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-
-              <section className="panel-section">
-                <h4>Informações</h4>
-                <div className="panel-info">
-                  <div className="info-row">
-                    <span className="info-label">Solicitante:</span>
-                    <span className="info-value">{selectedTicket.requester_name || 'Usuário interno'}</span>
-                  </div>
-                  {selectedTicket.requester_email && (
-                    <div className="info-row">
-                      <span className="info-label">Email:</span>
-                      <span className="info-value">{selectedTicket.requester_email}</span>
-                    </div>
-                  )}
-                  {(selectedTicket.requester_department || selectedTicket.requester_unit) && (
-                    <div className="info-row">
-                      <span className="info-label">Localização:</span>
-                      <span className="info-value">
-                        {selectedTicket.requester_department || '—'}
-                        {selectedTicket.requester_department && selectedTicket.requester_unit && ' • '}
-                        {selectedTicket.requester_unit || ''}
-                      </span>
-                    </div>
-                  )}
-                  <div className="info-row">
-                    <span className="info-label">Departamento:</span>
-                    <span className="info-value">
-                      {selectedTicket.department === 'administrativo' ? 'Administrativo'
-                        : selectedTicket.department === 'rh' ? 'RH'
-                        : 'TI'}
-                    </span>
-                  </div>
-                  {selectedTicket.category && (
-                    <div className="info-row">
-                      <span className="info-label">Categoria:</span>
-                      <span className="info-value" style={{ textTransform: 'capitalize' }}>
-                        {selectedTicket.category.replace(/_/g, ' ')}
-                      </span>
-                    </div>
-                  )}
-                  <div className="info-row">
-                    <span className="info-label">Responsável:</span>
-                    <span className="info-value">{getUserName(selectedTicket.assigned_to)}</span>
-                  </div>
-                </div>
-              </section>
-              </div>
-            </div>
-          </aside>
-        )}
-        </dialog>
       </div>
       </div>
     </div>
