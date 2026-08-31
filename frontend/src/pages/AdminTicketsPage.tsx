@@ -14,6 +14,7 @@ import QuickFilters from '../components/tickets/QuickFilters';
 import EmptyState from '../components/tickets/EmptyState';
 import TicketRef from '../components/tickets/TicketRef';
 import TicketRowMenu from '../components/tickets/TicketRowMenu';
+import TicketBulkActions from '../components/tickets/TicketBulkActions';
 import { isUntouched, isSlaPaused } from '../components/tickets/ticketPermissions';
 import { ACTIVE_TICKET_STATUSES } from '../utils/ticketStatus';
 import { profileForDepartment } from '../components/tickets/sectorProfiles';
@@ -1021,43 +1022,15 @@ export default function AdminTicketsPage() {
             </div>
 
             {/* Barra de ações em lote */}
-            {selectedIds.size > 0 && (
-              <div className="bulk-action-bar">
-                <span className="bulk-count">{selectedIds.size} selecionado{selectedIds.size !== 1 ? 's' : ''}</span>
-                <div className="bulk-actions">
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    onClick={toggleSelectAll}
-                  >
-                    {selectedIds.size === sortedTickets.length ? 'Desmarcar todos' : 'Selecionar todos'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    onClick={handleBulkAssignToMe}
-                    disabled={bulkLoading}
-                  >
-                    Assumir selecionados
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-warning btn-sm"
-                    onClick={handleBulkClose}
-                    disabled={bulkLoading}
-                  >
-                    Fechar selecionados
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    onClick={clearSelection}
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-            )}
+            <TicketBulkActions
+              selectedCount={selectedIds.size}
+              totalCount={sortedTickets.length}
+              busy={bulkLoading}
+              onToggleAll={toggleSelectAll}
+              onAssign={handleBulkAssignToMe}
+              onClose={handleBulkClose}
+              onCancel={clearSelection}
+            />
 
           {loading ? (
               <div className="tickets-list">
