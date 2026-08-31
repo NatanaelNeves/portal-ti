@@ -187,4 +187,17 @@ describe('continuidade da fila de chamados', () => {
     expect(within(details).queryByRole('button', { name: 'Assumir chamado' })).not.toBeInTheDocument();
     expect(within(details).getByRole('link', { name: 'Abrir atendimento' })).toBeVisible();
   });
+
+  it('aplica a equipe escolhida à consulta e mantém o seletor restrito aos perfis permitidos', async () => {
+    localStorage.setItem('internal_user', JSON.stringify({ id: 'manager', role: 'manager' }));
+    await mount();
+    fireEvent.click(screen.getByRole('combobox', { name: /Equipe responsável/ }));
+    await act(async () => { fireEvent.click(screen.getByRole('option', { name: 'Recursos Humanos' })); });
+    expect(api.get).toHaveBeenCalledWith(expect.stringMatching(/\/tickets\?.*department=rh/), expect.anything());
+    expect(screen.getByRole('combobox')).toHaveAccessibleName('Equipe responsável Recursos Humanos');
+    cleanup();
+    localStorage.setItem('internal_user', JSON.stringify({ id: 'staff', role: 'it_staff' }));
+    await mount();
+    expect(screen.queryByRole('combobox', { name: /Equipe responsável/ })).not.toBeInTheDocument();
+  });
 });

@@ -15,6 +15,7 @@ import EmptyState from '../components/tickets/EmptyState';
 import TicketRef from '../components/tickets/TicketRef';
 import TicketRowMenu from '../components/tickets/TicketRowMenu';
 import TicketBulkActions from '../components/tickets/TicketBulkActions';
+import TicketTeamSelect from '../components/tickets/TicketTeamSelect';
 import { isUntouched, isSlaPaused } from '../components/tickets/ticketPermissions';
 import { ACTIVE_TICKET_STATUSES } from '../utils/ticketStatus';
 import { profileForDepartment } from '../components/tickets/sectorProfiles';
@@ -639,15 +640,7 @@ export default function AdminTicketsPage() {
           </button>
         </div>
         <div className="tk-scope-control">
-          {canPickSector ? <>
-            <label htmlFor="ticket-department">Equipe responsável</label>
-            <select id="ticket-department" value={departmentFilter} onChange={(e) => handleSectorChange(e.target.value)}>
-              <option value="">Todas as equipes</option>
-              <option value="ti">Tecnologia da Informação</option>
-              <option value="rh">Recursos Humanos</option>
-              <option value="administrativo">Administrativo</option>
-            </select>
-          </> : <span>Equipe responsável: <strong>{sectorProfile.label}</strong></span>}
+          {canPickSector ? <TicketTeamSelect value={departmentFilter} onChange={handleSectorChange} /> : <span>Equipe responsável: <strong>{sectorProfile.label}</strong></span>}
         </div>
       </div>
 

@@ -307,6 +307,10 @@ A superfície da fila usa borda fina, raio externo de 12px e linhas planas com d
 - **FIRST VIEWPORT:** título e ação, busca, visões e escopo, filtros rápidos, fila.
 - **FORM:** inbox com detalhes expansíveis na própria linha; referência de direção `fcbc1f1c`.
 
+### Central de Chamados — equipe responsável
+
+O seletor de equipe usa um controle próprio de 64px, com rótulo, nome e ícone da equipe. O menu branco apresenta quatro opções com alvos de pelo menos 54px; verde e marca de confirmação identificam o valor aplicado. Setas, Home/End e digitação exploram as opções sem aplicar filtros; Enter, espaço ou clique confirmam. Escape, Tab e clique externo fecham o menu. A navegação por teclado rola apenas o menu, sem deslocar a página. No celular, o controle ocupa a largura disponível. As permissões para escolher equipe permanecem inalteradas.
+
 ### Central de Chamados — detalhe contextual
 
 O detalhe usa uma região nomeada dentro da própria linha. O botão do assunto expõe `aria-expanded` e `aria-controls`; a seta gira ao expandir, e a superfície verde conecta resumo e ações. Cliques no resumo também alternam a abertura, sem interferir no checkbox, na cópia do identificador, no menu ou no conteúdo expandido. Não há modal nem rolagem interna.
