@@ -39,9 +39,9 @@ export default function QuickFilters({
   const chips = [
     {
       key: 'all',
-      label: 'Todos',
+      label: 'Fila ativa',
       icon: 'ti-layout-grid',
-      active: state.assignment === 'all' && !state.priority && !state.today && !state.overdue,
+      active: activeCount === 0,
       onClick: onClear,
     },
     {

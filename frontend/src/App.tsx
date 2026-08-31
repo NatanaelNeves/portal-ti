@@ -73,6 +73,7 @@ import './styles/AdminUnifiedPages.css';
 import './styles/AdminPaletteBridge.css';
 import './styles/AdminSectorScreens.css';
 import './styles/AdminTicketsRefinement.css';
+import './styles/TicketsWorkspace.css';
 
 /**
  * Escolhe o relatorio conforme o perfil. A protecao real esta no backend

@@ -116,7 +116,9 @@ components:
 
 A interface administrativa é uma central de operações institucional, não uma barra genérica sobre uma grade de cartões. A moldura evergreen permanece fixa e reconhecível durante o expediente; dentro dela, a topbar branca funciona como uma faixa de utilidades e o canvas mineral recebe superfícies brancas, planas e regradas. O resultado é sóbrio, humano e operacional: denso o bastante para trabalhar, hierárquico o bastante para decidir sem reler.
 
-O percurso visual é sempre o mesmo: reconhecer o escopo atual, ler a saúde da operação, entrar na fila e agir com contexto. O dashboard entrega estado, indicadores, desempenho e ações em capítulos claros; a Central de Chamados aproxima filtros rápidos, resumo do dia, fila contínua e detalhe acionável. A cor aparece quando há uma ação, seleção ou estado real — nunca para compensar falta de hierarquia.
+O dashboard conduz da leitura da saúde da operação para a ação, com estado, indicadores, desempenho e ações em capítulos claros. Na Central de Chamados, o percurso começa pela fila: encontrar, ler, abrir o contexto e retornar sem interrupção; a leitura de indicadores fica na visão separada “Panorama”. A cor aparece quando há uma ação, seleção ou estado real — nunca para compensar falta de hierarquia.
+
+As especificações locais de `frontend/src/pages/AdminTicketsPage.tsx` abaixo substituem, somente nessa rota, a tipografia miúda e a antiga composição de fila e detalhe sempre visíveis. Os tokens gerais e as orientações de dashboard, relatórios e shell permanecem vigentes; as medidas locais não são uma nova escala global.
 
 ### Directional Contract
 
@@ -134,7 +136,7 @@ O percurso visual é sempre o mesmo: reconhecer o escopo atual, ler a saúde da 
 - Canvas mineral com superfícies brancas delimitadas por linhas frias de 1px.
 - Hierarquia tipográfica compacta em DM Sans e números operacionais tabulares.
 - Dashboard em capítulos: comando, indicadores, desempenho, atividade, prioridade e atalhos.
-- Fila em composição mestre–detalhe, com filtros e resumo do dia antes da lista.
+- Na Central de Chamados, fila de largura integral em “Atendimento”, indicadores em “Panorama” e detalhe aberto sob demanda.
 - Cor semântica e movimento contido, sempre ligados a estado ou feedback real.
 
 ## Colors
@@ -185,7 +187,7 @@ A paleta combina verdes institucionais firmes com papel branco e canvas mineral;
 ### Hierarchy
 
 - **Display** (peso 750, escala fluida até 2.25rem, linha 1.12): saudação e contexto principal do cabeçalho de comando do dashboard.
-- **Headline** (peso 780, 1.35rem, linha 1.2): título da Central de Chamados e títulos de página compactos.
+- **Headline** (peso 780, 1.35rem, linha 1.2): títulos de página compactos; a Central de Chamados usa a hierarquia local abaixo.
 - **Title** (peso 750, 1rem, linha 1.25): cabeçalhos de painéis, seções e agrupamentos operacionais.
 - **Body** (peso 400, 0.92rem, linha 1.55): contexto, explicações e descrições curtas; mantenha linhas contínuas entre 55–72ch.
 - **Label** (peso 800, 0.61rem, tracking 0.05em): cabeçalhos de filtro, estados, metadados e orientação de controles; caixa alta somente nesses papéis.
@@ -196,13 +198,25 @@ A paleta combina verdes institucionais firmes com papel branco e canvas mineral;
 
 **The Compact-Authority Rule.** Títulos administrativos são compactos e densos; escala exagerada não substitui uma ordem de leitura clara.
 
+### Central de Chamados — hierarquia local
+
+Em `AdminTicketsPage.tsx`, DM Sans permanece, mas o assunto do chamado usa leitura de corpo (16px, peso 650, linha 1.45), e solicitante e contexto próximo usam 14px, linha 1.5. O assunto cresce para 17px em telas a partir de 1700px; não há corte que impeça a leitura de títulos longos. Referência e responsável usam 13px; prioridade, estado e idade usam 12px, sem caixa alta obrigatória. O token global `label` de 0.61rem não rege esses papéis nesta rota.
+
+O título da página usa 30px no desktop, reduzindo conforme o espaço; a busca usa 16px e os filtros rápidos, 14px. No drawer, o assunto usa 22px e a descrição, 15px com linha 1.65. Esses valores pertencem à implementação local em `frontend/src/styles/TicketsWorkspace.css`.
+
 ## Layout
 
 O shell desktop reserva 236px para a sidebar fixa e 72px para a topbar. Entre 761px e 1040px, a sidebar reduz para 214px; abaixo de 760px, ela vira um drawer de até 292px acionado por um controle explícito de 44px, e a topbar passa a 64px. A área principal respeita esses offsets e nunca corre sob a navegação.
 
-As páginas usam largura central de até 1380–1420px, margens laterais de 17–19px e intervalo vertical compacto de 12–20px. O dashboard abre com um cabeçalho de comando em duas colunas — contexto à esquerda, escopo e ações à direita — seguido por quatro indicadores, painéis de desempenho e atividade, leitura de prioridade e atalhos. A Central de Chamados abre com título, atualização e “Novo chamado”; logo abaixo, departamento, prioridade e resumo do dia formam um único ledger antes da composição mestre–detalhe.
+As páginas usam largura central de até 1380–1420px, margens laterais de 17–19px e intervalo vertical compacto de 12–20px, exceto pela largura local da Central de Chamados descrita abaixo. O dashboard abre com um cabeçalho de comando em duas colunas — contexto à esquerda, escopo e ações à direita — seguido por quatro indicadores, painéis de desempenho e atividade, leitura de prioridade e atalhos.
 
-A fila usa duas colunas no desktop: lista contínua a partir de 390px e painel de contexto a partir de 500px. O detalhe fica sticky a 88px do topo; em até 1180px, lista e detalhe empilham e o painel deixa de ser sticky. Em até 900px, cabeçalhos e ledgers de filtro viram fluxo único; em até 620px, métricas e ações viram uma coluna, filtros horizontais ganham rolagem e os alvos interativos sobem para pelo menos 44px.
+### Central de Chamados — composição local
+
+Somente em `AdminTicketsPage.tsx`, o conteúdo ocupa até 1560px, com 32px de margem lateral e 32px de respiro superior no desktop. A primeira viewport ordena título e “Novo chamado”, uma única busca de chamados com ações de filtro e atualização, seletor “Atendimento” / “Panorama” e equipe responsável, filtros rápidos e fila. A busca global do shell não muda. Indicadores, insights e distribuição da equipe aparecem apenas em “Panorama”; a fila não precisa disputar espaço com métricas ou com um detalhe vazio.
+
+“Atendimento” é a visão inicial. A lista usa toda a largura disponível, sem coluna lateral permanente ou rolagem interna da fila. Linhas contínuas organizam seleção, assunto e solicitante, situação, responsável e menu; divisores preservam o conjunto. O detalhe aparece em um diálogo nativo contextual na borda direita, com até 580px e altura da viewport, sem recompor a lista em duas colunas. O cabeçalho do diálogo permanece visível enquanto seu conteúdo rola.
+
+Até 1280px, margens laterais passam a 20px e colunas ficam mais estreitas; até 1080px, o responsável passa para uma linha abaixo do assunto. Até 760px, margens laterais passam a 16px, busca e ações empilham, equipe responsável ocupa sua própria faixa, filtros rápidos permitem rolagem horizontal, e as linhas acomodam situação e responsável abaixo do assunto. O drawer ocupa no máximo a largura da tela. Até 420px, “Novo chamado” passa para baixo do título. Filtros e ações principais mantêm controles explícitos; o layout não depende de uma tabela larga no celular.
 
 Relatórios preservam “Equipe responsável” e “Setor solicitante” como dimensões distintas e mostram um resumo do escopo ativo. No dashboard, a dimensão operacional correspondente é nomeada “Fila responsável”. A interface nunca faz o usuário inferir qual universo de dados está lendo.
 
@@ -279,13 +293,29 @@ A linguagem é contida: 7–9px em controles, 10px em grupos de filtro, 11–12p
 
 O cabeçalho evergreen declara contexto, atualização ao vivo, “Fila responsável” e ações. Indicadores usam quatro células brancas de mesma hierarquia; categorias aparecem por ícone e cor real, sem tags decorativas. Ativos, desempenho, distribuição de chamados, atividade recente, prioridade e atalhos formam capítulos separados por cabeçalhos, linhas e proporção — não uma grade indiferenciada.
 
-### Ledger de Filtros e Resumo
+### Central de Chamados — fila e visões
 
-Departamento e prioridade ocupam duas faixas anexadas à esquerda; o resumo do dia ocupa uma superfície regrada à direita, com abertos, resolvidos e progresso. Em telas menores, os três blocos empilham na mesma ordem. Filtros avançados aparecem como expansão deliberada e avisam quando substituem os filtros rápidos.
+Esta composição pertence somente a `AdminTicketsPage.tsx` e substitui seu antigo ledger com resumo do dia e painel mestre–detalhe permanente. “Atendimento” reúne uma busca, filtros rápidos, expansão deliberada dos filtros avançados e fila contínua. Busca e filtros mantêm o escopo explícito; a busca tem debounce de 300ms e volta à visão de atendimento. “Panorama” apresenta os indicadores reais da equipe e declara que eles independem dos filtros da fila.
 
-### Fila Mestre–Detalhe
+A superfície da fila usa borda fina, raio externo de 12px e linhas planas com divisores. No desktop, cada linha tem pelo menos 128px de altura e 22px de preenchimento; seleção usa lavagem verde e contorno interno. Assunto é um botão legível que abre a prévia, seleção em lote tem checkbox próprio e o menu mantém as ações existentes. Estado, prioridade e “Meta de SLA excedida” têm texto além de cor.
 
-A lista é uma superfície contínua, rolável e selecionável; cada linha apresenta título, solicitante, badges, SLA e responsável com divisores claros. O painel de detalhe mantém ID, título, estado, metadados, linha do tempo, ações e descrição em uma coluna sticky. A seleção usa lavagem verde e contorno interno, e atraso usa lavagem de exceção sem depender apenas da cor.
+**Contrato local de direção:**
+
+- **THESIS:** fila em primeiro plano, em um espaço de trabalho calmo para executar o atendimento.
+- **OWN-WORLD:** verde institucional, DM Sans e superfícies brancas do produto existente; shell preservado.
+- **STORY:** encontrar, ler, abrir o contexto e retornar sem interrupção.
+- **FIRST VIEWPORT:** título e ação, busca, visões e escopo, filtros rápidos, fila.
+- **FORM:** inbox com drawer contextual; referência de direção `fcbc1f1c`.
+
+### Central de Chamados — detalhe contextual
+
+O detalhe usa `<dialog>` aberto por `showModal()`, com fundo de contenção e superfície branca de até 580px. ID, assunto, estados, responsável, linha do tempo, ações, descrição, histórico e informações ficam no contexto do chamado escolhido. “Ver detalhes completos” mantém o acesso à rota completa; “Aguardar” e “Resolver” respeitam as permissões existentes. Fechar pelo controle explícito, Escape ou fundo devolve o foco ao assunto que abriu a prévia, sem pedir uma nova busca nem forçar rolagem. Descrições longas quebram linha; a prévia não usa animação de entrada contínua e respeita redução de movimento.
+
+### Central de Chamados — atualização sem interrupção
+
+A checagem automática roda a cada 30 segundos enquanto a página está visível; eventos de chamados são agrupados com debounce de 400ms. A resposta em segundo plano apenas sinaliza mudanças e oferece “Ver novidades”: não substitui a lista visível, não reapresenta skeletons e não altera busca, seleção ou posição de leitura. O usuário decide quando aplicar os dados. O placeholder da fila aparece somente antes da primeira carga concluída; atualizações posteriores mantêm o conteúdo disponível e mostram feedback no controle.
+
+Ao aplicar a atualização, a busca e a página atual permanecem; a seleção conserva os IDs ainda presentes na resposta e a prévia acompanha o chamado se ele continuar na lista. Mudar filtros, escopo ou página é uma ação explícita e pode limpar a seleção. Erros de atualização mantêm a última fila e oferecem nova tentativa. Erros do panorama não impedem usar o atendimento. Esse comportamento é local à rota e não altera a política de atualização do dashboard ou dos relatórios.
 
 ### Escopos e transparência da fila
 

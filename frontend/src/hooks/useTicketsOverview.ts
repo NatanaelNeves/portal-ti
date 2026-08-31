@@ -54,8 +54,12 @@ export function useTicketsOverview(department: string, enabled: boolean) {
   const [error, setError] = useState('');
   const inFlight = useRef(false);
   const alive = useRef(true);
+  const requestVersion = useRef(0);
 
-  useEffect(() => () => { alive.current = false; }, []);
+  useEffect(() => {
+    alive.current = true;
+    return () => { alive.current = false; requestVersion.current += 1; inFlight.current = false; };
+  }, []);
 
   /**
    * Uma alteração dispara duas coisas ao mesmo tempo: o recarregamento
@@ -65,22 +69,28 @@ export function useTicketsOverview(department: string, enabled: boolean) {
   const load = useCallback(async () => {
     if (!enabled || inFlight.current) return;
     inFlight.current = true;
+    const version = ++requestVersion.current;
     try {
       setError('');
       const params = department ? `?department=${encodeURIComponent(department)}` : '';
       const { data } = await api.get(`/tickets/overview${params}`, { timeout: 15000 });
-      if (alive.current) setOverview(data);
+      if (alive.current && version === requestVersion.current) setOverview(data);
     } catch (err: any) {
-      if (alive.current) {
+      if (alive.current && version === requestVersion.current) {
         setError(err?.response?.data?.error || 'Não foi possível carregar o panorama');
       }
     } finally {
-      inFlight.current = false;
-      if (alive.current) setLoading(false);
+      if (version === requestVersion.current) {
+        inFlight.current = false;
+        if (alive.current) setLoading(false);
+      }
     }
   }, [department, enabled]);
 
   useEffect(() => {
+    requestVersion.current += 1;
+    inFlight.current = false;
+    setOverview(null);
     setLoading(true);
     load();
   }, [load]);

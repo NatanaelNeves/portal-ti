@@ -13,6 +13,7 @@ interface Props {
   filtersOpen: boolean;
   activeFilterCount: number;
   refreshing?: boolean;
+  hasUpdates?: boolean;
 }
 
 const formatClock = (date: Date) =>
@@ -38,6 +39,7 @@ export default function TicketsHero({
   filtersOpen,
   activeFilterCount,
   refreshing,
+  hasUpdates,
 }: Props) {
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -59,20 +61,10 @@ export default function TicketsHero({
   return (
     <header className="tk-hero">
       <div className="tk-hero-context">
-        <span className="tk-hero-scope">
-          <i className={`ti ${profile.icon}`} aria-hidden="true" />
-          {scopeLabel}
-        </span>
-        <h1 className="tk-hero-title">Central de Chamados</h1>
-        <p className="tk-hero-tagline">{profile.tagline}</p>
-        {lastUpdate && (
-          <span className="tk-hero-pulse" title={lastUpdate.toLocaleString('pt-BR')}>
-            <span className="tk-pulse-dot" aria-hidden="true" />
-            Atualizado às {formatClock(lastUpdate)}
-          </span>
-        )}
+        <div className="tk-heading-line"><h1 className="tk-hero-title">Central de Chamados</h1><span className="tk-hero-scope"><i className={`ti ${profile.icon}`} aria-hidden="true" />{scopeLabel}</span></div>
+        <p className="tk-hero-tagline">Mais clareza para cuidar de cada solicitação.</p>
       </div>
-
+      <button type="button" className="tk-btn tk-btn--primary tk-new-ticket" onClick={onNewTicket}><i className="ti ti-plus" aria-hidden="true" />Novo chamado</button>
       <div className="tk-hero-tools">
         <div className="tk-search">
           <i className="ti ti-search" aria-hidden="true" />
@@ -81,7 +73,7 @@ export default function TicketsHero({
             type="search"
             value={searchValue}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Buscar por título, solicitante ou descrição"
+            placeholder="Encontre um chamado por assunto, pessoa ou descrição..."
             aria-label="Buscar chamados"
           />
           {searchValue ? (
@@ -104,6 +96,7 @@ export default function TicketsHero({
             className={`tk-btn tk-btn--ghost ${filtersOpen ? 'is-on' : ''}`}
             onClick={onToggleFilters}
             aria-expanded={filtersOpen}
+            aria-controls="ticket-advanced-filters"
           >
             <i className="ti ti-adjustments-horizontal" aria-hidden="true" />
             Filtros
@@ -112,19 +105,20 @@ export default function TicketsHero({
 
           <button
             type="button"
-            className={`tk-btn tk-btn--ghost tk-btn--icon ${refreshing ? 'is-spinning' : ''}`}
+            className={`tk-btn tk-btn--ghost ${refreshing ? 'is-spinning' : ''} ${hasUpdates ? 'tk-refresh-pending' : ''}`}
             onClick={onRefresh}
+            disabled={refreshing}
             title="Atualizar fila"
-            aria-label="Atualizar fila"
+            aria-label={hasUpdates ? 'Aplicar atualizações à fila' : 'Atualizar fila'}
           >
             <i className="ti ti-refresh" aria-hidden="true" />
-          </button>
-
-          <button type="button" className="tk-btn tk-btn--primary" onClick={onNewTicket}>
-            <i className="ti ti-plus" aria-hidden="true" />
-            Novo chamado
+            <span>{refreshing ? 'Atualizando' : hasUpdates ? 'Ver novidades' : 'Atualizar'}</span>
           </button>
         </div>
+      </div>
+      <div className="tk-sync-status" role="status" aria-live="polite">
+        <i className={`ti ${hasUpdates ? 'ti-bell-ringing' : 'ti-circle-check'}`} aria-hidden="true" />
+        <span>{hasUpdates ? 'Há novidades. Atualize quando estiver pronto; sua fila permanece no lugar.' : lastUpdate ? `Fila atualizada às ${formatClock(lastUpdate)}. Novidades chegam sem interromper sua leitura.` : 'Preparando sua fila de atendimento...'}</span>
       </div>
     </header>
   );

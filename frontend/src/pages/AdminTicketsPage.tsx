@@ -1,12 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import StatusTimeline from '../components/StatusTimeline';
 import { showToast } from '../utils/toast';
-import useAnimatedCount from '../hooks/useAnimatedCount';
 import useTicketsOverview from '../hooks/useTicketsOverview';
 import TicketsHero from '../components/tickets/TicketsHero';
-import SectorSwitch from '../components/tickets/SectorSwitch';
 import MetricCard from '../components/tickets/MetricCard';
 import MetricSkeleton from '../components/tickets/MetricSkeleton';
 import InsightStrip from '../components/tickets/InsightStrip';
@@ -51,13 +49,6 @@ interface InternalUser {
   email: string;
 }
 
-interface TicketStats {
-  waitingUser: number;
-  inProgress: number;
-  newToday: number;
-  resolvedToday: number;
-}
-
 interface TicketMessage {
   id: string;
   message: string;
@@ -75,20 +66,24 @@ export default function AdminTicketsPage() {
   const [users, setUsers] = useState<InternalUser[]>([]);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [hasUpdates, setHasUpdates] = useState(false);
+  const [activeView, setActiveView] = useState<'queue' | 'overview'>('queue');
+  const requestVersion = useRef(0);
+  const requestInFlight = useRef(false);
+  const hasLoaded = useRef(false);
+  const queueSnapshot = useRef('');
+  const refreshRef = useRef<() => void>(() => {});
+  const previewDialog = useRef<HTMLDialogElement>(null);
+  const previewTrigger = useRef<HTMLElement | null>(null);
   const [error, setError] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterPriority, setFilterPriority] = useState<'high' | 'medium' | 'low' | null>(null);
   const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'mine' | 'unassigned'>('all');
   const [currentUserId, setCurrentUserId] = useState<string>('');
-  const [stats, setStats] = useState<TicketStats>({
-    waitingUser: 0,
-    inProgress: 0,
-    newToday: 0,
-    resolvedToday: 0
-  });
-  
   // Novos estados para filtros avançados e paginação
   const [searchText, setSearchText] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [selectedPriorities, setSelectedPriorities] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -99,7 +94,6 @@ export default function AdminTicketsPage() {
   const [departmentFilter, setDepartmentFilter] = useState<string>('');
   const [userRole, setUserRole] = useState<string>('');
   const [isContextReady, setIsContextReady] = useState(false);
-  const [priorityFeedback, setPriorityFeedback] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
   const [dateFrom, setDateFrom] = useState('');
@@ -110,7 +104,6 @@ export default function AdminTicketsPage() {
   const [overdueOnly, setOverdueOnly] = useState(false);
   const [previewMessages, setPreviewMessages] = useState<TicketMessage[]>([]);
   const [previewMessagesLoading, setPreviewMessagesLoading] = useState(false);
-  const [panelSwitching, setPanelSwitching] = useState(false);
 
   // Panorama agregado: calculado no servidor sobre TODO o conjunto visivel,
   // nao sobre a pagina atual da lista.
@@ -176,26 +169,39 @@ export default function AdminTicketsPage() {
   }, [filterPriority]);
 
   useEffect(() => {
-    if (!priorityFeedback) return;
-
-    const timer = window.setTimeout(() => {
-      setPriorityFeedback('');
-    }, 1800);
-
+    const timer = window.setTimeout(() => setSearchQuery(searchText), 300);
     return () => window.clearTimeout(timer);
-  }, [priorityFeedback]);
+  }, [searchText]);
+
+  useEffect(() => () => { requestVersion.current += 1; }, []);
+
+  useEffect(() => {
+    if (selectedTicket) previewDialog.current?.showModal();
+    else {
+      previewDialog.current?.close();
+      previewTrigger.current?.focus({ preventScroll: true });
+    }
+  }, [selectedTicket?.id]);
 
   useEffect(() => {
     if (!isContextReady) return;
+    setHasUpdates(false);
+    setSelectedIds(new Set());
     fetchTickets();
+  }, [isContextReady, filterStatus, filterPriority, assignmentFilter, selectedStatuses, selectedPriorities, searchQuery, currentPage, departmentFilter, currentUserId, dateFrom, dateTo, todayOnly, overdueOnly]);
+
+  useEffect(() => {
+    if (!isContextReady) return;
     fetchUsers();
-  }, [isContextReady, filterStatus, filterPriority, assignmentFilter, selectedStatuses, selectedPriorities, searchText, currentPage, departmentFilter, currentUserId, dateFrom, dateTo, todayOnly, overdueOnly]);
+  }, [isContextReady]);
 
   useEffect(() => {
     if (!isContextReady) return;
 
+    let debounceTimer = 0;
     const handleRealtimeUpdate = () => {
-      fetchTickets();
+      window.clearTimeout(debounceTimer);
+      debounceTimer = window.setTimeout(() => refreshRef.current(), 400);
     };
 
     window.addEventListener('ticket:new', handleRealtimeUpdate);
@@ -205,7 +211,7 @@ export default function AdminTicketsPage() {
     window.addEventListener('ticket:auto_close_warning', handleRealtimeUpdate);
 
     const refreshInterval = window.setInterval(() => {
-      fetchTickets();
+      if (document.visibilityState === 'visible') refreshRef.current();
     }, 30000);
 
     return () => {
@@ -215,8 +221,9 @@ export default function AdminTicketsPage() {
       window.removeEventListener('ticket:reopened', handleRealtimeUpdate);
       window.removeEventListener('ticket:auto_close_warning', handleRealtimeUpdate);
       window.clearInterval(refreshInterval);
+      window.clearTimeout(debounceTimer);
     };
-  }, [isContextReady, filterStatus, filterPriority, assignmentFilter, selectedStatuses, selectedPriorities, searchText, currentPage, departmentFilter, currentUserId]);
+  }, [isContextReady]);
 
   // Load the activity history for whichever ticket is previewed, so the panel
   // reads like a real workspace instead of a static summary card.
@@ -240,18 +247,6 @@ export default function AdminTicketsPage() {
     return () => { cancelled = true; };
   }, [selectedTicket?.id]);
 
-  // A brief skeleton flicker on every switch — long enough to read as an
-  // intentional transition, short enough to never feel like a stall.
-  useEffect(() => {
-    if (!selectedTicket) {
-      setPanelSwitching(false);
-      return;
-    }
-    setPanelSwitching(true);
-    const timer = window.setTimeout(() => setPanelSwitching(false), 150);
-    return () => window.clearTimeout(timer);
-  }, [selectedTicket?.id]);
-
   const fetchUsers = async () => {
     try {
       const response = await api.get('/internal-auth/users', { timeout: 15000 });
@@ -259,46 +254,6 @@ export default function AdminTicketsPage() {
       setUsers(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
       console.error('Erro ao carregar usuários:', err);
-    }
-  };
-
-  const handleQuickAssume = async (ticketId: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Evita abrir o painel lateral
-    
-    console.log('🎯 Assumindo ticket:', ticketId);
-    
-    try {
-      const userData = localStorage.getItem('internal_user');
-      
-      if (!userData) {
-        console.error('❌ Usuário não encontrado');
-        return;
-      }
-      
-      const user = JSON.parse(userData);
-      console.log('👤 Usuário logado:', user.name, '- ID:', user.id);
-      
-      const payload = {
-        status: 'in_progress',
-        assigned_to_id: user.id
-      };
-      console.log('📤 Enviando para backend:', payload);
-      
-      const response = await api.patch(`/tickets/${ticketId}`, payload);
-      
-      console.log('📥 Resposta do backend - Status:', response.status);
-      console.log('✅ Ticket atualizado:', response.data);
-      console.log('Status:', response.data.status, '| Assigned to:', response.data.assigned_to_id);
-      
-      // Recarregar tickets
-      console.log('🔄 Recarregando lista de tickets...');
-      fetchTickets();
-      reloadOverview();
-      showToast.success('Chamado atribuído a você');
-    } catch (err: any) {
-      console.error('❌ Erro ao assumir:', err);
-      setError(err.message || 'Erro ao assumir chamado');
-      showToast.error('Não foi possível assumir o chamado');
     }
   };
 
@@ -421,11 +376,17 @@ export default function AdminTicketsPage() {
     }
   };
 
-  const fetchTickets = async () => {
+  const fetchTickets = async (background = false) => {
+    if (background && requestInFlight.current) return;
+    const version = ++requestVersion.current;
+    requestInFlight.current = true;
     try {
-      setLoading(true);
+      if (!background) {
+        setError('');
+        setRefreshing(true);
+        if (!hasLoaded.current) setLoading(true);
+      }
       const params = new URLSearchParams();
-      const hasAdvancedFilters = selectedStatuses.length > 0 || selectedPriorities.length > 0 || searchText.trim() !== '';
       const activeStatuses = [...ACTIVE_TICKET_STATUSES];
       const normalizePriorityValues = (priorities: string[]) => {
         return Array.from(
@@ -446,11 +407,11 @@ export default function AdminTicketsPage() {
         selectedStatuses.forEach((status) => params.append('status', status));
       }
 
-      if (searchText.trim()) {
-        params.append('search', searchText.trim());
+      if (searchQuery.trim()) {
+        params.append('search', searchQuery.trim());
       }
 
-      if (selectedStatuses.length === 0 && !hasAdvancedFilters) {
+      if (selectedStatuses.length === 0) {
         if (filterStatus === 'all') {
           activeStatuses.forEach((status) => params.append('status', status));
         } else if (filterStatus !== 'all') {
@@ -471,7 +432,7 @@ export default function AdminTicketsPage() {
 
       if (selectedPriorities.length > 0) {
         normalizePriorityValues(selectedPriorities).forEach((priority) => params.append('priority', priority));
-      } else if (!hasAdvancedFilters && filterPriority) {
+      } else if (filterPriority) {
         const quickPriorities = filterPriority === 'high' ? ['high', 'urgent'] : [filterPriority];
         quickPriorities.forEach((priority) => params.append('priority', priority));
       }
@@ -493,81 +454,51 @@ export default function AdminTicketsPage() {
       params.append('sort', 'created_at');
       params.append('order', 'desc');
 
-      const summaryParams = new URLSearchParams();
-      if (effectiveDepartmentFilter) {
-        summaryParams.append('department', effectiveDepartmentFilter);
-      }
-      summaryParams.append('page', '1');
-      summaryParams.append('limit', '1');
-      summaryParams.append('sort', 'updated_at');
-      summaryParams.append('order', 'desc');
+      const response = await api.get('/tickets?' + params.toString(), { timeout: 15000 });
 
-      const [response, summaryResponse] = await Promise.all([
-        api.get(`/tickets?${params.toString()}`, { timeout: 15000 }),
-        api.get(`/tickets?${summaryParams.toString()}`, { timeout: 15000 })
-      ]);
+      if (version !== requestVersion.current) return;
+      setError('');
 
       const responseData = response.data;
-      const summaryData = summaryResponse.data;
       
       // Suporte para a nova resposta com paginação e para a resposta antiga (array)
       const ticketList = responseData.data || (Array.isArray(responseData) ? responseData : []);
       const pagination = responseData.pagination;
-      
-      if (pagination) {
-        setTotalPages(pagination.totalPages);
-        setTotalTickets(pagination.total);
+      const snapshot = JSON.stringify({ ticketList, pagination });
+      // Automatic refresh only advertises changes. The visible list, its DOM,
+      // scroll position and selection belong to the person using the queue.
+      if (background) {
+        setHasUpdates(snapshot !== queueSnapshot.current);
+        return;
       }
-      
-      console.log('📋 Tickets carregados:', ticketList.length);
-      console.log('  - Open:', ticketList.filter((t: Ticket) => t.status === 'open').length);
-      console.log('  - In Progress:', ticketList.filter((t: Ticket) => t.status === 'in_progress').length);
-      console.log('  - Closed:', ticketList.filter((t: Ticket) => t.status === 'closed').length);
-      console.log('  - Resolved:', ticketList.filter((t: Ticket) => t.status === 'resolved').length);
-      console.log('  - Awaiting Confirmation:', ticketList.filter((t: Ticket) => t.status === 'aguardando_confirmacao').length);
-      
+      queueSnapshot.current = snapshot;
+      hasLoaded.current = true;
+      setHasUpdates(false);
+      setTotalPages(pagination?.totalPages || 1);
+      setTotalTickets(pagination?.total ?? ticketList.length);
       setTickets(ticketList);
+      setSelectedIds((current) => new Set([...current].filter((id) => ticketList.some((ticket: Ticket) => ticket.id === id))));
       setSelectedTicket((current) => {
-        if (current && ticketList.some((ticket: Ticket) => ticket.id === current.id)) return current;
-        return ticketList[0] || null;
+        if (!current) return null;
+        return ticketList.find((ticket: Ticket) => ticket.id === current.id) || null;
       });
 
-      // Resumo executivo: usa stats da consulta sem filtros da lista
-      if (summaryData?.stats) {
-        setStats({
-          waitingUser: Number(summaryData.stats.waitingUser || 0),
-          inProgress: Number(summaryData.stats.inProgress || 0),
-          newToday: Number(summaryData.stats.newToday || 0),
-          resolvedToday: Number(summaryData.stats.resolvedToday || 0),
-        });
-      } else if (responseData.stats) {
-        setStats({
-          waitingUser: Number(responseData.stats.waitingUser || 0),
-          inProgress: Number(responseData.stats.inProgress || 0),
-          newToday: Number(responseData.stats.newToday || 0),
-          resolvedToday: Number(responseData.stats.resolvedToday || 0),
-        });
-      } else {
-        const today = new Date().toDateString();
-        setStats({
-          waitingUser: ticketList.filter((t: Ticket) => t.status === 'waiting_user').length,
-          inProgress: ticketList.filter((t: Ticket) => t.status === 'in_progress').length,
-          newToday: ticketList.filter((t: Ticket) => new Date(t.created_at).toDateString() === today).length,
-          resolvedToday: ticketList.filter((t: Ticket) =>
-            (t.status === 'resolved' || t.status === 'closed') &&
-            new Date(t.updated_at).toDateString() === today
-          ).length
-        });
-      }
-      
       // Atualizar timestamp
       setLastUpdate(new Date());
     } catch (err: any) {
+      if (version !== requestVersion.current) return;
       setError(err.message || 'Erro ao carregar chamados');
     } finally {
-      setLoading(false);
+      if (version === requestVersion.current) {
+        requestInFlight.current = false;
+        if (!background) {
+          setLoading(false);
+          setRefreshing(false);
+        }
+      }
     }
   };
+  refreshRef.current = () => { void fetchTickets(true); };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
@@ -668,32 +599,10 @@ export default function AdminTicketsPage() {
     return 'badge-type-neutral';
   };
 
-  const getMetricValueClass = (value: number) => {
-    return value === 0 ? 'metric-value metric-value--muted' : 'metric-value metric-value--strong';
-  };
-
   const getUserName = (userId?: string) => {
-    if (!userId) return 'Ninguém';
+    if (!userId) return 'Sem responsável';
     const user = users.find(u => u.id === userId);
     return user ? user.name : 'Atribuído';
-  };
-
-  const isPriorityMatch = (ticket: Ticket, priority: 'high' | 'medium' | 'low') => {
-    if (priority === 'high') {
-      return ticket.priority === 'high' || ticket.priority === 'urgent';
-    }
-    return ticket.priority === priority;
-  };
-
-  const getPriorityCount = (priority: 'high' | 'medium' | 'low') => {
-    return tickets.filter(ticket => {
-      // Só conta chamados ativos (open, in_progress ou waiting)
-      const activeStatuses = [...ACTIVE_TICKET_STATUSES, 'waiting'];
-      if (!activeStatuses.includes(ticket.status)) {
-        return false;
-      }
-      return isPriorityMatch(ticket, priority);
-    }).length;
   };
 
   const getTimeAgo = (date: string) => {
@@ -706,27 +615,6 @@ export default function AdminTicketsPage() {
     if (diffDays > 0) return `${diffDays}d atrás`;
     if (diffHours > 0) return `${diffHours}h atrás`;
     return 'agora';
-  };
-
-  const getAgeToneClass = (date: string) => {
-    const now = new Date();
-    const then = new Date(date);
-    const diffMs = now.getTime() - then.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-
-    if (diffHours >= 24) return 'time-ago--critical';
-    if (diffHours >= 8) return 'time-ago--warning';
-    return 'time-ago--fresh';
-  };
-
-  const handlePriorityChipSelect = (value: 'high' | 'medium' | 'low' | null) => {
-    setFilterPriority(value);
-    if (value) {
-      setPriorityFeedback(`Prioridade ${getPriorityLabel(value)} aplicada`);
-    } else {
-      setPriorityFeedback('Filtro de prioridade limpo');
-    }
-    setCurrentPage(1);
   };
 
   const getSLAThresholdHours = (priority: string) => {
@@ -782,47 +670,8 @@ export default function AdminTicketsPage() {
     return ticket.status !== 'closed' && ticket.status !== 'open';
   };
 
-  // A filtragem agora é feita no backend para manter paginação e contagem consistentes
-  const hasAdvancedFilters = selectedStatuses.length > 0 || selectedPriorities.length > 0 || searchText.trim() !== '';
-  const filteredTickets = tickets;
-  
-  console.log('🔍 Filtros ativos:', { 
-    filterStatus, 
-    filterPriority,
-    selectedStatuses, 
-    selectedPriorities, 
-    assignmentFilter,
-    totalTickets: tickets.length,
-    afterFilter: filteredTickets.length 
-  });
-  
-  // A API já retorna ordenado e paginado
-  const sortedTickets = filteredTickets;
+  const sortedTickets = tickets;
 
-  const myTicketsCount = tickets.filter(t =>
-    t.assigned_to === currentUserId &&
-    t.status !== 'closed' &&
-    t.status !== 'resolved'
-  ).length;
-
-  // Numbers tween into place instead of snapping whenever the queue changes
-  const animatedQueueCount = useAnimatedCount(sortedTickets.length);
-  const animatedMyCount = useAnimatedCount(myTicketsCount);
-  const animatedWaiting = useAnimatedCount(stats.waitingUser);
-  const animatedNewToday = useAnimatedCount(stats.newToday);
-  const animatedResolvedToday = useAnimatedCount(stats.resolvedToday);
-  const animatedPriorityAll = useAnimatedCount(totalTickets || sortedTickets.length);
-  const animatedPriorityHigh = useAnimatedCount(getPriorityCount('high'));
-  const animatedPriorityMedium = useAnimatedCount(getPriorityCount('medium'));
-  const animatedPriorityLow = useAnimatedCount(getPriorityCount('low'));
-
-  const activeFiltersCount = selectedStatuses.length + selectedPriorities.length + (searchText.trim() ? 1 : 0);
-  const priorityOptions: Array<{ value: 'high' | 'medium' | 'low' | null; label: string; count: number }> = [
-    { value: null, label: 'Todas', count: animatedPriorityAll },
-    { value: 'high', label: 'Alta', count: animatedPriorityHigh },
-    { value: 'medium', label: 'Média', count: animatedPriorityMedium },
-    { value: 'low', label: 'Baixa', count: animatedPriorityLow },
-  ];
   const panelCanResolve = selectedTicket ? canQuickResolve(selectedTicket) : false;
   const panelCanWait = selectedTicket ? canMoveToWaiting(selectedTicket) : false;
 
@@ -842,6 +691,7 @@ export default function AdminTicketsPage() {
   };
 
   const activeQuickFilters =
+    (filterStatus !== 'all' ? 1 : 0) +
     (assignmentFilter !== 'all' ? 1 : 0) +
     (filterPriority ? 1 : 0) +
     (todayOnly ? 1 : 0) +
@@ -853,6 +703,7 @@ export default function AdminTicketsPage() {
 
   const clearAllFilters = () => {
     setAssignmentFilter('all');
+    setFilterStatus('all');
     setFilterPriority(null);
     setTodayOnly(false);
     setOverdueOnly(false);
@@ -866,58 +717,51 @@ export default function AdminTicketsPage() {
 
   const handleSectorChange = (department: string) => {
     setDepartmentFilter(department);
+    setSelectedTicket(null);
     setCurrentPage(1);
   };
 
-  const departmentCounts = (overview?.byDepartment ?? []).reduce<Record<string, number>>(
-    (acc, entry) => ({ ...acc, [entry.department]: entry.open }),
-    {},
-  );
-
   return (
-    <div className="admin-tickets-dashboard">
+    <div className="admin-tickets-dashboard tk-workspace">
       <TicketsHero
         profile={sectorProfile}
         scopeLabel={overview?.scope.label ?? sectorProfile.label}
         lastUpdate={lastUpdate}
         searchValue={searchText}
-        onSearchChange={(value) => { setSearchText(value); setCurrentPage(1); }}
+        onSearchChange={(value) => { setActiveView('queue'); setSearchText(value); setCurrentPage(1); }}
         onRefresh={() => { fetchTickets(); reloadOverview(); }}
         onNewTicket={() => navigate('/abrir-chamado')}
-        onToggleFilters={() => setShowFilters(!showFilters)}
+        onToggleFilters={() => { setActiveView('queue'); setShowFilters(!showFilters); }}
         filtersOpen={showFilters}
         activeFilterCount={activeQuickFilters}
-        refreshing={loading}
+        refreshing={refreshing}
+        hasUpdates={hasUpdates}
       />
 
-      {canPickSector && (
-        <SectorSwitch
-          value={departmentFilter}
-          onChange={handleSectorChange}
-          counts={departmentCounts}
-          disabled={loading}
-        />
-      )}
+      <div className="tk-viewbar">
+        <div className="tk-view-switch" role="group" aria-label="Visualização de chamados">
+          <button type="button" aria-pressed={activeView === 'queue'} onClick={() => setActiveView('queue')}>
+            <i className="ti ti-list-details" aria-hidden="true" /> Atendimento
+          </button>
+          <button type="button" aria-pressed={activeView === 'overview'} onClick={() => setActiveView('overview')}>
+            <i className="ti ti-chart-bar" aria-hidden="true" /> Panorama
+          </button>
+        </div>
+        <div className="tk-scope-control">
+          {canPickSector ? <>
+            <label htmlFor="ticket-department">Equipe responsável</label>
+            <select id="ticket-department" value={departmentFilter} onChange={(e) => handleSectorChange(e.target.value)}>
+              <option value="">Todas as equipes</option>
+              <option value="ti">Tecnologia da Informação</option>
+              <option value="rh">Recursos Humanos</option>
+              <option value="administrativo">Administrativo</option>
+            </select>
+          </> : <span>Equipe responsável: <strong>{sectorProfile.label}</strong></span>}
+        </div>
+      </div>
 
-      <QuickFilters
-        showAssignmentChips={userRole !== 'admin_staff'}
-        state={quickFilterState}
-        counts={{
-          unassigned: overview?.attention.unassigned,
-          urgent: overview ? overview.priority.urgent + overview.priority.high : undefined,
-          overdue: overview?.attention.overdue,
-        }}
-        onChange={(next) => {
-          if (next.assignment !== undefined) setAssignmentFilter(next.assignment);
-          if (next.priority !== undefined) setFilterPriority(next.priority);
-          if (next.today !== undefined) setTodayOnly(next.today);
-          if (next.overdue !== undefined) setOverdueOnly(next.overdue);
-          setCurrentPage(1);
-        }}
-        onClear={clearAllFilters}
-        activeCount={activeQuickFilters}
-      />
-
+      <section className="tk-overview-view" hidden={activeView !== 'overview'} aria-label="Panorama da equipe">
+        <div className="tk-section-intro"><h2>O ritmo do atendimento</h2><p>Indicadores de toda a equipe, independentemente dos filtros da sua fila.</p></div>
       {/* Falha no panorama nao derruba a fila: a lista continua utilizavel e o
           usuario ganha um caminho para tentar de novo. */}
       {overviewError && !overview && (
@@ -951,113 +795,35 @@ export default function AdminTicketsPage() {
           onSelect={(userId) => {
             setAssignmentFilter(userId === currentUserId ? 'mine' : 'all');
             setCurrentPage(1);
+            setActiveView('queue');
           }}
         />
       )}
 
-      <section className="ticket-filter-ledger" aria-label="Filtros e resumo da fila">
-      {error && (
-        <div className="alert alert-error" role="alert">
-          <div>
-            <strong>Não foi possível atualizar a fila.</strong>
-            <span>{error}</span>
-          </div>
-          <button type="button" onClick={fetchTickets}>Tentar novamente</button>
-          </div>
-        )}
-
-      {hasAdvancedFilters && (
-        <div className="filters-warning">
-          <i className="ti ti-info-circle" /> <strong>Filtros avançados ativos.</strong> Os filtros rápidos abaixo estão desabilitados.
-        </div>
-      )}
-
-      {/* Filtros Rápidos por Prioridade */}
-      <div className="stats-container">
-        <div className="priority-toolbar" role="group" aria-label="Filtrar por prioridade">
-          <span className="priority-toolbar-label">Prioridade</span>
-          <div className="priority-chip-row">
-            {priorityOptions.map((option) => {
-              const isActive = option.value === null ? filterPriority === null : filterPriority === option.value;
-              const optionClass = option.value === null ? 'all' : option.value;
-              return (
-                <button
-                  key={option.value ?? 'all'}
-                  type="button"
-                  className={`priority-chip priority-chip--${optionClass} ${isActive ? 'is-active' : ''}`}
-                  onClick={() => {
-                    if (!hasAdvancedFilters) {
-                      handlePriorityChipSelect(option.value);
-                    }
-                  }}
-                  disabled={hasAdvancedFilters}
-                  aria-pressed={isActive}
-                >
-                  <span>{option.label}</span>
-                  <span className="priority-chip-count">{option.count}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="day-summary-compact" aria-label="Resumo do dia">
-          <div className="summary-pill">
-            <span className={getMetricValueClass(stats.newToday)}>{animatedNewToday}</span>
-            <span className="summary-pill-label">Novos</span>
-          </div>
-          <div className="summary-pill">
-            <span className={getMetricValueClass(stats.resolvedToday)}>{animatedResolvedToday}</span>
-            <span className="summary-pill-label">Resolvidos</span>
-          </div>
-          {(stats.newToday + stats.resolvedToday) > 0 && (
-            <div className="day-progress" title={`${stats.resolvedToday} de ${stats.newToday + stats.resolvedToday} chamados do dia já resolvidos`}>
-              <div className="day-progress-track">
-                <div
-                  className="day-progress-fill"
-                  style={{ width: `${Math.round((stats.resolvedToday / (stats.newToday + stats.resolvedToday)) * 100)}%` }}
-                />
-              </div>
-              <span className="day-progress-label">
-                {animatedResolvedToday} de {stats.newToday + stats.resolvedToday} resolvidos hoje
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
       </section>
 
-      {priorityFeedback && (
-        <div className="priority-feedback" role="status" aria-live="polite">
-          {priorityFeedback}
-        </div>
-      )}
+      <div className="tk-queue-view" hidden={activeView !== 'queue'}>
+      <QuickFilters
+        showAssignmentChips={userRole !== 'admin_staff'}
+        state={quickFilterState}
+        counts={{ unassigned: overview?.attention.unassigned, urgent: overview ? overview.priority.urgent + overview.priority.high : undefined, overdue: overview?.attention.overdue }}
+        onChange={(next) => {
+          if (next.assignment !== undefined) setAssignmentFilter(next.assignment);
+          if (next.priority !== undefined) { setFilterPriority(next.priority); setSelectedPriorities([]); }
+          if (next.today !== undefined) setTodayOnly(next.today);
+          if (next.overdue !== undefined) setOverdueOnly(next.overdue);
+          setCurrentPage(1);
+        }}
+        onClear={clearAllFilters}
+        activeCount={activeQuickFilters}
+      />
 
-      {/* Indicador de Filtro Rápido Ativo */}
-      {filterPriority && !hasAdvancedFilters && (
-        <div className="active-filter-banner">
-          <div className="active-filter-info">
-            <span className="active-filter-icon" aria-hidden="true">
-              <i className="ti ti-circle-filled" />
-            </span>
-            <span>
-              Filtro ativo: Prioridade {getPriorityLabel(filterPriority)}
-            </span>
-          </div>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={() => setFilterPriority(null)}
-          >
-            <i className="ti ti-x" /> Limpar Filtro
-          </button>
-        </div>
-      )}
+      {error && <div className="tk-queue-error" role="alert"><i className="ti ti-alert-circle" aria-hidden="true" /><span><strong>Não foi possível atualizar.</strong> Sua fila foi mantida. {error}</span><button type="button" onClick={() => fetchTickets()}>Tentar novamente</button></div>}
 
       {/* Filtros Avançados (Collapsible) */}
       {showFilters && (
-        <div className="advanced-filters card">
-          {hasAdvancedFilters && (
+        <div id="ticket-advanced-filters" className="advanced-filters card">
+          {activeQuickFilters > 0 && (
             <div className="advanced-filters-alert">
               <strong>Filtros ativos:</strong>
               {searchText.trim() && <span>Busca: "{searchText}"</span>}
@@ -1066,41 +832,6 @@ export default function AdminTicketsPage() {
             </div>
           )}
           <div className="advanced-filters-grid">
-            <div className="filter-group">
-              <label className="filter-label">Buscar</label>
-              <div className="filter-input-wrap">
-                <span className="filter-input-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
-                    <path d="M20 20L16.6 16.6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                </span>
-                <input 
-                  type="text"
-                  placeholder="Buscar por título, descrição, usuário ou e-mail"
-                  value={searchText}
-                  onChange={(e) => {
-                    setSearchText(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className="filter-input filter-input-search"
-                />
-                {searchText.trim() && (
-                  <button
-                    type="button"
-                    className="filter-input-clear"
-                    onClick={() => {
-                      setSearchText('');
-                      setCurrentPage(1);
-                    }}
-                    aria-label="Limpar busca"
-                  >
-                    <i className="ti ti-x" />
-                  </button>
-                )}
-              </div>
-            </div>
-
             <div className="filter-group">
               <label className="filter-label">Status</label>
               <div className="advanced-chip-list">
@@ -1151,8 +882,10 @@ export default function AdminTicketsPage() {
                     onClick={() => {
                       if (selectedPriorities.includes(priority.value)) {
                         setSelectedPriorities(selectedPriorities.filter(p => p !== priority.value));
+                      setFilterPriority(null);
                       } else {
                         setSelectedPriorities([...selectedPriorities, priority.value]);
+                      setFilterPriority(null);
                       }
                       setCurrentPage(1);
                     }}
@@ -1170,6 +903,7 @@ export default function AdminTicketsPage() {
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                 <input
                   type="date"
+                  aria-label="Data inicial"
                   className="filter-input"
                   value={dateFrom}
                   onChange={e => { setDateFrom(e.target.value); setCurrentPage(1); }}
@@ -1179,6 +913,7 @@ export default function AdminTicketsPage() {
                 <input
                   type="date"
                   className="filter-input"
+                  aria-label="Data final"
                   value={dateTo}
                   onChange={e => { setDateTo(e.target.value); setCurrentPage(1); }}
                   style={{ flex: 1 }}
@@ -1218,62 +953,12 @@ export default function AdminTicketsPage() {
       <div className="dashboard-layout">
         {/* Fila Inteligente */}
         <div className="queue-column">
-          <div className="assignment-filters assignment-filters--integrated">
-            {userRole !== 'admin_staff' && (
-              <button
-                className={`filter-btn ${assignmentFilter === 'all' && filterStatus === 'all' ? 'active' : ''}`}
-                onClick={() => {
-                  setAssignmentFilter('all');
-                  setFilterStatus('all');
-                }}
-              >
-                Fila ativa
-              </button>
-            )}
-            <button
-              className={`filter-btn filter-mine ${assignmentFilter === 'mine' ? 'active' : ''}`}
-              onClick={() => {
-                setAssignmentFilter('mine');
-                setFilterStatus('all');
-              }}
-            >
-              Meus atendimentos ({myTicketsCount})
-            </button>
-            {userRole !== 'admin_staff' && (
-              <button
-                className={`filter-btn ${assignmentFilter === 'unassigned' ? 'active' : ''}`}
-                onClick={() => {
-                  setAssignmentFilter('unassigned');
-                  setFilterStatus('all');
-                }}
-              >
-                Não atribuídos
-              </button>
-            )}
-            <button
-              className={`filter-btn filter-btn-toggle ${showFilters ? 'active' : ''}`}
-              onClick={() => {
-                setShowFilters(!showFilters);
-                if (!showFilters) {
-                  setFilterStatus('all');
-                  setFilterPriority(null);
-                }
-              }}
-            >
-              {showFilters ? 'Ocultar filtros' : 'Filtros avançados'}
-              {hasAdvancedFilters && (
-                <span className="filter-counter">
-                  {activeFiltersCount}
-                </span>
-              )}
-            </button>
-          </div>
           <section className="ticket-queue card ticket-queue--attached">
             <div className="queue-header card-header">
-              <h2>Fila de Atendimento</h2>
+            <h3>{assignmentFilter === 'mine' ? 'Meus atendimentos' : assignmentFilter === 'unassigned' ? 'Sem responsável' : selectedStatuses.length > 0 ? 'Chamados filtrados' : 'Chamados ativos'}</h3>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <span className="queue-count">
-                  {sortedTickets.length} chamados
+                  {totalTickets} {totalTickets === 1 ? 'chamado' : 'chamados'}
                   {filterStatus !== 'all' && ` (${getStatusLabel(filterStatus)})`}
                   {filterPriority && ` • Prioridade ${getPriorityLabel(filterPriority)}`}
                 </span>
@@ -1286,14 +971,13 @@ export default function AdminTicketsPage() {
                     try {
                       const token = localStorage.getItem('internal_token');
                       const p = new URLSearchParams();
-                      const hasAdvancedFilters = selectedStatuses.length > 0 || selectedPriorities.length > 0 || searchText.trim() !== '';
                       const activeStatuses = [...ACTIVE_TICKET_STATUSES];
                       const deptForExport = userRole === 'admin_staff' ? 'administrativo' : userRole === 'it_staff' ? 'ti' : departmentFilter;
                       const assignmentForExport = userRole === 'admin_staff' ? 'mine' : assignmentFilter;
                       if (deptForExport) p.append('department', deptForExport);
                       if (selectedStatuses.length > 0) {
                         selectedStatuses.forEach(s => p.append('status', s));
-                      } else if (!hasAdvancedFilters) {
+                      } else {
                         if (filterStatus === 'all') activeStatuses.forEach(s => p.append('status', s));
                         else p.append('status', filterStatus);
                       }
@@ -1301,7 +985,7 @@ export default function AdminTicketsPage() {
                         selectedPriorities
                           .flatMap(priority => priority === 'high' ? ['high', 'urgent'] : [priority])
                           .forEach(priority => p.append('priority', priority));
-                      } else if (!hasAdvancedFilters && filterPriority) {
+                      } else if (filterPriority) {
                         (filterPriority === 'high' ? ['high', 'urgent'] : [filterPriority])
                           .forEach(priority => p.append('priority', priority));
                       }
@@ -1309,6 +993,8 @@ export default function AdminTicketsPage() {
                       else if (assignmentForExport === 'unassigned') p.append('assigned_to', 'unassigned');
                       if (searchText.trim()) p.append('search', searchText.trim());
                       if (dateFrom) p.append('date_from', dateFrom);
+                      if (todayOnly && !dateFrom) { const today = new Date(); today.setHours(0, 0, 0, 0); p.append('date_from', today.toISOString()); }
+                      if (overdueOnly) p.append('overdue', 'true');
                       if (dateTo) p.append('date_to', new Date(dateTo + 'T23:59:59').toISOString());
                       const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/tickets/export/excel?${p.toString()}`, {
                         headers: { Authorization: `Bearer ${token}` },
@@ -1402,143 +1088,28 @@ export default function AdminTicketsPage() {
                 />
               )
             ) : (
-              <div className="tickets-list">
+              <div className="tickets-list" role="list" aria-label="Lista de chamados">
+                <div className="tk-list-head" aria-hidden="true"><span>Chamado / Solicitante</span><span>Situação</span><span>Responsável</span><span /></div>
                 {sortedTickets.map((ticket) => {
                   const overdue = isTicketOverdue(ticket);
-                  const ageTone = getAgeToneClass(ticket.created_at);
                   const sla = getSlaProgress(ticket);
                   return (
-                  <div
-                    key={ticket.id}
-                    data-sla={sla.state}
-                    style={{ ['--sla-pct' as string]: `${sla.pct}%` }}
-                    className={`ticket-card ticket-status-${ticket.status} ${selectedTicket?.id === ticket.id ? 'active' : ''} ticket-priority-${ticket.priority || 'neutral'} ${selectedIds.has(ticket.id) ? 'ticket-card--selected' : ''} ${overdue ? 'ticket-card--overdue' : ''}`}
-                    onClick={() => setSelectedTicket(ticket)}
-                  >
-                    <div className="ticket-card-top">
-                      <input
-                        type="checkbox"
-                        className="ticket-checkbox"
-                        checked={selectedIds.has(ticket.id)}
-                        onChange={() => {}}
-                        onClick={(e) => toggleSelect(ticket.id, e)}
-                        title="Selecionar chamado"
-                      />
-                      <div className="ticket-card-main">
-                        <div className="ticket-card-heading">
-                          <TicketRef id={ticket.id} />
-                          {isUntouched(ticket) && (
-                            <span className="tk-new-badge" title="Ainda sem primeira resposta">Novo</span>
-                          )}
-                        </div>
-                        <div className="ticket-card-title">{ticket.title}</div>
-                        <div className="ticket-card-requester">
-                          {ticket.requester_type === 'public' && ticket.requester_name ? (
-                            <>
-                              <span className="requester-name">{ticket.requester_name}</span>
-                              {(ticket.requester_department || ticket.requester_unit) && (
-                                <span className="requester-meta">
-                                  {ticket.requester_department && `${ticket.requester_department}`}
-                                  {ticket.requester_department && ticket.requester_unit && ' • '}
-                                  {ticket.requester_unit && `${ticket.requester_unit}`}
-                                </span>
-                              )}
-                            </>
-                          ) : (
-                            <span className="requester-name">Solicitante interno</span>
-                          )}
-                        </div>
+                    <article key={ticket.id} role="listitem" className={`ticket-card tk-ticket-row ${selectedTicket?.id === ticket.id ? 'active' : ''} ${selectedIds.has(ticket.id) ? 'ticket-card--selected' : ''}`}>
+                      <input type="checkbox" className="ticket-checkbox" checked={selectedIds.has(ticket.id)} onChange={() => {}} onClick={(e) => toggleSelect(ticket.id, e)} aria-label={`Selecionar ${ticket.title}`} />
+                      <div className="tk-ticket-subject">
+                        <div className="tk-ticket-reference"><TicketRef id={ticket.id} /><span className={`tk-priority-label tk-priority-label--${ticket.priority}`}><span aria-hidden="true" />{getPriorityLabel(ticket.priority)}</span>{isUntouched(ticket) && <span className="tk-unread-dot" title="Ainda sem primeira resposta" aria-label="Novo chamado" />}</div>
+                        <button type="button" className="tk-ticket-title" onClick={(event) => { previewTrigger.current = event.currentTarget; setSelectedTicket(ticket); }}>{ticket.title}</button>
+                        <p className="tk-ticket-requester">{ticket.requester_name || 'Solicitante interno'}{ticket.requester_department && <span> · {ticket.requester_department}</span>}{ticket.category && <span className="tk-ticket-category"> · {ticket.category.replace(/_/g, ' ')}</span>}</p>
                       </div>
-                      {overdue ? (
-                        <span
-                          className="overdue-flag"
-                          title={`Aberto em ${new Date(ticket.created_at).toLocaleString('pt-BR')}`}
-                        >
-                          {getSlaElapsedHours(ticket)}h atrasado
-                        </span>
-                      ) : (
-                        <span
-                          className={`time-ago ${ageTone}`}
-                          title={`Aberto em ${new Date(ticket.created_at).toLocaleString('pt-BR')}`}
-                        >
-                          {getTimeAgo(ticket.created_at)}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="ticket-card-badges">
-                      {ticket.department === 'administrativo' && departmentFilter === '' && (
-                        <span className="badge badge-dept-admin">Administrativo</span>
-                      )}
-                      {ticket.department === 'rh' && departmentFilter === '' && (
-                        <span className="badge badge-dept-rh">RH</span>
-                      )}
-                      {(!ticket.department || ticket.department === 'ti') && departmentFilter === '' && (
-                        <span className="badge badge-dept-ti">TI</span>
-                      )}
-                      {ticket.category && (
-                        <span className={`badge badge-category badge-category--${ticket.department === 'administrativo' ? 'admin' : ticket.department === 'rh' ? 'rh' : 'ti'}`}>
-                          {ticket.category}
-                        </span>
-                      )}
-                      <span className={`badge ${getPriorityBadgeClass(ticket.priority)}`}>
-                        {getPriorityLabel(ticket.priority)}
-                      </span>
-                      <span className={`badge ${getStatusBadgeClass(ticket.status)}`}>
-                        {getStatusLabel(ticket.status)}
-                      </span>
-                    </div>
-
-                    <div className="ticket-card-footer">
-                      <span className="assigned">
-                        {getUserName(ticket.assigned_to)}
-                      </span>
-                      <span
-                        className="sla-meter"
-                        title={`${sla.elapsed}h de ${sla.target}h do prazo (${sla.pct}%)`}
-                      >
-                        <span className="sla-meter-text">
-                          {sla.paused
-                            ? `${sla.elapsed}h · SLA pausado`
-                            : overdue
-                              ? `${sla.elapsed}h · prazo estourado`
-                              : `${sla.elapsed}h de ${sla.target}h`}
-                        </span>
-                      </span>
-                      <div className="footer-actions">
-                        {!ticket.assigned_to && ticket.status === 'open' && (
-                          <button
-                            type="button"
-                            className="btn btn-primary btn-sm btn-assume"
-                            onClick={(e) => handleQuickAssume(ticket.id, e)}
-                            title="Assumir atendimento"
-                          >
-                            Assumir atendimento
-                          </button>
-                        )}
-                        {canQuickResolve(ticket) && (
-                          <button
-                            type="button"
-                            className="btn btn-success btn-sm btn-resolve"
-                            onClick={(e) => handleQuickStatusChange(ticket.id, 'resolved', e)}
-                            title="Resolver chamado"
-                          >
-                            Resolver chamado
-                          </button>
-                        )}
-                        <div className="card-quick-actions">
-                          <button
-                            type="button"
-                            className="btn btn-secondary btn-sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/admin/chamados/${ticket.id}`);
-                            }}
-                            title="Ver detalhes"
-                          >
-                            Detalhes
-                          </button>
-                          <TicketRowMenu
+                      <div className="tk-ticket-state">
+                        <span className={`badge ${getStatusBadgeClass(ticket.status)}`}>{getStatusLabel(ticket.status)}</span>
+                        <span className={`tk-ticket-age ${overdue ? 'is-overdue' : ''}`} title={`Aberto em ${new Date(ticket.created_at).toLocaleString('pt-BR')}. Meta de SLA: ${sla.target}h.`}><i className={`ti ${overdue ? 'ti-clock-exclamation' : 'ti-clock'}`} aria-hidden="true" />{sla.paused ? 'SLA pausado' : overdue ? 'Meta de SLA excedida' : getTimeAgo(ticket.created_at)}</span>
+                      </div>
+                      <div className="tk-ticket-owner">
+                        <span className={`tk-owner-avatar ${!ticket.assigned_to ? 'is-unassigned' : ''}`} aria-hidden="true">{ticket.assigned_to ? getUserName(ticket.assigned_to).split(' ').map(part => part[0]).slice(0, 2).join('') : <i className="ti ti-user" />}</span>
+                        <div><span className="tk-owner-name">{getUserName(ticket.assigned_to)}</span>{!ticket.assigned_to && ticket.status === 'open' && <button type="button" className="tk-assume" disabled={rowBusyId === ticket.id} onClick={() => patchTicket(ticket.id, { status: 'in_progress', assigned_to_id: currentUserId }, 'Chamado atribuído a você')}>Assumir chamado</button>}</div>
+                      </div>
+                      <div className="tk-ticket-menu">                          <TicketRowMenu
                             ticket={ticket}
                             role={userRole}
                             userId={currentUserId}
@@ -1562,12 +1133,10 @@ export default function AdminTicketsPage() {
                             )}
                             onPriority={(priority) => handleRowPriority(ticket.id, priority)}
                             onAssign={(assignee) => handleRowAssign(ticket.id, assignee)}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )})}
+                          /></div>
+                    </article>
+                  );
+                })}
               </div>
             )}
 
@@ -1604,32 +1173,24 @@ export default function AdminTicketsPage() {
         </div>
 
         {/* Painel Lateral do Ticket Selecionado */}
-        {selectedTicket ? (
+        <dialog ref={previewDialog} className="tk-preview-dialog" aria-labelledby="ticket-preview-title" onCancel={() => setSelectedTicket(null)} onClose={() => setSelectedTicket(null)} onClick={(event) => { if (event.target === event.currentTarget) setSelectedTicket(null); }}>
+        {selectedTicket && (
           <aside className="ticket-panel card">
             <div className="panel-header card-header">
               <div className="panel-header-main">
                 <span className="panel-ticket-id">#{selectedTicket.id.substring(0, 8).toUpperCase()}</span>
-                <h3 className="panel-title">{selectedTicket.title}</h3>
+                <h3 id="ticket-preview-title" className="panel-title">{selectedTicket.title}</h3>
               </div>
               <button 
                 className="close-panel"
                 onClick={() => setSelectedTicket(null)}
-                aria-label="Fechar preview"
+                aria-label="Fechar detalhes"
               >
                 <i className="ti ti-x" />
               </button>
             </div>
 
             <div className="panel-content card-body">
-              {panelSwitching ? (
-                <div className="panel-skeleton" aria-hidden="true">
-                  <div className="skeleton-line" style={{ height: 16, width: '70%', borderRadius: 4 }} />
-                  <div className="skeleton-line" style={{ height: 12, width: '40%', borderRadius: 4, marginTop: 10 }} />
-                  <div className="skeleton-line" style={{ height: 60, borderRadius: 8, marginTop: 16 }} />
-                  <div className="skeleton-line" style={{ height: 12, width: '55%', borderRadius: 4, marginTop: 16 }} />
-                  <div className="skeleton-line" style={{ height: 12, width: '80%', borderRadius: 4, marginTop: 8 }} />
-                </div>
-              ) : (
               <div key={selectedTicket.id} className="panel-fade-in">
               <div className="panel-badges">
                 <span className={`badge ${getStatusBadgeClass(selectedTicket.status)}`}>
@@ -1751,38 +1312,12 @@ export default function AdminTicketsPage() {
                 </div>
               </section>
               </div>
-              )}
-            </div>
-          </aside>
-        ) : (
-          <aside className="ticket-panel empty card">
-            <div className="empty-panel">
-              <span className="empty-icon-large"><i className="ti ti-chart-bar" /></span>
-              <h3>Resumo Operacional</h3>
-              <p>Selecione um chamado da fila para ver o preview detalhado.</p>
-              <div className="empty-panel-metrics">
-                <div className="empty-metric-card">
-                  <span className={getMetricValueClass(sortedTickets.length)}>{animatedQueueCount}</span>
-                  <span className="empty-metric-label">Na fila</span>
-                </div>
-                <div className="empty-metric-card">
-                  <span className={getMetricValueClass(myTicketsCount)}>{animatedMyCount}</span>
-                  <span className="empty-metric-label">Meus atendimentos</span>
-                </div>
-                <div className="empty-metric-card">
-                  <span className={getMetricValueClass(stats.waitingUser)}>{animatedWaiting}</span>
-                  <span className="empty-metric-label">Aguardando usuário</span>
-                </div>
-                <div className="empty-metric-card">
-                  <span className={getMetricValueClass(stats.resolvedToday)}>{animatedResolvedToday}</span>
-                  <span className="empty-metric-label">Resolvidos hoje</span>
-                </div>
-              </div>
             </div>
           </aside>
         )}
+        </dialog>
+      </div>
       </div>
     </div>
   );
 }
-
