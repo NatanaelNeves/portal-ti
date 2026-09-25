@@ -16,21 +16,50 @@ interface Ticket {
   sla_due_at?: string | null;
 }
 
-const formatSlaBadge = (slaDueAt: string | null | undefined): string | null => {
+type StatusTone = 'new' | 'progress' | 'you' | 'waiting' | 'done' | 'closed';
+
+// Rótulos escritos para quem pediu, não para quem atende.
+const PUBLIC_STATUS: Record<string, { label: string; tone: StatusTone }> = {
+  open: { label: 'Recebido', tone: 'new' },
+  in_progress: { label: 'Em atendimento', tone: 'progress' },
+  waiting_user: { label: 'Aguardando você', tone: 'you' },
+  aguardando_confirmacao: { label: 'Confirme a solução', tone: 'you' },
+  aguardando_aquisicao: { label: 'Aguardando compra', tone: 'waiting' },
+  aguardando_terceiros: { label: 'Aguardando fornecedor', tone: 'waiting' },
+  resolved: { label: 'Resolvido', tone: 'done' },
+  closed: { label: 'Concluído', tone: 'closed' },
+  cancelled: { label: 'Cancelado', tone: 'closed' },
+};
+
+// `fetch` rejeita com TypeError quando não há conexão com o servidor.
+const OFFLINE_MESSAGE = 'Sem conexão com o portal. Confira sua internet e tente de novo.';
+
+// Em que trecho da jornada o chamado está: 1 recebido, 2 andando, 3 concluído.
+const TONE_STAGE: Record<StatusTone, number> = { new: 1, progress: 2, you: 2, waiting: 2, done: 3, closed: 3 };
+
+const DEPARTMENT_LABEL: Record<string, string> = {
+  ti: 'TI',
+  administrativo: 'Administrativo',
+  rh: 'RH',
+};
+
+const formatSla = (slaDueAt: string | null | undefined): { text: string; late: boolean } | null => {
   if (!slaDueAt) return null;
 
   const diffMs = new Date(slaDueAt).getTime() - Date.now();
-  if (diffMs <= 0) {
-    return '⚠️ Prazo estimado excedido';
-  }
+  if (diffMs <= 0) return { text: 'Meta de atendimento excedida', late: true };
 
   const diffHours = diffMs / (1000 * 60 * 60);
-  if (diffHours < 24) {
-    return `⏱️ Previsto em até ${Math.max(1, Math.ceil(diffHours))}h`;
-  }
+  if (diffHours < 24) return { text: `Meta: em até ${Math.max(1, Math.ceil(diffHours))}h`, late: false };
 
   const dueDate = new Date(slaDueAt);
-  return `⏱️ Previsto até ${dueDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
+  return { text: `Meta: até ${dueDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`, late: false };
+};
+
+const normalizeTickets = (data: any): Ticket[] => {
+  if (data?.data && Array.isArray(data.data)) return data.data;
+  if (Array.isArray(data)) return data;
+  return [];
 };
 
 export default function MyTicketsPage() {
@@ -42,12 +71,7 @@ export default function MyTicketsPage() {
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [searchEmail, setSearchEmail] = useState('');
   const [searchCode, setSearchCode] = useState('');
-  const [codeEmail, setCodeEmail] = useState('');
   const [changeEmailConfirm, setChangeEmailConfirm] = useState(false);
-
-  const handleChangeEmail = () => {
-    setChangeEmailConfirm(true);
-  };
 
   const confirmChangeEmail = () => {
     localStorage.removeItem('user_token');
@@ -56,6 +80,7 @@ export default function MyTicketsPage() {
     setTickets([]);
     setShowEmailForm(true);
     setError('');
+    setChangeEmailConfirm(false);
   };
 
   useEffect(() => {
@@ -72,6 +97,7 @@ export default function MyTicketsPage() {
       setEmail(storedEmail);
       fetchTickets(storedToken);
     } else {
+      setSearchEmail(storedEmail || '');
       setShowEmailForm(true);
       setLoading(false);
     }
@@ -81,7 +107,7 @@ export default function MyTicketsPage() {
     const token = localStorage.getItem('user_token');
     if (!token || showEmailForm) return;
 
-    const refresh = () => fetchTickets(token);
+    const refresh = () => fetchTickets(token, { quiet: true });
     const interval = window.setInterval(refresh, 30000);
 
     const onRealtime = (event: Event) => {
@@ -102,370 +128,250 @@ export default function MyTicketsPage() {
     };
   }, [showEmailForm]);
 
-  const handleSearchByEmail = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchEmail.trim()) {
-      setError('Por favor, informe seu email');
-      return;
+  const requestAccess = async (address: string) => {
+    const response = await fetch(`${BACKEND_URL}/api/public-auth/public-access`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: address, name: address.split('@')[0] || 'Visitante' }),
+    });
+    if (!response.ok) {
+      throw new Error('Não encontramos chamados com este e-mail. Confira se é o mesmo usado ao abrir o chamado.');
     }
-
-    try {
-      setLoading(true);
-      setError('');
-
-      const accessResponse = await fetch(`${BACKEND_URL}/api/public-auth/public-access`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: searchEmail,
-          name: 'Visitante',
-        }),
-      });
-
-      if (!accessResponse.ok) {
-        throw new Error('Email não encontrado. Você já abriu alguma solicitação com este email?');
-      }
-
-      const { user_token } = await accessResponse.json();
-
-      localStorage.setItem('user_token', user_token);
-      localStorage.setItem('ticket_email', searchEmail);
-      setEmail(searchEmail);
-      setShowEmailForm(false);
-      
-      await fetchTickets(user_token);
-    } catch (err: any) {
-      setError(err.message || 'Erro ao buscar solicitações');
-      setLoading(false);
-    }
+    const { user_token } = await response.json();
+    return user_token as string;
   };
 
-  const handleSearchByCode = async (e: React.FormEvent) => {
+  // Um formulário só: com protocolo, abre direto o chamado; sem ele, lista todos.
+  const handleLookup = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!searchCode.trim()) {
-      setError('Por favor, informe o código da solicitação');
+    const address = searchEmail.trim();
+    const code = searchCode.trim().toLowerCase();
+
+    if (!address) {
+      setError('Informe o e-mail usado para abrir o chamado.');
       return;
     }
-
-    if (!codeEmail.trim()) {
-      setError('Por favor, informe seu email');
-      return;
-    }
-
-    const ticketCode = searchCode.toLowerCase().trim();
-    const email = codeEmail.trim();
-    
-    // Verificar se é um código válido (pelo menos 8 caracteres)
-    if (ticketCode.length < 8) {
-      setError('O código deve ter pelo menos 8 caracteres. Exemplo: E0743972');
+    if (code && code.length < 8) {
+      setError('O protocolo tem 8 caracteres, como E0743972.');
       return;
     }
 
     try {
       setLoading(true);
       setError('');
-      
-      // Registrar/obter token do usuário público
-      const response = await fetch(`${BACKEND_URL}/api/public-auth/public-access`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, name: email.split('@')[0] }),
+      const userToken = await requestAccess(address);
+
+      if (!code) {
+        localStorage.setItem('user_token', userToken);
+        localStorage.setItem('ticket_email', address);
+        setEmail(address);
+        setShowEmailForm(false);
+        await fetchTickets(userToken);
+        return;
+      }
+
+      const ticketsResponse = await fetch(`${BACKEND_URL}/api/tickets`, {
+        headers: { 'Content-Type': 'application/json', 'X-User-Token': userToken },
       });
+      if (!ticketsResponse.ok) throw new Error('Não foi possível buscar seus chamados agora. Tente de novo em instantes.');
 
-      if (!response.ok) {
-        setError('Erro ao validar email');
-        setLoading(false);
-        return;
-      }
+      const userTickets = normalizeTickets(await ticketsResponse.json());
+      const foundTicket = userTickets.find((t) =>
+        code.length === 8 ? t.id.substring(0, 8).toLowerCase() === code : t.id.toLowerCase() === code,
+      );
 
-      const { user_token } = await response.json();
-      
-      // Buscar tickets do usuário
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'X-User-Token': user_token,
-      };
-      
-      const ticketsResponse = await fetch(`${BACKEND_URL}/api/tickets`, { headers });
-      
-      if (!ticketsResponse.ok) {
-        setError('Erro ao buscar solicitações');
-        setLoading(false);
-        return;
-      }
-
-      const ticketsData = await ticketsResponse.json();
-      
-      // Normalizar resposta (pode vir como {data: [...]} ou [...])
-      const userTickets = ticketsData.data && Array.isArray(ticketsData.data) 
-        ? ticketsData.data 
-        : Array.isArray(ticketsData) 
-        ? ticketsData 
-        : [];
-      
-      if (userTickets.length === 0) {
-        setError('Nenhuma solicitação encontrada para este email');
-        setLoading(false);
-        return;
-      }
-      
-      // Buscar ticket pelo código (8 chars ou UUID completo)
-      const foundTicket = userTickets.find((t: any) => {
-        if (ticketCode.length === 8) {
-          return t.id.substring(0, 8).toLowerCase() === ticketCode;
-        }
-        return t.id.toLowerCase() === ticketCode;
-      });
-      
       if (!foundTicket) {
-        setError('Código não encontrado. Verifique se o código pertence a uma solicitação deste email.');
-        setLoading(false);
-        return;
+        throw new Error('Este protocolo não pertence a um chamado deste e-mail. Confira os dois e tente de novo.');
       }
 
-      // Salvar token e email
-      localStorage.setItem('user_token', user_token);
-      localStorage.setItem('ticket_email', email);
-      
-      // Redirecionar para o ticket
+      localStorage.setItem('user_token', userToken);
+      localStorage.setItem('ticket_email', address);
       navigate(`/chamado/${foundTicket.id}`);
-      
     } catch (err: any) {
-      console.error('Erro ao buscar solicitação:', err);
-      setError(err.message || 'Erro ao buscar solicitação');
+      setError(err instanceof TypeError ? OFFLINE_MESSAGE : err.message || 'Não foi possível buscar seus chamados agora.');
       setLoading(false);
     }
   };
 
-  const fetchTickets = async (token: string) => {
+  const fetchTickets = async (token: string, { quiet = false } = {}) => {
     try {
-      setLoading(true);
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'X-User-Token': token,
-      };
-
-      console.log('Buscando tickets com token:', token.substring(0, 20) + '...');
-      const response = await fetch(`${BACKEND_URL}/api/tickets`, { headers });
+      if (!quiet) setLoading(true);
+      const response = await fetch(`${BACKEND_URL}/api/tickets`, {
+        headers: { 'Content-Type': 'application/json', 'X-User-Token': token },
+      });
 
       if (!response.ok) {
-        throw new Error('Erro ao carregar solicitações');
+        throw new Error('Não foi possível carregar seus chamados. Tente de novo em instantes.');
       }
 
-      const data = await response.json();
-      console.log('Resposta do backend:', data);
-      
-      // Backend retorna {data: [...], pagination: {...}} para usuários públicos
-      // ou apenas [...] para alguns endpoints
-      if (data.data && Array.isArray(data.data)) {
-        console.log('Tickets encontrados:', data.data.length);
-        setTickets(data.data);
-      } else if (Array.isArray(data)) {
-        console.log('Tickets encontrados (array direto):', data.length);
-        setTickets(data);
-      } else {
-        console.warn('Formato inesperado:', data);
-        setTickets([]);
-      }
+      setTickets(normalizeTickets(await response.json()));
+      setError('');
     } catch (err: any) {
-      console.error('Erro ao buscar tickets:', err);
-      setError(err.message || 'Erro ao carregar solicitações');
+      setError(err instanceof TypeError ? OFFLINE_MESSAGE : err.message || 'Não foi possível carregar seus chamados.');
     } finally {
       setLoading(false);
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'open':
-        return 'status-open';
-      case 'in_progress':
-        return 'status-progress';
-      case 'waiting_user':
-        return 'status-waiting';
-      case 'aguardando_aquisicao':
-        return 'status-waiting';
-      case 'aguardando_terceiros':
-        return 'status-waiting';
-      case 'aguardando_confirmacao':
-        return 'status-awaiting-confirmation';
-      case 'resolved':
-        return 'status-resolved';
-      case 'closed':
-        return 'status-closed';
-      default:
-        return 'status-default';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'open':
-        return '📋 Recebido';
-      case 'in_progress':
-        return '⏱️ Em Atendimento';
-      case 'waiting_user':
-        return '⏳ Aguardando Você';
-      case 'aguardando_confirmacao':
-        return '🔎 Aguardando Confirmação';
-      case 'aguardando_aquisicao':
-        return '🛒 Aguardando Aquisição';
-      case 'aguardando_terceiros':
-        return '🏢 Aguardando Terceiros';
-      case 'resolved':
-        return '✅ Resolvido';
-      case 'closed':
-        return '✔️ Concluído';
-      default:
-        return status;
-    }
-  };
-
-  const getPriorityLabel = (priority: string) => {
-    switch (priority) {
-      case 'low':
-        return '🟢 Baixo';
-      case 'medium':
-        return '🟡 Médio';
-      case 'high':
-        return '🟠 Alto';
-      default:
-        return priority;
-    }
-  };
+  const toneOf = (status: string): StatusTone => PUBLIC_STATUS[status]?.tone ?? 'closed';
+  const waitingOnYou = tickets.filter((t) => toneOf(t.status) === 'you').length;
+  const finished = tickets.filter((t) => TONE_STAGE[toneOf(t.status)] === 3).length;
+  const ongoing = tickets.length - finished - waitingOnYou;
 
   return (
-    <div className="my-tickets-page">
-      <div className="tickets-container">
-        <div className="tickets-header">
-          <h1>Minhas Solicitações</h1>
-          <p>Acompanhe o progresso das suas solicitações de apoio</p>
-          {email && (
-            <div className="user-info-section">
-              <p className="user-email">Solicitações de: {email}</p>
-              <button onClick={handleChangeEmail} className="btn-change-email">
-                Usar outro email
-              </button>
+    <div className="pub-page mtk">
+      <section className="mtk-hero pub-aurora">
+        <div className="pub-wrap mtk-wrap mtk-hero__inner">
+          <h1>Meus chamados</h1>
+          {email ? (
+            <div className="mtk-who">
+              <i className="ti ti-mail" aria-hidden="true" />
+              <span>{email}</span>
+              <button type="button" onClick={() => setChangeEmailConfirm(true)}>Trocar e-mail</button>
             </div>
+          ) : (
+            <p>Veja em que etapa está cada pedido que você fez.</p>
+          )}
+
+          {!showEmailForm && !loading && tickets.length > 0 && (
+            <dl className="mtk-stats">
+              <div className={waitingOnYou > 0 ? 'is-alert' : ''}>
+                <dt>Precisam de você</dt>
+                <dd>{waitingOnYou}</dd>
+              </div>
+              <div>
+                <dt>Em andamento</dt>
+                <dd>{ongoing}</dd>
+              </div>
+              <div>
+                <dt>Concluídos</dt>
+                <dd>{finished}</dd>
+              </div>
+            </dl>
           )}
         </div>
+      </section>
 
-        {error && <div className="alert alert-error">{error}</div>}
+      <div className="pub-wrap mtk-wrap mtk-body">
 
-        {showEmailForm && !loading && (
-          <div className="search-forms">
-            <div className="search-intro">
-              <h2>Como você quer encontrar suas solicitações?</h2>
-              <p>Escolha uma das opções abaixo:</p>
-            </div>
-
-            <div className="search-options">
-              <div className="search-option">
-                <div className="option-icon">✉️</div>
-                <h3>Buscar por Email</h3>
-                <p>Informe o email usado para abrir as solicitações</p>
-                <form onSubmit={handleSearchByEmail} className="search-form">
-                  <input
-                    type="email"
-                    placeholder="seu@email.com"
-                    value={searchEmail}
-                    onChange={(e) => setSearchEmail(e.target.value)}
-                    required
-                  />
-                  <button type="submit" className="btn btn-primary">
-                    Buscar Minhas Solicitações
-                  </button>
-                </form>
-              </div>
-
-              <div className="search-option">
-                <div className="option-icon">🔍</div>
-                <h3>Buscar por Código</h3>
-                <p>Digite seu email e o código da solicitação</p>
-                <form onSubmit={handleSearchByCode} className="search-form">
-                  <input
-                    type="email"
-                    placeholder="Seu email"
-                    value={codeEmail}
-                    onChange={(e) => setCodeEmail(e.target.value)}
-                    className="search-input"
-                    required
-                  />
-                  <input
-                    type="text"
-                    placeholder="Código da solicitação (ex: E0743972)"
-                    value={searchCode}
-                    onChange={(e) => setSearchCode(e.target.value.toUpperCase())}
-                    className="search-input"
-                    required
-                  />
-                  <button type="submit" className="btn btn-secondary">
-                    Buscar Solicitação
-                  </button>
-                </form>
-              </div>
-            </div>
-
-            <div className="search-help">
-              <p>💡 <strong>Ainda não tem uma solicitação?</strong></p>
-              <a href="/abrir-chamado" className="btn-link">
-                Clique aqui para solicitar apoio
-              </a>
-            </div>
+        {error && (
+          <div className="pub-alert mtk-alert" role="alert">
+            <i className="ti ti-alert-circle" aria-hidden="true" />
+            <span>{error}</span>
           </div>
         )}
 
-        {loading ? (
-          <div className="loading">Buscando suas solicitações...</div>
-        ) : !showEmailForm && tickets.length === 0 ? (
-          <div className="empty-state">
-            <span className="empty-icon">📋</span>
-            <h3>Nenhuma solicitação encontrada</h3>
-            <p>Você ainda não abriu nenhuma solicitação de apoio. Clique no botão abaixo para começar.</p>
-            <a href="/abrir-chamado" className="btn btn-primary">
-              Abrir Solicitação
-            </a>
+        {showEmailForm && (
+          <form onSubmit={handleLookup} className="mtk-lookup" noValidate>
+            <div className="pub-field">
+              <label htmlFor="mtk-email">E-mail usado no chamado</label>
+              <input
+                id="mtk-email"
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                autoCapitalize="off"
+                placeholder="nome@exemplo.com"
+                value={searchEmail}
+                onChange={(e) => setSearchEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="pub-field">
+              <label htmlFor="mtk-code">
+                Protocolo <span className="pub-field__optional">(opcional)</span>
+              </label>
+              <input
+                id="mtk-code"
+                type="text"
+                autoCapitalize="characters"
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="E0743972"
+                maxLength={36}
+                value={searchCode}
+                onChange={(e) => setSearchCode(e.target.value.toUpperCase())}
+                aria-describedby="mtk-code-hint"
+              />
+              <span id="mtk-code-hint" className="pub-field__hint">
+                Com o protocolo, abrimos direto aquele chamado.
+              </span>
+            </div>
+            <button type="submit" className="pub-btn pub-btn--primary pub-btn--block" disabled={loading}>
+              {loading ? 'Buscando…' : searchCode.trim() ? 'Abrir chamado' : 'Ver meus chamados'}
+            </button>
+            <p className="mtk-lookup__alt">
+              Ainda não pediu nada? <a href="/abrir-chamado">Abrir um chamado</a>
+            </p>
+          </form>
+        )}
+
+        {!showEmailForm && loading && (
+          <ul className="mtk-list" aria-busy="true" aria-label="Carregando chamados">
+            {[0, 1, 2].map((n) => <li key={n} className="mtk-skeleton" />)}
+          </ul>
+        )}
+
+        {!showEmailForm && !loading && tickets.length === 0 && !error && (
+          <div className="mtk-empty">
+            <h2>Nenhum chamado com este e-mail</h2>
+            <p>Quando você abrir um chamado, ele aparece aqui com cada etapa do atendimento.</p>
+            <a href="/abrir-chamado" className="pub-btn pub-btn--primary">Abrir um chamado</a>
           </div>
-        ) : !showEmailForm && (
-          <div className="tickets-list">
-            {tickets.map((ticket) => (
-              <a
-                key={ticket.id}
-                href={`/chamado/${ticket.id}`}
-                className="ticket-item"
-              >
-                <div className="ticket-header">
-                  <h3>{ticket.title}</h3>
-                  <span className={`status-badge ${getStatusColor(ticket.status)}`}>
-                    {getStatusLabel(ticket.status)}
-                  </span>
-                </div>
-                <div className="ticket-meta">
-                  <span className="priority">
-                    Impacto: {getPriorityLabel(ticket.priority)}
-                  </span>
-                  <span className="date">
-                    Aberta em: {ticket.created_at ? new Date(ticket.created_at).toLocaleDateString('pt-BR') : '-'}
-                  </span>
-                  {formatSlaBadge(ticket.sla_due_at) && (
-                    <span className="sla-estimate">{formatSlaBadge(ticket.sla_due_at)}</span>
-                  )}
-                </div>
-                <div className="ticket-code">
-                  Código: {ticket.id.substring(0, 8).toUpperCase()}
-                </div>
-              </a>
-            ))}
-          </div>
+        )}
+
+        {!showEmailForm && !loading && tickets.length > 0 && (
+          <>
+            {waitingOnYou > 0 && (
+              <p className="mtk-callout">
+                <i className="ti ti-hand-finger" aria-hidden="true" />
+                {waitingOnYou === 1
+                  ? 'Um chamado espera uma resposta sua. Ele está no topo da lista.'
+                  : `${waitingOnYou} chamados esperam uma resposta sua. Eles estão no topo da lista.`}
+              </p>
+            )}
+            <ul className="mtk-list">
+              {[...tickets]
+                .sort((a, b) => Number(toneOf(b.status) === 'you') - Number(toneOf(a.status) === 'you'))
+                .map((ticket) => {
+                const status = PUBLIC_STATUS[ticket.status] ?? { label: ticket.status, tone: 'closed' as StatusTone };
+                const stage = TONE_STAGE[status.tone];
+                const sla = status.tone === 'done' || status.tone === 'closed' ? null : formatSla(ticket.sla_due_at);
+                return (
+                  <li key={ticket.id}>
+                    <a href={`/chamado/${ticket.id}`} className={`mtk-item mtk-item--${status.tone}`}>
+                      <span className={`mtk-status mtk-status--${status.tone}`}>{status.label}</span>
+                      <strong className="mtk-item__title">{ticket.title}</strong>
+                      <span className="mtk-item__meta">
+                        <span>#{ticket.id.substring(0, 8).toUpperCase()}</span>
+                        {ticket.department && DEPARTMENT_LABEL[ticket.department] && (
+                          <span>{DEPARTMENT_LABEL[ticket.department]}</span>
+                        )}
+                        <span>
+                          Aberto em {ticket.created_at ? new Date(ticket.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '-'}
+                        </span>
+                      </span>
+                      <span className="mtk-track" aria-hidden="true">
+                        {[1, 2, 3].map((n) => (
+                          <span key={n} className={n <= stage ? 'is-on' : ''} />
+                        ))}
+                      </span>
+                      {sla && <span className={`mtk-item__sla ${sla.late ? 'is-late' : ''}`}>{sla.text}</span>}
+                      <i className="ti ti-chevron-right mtk-item__chevron" aria-hidden="true" />
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
         )}
       </div>
-      
+
       <ConfirmDialog
         isOpen={changeEmailConfirm}
-        title="Usar Outro Email"
-        message="Deseja usar outro email? Isso irá limpar os dados do email atual e você precisará fazer login novamente."
-        confirmText="Sim, trocar email"
+        title="Trocar de e-mail?"
+        message="Você volta para a busca e pode ver os chamados de outro e-mail."
+        confirmText="Trocar e-mail"
         cancelText="Cancelar"
         type="warning"
         onConfirm={confirmChangeEmail}

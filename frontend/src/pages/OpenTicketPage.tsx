@@ -1,9 +1,10 @@
-import { Fragment, useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { showToast } from '../utils/toast';
 import '../styles/OpenTicketPage.css';
 import { BACKEND_URL } from '../services/api';
-import { INSTITUTION_UNITS } from '../utils/institutionOptions';
+import { INSTITUTION_DEPARTMENTS, INSTITUTION_UNITS } from '../utils/institutionOptions';
+import { findShortcut, TICKET_SHORTCUTS, type TicketShortcut } from '../utils/ticketShortcuts';
 import { aiService, type ArticleSuggestion } from '../services/aiService';
 
 interface FormData {
@@ -44,71 +45,65 @@ const REQUESTER_STORAGE_KEY = 'opn_ticket_requester';
 
 const TOTAL_STEPS = 5;
 const STEPS = [
-  { n: 1, label: 'Departamento' },
-  { n: 2, label: 'Categoria' },
-  { n: 3, label: 'Seus Dados' },
-  { n: 4, label: 'Detalhes' },
-  { n: 5, label: 'Confirmação' },
+  { n: 1, label: 'Equipe', title: 'Abrir um chamado', lead: 'Escolha um problema comum ou a equipe que pode ajudar.' },
+  { n: 2, label: 'Assunto', title: 'Qual é o assunto?', lead: 'Escolha a opção mais próxima do seu caso.' },
+  { n: 3, label: 'Seus dados', title: 'Quem está pedindo?', lead: 'Usamos esses dados para dar retorno sobre o chamado.' },
+  { n: 4, label: 'Detalhes', title: 'Conte o que está acontecendo', lead: 'Quanto mais claro, mais rápido a equipe consegue ajudar.' },
+  { n: 5, label: 'Revisão', title: 'Revise antes de enviar', lead: 'Confira se está tudo certo. Você pode alterar qualquer parte.' },
 ];
 
 const DEPARTMENTS = [
-  { value: 'ti', label: 'Suporte de TI', icon: '🖥️', desc: 'Problemas técnicos, acessos, instalação de software, equipamentos' },
-  { value: 'administrativo', label: 'Administrativo', icon: '🏢', desc: 'Cópia de chave, apoio em evento, buscar doação, documentos' },
-  { value: 'rh', label: 'Recursos Humanos', icon: '👥', desc: 'Atestado, ponto, folha de pagamento, benefícios, declarações' },
+  { value: 'ti', label: 'Suporte de TI', icon: 'ti-device-laptop', desc: 'Computador, internet, acessos, impressora e sistemas' },
+  { value: 'administrativo', label: 'Administrativo', icon: 'ti-building', desc: 'Cópia de chave, apoio em evento, doações e documentos' },
+  { value: 'rh', label: 'Recursos Humanos', icon: 'ti-users', desc: 'Atestado, ponto, folha de pagamento, benefícios e declarações' },
 ];
 
 // TI categories
 const TI_CATEGORIES = [
-  { value: 'computador', label: 'Computador', icon: '💻' },
-  { value: 'internet', label: 'Internet', icon: '🌐' },
-  { value: 'impressora', label: 'Impressora', icon: '🖨️' },
-  { value: 'sistema', label: 'Sistema', icon: '⚙️' },
-  { value: 'outro', label: 'Outro', icon: '📋' },
+  { value: 'computador', label: 'Computador', icon: 'ti-device-desktop' },
+  { value: 'internet', label: 'Internet', icon: 'ti-wifi' },
+  { value: 'impressora', label: 'Impressora', icon: 'ti-printer' },
+  { value: 'sistema', label: 'Sistema', icon: 'ti-apps' },
+  { value: 'outro', label: 'Outro assunto', icon: 'ti-dots' },
 ];
 
 // Administrative categories
 const ADMIN_CATEGORIES = [
-  { value: 'copia_chave', label: 'Cópia de chave', icon: '🔑' },
-  { value: 'apoio_evento', label: 'Apoio em evento', icon: '🎪' },
-  { value: 'buscar_doacao', label: 'Buscar doação', icon: '📦' },
-  { value: 'solicitar_documento', label: 'Solicitar documento', icon: '📄' },
-  { value: 'outro', label: 'Outro', icon: '📋' },
+  { value: 'copia_chave', label: 'Cópia de chave', icon: 'ti-key' },
+  { value: 'apoio_evento', label: 'Apoio em evento', icon: 'ti-calendar-event' },
+  { value: 'buscar_doacao', label: 'Buscar doação', icon: 'ti-package' },
+  { value: 'solicitar_documento', label: 'Solicitar documento', icon: 'ti-file-text' },
+  { value: 'outro', label: 'Outro assunto', icon: 'ti-dots' },
 ];
 
 // RH public categories (confidential excluded from public form)
 const RH_CATEGORIES = [
-  { value: 'RH_ATESTADO', label: 'Atestado Médico', icon: '🏥' },
-  { value: 'RH_PONTO', label: 'Ajuste de Ponto', icon: '⏰' },
-  { value: 'RH_FOLHA', label: 'Folha de Pagamento', icon: '💰' },
-  { value: 'RH_DECLARACAO', label: 'Declaração', icon: '📜' },
-  { value: 'RH_BENEFICIOS', label: 'Benefícios', icon: '🎁' },
-  { value: 'RH_OUTROS', label: 'Outros RH', icon: '📋' },
+  { value: 'RH_ATESTADO', label: 'Atestado médico', icon: 'ti-stethoscope' },
+  { value: 'RH_PONTO', label: 'Ajuste de ponto', icon: 'ti-clock-edit' },
+  { value: 'RH_FOLHA', label: 'Folha de pagamento', icon: 'ti-cash' },
+  { value: 'RH_DECLARACAO', label: 'Declaração', icon: 'ti-file-certificate' },
+  { value: 'RH_BENEFICIOS', label: 'Benefícios', icon: 'ti-gift' },
+  { value: 'RH_OUTROS', label: 'Outro assunto', icon: 'ti-dots' },
 ];
 
 const ALL_CATEGORIES = [...TI_CATEGORIES, ...ADMIN_CATEGORIES, ...RH_CATEGORIES];
 
-interface QuickAction {
-  icon: string;
-  label: string;
-  hint: string;
-  dept: string;
-  cat: string;
-  title: string;
-  description: string;
-}
+const PRIORITY_LABEL: Record<string, string> = { low: 'Baixa', medium: 'Média', high: 'Alta' };
 
-const QUICK_ACTIONS: QuickAction[] = [
-  { icon: '🌐', label: 'Internet fora', hint: 'Sem conexão no computador', dept: 'ti', cat: 'internet', title: 'Internet sem conexão', description: 'Estou sem acesso à internet no meu computador.' },
-  { icon: '🖨️', label: 'Impressora', hint: 'Não imprime ou está com erro', dept: 'ti', cat: 'impressora', title: 'Impressora com problema', description: 'A impressora não está funcionando corretamente.' },
-  { icon: '🔑', label: 'Não consigo entrar', hint: 'Senha ou acesso bloqueado', dept: 'ti', cat: 'outro', title: 'Problema de acesso ao sistema', description: 'Não estou conseguindo acessar o sistema / minha senha está bloqueada.' },
-  { icon: '💻', label: 'Computador lento', hint: 'Travando ou lento demais', dept: 'ti', cat: 'computador', title: 'Computador lento ou travando', description: 'Meu computador está muito lento e travando com frequência.' },
-  { icon: '🗝️', label: 'Cópia de chave', hint: 'Solicitar chave de sala/armário', dept: 'administrativo', cat: 'copia_chave', title: 'Solicitar cópia de chave', description: 'Preciso de uma cópia de chave.' },
-  { icon: '⏰', label: 'Ajuste de ponto', hint: 'Corrigir horário registrado', dept: 'rh', cat: 'RH_PONTO', title: 'Ajuste de ponto', description: '' },
-];
+const hasStoredRequester = () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(REQUESTER_STORAGE_KEY) || 'null');
+    return !!(saved?.email && saved?.name);
+  } catch {
+    return false;
+  }
+};
 
 export default function OpenTicketPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [currentStep, setCurrentStep] = useState(1);
+  const [stepDirection, setStepDirection] = useState<'forward' | 'back'>('forward');
   const [isReturningUser, setIsReturningUser] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     email: '',
@@ -417,7 +412,9 @@ export default function OpenTicketPage() {
   // Navigate between steps — every jump scrolls back to the top so the
   // next question is always the first thing the user sees, never below the fold.
   const goToStep = (step: number) => {
-    setCurrentStep(Math.min(Math.max(step, 1), TOTAL_STEPS));
+    const next = Math.min(Math.max(step, 1), TOTAL_STEPS);
+    setStepDirection(next >= currentStep ? 'forward' : 'back');
+    setCurrentStep(next);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -435,7 +432,7 @@ export default function OpenTicketPage() {
 
   // A single tap fills department + category + a ready-to-send description
   // and skips straight past the questions the system can already answer.
-  const handleQuickAction = (tmpl: QuickAction) => {
+  const handleQuickAction = (tmpl: TicketShortcut, knownRequester = hasContactInfo()) => {
     setFormData(prev => ({
       ...prev,
       ticketDepartment: tmpl.dept,
@@ -445,8 +442,19 @@ export default function OpenTicketPage() {
       description: tmpl.description,
       requestDetails: tmpl.cat === 'RH_PONTO' ? { adjustments: [createEmptyRhAdjustment()] } : {},
     }));
-    goToStep(hasContactInfo() ? 4 : 3);
+    goToStep(knownRequester ? 4 : 3);
   };
+
+  // Atalho vindo da página inicial (`/abrir-chamado?atalho=internet`).
+  // Lê o solicitante direto do armazenamento: o estado ainda não foi
+  // atualizado pelo efeito que o carrega.
+  useEffect(() => {
+    const shortcut = findShortcut(searchParams.get('atalho'));
+    if (!shortcut) return;
+    handleQuickAction(shortcut, hasStoredRequester());
+    setSearchParams({}, { replace: true });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSelectDepartment = (dept: string) => {
     setFormData(prev => ({
@@ -634,753 +642,701 @@ export default function OpenTicketPage() {
         slaHours,
       });
 
-      showToast.success(`Chamado #${ticketCode} criado com sucesso!`);
     } catch (err: any) {
-      setError(err.message || 'Erro ao criar chamado');
-      showToast.error(err.message || 'Erro ao criar chamado. Tente novamente.');
+      // `fetch` rejeita com TypeError quando não há conexão com o servidor.
+      const message = err instanceof TypeError
+        ? 'Sem conexão com o portal. Seu chamado não foi enviado; confira a internet e toque em Enviar de novo.'
+        : err.message || 'Não foi possível enviar o chamado. Tente de novo.';
+      setError(message);
+      showToast.error(message);
     } finally {
       setLoading(false);
     }
   };
 
+  const stepMeta = STEPS[currentStep - 1];
+  const rhAdjustments = getRhAdjustments(formData.requestDetails);
+
+  const renderError = (id: string, message?: string) => message && (
+    <span id={id} className="pub-field__error" role="alert">
+      <i className="ti ti-alert-circle" aria-hidden="true" />
+      {message}
+    </span>
+  );
+
   const SelectionTrail = () => {
     if (!departmentMeta) return null;
     return (
-      <div className="selection-trail">
-        <button type="button" className="trail-chip" onClick={() => goToStep(1)}>
-          <span>{departmentMeta.icon}</span> {departmentMeta.label}
-          <span className="trail-change">trocar</span>
+      <div className="otp-trail">
+        <button type="button" className="otp-trail__chip" onClick={() => goToStep(1)}>
+          <i className={`ti ${departmentMeta.icon}`} aria-hidden="true" />
+          {departmentMeta.label}
+          <span className="pub-sr-only">(alterar equipe)</span>
         </button>
         {currentStep >= 3 && categoryMeta && (
-          <button type="button" className="trail-chip" onClick={() => goToStep(2)}>
-            <span>{categoryMeta.icon}</span> {categoryMeta.label}
-            <span className="trail-change">trocar</span>
+          <button type="button" className="otp-trail__chip" onClick={() => goToStep(2)}>
+            <i className={`ti ${categoryMeta.icon}`} aria-hidden="true" />
+            {categoryMeta.label}
+            <span className="pub-sr-only">(alterar assunto)</span>
           </button>
         )}
       </div>
     );
   };
 
+  if (successData) {
+    return (
+      <div className="pub-page otp" data-dept={formData.ticketDepartment || 'ti'}>
+        <span className="pub-sr-only" aria-live="polite">Chamado enviado</span>
+        <div className="otp-done-glow pub-aurora" aria-hidden="true" />
+        <div className="pub-wrap otp-done">
+          <h1 className="otp-done__title">Chamado enviado</h1>
+          <p className="otp-done__lead">
+            A equipe de {departmentMeta?.label ?? 'atendimento'} já recebeu seu pedido.
+            Você acompanha cada etapa em Meus chamados.
+          </p>
+
+          <div className="otp-stub">
+            <div className="otp-stub__main">
+              <span className="otp-stub__label">Protocolo</span>
+              <strong className="otp-stub__code">{successData.ticketCode}</strong>
+              <span className="otp-stub__title">{formData.title}</span>
+            </div>
+            <dl className="otp-stub__meta">
+              <div>
+                <dt>Enviado</dt>
+                <dd>
+                  {successData.timestamp.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} às{' '}
+                  {successData.timestamp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                </dd>
+              </div>
+              <div>
+                <dt>Meta de atendimento</dt>
+                <dd>até {successData.slaHours}h</dd>
+              </div>
+            </dl>
+          </div>
+
+          <p className="otp-done__hint">
+            Guarde o protocolo. Com ele e o seu e-mail você encontra o chamado de qualquer aparelho.
+          </p>
+
+          <div className="otp-done__actions">
+            <button
+              type="button"
+              className="pub-btn pub-btn--primary pub-btn--block"
+              onClick={() => navigate(`/chamado/${successData.ticketId}`)}
+            >
+              Acompanhar este chamado
+            </button>
+            <button
+              type="button"
+              className="pub-btn pub-btn--ghost pub-btn--block"
+              onClick={() => window.location.reload()}
+            >
+              Abrir outro chamado
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const showActionBar = currentStep >= 3;
+
   return (
-    <div className="open-ticket-page" data-dept={formData.ticketDepartment || 'ti'}>
-      <span className="sr-only" aria-live="polite">
-        {!successData ? `Etapa ${currentStep} de ${TOTAL_STEPS}: ${STEPS[currentStep - 1].label}` : 'Solicitação criada com sucesso'}
+    <div className="pub-page otp" data-dept={formData.ticketDepartment || 'ti'}>
+      <span className="pub-sr-only" aria-live="polite">
+        {`Etapa ${currentStep} de ${TOTAL_STEPS}: ${stepMeta.label}`}
       </span>
 
-      <div className={`open-ticket-layout ${successData ? 'single' : ''}`}>
-        <div className="ticket-form-container">
-          {!successData ? (
-            <>
-              {/* Stepper */}
-              <div className="stepper">
-                {STEPS.map((step, idx) => (
-                  <Fragment key={step.n}>
-                    <div className={`step ${currentStep >= step.n ? 'active' : ''} ${currentStep > step.n ? 'completed' : ''} ${currentStep === step.n ? 'current' : ''}`}>
-                      <div className="step-circle">
-                        {currentStep > step.n ? '✓' : step.n}
-                      </div>
-                      <div className="step-label">{step.label}</div>
-                    </div>
-                    {idx < STEPS.length - 1 && <div className="step-line"></div>}
-                  </Fragment>
-                ))}
-              </div>
+      <section className="otp-hero pub-aurora">
+        <div className="pub-wrap otp-hero__inner">
+          <div className="otp-progress">
+            {currentStep > 1 ? (
+              <button type="button" className="otp-back" onClick={handlePrevStep}>
+                <i className="ti ti-arrow-left" aria-hidden="true" />
+                Voltar
+              </button>
+            ) : <span />}
+            <span className="otp-progress__count">Etapa {currentStep} de {TOTAL_STEPS}</span>
+          </div>
+          <ol
+            className="otp-steps"
+            role="progressbar"
+            aria-label="Progresso do chamado"
+            aria-valuemin={1}
+            aria-valuemax={TOTAL_STEPS}
+            aria-valuenow={currentStep}
+          >
+            {STEPS.map((step) => (
+              <li
+                key={step.n}
+                className={step.n < currentStep ? 'is-done' : step.n === currentStep ? 'is-current' : ''}
+              >
+                <span className="otp-steps__bar" />
+                <span className="otp-steps__label">{step.label}</span>
+              </li>
+            ))}
+          </ol>
+          <div key={currentStep} className={`otp-hero__title otp-anim--${stepDirection}`}>
+            <h1>{stepMeta.title}</h1>
+            <p>{stepMeta.lead}</p>
+          </div>
+        </div>
+      </section>
 
-              <div className="form-header">
-                <h1>Central de Solicitações</h1>
-                <p>Conte o que você precisa — a gente te guia pelo resto</p>
-              </div>
+      <div className="pub-wrap otp-layout">
+        <div className="otp-main">
 
-              {error && <div className="alert alert-error">{error}</div>}
+          {error && (
+            <div className="pub-alert otp-alert" role="alert">
+              <i className="ti ti-alert-circle" aria-hidden="true" />
+              <span>{error}</span>
+            </div>
+          )}
 
-              <form onSubmit={handleSubmit} className="ticket-form">
-                {/* Step 1: Quick actions + Department */}
-                {currentStep === 1 && (
-                  <div className="form-step" data-step="1">
-                    <div className="quick-actions-hero">
-                      <span className="quick-actions-badge">⚡ Resposta rápida</span>
-                      <h2>O que aconteceu?</h2>
-                      <p className="section-subtitle">Toque em um problema comum e já preenchemos o resto para você</p>
-                      <div className="quick-actions-grid">
-                        {QUICK_ACTIONS.map(tmpl => (
-                          <button
-                            key={tmpl.label}
-                            type="button"
-                            className="quick-action-tile"
-                            onClick={() => handleQuickAction(tmpl)}
-                          >
-                            <span className="qa-icon">{tmpl.icon}</span>
-                            <span className="qa-label">{tmpl.label}</span>
-                            <span className="qa-hint">{tmpl.hint}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="step-divider"><span>ou escolha manualmente</span></div>
-
-                    <div className="step-card department-step-card">
-                      <h3 className="section-title-sm">Selecione o departamento</h3>
-                      <p className="section-subtitle">Sua solicitação vai direto para a equipe certa</p>
-
-                      <div className="department-selection" role="radiogroup" aria-label="Tipo de Solicitação">
-                        {DEPARTMENTS.map(dept => (
-                          <button
-                            key={dept.value}
-                            type="button"
-                            className={`department-card department-card--${dept.value} ${formData.ticketDepartment === dept.value ? 'active' : ''}`}
-                            onClick={() => handleSelectDepartment(dept.value)}
-                            role="radio"
-                            aria-checked={formData.ticketDepartment === dept.value}
-                          >
-                            <span className="department-icon">{dept.icon}</span>
-                            <span className="department-name">{dept.label}</span>
-                            <span className="department-desc">{dept.desc}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Step 2: Category */}
-                {currentStep === 2 && (
-                  <div className="form-step" data-step="2">
-                    <SelectionTrail />
-                    <div className="step-card">
-                      <h2 className="section-title">Qual é a categoria?</h2>
-                      <p className="section-subtitle">Escolha a opção que mais se aproxima do seu caso</p>
-
-                      <div className="type-chips" role="radiogroup" aria-label="Categoria">
-                        {activeCategories.map((cat) => (
-                          <button
-                            key={cat.value}
-                            type="button"
-                            className={`chip ${formData.category === cat.value ? 'active' : ''}`}
-                            onClick={() => handleSelectCategory(cat.value)}
-                            role="radio"
-                            aria-checked={formData.category === cat.value}
-                          >
-                            <span className="chip-icon">{cat.icon}</span>
-                            <span className="chip-text">{cat.label}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="step-actions step-actions--single">
-                      <button type="button" onClick={handlePrevStep} className="btn btn-secondary">
-                        ← Voltar
+          <form onSubmit={handleSubmit} className={`otp-form otp-anim-scope--${stepDirection} ${showActionBar ? 'has-bar' : ''}`} noValidate>
+            {/* Step 1: Quick actions + Department */}
+            {currentStep === 1 && (
+              <div className="otp-step" data-step="1">
+                <h2 className="otp-subhead">Problemas comuns</h2>
+                <ul className="pub-tiles">
+                  {TICKET_SHORTCUTS.map(tmpl => (
+                    <li key={tmpl.id}>
+                      <button type="button" className="pub-tile" onClick={() => handleQuickAction(tmpl)}>
+                        <span className={`pub-gicon pub-gicon--${tmpl.dept}`} aria-hidden="true">
+                          <i className={`ti ${tmpl.icon}`} />
+                        </span>
+                        <span className="pub-tile__copy">
+                          <strong>{tmpl.label}</strong>
+                          <span>{tmpl.hint}</span>
+                        </span>
                       </button>
-                    </div>
-                  </div>
+                    </li>
+                  ))}
+                </ul>
+
+                <h2 className="otp-subhead">Ou escolha a equipe</h2>
+                <ul className="otp-teams" role="radiogroup" aria-label="Equipe responsável">
+                  {DEPARTMENTS.map(dept => (
+                    <li key={dept.value}>
+                      <button
+                        type="button"
+                        className={`otp-team otp-team--${dept.value}`}
+                        onClick={() => handleSelectDepartment(dept.value)}
+                        role="radio"
+                        aria-checked={formData.ticketDepartment === dept.value}
+                      >
+                        <span className={`pub-gicon pub-gicon--${dept.value}`} aria-hidden="true">
+                          <i className={`ti ${dept.icon}`} />
+                        </span>
+                        <span className="otp-team__copy">
+                          <strong>{dept.label}</strong>
+                          <span>{dept.desc}</span>
+                        </span>
+                        <i className="ti ti-arrow-right otp-team__go" aria-hidden="true" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Step 2: Category */}
+            {currentStep === 2 && (
+              <div className="otp-step" data-step="2">
+                <SelectionTrail />
+                <ul className="pub-tiles otp-cats" role="radiogroup" aria-label="Assunto">
+                  {activeCategories.map((cat) => (
+                    <li key={cat.value}>
+                      <button
+                        type="button"
+                        className={`pub-tile ${formData.category === cat.value ? 'is-selected' : ''}`}
+                        onClick={() => handleSelectCategory(cat.value)}
+                        role="radio"
+                        aria-checked={formData.category === cat.value}
+                      >
+                        <span className={`pub-gicon pub-gicon--${formData.ticketDepartment}`} aria-hidden="true">
+                          <i className={`ti ${cat.icon}`} />
+                        </span>
+                        <span className="pub-tile__copy">
+                          <strong>{cat.label}</strong>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Step 3: Personal Info */}
+            {currentStep === 3 && (
+              <div className="otp-step" data-step="3">
+                <SelectionTrail />
+                {isReturningUser && (
+                  <p className="otp-note">
+                    <i className="ti ti-user-check" aria-hidden="true" />
+                    Preenchemos com os dados do seu último chamado. Se não for você, é só editar.
+                  </p>
                 )}
 
-                {/* Step 3: Personal Info */}
-                {currentStep === 3 && (
-                  <div className="form-step" data-step="3">
-                    <SelectionTrail />
-                    <div className="step-card">
-                      <h2 className="section-title">Suas Informações</h2>
-                      <p className="section-subtitle">Precisamos saber quem você é e onde trabalha</p>
-                      {isReturningUser && (
-                        <div className="returning-user-note">
-                          👋 Preenchemos com seus dados do último chamado. Não é você? Edite os campos abaixo.
-                        </div>
+                <div className="otp-panel">
+                  <div className="pub-field">
+                    <label htmlFor="name">Nome completo</label>
+                    <input
+                      id="name"
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleChange}
+                      onBlur={() => handleBlur('name')}
+                      required
+                      autoComplete="name"
+                      autoCapitalize="words"
+                      placeholder="Como você se chama"
+                      className={fieldErrors.name ? 'is-invalid' : ''}
+                      aria-invalid={!!fieldErrors.name}
+                      aria-describedby={fieldErrors.name ? 'name-error' : undefined}
+                    />
+                    {renderError('name-error', fieldErrors.name)}
+                  </div>
+
+                  <div className="pub-field">
+                    <label htmlFor="email">E-mail</label>
+                    <input
+                      id="email"
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      onBlur={() => handleBlur('email')}
+                      required
+                      autoComplete="email"
+                      inputMode="email"
+                      autoCapitalize="off"
+                      placeholder="nome@exemplo.com"
+                      className={fieldErrors.email ? 'is-invalid' : ''}
+                      aria-invalid={!!fieldErrors.email}
+                      aria-describedby={fieldErrors.email ? 'email-error' : 'email-hint'}
+                    />
+                    {fieldErrors.email
+                      ? renderError('email-error', fieldErrors.email)
+                      : <span id="email-hint" className="pub-field__hint">As atualizações do chamado chegam neste e-mail.</span>}
+                  </div>
+
+                  <div className="pub-field">
+                    <label htmlFor="department">
+                      Setor <span className="pub-field__optional">(opcional)</span>
+                    </label>
+                    <input
+                      id="department"
+                      type="text"
+                      name="department"
+                      list="otp-department-options"
+                      value={formData.department}
+                      onChange={handleChange}
+                      placeholder="Ex.: Acolhimento Institucional"
+                    />
+                    <datalist id="otp-department-options">
+                      {INSTITUTION_DEPARTMENTS.map((dept) => <option key={dept} value={dept} />)}
+                    </datalist>
+                  </div>
+
+                  <div className="pub-field">
+                    <label htmlFor="unit">
+                      Unidade <span className="pub-field__optional">(opcional)</span>
+                    </label>
+                    <select id="unit" name="unit" value={formData.unit} onChange={handleChange}>
+                      <option value="">Selecione a unidade</option>
+                      {INSTITUTION_UNITS.map((unit) => (
+                        <option key={unit} value={unit}>{unit}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Step 4: Ticket Details */}
+            {currentStep === 4 && (
+              <div className="otp-step" data-step="4">
+                <SelectionTrail />
+                <div className="otp-panel">
+                  <div className="pub-field">
+                    <label htmlFor="title">Resumo</label>
+                    <input
+                      id="title"
+                      type="text"
+                      name="title"
+                      value={formData.title}
+                      onChange={handleChange}
+                      onBlur={() => handleBlur('title')}
+                      required
+                      placeholder="Ex.: Impressora da sala 2 não imprime"
+                      maxLength={200}
+                      className={fieldErrors.title ? 'is-invalid' : ''}
+                      aria-invalid={!!fieldErrors.title}
+                      aria-describedby={fieldErrors.title ? 'title-error' : 'title-hint'}
+                    />
+                    {fieldErrors.title
+                      ? renderError('title-error', fieldErrors.title)
+                      : <span id="title-hint" className="pub-field__hint">Uma frase curta sobre o problema.</span>}
+                  </div>
+
+                  <div className="pub-field">
+                    <label htmlFor="description">O que está acontecendo</label>
+                    <textarea
+                      id="description"
+                      name="description"
+                      value={formData.description}
+                      onChange={handleChange}
+                      onBlur={() => handleBlur('description')}
+                      required
+                      placeholder="Desde quando acontece, o que você já tentou e como isso afeta seu trabalho."
+                      rows={5}
+                      maxLength={2000}
+                      className={fieldErrors.description ? 'is-invalid' : ''}
+                      aria-invalid={!!fieldErrors.description}
+                      aria-describedby={fieldErrors.description ? 'description-error' : 'description-hint'}
+                    />
+                    {fieldErrors.description
+                      ? renderError('description-error', fieldErrors.description)
+                      : (
+                        <span id="description-hint" className="pub-field__hint otp-counter">
+                          <span>Mínimo de 10 caracteres.</span>
+                          <span>{formData.description.length}/2000</span>
+                        </span>
                       )}
 
-                      <div className="form-row">
-                        <div className="form-group">
-                          <label htmlFor="email">
-                            Email <span className="required">*</span>
-                          </label>
-                          <input
-                            id="email"
-                            type="email"
-                            name="email"
-                            value={formData.email}
-                            onChange={handleChange}
-                            onBlur={() => handleBlur('email')}
-                            required
-                            placeholder="seu@email.com"
-                            className={fieldErrors.email ? 'input-error' : ''}
-                            aria-describedby={fieldErrors.email ? 'email-error' : undefined}
-                          />
-                          {fieldErrors.email && (
-                            <span id="email-error" className="error-message" role="alert">
-                              {fieldErrors.email}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="form-group">
-                          <label htmlFor="name">
-                            Nome Completo <span className="required">*</span>
-                          </label>
-                          <input
-                            id="name"
-                            type="text"
-                            name="name"
-                            value={formData.name}
-                            onChange={handleChange}
-                            onBlur={() => handleBlur('name')}
-                            required
-                            placeholder="Seu Nome"
-                            className={fieldErrors.name ? 'input-error' : ''}
-                            aria-describedby={fieldErrors.name ? 'name-error' : undefined}
-                          />
-                          {fieldErrors.name && (
-                            <span id="name-error" className="error-message" role="alert">
-                              {fieldErrors.name}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="form-row">
-                        <div className="form-group">
-                          <label htmlFor="department">Setor</label>
-                          <input
-                            id="department"
-                            type="text"
-                            name="department"
-                            value={formData.department}
-                            onChange={handleChange}
-                            placeholder="Ex: Educação Social, Acolhimento, Administrativo"
-                          />
-                          <span className="field-hint">Digite seu setor ou área de atuação</span>
-                        </div>
-
-                        <div className="form-group">
-                          <label htmlFor="unit">Unidade</label>
-                          <select
-                            id="unit"
-                            name="unit"
-                            value={formData.unit}
-                            onChange={handleChange}
+                    {(suggestionsLoading || articleSuggestions.length > 0) && (
+                      <div className="otp-kb">
+                        <p className="otp-kb__head">
+                          <i className="ti ti-bulb" aria-hidden="true" />
+                          {suggestionsLoading ? 'Procurando artigos que podem ajudar…' : 'Isto pode resolver sem chamado'}
+                        </p>
+                        {articleSuggestions.map(article => (
+                          <a
+                            key={article.id}
+                            href={`/central#${article.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="otp-kb__item"
                           >
-                            <option value="">Selecione a unidade (opcional)</option>
-                            {INSTITUTION_UNITS.map((unit) => (
-                              <option key={unit} value={unit}>{unit}</option>
-                            ))}
-                          </select>
-                          <span className="field-hint">Unidades oficiais do O Pequeno Nazareno</span>
-                        </div>
+                            <span>
+                              <small>{article.category}</small>
+                              {article.title}
+                            </span>
+                            <i className="ti ti-external-link" aria-hidden="true" />
+                          </a>
+                        ))}
                       </div>
-                    </div>
-
-                    <div className="step-actions">
-                      <button
-                        type="button"
-                        onClick={handlePrevStep}
-                        className="btn btn-secondary"
-                      >
-                        ← Voltar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleNextStep}
-                        className="btn btn-primary"
-                        disabled={!isStepValid(3)}
-                      >
-                        Continuar →
-                      </button>
-                    </div>
+                    )}
                   </div>
-                )}
 
-                {/* Step 4: Ticket Details */}
-                {currentStep === 4 && (
-                  <div className="form-step" data-step="4">
-                    <SelectionTrail />
-                    <div className="step-card">
-                      <h2 className="section-title">Detalhes da Solicitação</h2>
-                      <p className="section-subtitle">Descreva o que você precisa</p>
-
-                      <div className="form-group">
-                        <label htmlFor="title">
-                          Resumo <span className="required">*</span>
+                  {/* RH extra fields based on category */}
+                  {formData.ticketDepartment === 'rh' && formData.category === 'RH_ATESTADO' && (
+                    <>
+                      <div className="pub-field">
+                        <label htmlFor="medicalLeaveDays">Dias de afastamento</label>
+                        <input
+                          id="medicalLeaveDays"
+                          type="number"
+                          inputMode="numeric"
+                          min={1}
+                          value={formData.requestDetails.medicalLeaveDays || ''}
+                          onChange={e => handleRequestDetailChange('medicalLeaveDays', e.target.value)}
+                          placeholder="Ex.: 3"
+                        />
+                      </div>
+                      <div className="pub-field">
+                        <label htmlFor="adjustmentDateAtestado">
+                          Data do atestado <span className="pub-field__optional">(opcional)</span>
                         </label>
                         <input
-                          id="title"
-                          type="text"
-                          name="title"
-                          value={formData.title}
-                          onChange={handleChange}
-                          onBlur={() => handleBlur('title')}
-                          required
-                          placeholder="Ex: Impressora do setor não imprime"
-                          maxLength={200}
-                          className={fieldErrors.title ? 'input-error' : ''}
-                          aria-describedby="title-hint title-error"
+                          id="adjustmentDateAtestado"
+                          type="date"
+                          value={formData.requestDetails.adjustmentDate || ''}
+                          onChange={e => handleRequestDetailChange('adjustmentDate', e.target.value)}
                         />
-                        <span id="title-hint" className="field-hint">
-                          Seja objetivo. Descreva o problema em uma frase curta
-                        </span>
-                        {fieldErrors.title && (
-                          <span id="title-error" className="error-message" role="alert">
-                            {fieldErrors.title}
-                          </span>
-                        )}
                       </div>
-
-                      <div className="form-group">
-                        <label htmlFor="description">
-                          Descrição Completa <span className="required">*</span>
+                      <div className="pub-field">
+                        <label htmlFor="rhNotesAtestado">
+                          Observações <span className="pub-field__optional">(opcional)</span>
                         </label>
                         <textarea
-                          id="description"
-                          name="description"
-                          value={formData.description}
-                          onChange={handleChange}
-                          onBlur={() => handleBlur('description')}
-                          required
-                          placeholder="Descreva em detalhes o que está acontecendo e como isso impacta seu trabalho..."
-                          rows={6}
-                          maxLength={2000}
-                          className={fieldErrors.description ? 'input-error' : ''}
-                          aria-describedby="description-hint description-error"
+                          id="rhNotesAtestado"
+                          value={formData.requestDetails.notes || ''}
+                          onChange={e => handleRequestDetailChange('notes', e.target.value)}
+                          rows={2}
                         />
-                        <span id="description-hint" className="field-hint">
-                          Quanto mais detalhes, mais rápido conseguiremos ajudar
-                        </span>
-                        {fieldErrors.description && (
-                          <span id="description-error" className="error-message" role="alert">
-                            {fieldErrors.description}
-                          </span>
-                        )}
-
-                        {/* Sugestões de artigos da KB */}
-                        {(suggestionsLoading || articleSuggestions.length > 0) && (
-                          <div className="kb-suggestions">
-                            <div className="kb-suggestions-header">
-                              <span className="kb-suggestions-icon">💡</span>
-                              <span>Artigos que podem ajudar</span>
-                              {suggestionsLoading && <span className="kb-suggestions-loading">buscando...</span>}
-                            </div>
-                            {articleSuggestions.map(article => (
-                              <a
-                                key={article.id}
-                                href={`/central#${article.id}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="kb-suggestion-item"
-                              >
-                                <span className="kb-suggestion-category">{article.category}</span>
-                                <span className="kb-suggestion-title">{article.title}</span>
-                                <span className="kb-suggestion-arrow">→</span>
-                              </a>
-                            ))}
-                            {articleSuggestions.length > 0 && (
-                              <p className="kb-suggestions-footer">
-                                Se um desses artigos resolver seu problema, não precisa abrir chamado.
-                              </p>
-                            )}
-                          </div>
-                        )}
                       </div>
+                    </>
+                  )}
 
-                      {/* RH extra fields based on category */}
-                      {formData.ticketDepartment === 'rh' && formData.category === 'RH_ATESTADO' && (
-                        <div className="form-group">
-                          <label htmlFor="medicalLeaveDays">
-                            Dias de Afastamento <span className="required">*</span>
-                          </label>
-                          <input
-                            id="medicalLeaveDays"
-                            type="number"
-                            min={1}
-                            value={formData.requestDetails.medicalLeaveDays || ''}
-                            onChange={e => handleRequestDetailChange('medicalLeaveDays', e.target.value)}
-                            placeholder="Ex: 3"
-                          />
-                          <label htmlFor="adjustmentDateAtestado" style={{ marginTop: '0.75rem' }}>Data do Atestado</label>
-                          <input
-                            id="adjustmentDateAtestado"
-                            type="date"
-                            value={formData.requestDetails.adjustmentDate || ''}
-                            onChange={e => handleRequestDetailChange('adjustmentDate', e.target.value)}
-                          />
-                          <label style={{ marginTop: '0.75rem' }}>Observações</label>
-                          <textarea
-                            value={formData.requestDetails.notes || ''}
-                            onChange={e => handleRequestDetailChange('notes', e.target.value)}
-                            placeholder="Informações adicionais..."
-                            rows={2}
-                          />
-                        </div>
-                      )}
-
-                      {formData.ticketDepartment === 'rh' && formData.category === 'RH_PONTO' && (
-                        <div className="form-group">
-                          <div className="field-hint" style={{ marginBottom: '0.75rem' }}>
-                            Adicione todas as datas do mês que precisam de correção no mesmo chamado.
-                          </div>
-                          {getRhAdjustments(formData.requestDetails).map((adjustment, index) => (
-                            <div
-                              key={index}
-                              className="form-group rh-adjustment-card"
-                            >
-                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center' }}>
-                                <strong>Ajuste {index + 1}</strong>
-                                {getRhAdjustments(formData.requestDetails).length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => removeRhAdjustment(index)}
-                                    className="rh-adjustment-remove"
-                                  >
-                                    Remover
-                                  </button>
-                                )}
-                              </div>
-                              <label htmlFor={`adjustmentDate-${index}`} style={{ marginTop: '0.75rem' }}>
-                                Data do Ajuste <span className="required">*</span>
-                              </label>
+                  {formData.ticketDepartment === 'rh' && formData.category === 'RH_PONTO' && (
+                    <div className="otp-adjustments">
+                      <p className="pub-field__hint">
+                        Inclua todas as datas do mês que precisam de correção neste mesmo chamado.
+                      </p>
+                      {rhAdjustments.map((adjustment, index) => (
+                        <fieldset key={index} className="otp-adjustment">
+                          <legend>
+                            Data {index + 1}
+                            {rhAdjustments.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => removeRhAdjustment(index)}
+                                className="otp-adjustment__remove"
+                              >
+                                Remover
+                              </button>
+                            )}
+                          </legend>
+                          <div className="otp-adjustment__grid">
+                            <div className="pub-field">
+                              <label htmlFor={`adjustmentDate-${index}`}>Dia</label>
                               <input
                                 id={`adjustmentDate-${index}`}
                                 type="date"
                                 value={adjustment.date}
                                 onChange={e => updateRhAdjustment(index, 'date', e.target.value)}
                               />
-                              <label htmlFor={`correctedTime-${index}`} style={{ marginTop: '0.75rem' }}>Horário Correto</label>
+                            </div>
+                            <div className="pub-field">
+                              <label htmlFor={`correctedTime-${index}`}>Horário correto</label>
                               <input
                                 id={`correctedTime-${index}`}
                                 type="time"
                                 value={adjustment.correctedTime}
                                 onChange={e => updateRhAdjustment(index, 'correctedTime', e.target.value)}
-                                placeholder="HH:MM"
-                              />
-                              <label htmlFor={`adjustmentNotes-${index}`} style={{ marginTop: '0.75rem' }}>Justificativa</label>
-                              <textarea
-                                id={`adjustmentNotes-${index}`}
-                                value={adjustment.notes}
-                                onChange={e => updateRhAdjustment(index, 'notes', e.target.value)}
-                                placeholder="Explique o motivo deste ajuste..."
-                                rows={2}
                               />
                             </div>
-                          ))}
-                          <button
-                            type="button"
-                            onClick={addRhAdjustment}
-                            className="btn btn-secondary"
-                            style={{ marginTop: '0.25rem' }}
-                          >
-                            + Adicionar outra data
-                          </button>
-                        </div>
-                      )}
+                          </div>
+                          <div className="pub-field">
+                            <label htmlFor={`adjustmentNotes-${index}`}>
+                              Justificativa <span className="pub-field__optional">(opcional)</span>
+                            </label>
+                            <textarea
+                              id={`adjustmentNotes-${index}`}
+                              value={adjustment.notes}
+                              onChange={e => updateRhAdjustment(index, 'notes', e.target.value)}
+                              placeholder="Por que o registro precisa ser corrigido"
+                              rows={2}
+                            />
+                          </div>
+                        </fieldset>
+                      ))}
+                      <button type="button" onClick={addRhAdjustment} className="otp-add">
+                        <i className="ti ti-plus" aria-hidden="true" />
+                        Adicionar outra data
+                      </button>
+                    </div>
+                  )}
 
-                      {formData.ticketDepartment === 'rh' && formData.category === 'RH_FOLHA' && (
-                        <div className="form-group">
-                          <label htmlFor="payrollMonth">
-                            Mês/Ano de Referência <span className="required">*</span>
-                          </label>
-                          <input
-                            id="payrollMonth"
-                            type="month"
-                            value={formData.requestDetails.payrollMonth || ''}
-                            onChange={e => handleRequestDetailChange('payrollMonth', e.target.value)}
-                          />
-                          <label style={{ marginTop: '0.75rem' }}>Observações</label>
-                          <textarea
-                            value={formData.requestDetails.notes || ''}
-                            onChange={e => handleRequestDetailChange('notes', e.target.value)}
-                            placeholder="Descreva a solicitação..."
-                            rows={2}
-                          />
-                        </div>
-                      )}
-
-                      {formData.ticketDepartment === 'rh' && ['RH_DECLARACAO', 'RH_BENEFICIOS', 'RH_OUTROS'].includes(formData.category) && (
-                        <div className="form-group">
-                          <label>
-                            Detalhes <span className="required">*</span>
-                          </label>
-                          <textarea
-                            value={formData.requestDetails.notes || ''}
-                            onChange={e => handleRequestDetailChange('notes', e.target.value)}
-                            placeholder="Descreva o que você precisa..."
-                            rows={3}
-                          />
-                        </div>
-                      )}
-
-                      {/* Attachments */}
-                      <div className="form-group">
-                        <label>Anexar Arquivos <span className="field-hint" style={{ fontWeight: 'normal' }}>(opcional)</span></label>
-                        <div
-                          className="file-drop-zone"
-                          onClick={() => document.getElementById('open-ticket-file-input')?.click()}
-                          onDragOver={(e) => e.preventDefault()}
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            const dropped = Array.from(e.dataTransfer.files);
-                            setPendingFiles((prev) => [...prev, ...dropped]);
-                          }}
-                        >
-                          <span style={{ fontSize: '1.5rem' }}>📎</span>
-                          <p style={{ margin: '0.25rem 0 0', fontSize: '0.875rem', color: '#555' }}>
-                            Clique ou arraste arquivos aqui
-                          </p>
-                          <p style={{ margin: '0.125rem 0 0', fontSize: '0.75rem', color: '#888' }}>
-                            PDF, DOC, TXT, imagens, ZIP — máx. 10MB por arquivo
-                          </p>
-                          <input
-                            id="open-ticket-file-input"
-                            type="file"
-                            multiple
-                            accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif,.zip,.xls,.xlsx"
-                            style={{ display: 'none' }}
-                            onChange={(e) => {
-                              const selected = Array.from(e.target.files || []);
-                              setPendingFiles((prev) => [...prev, ...selected]);
-                              e.target.value = '';
-                            }}
-                          />
-                        </div>
-                        {pendingFiles.length > 0 && (
-                          <ul style={{ marginTop: '0.5rem', paddingLeft: '1rem', fontSize: '0.85rem' }}>
-                            {pendingFiles.map((f, i) => (
-                              <li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                                📄 {f.name} ({(f.size / 1024).toFixed(0)} KB)
-                                <button
-                                  type="button"
-                                  onClick={() => setPendingFiles((prev) => prev.filter((_, idx) => idx !== i))}
-                                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#e53e3e', fontWeight: 'bold' }}
-                                >
-                                  ✕
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
+                  {formData.ticketDepartment === 'rh' && formData.category === 'RH_FOLHA' && (
+                    <>
+                      <div className="pub-field">
+                        <label htmlFor="payrollMonth">Mês de referência</label>
+                        <input
+                          id="payrollMonth"
+                          type="month"
+                          value={formData.requestDetails.payrollMonth || ''}
+                          onChange={e => handleRequestDetailChange('payrollMonth', e.target.value)}
+                        />
                       </div>
-
-                    </div>
-
-                    <div className="step-actions">
-                      <button
-                        type="button"
-                        onClick={handlePrevStep}
-                        className="btn btn-secondary"
-                      >
-                        ← Voltar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleNextStep}
-                        className="btn btn-primary"
-                        disabled={!isStepValid(4)}
-                      >
-                        Continuar →
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Step 5: Confirmation */}
-                {currentStep === 5 && (
-                  <div className="form-step" data-step="5">
-                    <div className="step-card">
-                      <h2 className="section-title">Confirmação</h2>
-                      <p className="section-subtitle">Revise suas informações antes de enviar</p>
-
-                      <div className="confirmation-summary">
-                        <div className="summary-section">
-                          <h3>Departamento</h3>
-                          <div className="summary-item">
-                            <span className="summary-label">Tipo de Solicitação:</span>
-                            <span className="summary-value">
-                              {departmentMeta && `${departmentMeta.icon} ${departmentMeta.label}`}
-                            </span>
-                          </div>
-                          {categoryMeta && (
-                            <div className="summary-item">
-                              <span className="summary-label">Categoria:</span>
-                              <span className="summary-value">
-                                {categoryMeta.icon} {categoryMeta.label}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="summary-section">
-                          <h3>Seus Dados</h3>
-                          <div className="summary-item">
-                            <span className="summary-label">Nome:</span>
-                            <span className="summary-value">{formData.name}</span>
-                          </div>
-                          <div className="summary-item">
-                            <span className="summary-label">Email:</span>
-                            <span className="summary-value">{formData.email}</span>
-                          </div>
-                          {formData.department && (
-                            <div className="summary-item">
-                              <span className="summary-label">Setor:</span>
-                              <span className="summary-value">{formData.department}</span>
-                            </div>
-                          )}
-                          {formData.unit && (
-                            <div className="summary-item">
-                              <span className="summary-label">Unidade:</span>
-                              <span className="summary-value">{formData.unit}</span>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="summary-section">
-                          <h3>Solicitação</h3>
-                          <div className="summary-item">
-                            <span className="summary-label">Resumo:</span>
-                            <span className="summary-value">{formData.title}</span>
-                          </div>
-                          <div className="summary-item">
-                            <span className="summary-label">Descrição:</span>
-                            <span className="summary-value">{formData.description}</span>
-                          </div>
-                          {formData.ticketDepartment === 'ti' && (
-                            <div className="summary-item">
-                              <span className="summary-label">Prioridade:</span>
-                              <span className={`summary-value priority-badge priority-${formData.priority}`}>
-                                {formData.priority === 'low' && '🟢 Baixa'}
-                                {formData.priority === 'medium' && '🟡 Média'}
-                                {formData.priority === 'high' && '🔴 Alta'}
-                              </span>
-                              <span className="priority-auto-note">Definida automaticamente pelo sistema</span>
-                            </div>
-                          )}
-                        </div>
+                      <div className="pub-field">
+                        <label htmlFor="rhNotesFolha">
+                          Observações <span className="pub-field__optional">(opcional)</span>
+                        </label>
+                        <textarea
+                          id="rhNotesFolha"
+                          value={formData.requestDetails.notes || ''}
+                          onChange={e => handleRequestDetailChange('notes', e.target.value)}
+                          rows={2}
+                        />
                       </div>
+                    </>
+                  )}
+
+                  {formData.ticketDepartment === 'rh' && ['RH_DECLARACAO', 'RH_BENEFICIOS', 'RH_OUTROS'].includes(formData.category) && (
+                    <div className="pub-field">
+                      <label htmlFor="rhNotesOther">Detalhes para o RH</label>
+                      <textarea
+                        id="rhNotesOther"
+                        value={formData.requestDetails.notes || ''}
+                        onChange={e => handleRequestDetailChange('notes', e.target.value)}
+                        placeholder="Qual documento, benefício ou informação você precisa"
+                        rows={3}
+                      />
                     </div>
+                  )}
 
-                    <div className="step-actions">
-                      <button
-                        type="button"
-                        onClick={handlePrevStep}
-                        className="btn btn-secondary"
-                      >
-                        ← Voltar
-                      </button>
-                      <button
-                        type="submit"
-                        className="btn btn-primary btn-submit"
-                        disabled={loading}
-                      >
-                        {loading ? 'Enviando...' : '✓ Solicitar Apoio'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </form>
-            </>
-          ) : (
-            /* Success Screen */
-            <div className="success-screen">
-              <div className="success-icon-animated">
-                <svg className="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
-                  <circle className="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
-                  <path className="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
-                </svg>
-              </div>
-
-              <h2 className="success-title">Solicitação Criada com Sucesso!</h2>
-
-              <div className="protocol-card">
-                <div className="protocol-number">
-                  <span className="protocol-label">Número do Protocolo</span>
-                  <span className="protocol-value">{successData.ticketCode}</span>
-                </div>
-
-                <div className="protocol-details">
-                  <div className="detail-item">
-                    <span className="detail-icon">📅</span>
-                    <div className="detail-content">
-                      <span className="detail-label">Data/Hora</span>
-                      <span className="detail-value">
-                        {successData.timestamp.toLocaleDateString('pt-BR')} às {successData.timestamp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                  {/* Attachments */}
+                  <div className="pub-field">
+                    <span className="pub-field__label">
+                      Anexos <span className="pub-field__optional">(opcional)</span>
+                    </span>
+                    <label
+                      htmlFor="open-ticket-file-input"
+                      className="otp-drop"
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const dropped = Array.from(e.dataTransfer.files);
+                        setPendingFiles((prev) => [...prev, ...dropped]);
+                      }}
+                    >
+                      <i className="ti ti-paperclip" aria-hidden="true" />
+                      <span>
+                        <strong>Adicionar foto ou arquivo</strong>
+                        <small>PDF, Word, Excel, imagens ou ZIP, até 10 MB cada</small>
                       </span>
-                    </div>
-                  </div>
-
-                  <div className="detail-item">
-                    <span className="detail-icon">⏱️</span>
-                    <div className="detail-content">
-                      <span className="detail-label">SLA Estimado</span>
-                      <span className="detail-value">{successData.slaHours}h</span>
-                    </div>
+                    </label>
+                    <input
+                      id="open-ticket-file-input"
+                      className="pub-sr-only"
+                      type="file"
+                      multiple
+                      accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif,.zip,.xls,.xlsx"
+                      onChange={(e) => {
+                        const selected = Array.from(e.target.files || []);
+                        setPendingFiles((prev) => [...prev, ...selected]);
+                        e.target.value = '';
+                      }}
+                    />
+                    {pendingFiles.length > 0 && (
+                      <ul className="otp-files">
+                        {pendingFiles.map((f, i) => (
+                          <li key={i}>
+                            <i className="ti ti-file" aria-hidden="true" />
+                            <span className="otp-files__name">{f.name}</span>
+                            <span className="otp-files__size">{(f.size / 1024).toFixed(0)} KB</span>
+                            <button
+                              type="button"
+                              aria-label={`Remover ${f.name}`}
+                              onClick={() => setPendingFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                            >
+                              <i className="ti ti-x" aria-hidden="true" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 </div>
               </div>
+            )}
 
-              <div className="success-message-box">
-                <p className="success-message">
-                  Sua solicitação foi registrada com sucesso. Nossa equipe irá analisá-la e entrar em contato.
-                </p>
-                <p className="success-hint">
-                  Guarde o número do protocolo para acompanhar sua solicitação
-                </p>
+            {/* Step 5: Confirmation */}
+            {currentStep === 5 && (
+              <div className="otp-step" data-step="5">
+                <dl className="otp-review">
+                  <div className="otp-review__row">
+                    <dt>Equipe e assunto</dt>
+                    <dd>{departmentMeta?.label}{categoryMeta ? `, ${categoryMeta.label}` : ''}</dd>
+                    <button type="button" onClick={() => goToStep(1)}>Alterar</button>
+                  </div>
+                  <div className="otp-review__row">
+                    <dt>Solicitante</dt>
+                    <dd>
+                      {formData.name}
+                      <span>{formData.email}</span>
+                      {(formData.department || formData.unit) && (
+                        <span>{[formData.department, formData.unit].filter(Boolean).join(', ')}</span>
+                      )}
+                    </dd>
+                    <button type="button" onClick={() => goToStep(3)}>Alterar</button>
+                  </div>
+                  <div className="otp-review__row">
+                    <dt>Pedido</dt>
+                    <dd>
+                      <strong>{formData.title}</strong>
+                      <span className="otp-review__text">{formData.description}</span>
+                      {pendingFiles.length > 0 && (
+                        <span>{pendingFiles.length} {pendingFiles.length === 1 ? 'anexo' : 'anexos'}</span>
+                      )}
+                    </dd>
+                    <button type="button" onClick={() => goToStep(4)}>Alterar</button>
+                  </div>
+                  {formData.ticketDepartment === 'ti' && (
+                    <div className="otp-review__row">
+                      <dt>Prioridade</dt>
+                      <dd>
+                        <span className={`otp-priority otp-priority--${formData.priority}`}>
+                          {PRIORITY_LABEL[formData.priority]}
+                        </span>
+                        <span>Calculada pelo sistema a partir do assunto e da descrição.</span>
+                      </dd>
+                    </div>
+                  )}
+                </dl>
               </div>
+            )}
 
-              <div className="success-actions">
-                <button
-                  onClick={() => navigate(`/chamado/${successData.ticketId}`)}
-                  className="btn btn-primary"
-                >
-                  Ver Detalhes do Chamado
-                </button>
-                <button
-                  onClick={() => window.location.reload()}
-                  className="btn btn-secondary"
-                >
-                  ➕ Abrir Novo Chamado
-                </button>
+            {showActionBar && (
+              <div className="otp-bar">
+                <div className="otp-bar__inner">
+                  {/* Chaves distintas: se o React reaproveitasse o mesmo botão e
+                      trocasse type="button" por "submit" durante o clique em
+                      Continuar, o formulário seria enviado na etapa 4. */}
+                  {currentStep < TOTAL_STEPS ? (
+                    <button
+                      key="next"
+                      type="button"
+                      onClick={handleNextStep}
+                      className="pub-btn pub-btn--primary pub-btn--block"
+                      disabled={!isStepValid(currentStep)}
+                    >
+                      Continuar
+                    </button>
+                  ) : (
+                    <button
+                      key="submit"
+                      type="submit"
+                      className="pub-btn pub-btn--primary pub-btn--block"
+                      disabled={loading}
+                    >
+                      {loading ? 'Enviando…' : 'Enviar chamado'}
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </form>
         </div>
 
-        {!successData && (
-          <aside className="otp-sidebar" aria-label="Resumo do chamado">
-            <div className="otp-sidebar-card">
-              <h4>Seu chamado</h4>
-              <div className="otp-sidebar-row">
-                <span className="otp-sidebar-label">Departamento</span>
-                <span className={`otp-sidebar-value ${!departmentMeta ? 'muted' : ''}`}>
-                  {departmentMeta ? `${departmentMeta.icon} ${departmentMeta.label}` : 'Ainda não escolhido'}
-                </span>
-              </div>
-              <div className="otp-sidebar-row">
-                <span className="otp-sidebar-label">Categoria</span>
-                <span className={`otp-sidebar-value ${!categoryMeta ? 'muted' : ''}`}>
-                  {categoryMeta ? `${categoryMeta.icon} ${categoryMeta.label}` : '—'}
-                </span>
-              </div>
-              <div className="otp-sidebar-row">
-                <span className="otp-sidebar-label">Problema</span>
-                <span className={`otp-sidebar-value ${!formData.title ? 'muted' : ''}`}>
-                  {formData.title || '—'}
-                </span>
-              </div>
-              {formData.ticketDepartment === 'ti' && (
-                <div className="otp-sidebar-row">
-                  <span className="otp-sidebar-label">Prioridade</span>
-                  <span className={`otp-sidebar-value priority-badge priority-${formData.priority}`}>
-                    {formData.priority === 'low' && '🟢 Baixa'}
-                    {formData.priority === 'medium' && '🟡 Média'}
-                    {formData.priority === 'high' && '🔴 Alta'}
-                  </span>
-                </div>
-              )}
-              <div className="otp-sidebar-row">
-                <span className="otp-sidebar-label">Solicitante</span>
-                <span className={`otp-sidebar-value ${!formData.name ? 'muted' : ''}`}>
-                  {formData.name || '—'}
-                </span>
-              </div>
+        <aside className="otp-aside" aria-label="Resumo do chamado">
+          <h2>Seu chamado</h2>
+          <dl>
+            <div>
+              <dt>Equipe</dt>
+              <dd className={!departmentMeta ? 'is-empty' : ''}>{departmentMeta?.label ?? 'Ainda não escolhida'}</dd>
             </div>
-          </aside>
-        )}
+            <div>
+              <dt>Assunto</dt>
+              <dd className={!categoryMeta ? 'is-empty' : ''}>{categoryMeta?.label ?? 'Ainda não escolhido'}</dd>
+            </div>
+            <div>
+              <dt>Resumo</dt>
+              <dd className={!formData.title ? 'is-empty' : ''}>{formData.title || 'Ainda não escrito'}</dd>
+            </div>
+            {formData.ticketDepartment === 'ti' && (
+              <div>
+                <dt>Prioridade</dt>
+                <dd>
+                  <span className={`otp-priority otp-priority--${formData.priority}`}>
+                    {PRIORITY_LABEL[formData.priority]}
+                  </span>
+                </dd>
+              </div>
+            )}
+            <div>
+              <dt>Solicitante</dt>
+              <dd className={!formData.name ? 'is-empty' : ''}>{formData.name || 'Ainda não informado'}</dd>
+            </div>
+          </dl>
+        </aside>
       </div>
     </div>
   );

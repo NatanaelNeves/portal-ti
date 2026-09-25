@@ -1,156 +1,198 @@
-.internal-login-page {
+/* Login da equipe — página inteira sobre a aurora, sem o cabeçalho público.
+   Tokens e primitivas em PublicShell.css. */
+
+.ilogin {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100dvh;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
+  flex-direction: column;
+  background-color: #04291f;
 }
 
-.login-container {
-  width: 100%;
-  max-width: 400px;
+.ilogin__brand {
+  padding: 20px var(--pub-gutter) 40px;
 }
 
-.login-card {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  padding: 40px;
-  animation: slideUp 0.5s ease;
+.ilogin__home {
+  min-height: 44px;
 }
 
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.ilogin__intro {
+  margin-top: 32px;
 }
 
-.login-header {
-  text-align: center;
-  margin-bottom: 30px;
-}
-
-.login-header h1 {
-  font-size: 2rem;
-  color: #333;
-  margin: 0 0 10px 0;
-  font-weight: 700;
-}
-
-.login-header p {
-  color: #666;
-  font-size: 0.95rem;
+.ilogin__intro h1 {
   margin: 0;
+  font: 800 clamp(2.5rem, 11vw, 4.4rem)/0.98 var(--pub-display);
+  letter-spacing: -0.04em;
 }
 
-.alert {
-  padding: 12px 15px;
-  border-radius: 6px;
-  margin-bottom: 20px;
-  font-weight: 500;
+.ilogin__intro > p {
+  max-width: 34ch;
+  margin: 14px 0 0;
+  color: rgba(232, 246, 238, 0.82);
+  font-size: 1.05rem;
 }
 
-.alert-error {
-  background: #fee;
-  color: #c33;
-  border-left: 4px solid #c33;
+.ilogin__features {
+  display: none;
 }
 
-form {
+/* ── Cartão de login ───────────────────────────────────────────── */
+.ilogin__form-wrap {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 20px;
 }
 
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.ilogin__form {
+  flex: 1;
+  width: 100%;
+  padding: 28px var(--pub-gutter) 36px;
+  color: var(--pub-ink);
+  background: var(--pub-canvas);
+  border-radius: 26px 26px 0 0;
+  box-shadow: 0 -20px 40px -20px rgba(0, 0, 0, 0.5);
 }
 
-.form-group label {
-  font-weight: 600;
-  color: #333;
+.ilogin__form h2 {
+  margin: 0;
+  font: 800 1.6rem/1.15 var(--pub-display);
+  letter-spacing: -0.02em;
+}
+
+.ilogin__form-lead {
+  margin: 6px 0 22px;
+  color: var(--pub-muted);
   font-size: 0.95rem;
 }
 
-.form-group input {
-  padding: 12px 15px;
-  border: 2px solid #e0e0e0;
-  border-radius: 6px;
-  font-size: 0.95rem;
-  font-family: inherit;
-  transition: all 0.3s ease;
+.ilogin__form .pub-alert {
+  margin-bottom: 18px;
 }
 
-.form-group input:focus {
-  outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+.ilogin__form > .pub-btn {
+  margin-top: 26px;
+  min-height: 56px;
 }
 
-.btn {
-  padding: 12px 20px;
-  border: none;
-  border-radius: 6px;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
+.pub-field .ilogin__password input {
+  padding-right: 52px;
 }
 
-.btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+.ilogin__password {
+  position: relative;
 }
 
-.btn-primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+.ilogin__reveal {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  color: var(--pub-muted);
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  font-size: 1.25rem;
+  transform: translateY(-50%);
 }
 
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.pub-page .ilogin__reveal:hover {
+  color: var(--pub-ink);
+  transform: translateY(-50%);
 }
 
-.login-footer {
-  text-align: center;
-  margin-top: 30px;
-  padding-top: 20px;
-  border-top: 2px solid #f0f0f0;
-}
-
-.login-footer p {
-  color: #666;
-  font-size: 0.9rem;
-  margin: 0 0 10px 0;
-}
-
-.login-footer a {
-  color: #667eea;
+.ilogin__back {
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  color: var(--pub-leaf);
+  font-weight: 700;
   text-decoration: none;
-  font-weight: 600;
-  transition: all 0.3s ease;
 }
 
-.login-footer a:hover {
-  color: #764ba2;
-  text-decoration: underline;
-}
-
-@media (max-width: 480px) {
-  .login-card {
-    padding: 30px 20px;
+@media (min-width: 900px) {
+  .ilogin {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 40px;
+    padding: 0 clamp(32px, 6vw, 96px);
   }
 
-  .login-header h1 {
-    font-size: 1.5rem;
+  .ilogin__brand {
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    padding: 32px 0 56px;
+  }
+
+  .ilogin__intro {
+    margin-top: auto;
+    margin-bottom: auto;
+  }
+
+  .ilogin__features {
+    display: grid;
+    gap: 10px;
+    max-width: 420px;
+    margin: 36px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .ilogin__features li {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 14px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+
+  .ilogin__features li > span:last-child {
+    display: grid;
+    gap: 2px;
+    color: rgba(226, 244, 233, 0.75);
+    font-size: 0.88rem;
+  }
+
+  .ilogin__features strong {
+    color: #fff;
+    font-size: 1rem;
+  }
+
+  .ilogin__form-wrap {
+    flex: none;
+    align-items: flex-end;
+  }
+
+  .ilogin__form {
+    flex: none;
+    max-width: 440px;
+    padding: 36px 34px 30px;
+    background: var(--pub-paper);
+    border-radius: 24px;
+    box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    animation: ilogin-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+}
+
+@keyframes ilogin-in {
+  from { opacity: 0; transform: translateY(16px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ilogin__form {
+    animation: none;
   }
 }

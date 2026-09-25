@@ -48,7 +48,7 @@ export default function ChatWidget() {
   if (!aiAvailable) return null;
 
   return (
-    <div style={{ position: 'fixed', bottom: '1.5rem', right: '1.5rem', zIndex: 9999 }}>
+    <div className="chat-widget" style={{ position: 'fixed', bottom: '1.5rem', right: '1.5rem', zIndex: 9999 }}>
       {/* Chat panel */}
       {open && (
         <div style={{

@@ -1,0 +1,759 @@
+/* ════════════════════════════════════════════════════════════════
+   PORTAL PÚBLICO — base compartilhada
+   Tokens, cabeçalho e primitivas (botão, campo, linha) usados pelas
+   páginas públicas redesenhadas (início, abrir chamado, minhas
+   solicitações, login da equipe). Tudo fica sob `.pub-*` para não
+   vazar para a área interna, que tem o próprio sistema.
+   ════════════════════════════════════════════════════════════════ */
+
+:root {
+  --pub-evergreen: #063c2d;
+  --pub-evergreen-2: #0a4a37;
+  --pub-leaf: #0f7a4a;
+  --pub-leaf-hover: #0b6a3f;
+  --pub-leaf-wash: #e4f1e9;
+  --pub-sun: #f6c350;
+  --pub-sun-hover: #f9d27a;
+  --pub-ink: #13241d;
+  --pub-muted: #5a6b63;
+  --pub-canvas: #f2f5f1;
+  --pub-paper: #ffffff;
+  --pub-line: #dbe3dc;
+  --pub-danger: #b3261e;
+  --pub-danger-wash: #fbeceb;
+  --pub-warn: #9a5b00;
+  --pub-warn-wash: #fdf1dc;
+
+  --pub-display: 'Schibsted Grotesk', 'DM Sans', system-ui, sans-serif;
+  --pub-body: 'DM Sans', system-ui, sans-serif;
+
+  --pub-gutter: 20px;
+  --pub-max: 1080px;
+  --pub-radius: 12px;
+  --pub-header-h: 60px;
+}
+
+/* As páginas redesenhadas controlam o próprio respiro. */
+.main-content:has(> .pub-page) {
+  padding: 0;
+  background: var(--pub-canvas);
+}
+
+.pub-page {
+  min-height: calc(100vh - var(--pub-header-h));
+  color: var(--pub-ink);
+  background: var(--pub-canvas);
+  font-family: var(--pub-body);
+  font-size: 1rem;
+  line-height: 1.5;
+  overflow-x: clip; /* animações de entrada não podem gerar rolagem lateral */
+}
+
+/* Botões e campos não herdam a fonte por padrão. */
+.pub-page button,
+.pub-page input,
+.pub-page select,
+.pub-page textarea,
+.pub-header button {
+  font-family: inherit;
+}
+
+/* Neutraliza o "pulo" global de botões definido em index.css. */
+.pub-page button:hover,
+.pub-header button:hover {
+  transform: none;
+}
+
+.pub-page button:not(.pub-btn):hover,
+.pub-header button:hover {
+  box-shadow: none;
+}
+
+.pub-page :focus-visible,
+.pub-header :focus-visible {
+  outline: 3px solid var(--pub-sun);
+  outline-offset: 2px;
+}
+
+.pub-wrap {
+  width: 100%;
+  max-width: var(--pub-max);
+  margin-inline: auto;
+  padding-inline: var(--pub-gutter);
+}
+
+.pub-sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* ── Cabeçalho ─────────────────────────────────────────────────── */
+.pub-header {
+  position: sticky;
+  top: 0;
+  z-index: 900;
+  color: #fff;
+  background: rgba(5, 46, 34, 0.86);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  font-family: var(--pub-body);
+}
+
+.pub-header__bar {
+  height: var(--pub-header-h);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.pub-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  text-align: left;
+  text-decoration: none;
+}
+
+.pub-brand__mark {
+  position: relative;
+  width: 28px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 2.5px solid #20b66a;
+  border-radius: 9px 9px 10px 10px;
+  transform: skewY(-3deg);
+}
+
+.pub-brand__mark::before {
+  content: '';
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #20b66a;
+}
+
+.pub-brand__mark::after {
+  content: '';
+  position: absolute;
+  right: 4px;
+  bottom: 5px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--pub-sun);
+}
+
+.pub-brand__copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.pub-brand__copy strong {
+  font: 700 1rem/1.15 var(--pub-display);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.pub-brand__copy small {
+  color: rgba(226, 244, 233, 0.72);
+  font-size: 0.75rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.pub-nav {
+  display: none;
+}
+
+.pub-header__staff {
+  display: none;
+}
+
+.pub-menu-toggle {
+  margin-left: auto;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  font: 600 0.9rem/1 var(--pub-body);
+}
+
+.pub-menu-toggle i {
+  font-size: 1.15rem;
+}
+
+/* Painel do menu no celular: desce do cabeçalho, sem cobrir a marca. */
+.pub-sheet {
+  position: fixed;
+  inset: var(--pub-header-h) 0 0 0;
+  z-index: 899;
+  display: flex;
+  flex-direction: column;
+  background: rgba(6, 30, 22, 0.45);
+}
+
+.pub-sheet__panel {
+  padding: 8px var(--pub-gutter) 20px;
+  background: var(--pub-evergreen);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  animation: pub-sheet-in 0.18s ease-out;
+}
+
+.pub-sheet__backdrop {
+  flex: 1;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+@keyframes pub-sheet-in {
+  from { transform: translateY(-8px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+.pub-sheet__link {
+  width: 100%;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 4px;
+  color: #fff;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0;
+  font: 500 1.05rem/1.2 var(--pub-body);
+  text-align: left;
+}
+
+.pub-sheet__link i {
+  width: 24px;
+  color: #7fd9a4;
+  font-size: 1.3rem;
+}
+
+.pub-sheet__link[aria-current='page'] {
+  font-weight: 700;
+}
+
+.pub-sheet__link[aria-current='page'] i {
+  color: var(--pub-sun);
+}
+
+.pub-sheet__staff {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #fff;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 10px;
+  font: 600 0.95rem/1 var(--pub-body);
+}
+
+@media (min-width: 960px) {
+  .pub-menu-toggle,
+  .pub-sheet {
+    display: none;
+  }
+
+  .pub-nav {
+    display: flex;
+    align-items: stretch;
+    height: 100%;
+    gap: 4px;
+    margin-left: 28px;
+  }
+
+  .pub-nav__link {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 12px;
+    color: rgba(236, 248, 241, 0.82);
+    background: none;
+    border: 0;
+    border-radius: 0;
+    font: 500 0.92rem/1 var(--pub-body);
+    white-space: nowrap;
+  }
+
+  .pub-nav__link:hover {
+    color: #fff;
+  }
+
+  .pub-nav__link[aria-current='page'] {
+    color: #fff;
+    font-weight: 700;
+  }
+
+  .pub-nav__link[aria-current='page']::after {
+    content: '';
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 0;
+    height: 3px;
+    border-radius: 3px 3px 0 0;
+    background: var(--pub-sun);
+  }
+
+  .pub-header__staff {
+    margin-left: auto;
+    min-height: 38px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    color: #fff;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 8px;
+    font: 600 0.86rem/1 var(--pub-body);
+    white-space: nowrap;
+  }
+
+  .pub-header__staff:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+
+/* ── Primitivas ────────────────────────────────────────────────── */
+.pub-btn {
+  min-height: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 22px;
+  border: 1.5px solid transparent;
+  border-radius: 999px;
+  font: 700 1rem/1.1 var(--pub-body);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.2s ease, transform 0.12s ease;
+}
+
+.pub-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.pub-btn i {
+  font-size: 1.2rem;
+}
+
+.pub-btn--primary {
+  color: #fff;
+  background: linear-gradient(180deg, #169a5d 0%, var(--pub-leaf) 100%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.22) inset, 0 8px 22px -10px rgba(15, 122, 74, 0.75);
+}
+
+.pub-btn--primary:hover {
+  background: var(--pub-leaf-hover);
+}
+
+.pub-btn--sun {
+  color: var(--pub-evergreen);
+  background: linear-gradient(180deg, #ffd978 0%, var(--pub-sun) 100%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset, 0 10px 30px -8px rgba(246, 195, 80, 0.65);
+}
+
+.pub-btn--sun:hover {
+  background: var(--pub-sun-hover);
+}
+
+.pub-btn--ghost {
+  color: var(--pub-ink);
+  background: var(--pub-paper);
+  border-color: var(--pub-line);
+}
+
+.pub-btn--ghost:hover {
+  border-color: #b9c8bd;
+}
+
+.pub-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.pub-btn--block {
+  width: 100%;
+}
+
+.pub-field {
+  display: grid;
+  gap: 6px;
+}
+
+.pub-field + .pub-field {
+  margin-top: 18px;
+}
+
+.pub-field label,
+.pub-field__label {
+  color: var(--pub-ink);
+  font: 600 0.92rem/1.3 var(--pub-body);
+}
+
+.pub-field__optional {
+  color: var(--pub-muted);
+  font-weight: 400;
+}
+
+.pub-field input,
+.pub-field select,
+.pub-field textarea {
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 14px;
+  color: var(--pub-ink);
+  background: var(--pub-paper);
+  border: 1.5px solid var(--pub-line);
+  border-radius: 10px;
+  font: 400 1rem/1.4 var(--pub-body); /* 16px: evita zoom automático no iOS */
+  transition: border-color 0.15s ease;
+}
+
+.pub-field textarea {
+  min-height: 132px;
+  resize: vertical;
+}
+
+.pub-field input:focus,
+.pub-field select:focus,
+.pub-field textarea:focus {
+  outline: none;
+  border-color: var(--pub-leaf);
+  box-shadow: 0 0 0 3px rgba(15, 122, 74, 0.16);
+}
+
+.pub-field input::placeholder,
+.pub-field textarea::placeholder {
+  color: #8a9a92;
+}
+
+.pub-field .is-invalid {
+  border-color: var(--pub-danger);
+}
+
+.pub-field__hint {
+  color: var(--pub-muted);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.pub-field__error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--pub-danger);
+  font-size: 0.87rem;
+  font-weight: 600;
+}
+
+.pub-alert {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  color: var(--pub-danger);
+  background: var(--pub-danger-wash);
+  border-radius: 10px;
+  font-size: 0.93rem;
+  line-height: 1.4;
+}
+
+.pub-alert i {
+  margin-top: 1px;
+  font-size: 1.15rem;
+}
+
+/* Lista de escolhas em linhas: alvo de toque inteiro, estilo app. */
+.pub-list {
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+  background: var(--pub-paper);
+  border: 1px solid var(--pub-line);
+  border-radius: var(--pub-radius);
+  overflow: hidden;
+}
+
+.pub-list li + li {
+  border-top: 1px solid var(--pub-line);
+}
+
+.pub-row {
+  width: 100%;
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px 12px 16px;
+  color: var(--pub-ink);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  text-align: left;
+  transition: background-color 0.12s ease;
+}
+
+.pub-row:hover {
+  background: #f7faf7;
+}
+
+.pub-row:active {
+  background: var(--pub-leaf-wash);
+}
+
+.pub-row__icon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  color: var(--pub-leaf);
+  background: var(--pub-leaf-wash);
+  border-radius: 10px;
+  font-size: 1.35rem;
+}
+
+/* A cor do ícone diz para qual equipe o atalho vai. */
+.pub-row__icon--administrativo {
+  color: #8a5300;
+  background: #fbefd9;
+}
+
+.pub-row__icon--rh {
+  color: #5b3fa0;
+  background: #eee8f8;
+}
+
+.pub-row__copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pub-row__copy strong {
+  font: 700 1rem/1.25 var(--pub-body);
+}
+
+.pub-row__copy span {
+  color: var(--pub-muted);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.pub-row__chevron {
+  color: #9aaba2;
+  font-size: 1.2rem;
+}
+
+.pub-row--compact {
+  min-height: 60px;
+}
+
+.pub-row.is-selected {
+  background: var(--pub-leaf-wash);
+}
+
+/* ── Aurora: fundo evergreen com luzes que se movem devagar ─────────
+   Usado nos topos (home, etapas do chamado, meus chamados, login). */
+.pub-aurora {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  color: #fff;
+  background: #04291f;
+}
+
+.pub-aurora::before {
+  content: '';
+  position: absolute;
+  inset: -40% -20%;
+  z-index: -2;
+  background:
+    radial-gradient(38% 42% at 18% 28%, rgba(32, 182, 106, 0.62), transparent 70%),
+    radial-gradient(30% 34% at 82% 18%, rgba(246, 195, 80, 0.42), transparent 72%),
+    radial-gradient(44% 40% at 66% 88%, rgba(16, 140, 88, 0.55), transparent 72%),
+    radial-gradient(26% 30% at 40% 70%, rgba(120, 220, 170, 0.25), transparent 70%);
+  filter: blur(36px);
+  animation: pub-aurora-drift 22s ease-in-out infinite alternate;
+}
+
+/* Grade de pontos que some para baixo: dá textura sem competir. */
+.pub-aurora::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.13) 1px, transparent 1.2px);
+  background-size: 22px 22px;
+  -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.9), transparent 85%);
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.9), transparent 85%);
+}
+
+@keyframes pub-aurora-drift {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+  50% { transform: translate3d(-5%, 3%, 0) rotate(6deg) scale(1.08); }
+  100% { transform: translate3d(4%, -2%, 0) rotate(-4deg) scale(1.02); }
+}
+
+/* ── Ícone com volume, na cor da equipe ─────────────────────────── */
+.pub-gicon {
+  --g1: #25c178;
+  --g2: #0b7a47;
+  --glow: rgba(18, 161, 95, 0.45);
+  position: relative;
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: #fff;
+  background: linear-gradient(155deg, var(--g1) 0%, var(--g2) 100%);
+  border-radius: 13px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.18),
+    0 8px 18px -8px var(--glow);
+  font-size: 1.4rem;
+}
+
+.pub-gicon::after {
+  content: '';
+  position: absolute;
+  inset: 2px 2px 50% 2px;
+  border-radius: 11px 11px 40% 40%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.32), transparent);
+  pointer-events: none;
+}
+
+.pub-gicon--administrativo {
+  --g1: #ffc857;
+  --g2: #e08a0b;
+  --glow: rgba(224, 138, 11, 0.45);
+}
+
+.pub-gicon--rh {
+  --g1: #a48bff;
+  --g2: #5f40d6;
+  --glow: rgba(95, 64, 214, 0.45);
+}
+
+.pub-gicon--neutral {
+  --g1: #4f8f74;
+  --g2: #1f5a43;
+  --glow: rgba(31, 90, 67, 0.4);
+}
+
+/* ── Bloco de escolha (atalhos, assuntos) ───────────────────────── */
+.pub-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pub-tile {
+  width: 100%;
+  height: 100%;
+  min-height: 132px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  color: var(--pub-ink);
+  background: var(--pub-paper);
+  border: 1px solid var(--pub-line);
+  border-radius: 16px;
+  text-align: left;
+  box-shadow: 0 1px 2px rgba(6, 60, 45, 0.04);
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.pub-tile:hover {
+  transform: translateY(-3px) !important;
+  border-color: #c3d6c9;
+  box-shadow: 0 14px 30px -18px rgba(6, 60, 45, 0.45) !important;
+}
+
+.pub-tile:active {
+  transform: scale(0.97) !important;
+}
+
+.pub-tile__copy {
+  display: grid;
+  gap: 3px;
+}
+
+.pub-tile__copy strong {
+  font: 700 1rem/1.2 var(--pub-body);
+}
+
+.pub-tile__copy span {
+  color: var(--pub-muted);
+  font-size: 0.86rem;
+  line-height: 1.3;
+}
+
+.pub-tile.is-selected {
+  border-color: var(--pub-leaf);
+  box-shadow: 0 0 0 2px var(--pub-leaf) inset;
+}
+
+@media (min-width: 720px) {
+  .pub-tiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .pub-tile {
+    min-height: 148px;
+    padding: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pub-page *,
+  .pub-header *,
+  .pub-sheet *,
+  .pub-aurora::before {
+    animation: none !important;
+    transition: none !important;
+  }
+}

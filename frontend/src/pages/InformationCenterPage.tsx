@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/InformationCenterPage.css';
 import { BACKEND_URL } from '../services/api';
@@ -11,6 +11,29 @@ interface Article {
   created_at: string;
 }
 
+const CATEGORIES = [
+  { id: 'all', name: 'Todos', icon: 'ti-layout-grid' },
+  { id: 'getting-started', name: 'Primeiros passos', icon: 'ti-flag' },
+  { id: 'troubleshooting', name: 'Soluções práticas', icon: 'ti-tool' },
+  { id: 'faq', name: 'Dúvidas frequentes', icon: 'ti-help' },
+  { id: 'tutorials', name: 'Passo a passo', icon: 'ti-list-numbers' },
+  { id: 'institutional', name: 'Documentos institucionais', icon: 'ti-building-bank' },
+];
+
+// Cada categoria reaproveita uma das cores de equipe do portal.
+const CATEGORY_TONE: Record<string, string> = {
+  'getting-started': '',
+  troubleshooting: 'administrativo',
+  faq: 'rh',
+  tutorials: '',
+  institutional: 'neutral',
+};
+
+const categoryMeta = (id: string) =>
+  CATEGORIES.find((cat) => cat.id === id) ?? { id, name: id, icon: 'ti-file-text' };
+
+const ARTICLES_PER_PAGE = 9;
+
 export default function InformationCenterPage() {
   const navigate = useNavigate();
   const [articles, setArticles] = useState<Article[]>([]);
@@ -21,7 +44,7 @@ export default function InformationCenterPage() {
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [feedbackSent, setFeedbackSent] = useState<Record<string, boolean>>({});
   const [articlesPage, setArticlesPage] = useState(1);
-  const ARTICLES_PER_PAGE = 9;
+  const contentRef = useRef<HTMLDivElement | null>(null);
 
   const sendFeedback = async (articleId: string, helpful: boolean) => {
     if (feedbackSent[articleId]) return;
@@ -35,15 +58,6 @@ export default function InformationCenterPage() {
     setFeedbackSent(prev => ({ ...prev, [articleId]: true }));
   };
 
-  const categories = [
-    { id: 'all', name: 'Todos os Tópicos' },
-    { id: 'getting-started', name: 'Primeiros Passos' },
-    { id: 'troubleshooting', name: 'Soluções Práticas' },
-    { id: 'faq', name: 'Dúvidas Frequentes' },
-    { id: 'tutorials', name: 'Tutoriais Passo a Passo' },
-    { id: 'institutional', name: 'Documentos Institucionais' },
-  ];
-
   useEffect(() => {
     fetchArticles();
   }, []);
@@ -51,27 +65,49 @@ export default function InformationCenterPage() {
   const fetchArticles = async () => {
     try {
       setLoading(true);
+      setError('');
       const response = await fetch(`${BACKEND_URL}/api/information-articles?public=true`);
 
       if (!response.ok) {
-        throw new Error('Erro ao carregar artigos');
+        throw new Error('Não foi possível carregar os artigos. Tente de novo em instantes.');
       }
 
       const data = await response.json();
-      setArticles(data.articles || []);
+      const loaded: Article[] = data.articles || [];
+      setArticles(loaded);
+
+      // As sugestões do "Abrir chamado" apontam para /central#<id>.
+      const linkedId = decodeURIComponent(window.location.hash.slice(1));
+      const linked = linkedId && loaded.find((article) => article.id === linkedId);
+      if (linked) setSelectedArticle(linked);
     } catch (err: any) {
-      setError(err.message || 'Erro ao carregar artigos');
+      setError(err instanceof TypeError
+        ? 'Sem conexão com o portal. Confira sua internet e tente de novo.'
+        : err.message || 'Não foi possível carregar os artigos.');
     } finally {
       setLoading(false);
     }
   };
 
+  const openArticle = (article: Article | null) => {
+    setSelectedArticle(article);
+    window.history.replaceState(null, '', article ? `#${article.id}` : window.location.pathname);
+    contentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const chooseCategory = (id: string) => {
+    setSelectedCategory(id);
+    setArticlesPage(1);
+    if (selectedArticle) openArticle(null);
+  };
+
+  const term = searchTerm.trim().toLowerCase();
   const allFilteredArticles = articles.filter((article) => {
-    const matchesCategory =
-      selectedCategory === 'all' || article.category === selectedCategory;
+    const matchesCategory = selectedCategory === 'all' || article.category === selectedCategory;
     const matchesSearch =
-      article.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      article.content.toLowerCase().includes(searchTerm.toLowerCase());
+      !term ||
+      article.title.toLowerCase().includes(term) ||
+      article.content.toLowerCase().includes(term);
     return matchesCategory && matchesSearch;
   });
 
@@ -81,154 +117,192 @@ export default function InformationCenterPage() {
     articlesPage * ARTICLES_PER_PAGE,
   );
 
+  const countFor = (id: string) =>
+    id === 'all' ? articles.length : articles.filter((article) => article.category === id).length;
+
+  const visibleCategories = CATEGORIES.filter((cat) => cat.id === 'all' || countFor(cat.id) > 0 || loading);
+
   return (
-    <div className="information-center-page">
-      <div className="center-header">
-        <h1>📚 Central de Dúvidas</h1>
-        <p>Encontre respostas, tutoriais e documentação para apoiar seu trabalho</p>
-      </div>
+    <div className="pub-page kb">
+      <section className="kb-hero pub-aurora">
+        <div className="pub-wrap kb-hero__inner">
+          <h1>Central de dúvidas</h1>
+          <p>Tutoriais e respostas rápidas para resolver sozinho, sem esperar atendimento.</p>
 
-      <div className="center-container">
-        {/* Search Bar */}
-        <div className="search-section">
-          <input
-            type="text"
-            placeholder="O que você precisa encontrar? Ex: como trocar toner da impressora..."
-            value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); setArticlesPage(1); }}
-            className="search-input"
-          />
+          <label className="kb-search" htmlFor="kb-search-input">
+            <i className="ti ti-search" aria-hidden="true" />
+            <span className="pub-sr-only">Buscar artigos</span>
+            <input
+              id="kb-search-input"
+              type="search"
+              placeholder="Ex.: como trocar o toner da impressora"
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setArticlesPage(1);
+                if (selectedArticle) openArticle(null);
+              }}
+            />
+            {searchTerm && (
+              <button type="button" className="kb-search__clear" aria-label="Limpar busca" onClick={() => setSearchTerm('')}>
+                <i className="ti ti-x" aria-hidden="true" />
+              </button>
+            )}
+          </label>
         </div>
+      </section>
 
-        {/* Categories */}
-        <div className="categories-section">
-          {categories.map((cat) => (
+      <nav className="kb-cats" aria-label="Categorias">
+        <div className="pub-wrap kb-cats__scroller">
+          {visibleCategories.map((cat) => (
             <button
               key={cat.id}
-              className={`category-btn ${selectedCategory === cat.id ? 'active' : ''}`}
-              onClick={() => { setSelectedCategory(cat.id); setArticlesPage(1); }}
+              type="button"
+              className={`kb-chip ${selectedCategory === cat.id ? 'is-active' : ''}`}
+              aria-pressed={selectedCategory === cat.id}
+              onClick={() => chooseCategory(cat.id)}
             >
+              <i className={`ti ${cat.icon}`} aria-hidden="true" />
               {cat.name}
+              {!loading && !error && <span className="kb-chip__count">{countFor(cat.id)}</span>}
             </button>
           ))}
         </div>
+      </nav>
 
-        {error && <div className="alert alert-error">{error}</div>}
+      <div className="pub-wrap kb-body" ref={contentRef}>
+        {error && (
+          <div className="pub-alert kb-alert" role="alert">
+            <i className="ti ti-alert-circle" aria-hidden="true" />
+            <span>{error}</span>
+            <button type="button" className="kb-alert__retry" onClick={fetchArticles}>Tentar de novo</button>
+          </div>
+        )}
 
         {loading ? (
-          <div className="loading">Carregando artigos...</div>
+          <ul className="kb-grid" aria-busy="true" aria-label="Carregando artigos">
+            {[0, 1, 2, 3, 4, 5].map((n) => <li key={n} className="kb-skeleton" />)}
+          </ul>
         ) : selectedArticle ? (
-          /* Article Detail View */
-          <div className="article-detail">
-            <button
-              className="back-btn"
-              onClick={() => setSelectedArticle(null)}
-            >
-              ← Voltar
+          <article className="kb-article">
+            <button type="button" className="kb-back" onClick={() => openArticle(null)}>
+              <i className="ti ti-arrow-left" aria-hidden="true" />
+              Todos os artigos
             </button>
+
+            <span className={`kb-card__cat kb-tone--${CATEGORY_TONE[selectedArticle.category] ?? ''}`}>
+              <i className={`ti ${categoryMeta(selectedArticle.category).icon}`} aria-hidden="true" />
+              {categoryMeta(selectedArticle.category).name}
+            </span>
             <h2>{selectedArticle.title}</h2>
-            <p className="article-meta">
-              Categoria: <span>{selectedArticle.category}</span>
-            </p>
-            <div className="article-content">{selectedArticle.content}</div>
-            <div className="article-feedback">
+            <div className="kb-article__content">{selectedArticle.content}</div>
+
+            <div className="kb-feedback">
               {feedbackSent[selectedArticle.id] ? (
-                <span className="feedback-thanks">Obrigado pelo feedback!</span>
+                <p className="kb-feedback__thanks">
+                  <i className="ti ti-heart-handshake" aria-hidden="true" />
+                  Obrigado. Sua resposta ajuda a melhorar os artigos.
+                </p>
               ) : (
                 <>
-                  <span className="feedback-label">Esse artigo foi útil?</span>
-                  <button className="feedback-btn feedback-yes" onClick={() => sendFeedback(selectedArticle.id, true)}>👍 Sim</button>
-                  <button className="feedback-btn feedback-no" onClick={() => sendFeedback(selectedArticle.id, false)}>👎 Não</button>
+                  <p>Este artigo resolveu sua dúvida?</p>
+                  <div className="kb-feedback__actions">
+                    <button type="button" className="kb-vote" onClick={() => sendFeedback(selectedArticle.id, true)}>
+                      <i className="ti ti-thumb-up" aria-hidden="true" />
+                      Sim
+                    </button>
+                    <button type="button" className="kb-vote" onClick={() => sendFeedback(selectedArticle.id, false)}>
+                      <i className="ti ti-thumb-down" aria-hidden="true" />
+                      Não
+                    </button>
+                  </div>
                 </>
               )}
             </div>
-          </div>
-        ) : filteredArticles.length === 0 ? (
-          <div className="empty-state">
-            <p>Nenhum artigo encontrado</p>
+          </article>
+        ) : filteredArticles.length === 0 && !error ? (
+          <div className="kb-empty">
+            <span className="pub-gicon pub-gicon--neutral" aria-hidden="true"><i className="ti ti-search-off" /></span>
+            <h2>{term ? `Nada encontrado para "${searchTerm.trim()}"` : 'Ainda não há artigos aqui'}</h2>
+            <p>
+              {term
+                ? 'Tente outras palavras ou veja todas as categorias.'
+                : 'Os artigos desta categoria aparecem aqui assim que forem publicados.'}
+            </p>
+            {term && (
+              <button type="button" className="pub-btn pub-btn--ghost" onClick={() => { setSearchTerm(''); chooseCategory('all'); }}>
+                Limpar busca
+              </button>
+            )}
           </div>
         ) : (
-          /* Articles List */
           <>
-            <div className="articles-grid">
-              {filteredArticles.map((article) => (
-                <div
-                  key={article.id}
-                  className="article-card"
-                  onClick={() => setSelectedArticle(article)}
-                >
-                  <div className="article-category">{article.category}</div>
-                  <h3>{article.title}</h3>
-                  <p>{article.content.substring(0, 100)}...</p>
-                  <a href="#" className="read-more">Ler mais →</a>
-                </div>
-              ))}
-            </div>
+            {term && (
+              <p className="kb-result-count">
+                {allFilteredArticles.length === 1 ? '1 artigo encontrado' : `${allFilteredArticles.length} artigos encontrados`}
+              </p>
+            )}
+            <ul className="kb-grid">
+              {filteredArticles.map((article) => {
+                const meta = categoryMeta(article.category);
+                const tone = CATEGORY_TONE[article.category] ?? '';
+                return (
+                  <li key={article.id}>
+                    <button type="button" className="kb-card" onClick={() => openArticle(article)}>
+                      <span className="kb-card__head">
+                        <span className={`pub-gicon ${tone ? `pub-gicon--${tone}` : ''}`} aria-hidden="true">
+                          <i className={`ti ${meta.icon}`} />
+                        </span>
+                        <span className={`kb-card__cat kb-tone--${tone}`}>{meta.name}</span>
+                      </span>
+                      <strong className="kb-card__title">{article.title}</strong>
+                      <span className="kb-card__excerpt">{article.content}</span>
+                      <span className="kb-card__more">
+                        Ler artigo
+                        <i className="ti ti-arrow-right" aria-hidden="true" />
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
             {totalArticlePages > 1 && (
-              <div className="articles-pagination">
+              <nav className="kb-pages" aria-label="Páginas de artigos">
                 <button
-                  className="pagination-btn"
+                  type="button"
+                  className="kb-pages__btn"
                   disabled={articlesPage === 1}
-                  onClick={() => setArticlesPage(p => p - 1)}
-                >◀ Anterior</button>
-                <span className="pagination-info">Página {articlesPage} de {totalArticlePages}</span>
+                  onClick={() => { setArticlesPage(p => p - 1); contentRef.current?.scrollIntoView({ behavior: 'smooth' }); }}
+                >
+                  <i className="ti ti-chevron-left" aria-hidden="true" />
+                  Anterior
+                </button>
+                <span className="kb-pages__info">Página {articlesPage} de {totalArticlePages}</span>
                 <button
-                  className="pagination-btn"
+                  type="button"
+                  className="kb-pages__btn"
                   disabled={articlesPage === totalArticlePages}
-                  onClick={() => setArticlesPage(p => p + 1)}
-                >Próxima ▶</button>
-              </div>
+                  onClick={() => { setArticlesPage(p => p + 1); contentRef.current?.scrollIntoView({ behavior: 'smooth' }); }}
+                >
+                  Próxima
+                  <i className="ti ti-chevron-right" aria-hidden="true" />
+                </button>
+              </nav>
             )}
           </>
         )}
-      </div>
 
-      {/* Quick Access Section */}
-      <section className="quick-access">
-        <h3>Acesso Rápido</h3>
-        <div className="quick-links">
-          <button 
-            onClick={() => navigate('/abrir-chamado')}
-            className="quick-link"
-            title="Ir para nova solicitação"
-          >
-            <span>📝</span>
-            <p>Como Abrir Chamado</p>
+        <section className="kb-help pub-aurora" aria-labelledby="kb-help-title">
+          <div>
+            <h2 id="kb-help-title">Não encontrou o que precisava?</h2>
+            <p>Abra um chamado e a equipe certa cuida do seu caso.</p>
+          </div>
+          <button type="button" className="pub-btn pub-btn--sun" onClick={() => navigate('/abrir-chamado')}>
+            <i className="ti ti-message-plus" aria-hidden="true" />
+            Abrir um chamado
           </button>
-          <button
-            onClick={() => {
-              setSelectedCategory('troubleshooting');
-              setSelectedArticle(null);
-              window.scrollTo({ top: 300, behavior: 'smooth' });
-            }}
-            className="quick-link"
-            title="Ver problemas comuns"
-          >
-            <span>🔧</span>
-            <p>Problemas Comuns</p>
-          </button>
-          <button
-            onClick={() => {
-              setSelectedCategory('faq');
-              setSelectedArticle(null);
-              window.scrollTo({ top: 300, behavior: 'smooth' });
-            }}
-            className="quick-link"
-            title="Ver dicas e truques"
-          >
-            <span>💡</span>
-            <p>Dicas e Truques</p>
-          </button>
-          <button
-            onClick={() => navigate('/abrir-chamado')}
-            className="quick-link"
-            title="Abrir um novo chamado para contato"
-          >
-            <span>📞</span>
-            <p>Entrar em Contato</p>
-          </button>
-        </div>
-      </section>
+        </section>
+      </div>
     </div>
   );
 }

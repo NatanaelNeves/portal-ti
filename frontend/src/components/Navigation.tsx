@@ -7,6 +7,13 @@ import { useNotifications, type AppNotification, type NotificationKind } from '.
 import '../styles/Navigation.css';
 import '../styles/AdminNavigationShell.css';
 
+const PUBLIC_LINKS = [
+  { path: '/', label: 'Início', icon: 'ti-home' },
+  { path: '/abrir-chamado', label: 'Abrir chamado', icon: 'ti-message-plus' },
+  { path: '/meus-chamados', label: 'Meus chamados', icon: 'ti-list-check' },
+  { path: '/central', label: 'Central de dúvidas', icon: 'ti-help-circle' },
+];
+
 type NavIconName = 'panel' | 'tickets' | 'help' | 'calendar' | 'inventory' | 'repeat' | 'document' | 'report' | 'kpi' | 'team';
 
 const NavIcon = ({ name }: { name: NavIconName }) => {
@@ -105,37 +112,93 @@ export default function Navigation() {
 
   // Navegação para usuários públicos (não autenticados)
   if (!isInternalUser) {
+    // A tela de login da equipe é uma página inteira, com a própria marca.
+    if (location.pathname === '/admin/login') return null;
+
+    const go = (path: string) => {
+      setMobileMenuOpen(false);
+      navigate(path);
+    };
+    const isCurrent = (path: string) =>
+      path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
+
     return (
       <>
       <ChatWidget />
-      <nav className="navbar navbar-public">
-        <div className="navbar-brand" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
-          <h1>Portal de Serviços Internos</h1>
-          <small style={{ fontSize: '0.75rem', opacity: 0.9 }}>Cuidando de quem transforma vidas</small>
+      <header className="pub-header">
+        <div className="pub-wrap pub-header__bar">
+          <a
+            href="/"
+            className="pub-brand"
+            onClick={(event) => { event.preventDefault(); go('/'); }}
+          >
+            <span className="pub-brand__mark" aria-hidden="true" />
+            <span className="pub-brand__copy">
+              <strong>Portal de Serviços</strong>
+              <small>O Pequeno Nazareno</small>
+            </span>
+          </a>
+
+          <nav className="pub-nav" aria-label="Portal público">
+            {PUBLIC_LINKS.map((link) => (
+              <button
+                key={link.path}
+                type="button"
+                className="pub-nav__link"
+                aria-current={isCurrent(link.path) ? 'page' : undefined}
+                onClick={() => go(link.path)}
+              >
+                {link.label}
+              </button>
+            ))}
+          </nav>
+
+          <button type="button" className="pub-header__staff" onClick={() => go('/admin/login')}>
+            <i className="ti ti-lock" aria-hidden="true" />
+            Acesso da equipe
+          </button>
+
+          <button
+            type="button"
+            className="pub-menu-toggle"
+            aria-expanded={mobileMenuOpen}
+            aria-controls="pub-sheet"
+            onClick={() => setMobileMenuOpen((isOpen) => !isOpen)}
+          >
+            <i className={`ti ${mobileMenuOpen ? 'ti-x' : 'ti-menu-2'}`} aria-hidden="true" />
+            {mobileMenuOpen ? 'Fechar' : 'Menu'}
+          </button>
         </div>
-        <div className="navbar-menu">
-          <button onClick={() => navigate('/')} className="nav-link">
-            Início
-          </button>
-          <button onClick={() => navigate('/abrir-chamado')} className="nav-link">
-            Solicitar Apoio
-          </button>
-          <button onClick={() => navigate('/meus-chamados')} className="nav-link">
-            Minhas Solicitações
-          </button>
-          <button onClick={() => navigate('/central')} className="nav-link">
-            Central de Dúvidas
-          </button>
-          <button onClick={() => navigate('/reservar')} className="nav-link">
-            Reservas de Notebooks
-          </button>
-        </div>
-        <div className="navbar-user">
-          <button onClick={() => navigate('/admin/login')} className="btn-login">
-            Acesso Interno
-          </button>
-        </div>
-      </nav>
+
+        {mobileMenuOpen && (
+          <div className="pub-sheet" id="pub-sheet">
+            <nav className="pub-sheet__panel" aria-label="Portal público">
+              {PUBLIC_LINKS.map((link) => (
+                <button
+                  key={link.path}
+                  type="button"
+                  className="pub-sheet__link"
+                  aria-current={isCurrent(link.path) ? 'page' : undefined}
+                  onClick={() => go(link.path)}
+                >
+                  <i className={`ti ${link.icon}`} aria-hidden="true" />
+                  {link.label}
+                </button>
+              ))}
+              <button type="button" className="pub-sheet__staff" onClick={() => go('/admin/login')}>
+                <i className="ti ti-lock" aria-hidden="true" />
+                Acesso da equipe
+              </button>
+            </nav>
+            <button
+              type="button"
+              className="pub-sheet__backdrop"
+              aria-label="Fechar menu"
+              onClick={() => setMobileMenuOpen(false)}
+            />
+          </div>
+        )}
+      </header>
       </>
     );
   }
