@@ -30,8 +30,8 @@
 }
 
 .btn-back-move:hover {
-  border-color: #667eea;
-  color: #667eea;
+  border-color: #14945a;
+  color: #14945a;
   background: #f5f3ff;
 }
 
@@ -53,12 +53,12 @@
   display: flex;
   align-items: center;
   gap: 1.25rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #14945a 0%, #063c2d 100%);
   color: white;
   padding: 1.25rem 1.75rem;
   border-radius: 14px;
   margin-bottom: 1.75rem;
-  box-shadow: 0 4px 14px rgba(102, 126, 234, 0.35);
+  box-shadow: 0 4px 14px rgba(15, 122, 74, 0.35);
 }
 
 .equipment-card-icon {
@@ -131,7 +131,7 @@
 .section-number {
   width: 28px;
   height: 28px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #14945a 0%, #063c2d 100%);
   color: white;
   border-radius: 50%;
   display: flex;
@@ -175,20 +175,20 @@
 }
 
 .transfer-type-card:hover {
-  border-color: #667eea;
+  border-color: #14945a;
   background: #f5f3ff;
 }
 
 .transfer-type-card.active {
-  border-color: #667eea;
+  border-color: #14945a;
   background: #eff6ff;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.12);
+  box-shadow: 0 0 0 3px rgba(15, 122, 74, 0.12);
 }
 
 .transfer-type-card input[type="radio"] {
   width: 18px;
   height: 18px;
-  accent-color: #667eea;
+  accent-color: #14945a;
   cursor: pointer;
   flex-shrink: 0;
 }
@@ -257,8 +257,8 @@
 .form-group-move select:focus,
 .form-group-move textarea:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.12);
+  border-color: #14945a;
+  box-shadow: 0 0 0 3px rgba(15, 122, 74, 0.12);
 }
 
 .form-group-move textarea {
@@ -296,7 +296,7 @@
 
 .btn-confirm-move {
   padding: 0.75rem 2rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #14945a 0%, #063c2d 100%);
   border: none;
   border-radius: 8px;
   font-size: 0.95rem;
@@ -304,12 +304,12 @@
   color: white;
   cursor: pointer;
   transition: all 0.2s;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.35);
+  box-shadow: 0 2px 8px rgba(15, 122, 74, 0.35);
 }
 
 .btn-confirm-move:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.45);
+  box-shadow: 0 4px 12px rgba(15, 122, 74, 0.45);
 }
 
 .btn-cancel-move:disabled,

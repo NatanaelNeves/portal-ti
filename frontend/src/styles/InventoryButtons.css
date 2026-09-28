@@ -30,7 +30,7 @@
   transition: all 0.15s ease;
   text-decoration: none;
   white-space: nowrap;
-  background: #4338CA;
+  background: #0f7a4a;
   color: white;
 }
 
@@ -64,12 +64,12 @@
 
 /* Cores Padronizadas */
 .btn-primary {
-  background: #4338CA;
+  background: #0f7a4a;
   color: white;
 }
 
 .btn-primary:hover {
-  background: #3730A3;
+  background: #075039;
 }
 
 .btn-secondary {
@@ -128,8 +128,8 @@
 
 .btn-outline:hover {
   background: #f9fafb;
-  border-color: #4338CA;
-  color: #4338CA;
+  border-color: #0f7a4a;
+  color: #0f7a4a;
 }
 
 /* Botões específicos - cores únicas e consistentes */
@@ -170,12 +170,12 @@
 }
 
 .btn-new-term {
-  background: #4338CA;
+  background: #0f7a4a;
   color: white;
 }
 
 .btn-new-term:hover {
-  background: #3730A3;
+  background: #075039;
 }
 
 .btn-print {

@@ -28,7 +28,7 @@
   width: 50px;
   height: 50px;
   border: 4px solid #f0f0f0;
-  border-top: 4px solid #667eea;
+  border-top: 4px solid #14945a;
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -43,12 +43,12 @@
 }
 
 .detail-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #14945a 0%, #063c2d 100%);
   color: white;
   padding: 30px;
   border-radius: 16px;
   margin-bottom: 30px;
-  box-shadow: 0 10px 40px rgba(102, 126, 234, 0.25);
+  box-shadow: 0 10px 40px rgba(15, 122, 74, 0.25);
 }
 
 .btn-back {
@@ -136,12 +136,12 @@
 }
 
 .tab-btn:hover {
-  color: #667eea;
+  color: #14945a;
 }
 
 .tab-btn.active {
-  color: #667eea;
-  border-bottom-color: #667eea;
+  color: #14945a;
+  border-bottom-color: #14945a;
 }
 
 .tab-icon {
@@ -149,7 +149,7 @@
 }
 
 .badge {
-  background: #667eea;
+  background: #14945a;
   color: white;
   border-radius: 50px;
   padding: 2px 8px;
@@ -189,8 +189,8 @@
 }
 
 .card:hover {
-  border-color: #667eea;
-  box-shadow: 0 10px 25px rgba(102, 126, 234, 0.1);
+  border-color: #14945a;
+  box-shadow: 0 10px 25px rgba(15, 122, 74, 0.1);
   transform: translateY(-2px);
 }
 
@@ -216,7 +216,7 @@
 
 .info-list dt {
   font-weight: 600;
-  color: #667eea;
+  color: #14945a;
 }
 
 .info-list dd {
@@ -245,31 +245,31 @@
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #14945a 0%, #063c2d 100%);
   color: white;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 15px rgba(15, 122, 74, 0.3);
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 6px 20px rgba(15, 122, 74, 0.4);
 }
 
 .btn-secondary {
   background: #f3f4f6;
-  color: #667eea;
+  color: #14945a;
   border: 1px solid #e5e7eb;
 }
 
 .btn-secondary:hover {
   background: #e5e7eb;
-  border-color: #667eea;
+  border-color: #14945a;
 }
 
 .btn-outline {
   background: transparent;
-  color: #667eea;
-  border: 2px solid #667eea;
+  color: #14945a;
+  border: 2px solid #14945a;
 }
 
 .btn-outline:hover {
@@ -306,7 +306,7 @@
   width: 40px;
   height: 40px;
   background: white;
-  border: 2px solid #667eea;
+  border: 2px solid #14945a;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -425,14 +425,14 @@
   font-size: 13px;
   border-radius: 6px;
   background: #f3f4f6;
-  color: #667eea;
+  color: #14945a;
   border: 1px solid #e5e7eb;
   transition: all 0.3s ease;
 }
 
 .btn-small:hover {
   background: #e5e7eb;
-  color: #764ba2;
+  color: #063c2d;
 }
 
 .btn-danger {

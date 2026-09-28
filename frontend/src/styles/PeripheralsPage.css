@@ -50,8 +50,8 @@
   transition: background 0.15s;
 }
 
-.per-btn-primary { background: #4338CA; color: white; }
-.per-btn-primary:hover { background: #3730A3; }
+.per-btn-primary { background: #0f7a4a; color: white; }
+.per-btn-primary:hover { background: #075039; }
 
 /* â”€â”€ Alert â”€â”€ */
 .per-alert-error {
@@ -143,8 +143,8 @@
   justify-content: center;
   width: 26px;
   height: 26px;
-  background: #EEF2FF;
-  color: #4338CA;
+  background: #e7f4ec;
+  color: #0f7a4a;
   border-radius: 6px;
   flex-shrink: 0;
 }
@@ -203,7 +203,7 @@
   min-width: 140px;
 }
 
-.per-filter-group select:focus { outline: none; border-color: #4338CA; }
+.per-filter-group select:focus { outline: none; border-color: #0f7a4a; }
 
 /* â”€â”€ Table â”€â”€ */
 .per-table-wrap {

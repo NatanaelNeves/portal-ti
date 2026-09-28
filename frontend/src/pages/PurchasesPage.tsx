@@ -288,8 +288,8 @@ export default function PurchasesPage() {
       <div className="purchases-page">
         <div className="page-header">
           <div>
-            <h1>Compras & Solicitações</h1>
-            <p>Gestão de requisições e pedidos</p>
+            <h1>Compras</h1>
+            <p>Pedidos de compra, da solicitação até a entrega.</p>
           </div>
           <div className="header-actions">
             <button

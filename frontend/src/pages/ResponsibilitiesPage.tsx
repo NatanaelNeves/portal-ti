@@ -91,8 +91,8 @@ export default function ResponsibilitiesPage() {
       <div className="responsibilities-page">
         <div className="page-header">
           <div>
-            <h1>👤 Responsabilidades</h1>
-            <p>Equipamentos em posse de colaboradores</p>
+            <h1>Responsabilidades</h1>
+            <p>Quem está com cada equipamento e se o termo foi assinado.</p>
           </div>
           <div className="header-actions">
             <button
@@ -127,14 +127,14 @@ export default function ResponsibilitiesPage() {
               disabled={equipments.length === 0}
               title="Exportar lista para Excel"
             >
-              <span className="btn-icon">📊</span> Exportar Excel
+              <i className="ti ti-file-spreadsheet" aria-hidden="true" /> Exportar Excel
             </button>
             <button
               className="btn btn-deliver"
               onClick={() => navigate('/inventario/equipamentos/entregar')}
               title="Entregar equipamento a colaborador"
             >
-              <span className="btn-icon">📤</span> Entregar Equipamento
+              <i className="ti ti-arrow-up-right" aria-hidden="true" /> Entregar equipamento
             </button>
           </div>
         </div>
@@ -144,17 +144,17 @@ export default function ResponsibilitiesPage() {
         {/* Stats Cards */}
         <div className="stats-grid">
           <div className="stat-card">
-            <div className="stat-icon">📊</div>
+            <div className="stat-icon"><i className="ti ti-packages" aria-hidden="true" /></div>
             <div className="stat-value">{stats.total}</div>
             <div className="stat-label">Equipamentos</div>
           </div>
           <div className="stat-card stat-in-use">
-            <div className="stat-icon">👥</div>
+            <div className="stat-icon"><i className="ti ti-users" aria-hidden="true" /></div>
             <div className="stat-value">{stats.unique_people}</div>
             <div className="stat-label">Colaboradores</div>
           </div>
           <div className="stat-card stat-maintenance">
-            <div className="stat-icon">🏢</div>
+            <div className="stat-icon"><i className="ti ti-building" aria-hidden="true" /></div>
             <div className="stat-value">{stats.departments}</div>
             <div className="stat-label">Setores</div>
           </div>
@@ -230,25 +230,25 @@ export default function ResponsibilitiesPage() {
                     <td>
                       <div className="btn-group">
                         <button
-                          className="btn btn-sm btn-view"
+                          className="btn btn-sm btn-view btn-square"
                           onClick={() => navigate(`/inventario/equipamento/${eq.id}`)}
-                          title="Ver detalhes"
+                          title="Ver detalhes" aria-label="Ver detalhes"
                         >
-                          <span className="btn-icon">📋</span> Detalhes
+                          <i className="ti ti-eye" aria-hidden="true" />
                         </button>
                         <button
-                          className="btn btn-sm btn-move"
+                          className="btn btn-sm btn-move btn-square"
                           onClick={() => navigate(`/inventario/equipamento/${eq.id}/movimentar`)}
-                          title="Transferir equipamento"
+                          title="Transferir equipamento" aria-label="Transferir equipamento"
                         >
-                          <span className="btn-icon">🔄</span> Transferir
+                          <i className="ti ti-arrows-exchange" aria-hidden="true" />
                         </button>
                         <button
-                          className="btn btn-sm btn-return"
+                          className="btn btn-sm btn-return btn-square"
                           onClick={() => navigate(`/inventario/equipamentos/devolver?equipment=${eq.id}`)}
-                          title="Devolver equipamento"
+                          title="Receber devolução" aria-label="Receber devolução"
                         >
-                          <span className="btn-icon">📥</span> Devolver
+                          <i className="ti ti-arrow-down-left" aria-hidden="true" />
                         </button>
                       </div>
                     </td>
@@ -261,7 +261,7 @@ export default function ResponsibilitiesPage() {
 
         {filteredEquipments.length === 0 && (
           <div className="empty-state">
-            <div className="empty-icon">📋</div>
+            <div className="empty-icon"><i className="ti ti-user-check" aria-hidden="true" /></div>
             <h3>Nenhuma responsabilidade encontrada</h3>
             <p>Não há equipamentos em uso no momento.</p>
           </div>

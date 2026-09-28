@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/InformationCenterPage.css';
 import { BACKEND_URL } from '../services/api';
+import MiniMarkdown, { stripMarkdown } from '../components/MiniMarkdown';
+import { ARTICLE_CATEGORIES, articleCategoryMeta, normalizeArticleCategory } from '../utils/articleCategories';
 
 interface Article {
   id: string;
@@ -11,26 +13,18 @@ interface Article {
   created_at: string;
 }
 
+// Mesmas categorias do editor interno (utils/articleCategories).
 const CATEGORIES = [
   { id: 'all', name: 'Todos', icon: 'ti-layout-grid' },
-  { id: 'getting-started', name: 'Primeiros passos', icon: 'ti-flag' },
-  { id: 'troubleshooting', name: 'Soluções práticas', icon: 'ti-tool' },
-  { id: 'faq', name: 'Dúvidas frequentes', icon: 'ti-help' },
-  { id: 'tutorials', name: 'Passo a passo', icon: 'ti-list-numbers' },
-  { id: 'institutional', name: 'Documentos institucionais', icon: 'ti-building-bank' },
+  ...ARTICLE_CATEGORIES.map((c) => ({ id: c.id, name: c.label, icon: c.icon })),
 ];
 
-// Cada categoria reaproveita uma das cores de equipe do portal.
-const CATEGORY_TONE: Record<string, string> = {
-  'getting-started': '',
-  troubleshooting: 'administrativo',
-  faq: 'rh',
-  tutorials: '',
-  institutional: 'neutral',
-};
+const CATEGORY_TONE: Record<string, string> = Object.fromEntries(ARTICLE_CATEGORIES.map((c) => [c.id, c.tone]));
 
-const categoryMeta = (id: string) =>
-  CATEGORIES.find((cat) => cat.id === id) ?? { id, name: id, icon: 'ti-file-text' };
+const categoryMeta = (id: string) => {
+  const meta = articleCategoryMeta(id);
+  return { id: meta.id, name: meta.label, icon: meta.icon };
+};
 
 const ARTICLES_PER_PAGE = 9;
 
@@ -73,7 +67,8 @@ export default function InformationCenterPage() {
       }
 
       const data = await response.json();
-      const loaded: Article[] = data.articles || [];
+      // Nomes antigos de categoria ("FAQ", "Tutoriais"…) viram os ids atuais.
+      const loaded: Article[] = (data.articles || []).map((a: Article) => ({ ...a, category: normalizeArticleCategory(a.category) }));
       setArticles(loaded);
 
       // As sugestões do "Abrir chamado" apontam para /central#<id>.
@@ -120,7 +115,12 @@ export default function InformationCenterPage() {
   const countFor = (id: string) =>
     id === 'all' ? articles.length : articles.filter((article) => article.category === id).length;
 
-  const visibleCategories = CATEGORIES.filter((cat) => cat.id === 'all' || countFor(cat.id) > 0 || loading);
+  // Categorias livres (criadas no editor com "Outro") também viram filtro.
+  const extraCategories = Array.from(new Set(articles.map((a) => a.category)))
+    .filter((id) => id && !CATEGORIES.some((c) => c.id === id))
+    .map((id) => categoryMeta(id));
+  const visibleCategories = [...CATEGORIES, ...extraCategories]
+    .filter((cat) => cat.id === 'all' || countFor(cat.id) > 0 || loading);
 
   return (
     <div className="pub-page kb">
@@ -195,7 +195,7 @@ export default function InformationCenterPage() {
               {categoryMeta(selectedArticle.category).name}
             </span>
             <h2>{selectedArticle.title}</h2>
-            <div className="kb-article__content">{selectedArticle.content}</div>
+            <MiniMarkdown className="kb-article__content pub-md" source={selectedArticle.content} />
 
             <div className="kb-feedback">
               {feedbackSent[selectedArticle.id] ? (
@@ -256,7 +256,7 @@ export default function InformationCenterPage() {
                         <span className={`kb-card__cat kb-tone--${tone}`}>{meta.name}</span>
                       </span>
                       <strong className="kb-card__title">{article.title}</strong>
-                      <span className="kb-card__excerpt">{article.content}</span>
+                      <span className="kb-card__excerpt">{stripMarkdown(article.content)}</span>
                       <span className="kb-card__more">
                         Ler artigo
                         <i className="ti ti-arrow-right" aria-hidden="true" />

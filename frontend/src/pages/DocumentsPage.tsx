@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import api, { BACKEND_URL } from '../services/api';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { showToast } from '../utils/toast';
 import '../styles/DocumentsPage.css';
 
-interface Document {
+interface Doc {
   id: string;
   title: string;
   description: string | null;
@@ -31,334 +32,326 @@ interface DocumentStats {
   total_views: string;
 }
 
-const DOC_TYPES: Record<string, { label: string; icon: string; color: string; bg: string }> = {
-  manual:    { label: 'Manual',        icon: 'ti-book',        color: '#1D4ED8', bg: '#DBEAFE' },
-  policy:    { label: 'Política',      icon: 'ti-certificate', color: '#6D28D9', bg: '#EDE9FE' },
-  procedure: { label: 'Procedimento',  icon: 'ti-list-check',  color: '#065F46', bg: '#D1FAE5' },
-  form:      { label: 'Formulário',    icon: 'ti-forms',       color: '#92400E', bg: '#FEF3C7' },
-  template:  { label: 'Modelo',        icon: 'ti-template',    color: '#3730A3', bg: '#E0E7FF' },
-  other:     { label: 'Outro',         icon: 'ti-file',        color: '#374151', bg: '#F3F4F6' },
+const DOC_TYPES: Record<string, { label: string; plural: string; icon: string; tone: string; stat: keyof DocumentStats }> = {
+  manual: { label: 'Manual', plural: 'Manuais', icon: 'ti-book', tone: '', stat: 'manuais' },
+  policy: { label: 'Política', plural: 'Políticas', icon: 'ti-certificate', tone: 'rh', stat: 'politicas' },
+  procedure: { label: 'Procedimento', plural: 'Procedimentos', icon: 'ti-list-check', tone: '', stat: 'procedimentos' },
+  form: { label: 'Formulário', plural: 'Formulários', icon: 'ti-forms', tone: 'administrativo', stat: 'formularios' },
+  template: { label: 'Modelo', plural: 'Modelos', icon: 'ti-template', tone: 'administrativo', stat: 'modelos' },
+  other: { label: 'Outro', plural: 'Outros', icon: 'ti-file', tone: 'neutral', stat: 'outros' },
 };
 
-function formatFileSize(bytes: number | null): string {
+const fileSize = (bytes: number | null) => {
   if (!bytes) return '';
   if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1).replace('.', ',')} MB`;
+};
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
-}
+const fileExt = (url: string | null) => (url?.split('.').pop() || '').toUpperCase().slice(0, 4);
 
 export default function DocumentsPage() {
-  const [documents, setDocuments] = useState<Document[]>([]);
+  const [documents, setDocuments] = useState<Doc[]>([]);
   const [stats, setStats] = useState<DocumentStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
   const [filterType, setFilterType] = useState('');
   const [filterPublic, setFilterPublic] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-
+  const [search, setSearch] = useState('');
+  const [debounced, setDebounced] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [editingDoc, setEditingDoc] = useState<Document | null>(null);
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    document_type: 'manual',
-    is_public: false,
-  });
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [editing, setEditing] = useState<Doc | null>(null);
+  const [form, setForm] = useState({ title: '', description: '', document_type: 'manual', is_public: false });
+  const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState('');
 
-  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; docId: string | null }>({
-    isOpen: false,
-    docId: null,
-  });
+  // Espera a pessoa parar de digitar antes de consultar o servidor.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(search.trim()), 350);
+    return () => window.clearTimeout(timer);
+  }, [search]);
 
   const fetchDocuments = useCallback(async () => {
     try {
       setLoading(true);
-      const params: any = {};
+      const params: Record<string, string> = {};
       if (filterType) params.document_type = filterType;
       if (filterPublic) params.is_public = filterPublic;
-      if (searchTerm) params.search = searchTerm;
-
+      if (debounced) params.search = debounced;
       const [docsRes, statsRes] = await Promise.all([
         api.get('/documents', { params }),
         api.get('/documents/stats'),
       ]);
-
-      setDocuments(docsRes.data);
+      setDocuments(Array.isArray(docsRes.data) ? docsRes.data : []);
       setStats(statsRes.data);
       setError('');
-    } catch (err: any) {
-      setError('Erro ao carregar documentos');
-      console.error(err);
+    } catch {
+      setError('Não foi possível carregar os documentos. Tente de novo.');
     } finally {
       setLoading(false);
     }
-  }, [filterType, filterPublic, searchTerm]);
+  }, [filterType, filterPublic, debounced]);
 
-  useEffect(() => {
-    fetchDocuments();
-  }, [fetchDocuments]);
+  useEffect(() => { void fetchDocuments(); }, [fetchDocuments]);
 
-  const handleOpenForm = (doc?: Document) => {
-    if (doc) {
-      setEditingDoc(doc);
-      setFormData({
-        title: doc.title,
-        description: doc.description || '',
-        document_type: doc.document_type,
-        is_public: doc.is_public,
-      });
-    } else {
-      setEditingDoc(null);
-      setFormData({ title: '', description: '', document_type: 'manual', is_public: false });
-    }
-    setSelectedFile(null);
+  const openForm = (doc?: Doc) => {
+    setEditing(doc ?? null);
+    setForm(doc
+      ? { title: doc.title, description: doc.description || '', document_type: doc.document_type, is_public: doc.is_public }
+      : { title: '', description: '', document_type: 'manual', is_public: false });
+    setFile(null);
     setShowForm(true);
   };
 
-  const handleCloseForm = () => {
-    setShowForm(false);
-    setEditingDoc(null);
-    setSelectedFile(null);
-  };
+  const closeForm = () => { setShowForm(false); setEditing(null); setFile(null); };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      if (editingDoc) {
-        await api.put(`/documents/${editingDoc.id}`, formData);
+      if (editing) {
+        await api.put(`/documents/${editing.id}`, form);
+        showToast.success('Documento atualizado.');
       } else {
         const fd = new FormData();
-        fd.append('title', formData.title);
-        fd.append('description', formData.description);
-        fd.append('document_type', formData.document_type);
-        fd.append('is_public', String(formData.is_public));
-        if (selectedFile) fd.append('file', selectedFile);
-        await api.post('/documents', fd, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
+        fd.append('title', form.title);
+        fd.append('description', form.description);
+        fd.append('document_type', form.document_type);
+        fd.append('is_public', String(form.is_public));
+        if (file) fd.append('file', file);
+        await api.post('/documents', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+        showToast.success('Documento cadastrado.');
       }
-      handleCloseForm();
-      fetchDocuments();
+      closeForm();
+      void fetchDocuments();
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Erro ao salvar documento');
+      showToast.error(err.response?.data?.error || 'Não foi possível salvar o documento.');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async () => {
-    if (!deleteConfirm.docId) return;
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    const id = deleteId;
+    setDeleteId(null);
     try {
-      await api.delete(`/documents/${deleteConfirm.docId}`);
-      setDeleteConfirm({ isOpen: false, docId: null });
-      fetchDocuments();
+      await api.delete(`/documents/${id}`);
+      showToast.success('Documento excluído.');
+      void fetchDocuments();
     } catch {
-      setError('Erro ao remover documento');
+      showToast.error('Não foi possível excluir o documento.');
     }
   };
 
-  const handleDownload = async (doc: Document) => {
+  const download = async (doc: Doc) => {
     if (!doc.file_url) return;
     try {
-      const response = await fetch(`${BACKEND_URL}/api/documents/${doc.id}/download`);
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP ${response.status}: Falha ao baixar documento`);
+      setDownloadingId(doc.id);
+      const token = localStorage.getItem('internal_token');
+      const res = await fetch(`${BACKEND_URL}/api/documents/${doc.id}/download`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error || 'O arquivo não pôde ser baixado.');
       }
-      const blob = await response.blob();
+      const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      const ext = doc.file_url.split('.').pop() || 'pdf';
-      link.download = `${doc.title}.${ext}`;
+      link.download = `${doc.title}.${doc.file_url.split('.').pop() || 'pdf'}`;
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      link.remove();
       window.URL.revokeObjectURL(url);
-    } catch (error: any) {
-      alert(`Erro ao baixar documento: ${error.message}\n\nTente novamente ou contate o suporte de TI.`);
+    } catch (err: any) {
+      showToast.error(err instanceof TypeError ? 'Sem conexão com o servidor.' : err.message);
+    } finally {
+      setDownloadingId('');
     }
   };
 
+  const count = (key: keyof DocumentStats) => Number(stats?.[key] || 0);
+
   return (
-    <div className="dp-page">
-      {/* Header */}
-      <div className="dp-header">
-        <div className="dp-header-left">
-          <div className="dp-title">
-            <i className="ti ti-folder" />
-            <span>Gestão de Documentos</span>
-          </div>
-          <p className="dp-subtitle">Manuais, políticas, procedimentos e formulários</p>
-        </div>
-        <button className="dp-btn-new" onClick={() => handleOpenForm()}>
-          <i className="ti ti-plus" />
-          Novo Documento
-        </button>
-      </div>
-
-      {/* Stats */}
-      {stats && (
-        <div className="dp-stats">
-          <div className="dp-stat-card">
-            <i className="ti ti-folder dp-stat-icon" />
-            <span className="dp-stat-number">{stats.total}</span>
-            <span className="dp-stat-label">Total</span>
-          </div>
-          <div className="dp-stat-card">
-            <i className="ti ti-book dp-stat-icon" />
-            <span className="dp-stat-number">{stats.manuais}</span>
-            <span className="dp-stat-label">Manuais</span>
-          </div>
-          <div className="dp-stat-card">
-            <i className="ti ti-certificate dp-stat-icon" />
-            <span className="dp-stat-number">{stats.politicas}</span>
-            <span className="dp-stat-label">Políticas</span>
-          </div>
-          <div className="dp-stat-card">
-            <i className="ti ti-list-check dp-stat-icon" />
-            <span className="dp-stat-number">{stats.procedimentos}</span>
-            <span className="dp-stat-label">Procedimentos</span>
-          </div>
-          <div className="dp-stat-card">
-            <i className="ti ti-eye dp-stat-icon" />
-            <span className="dp-stat-number">{stats.total_views}</span>
-            <span className="dp-stat-label">Visualizações</span>
-          </div>
-        </div>
-      )}
-
-      {/* Filters */}
-      <div className="dp-filters">
-        <div className="dp-search-wrap">
-          <i className="ti ti-search dp-search-icon" />
-          <input
-            className="dp-search-input"
-            type="text"
-            placeholder="Buscar documentos..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <select className="dp-filter-select" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
-          <option value="">Todos os tipos</option>
-          {Object.entries(DOC_TYPES).map(([key, val]) => (
-            <option key={key} value={key}>{val.label}</option>
-          ))}
-        </select>
-        <select className="dp-filter-select" value={filterPublic} onChange={(e) => setFilterPublic(e.target.value)}>
-          <option value="">Visibilidade</option>
-          <option value="true">Público</option>
-          <option value="false">Privado</option>
-        </select>
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div className="dp-error">
-          <span>{error}</span>
-          <button onClick={() => setError('')}><i className="ti ti-x" /></button>
-        </div>
-      )}
-
-      {/* Form Modal */}
-      {showForm && (
-        <div className="dp-modal-overlay" onClick={handleCloseForm}>
-          <div className="dp-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="dp-modal-header">
-              <h2>{editingDoc ? 'Editar Documento' : 'Novo Documento'}</h2>
-              <button className="dp-modal-close" onClick={handleCloseForm}>
-                <i className="ti ti-x" />
-              </button>
+    <div className="tpg dp">
+      <header className="tpg-hero pub-aurora">
+        <div className="tpg-hero__top">
+          <div className="tpg-hero__title">
+            <span className="pub-gicon pub-gicon--administrativo" aria-hidden="true"><i className="ti ti-folders" /></span>
+            <div>
+              <h1>Documentos</h1>
+              <p>Manuais, políticas, procedimentos e modelos da instituição, num lugar só.</p>
             </div>
+          </div>
+          <div className="tpg-hero__actions">
+            <button type="button" className="tpg-btn tpg-btn--sun" onClick={() => openForm()}>
+              <i className="ti ti-upload" aria-hidden="true" />Novo documento
+            </button>
+          </div>
+        </div>
 
-            <form onSubmit={handleSubmit} className="dp-form">
-              <div className="dp-form-group">
-                <label>Título *</label>
-                <input
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  required
-                  placeholder="Nome do documento"
-                />
-              </div>
+        {stats && (
+          <ul className="tpg-stats" aria-label="Resumo">
+            <li className="tpg-stat"><strong>{count('total')}</strong>documentos</li>
+            <li className="tpg-stat"><strong>{count('publicos')}</strong>públicos</li>
+            <li className="tpg-stat"><strong>{count('privados')}</strong>privados</li>
+            <li className="tpg-stat"><strong>{count('total_views')}</strong>visualizações</li>
+          </ul>
+        )}
 
-              <div className="dp-form-group">
-                <label>Descrição</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Descrição breve do documento..."
-                  rows={3}
-                />
-              </div>
+        <div className="tpg-hero__tools">
+          <label className="tpg-search">
+            <i className="ti ti-search" aria-hidden="true" />
+            <span className="pub-sr-only">Buscar documentos</span>
+            <input type="search" placeholder="Buscar por título ou descrição" value={search} onChange={(e) => setSearch(e.target.value)} />
+            {search && (
+              <button type="button" className="tpg-search__clear" aria-label="Limpar busca" onClick={() => setSearch('')}><i className="ti ti-x" aria-hidden="true" /></button>
+            )}
+          </label>
+        </div>
+      </header>
 
-              <div className="dp-form-row">
-                <div className="dp-form-group">
-                  <label>Tipo *</label>
-                  <select
-                    value={formData.document_type}
-                    onChange={(e) => setFormData({ ...formData, document_type: e.target.value })}
-                  >
-                    {Object.entries(DOC_TYPES).map(([key, val]) => (
-                      <option key={key} value={key}>{val.label}</option>
-                    ))}
-                  </select>
-                </div>
+      {error && (
+        <div className="tpg-alert" role="alert">
+          <i className="ti ti-alert-circle" aria-hidden="true" /><span>{error}</span>
+          <button type="button" onClick={() => void fetchDocuments()} aria-label="Tentar de novo"><i className="ti ti-refresh" aria-hidden="true" /></button>
+        </div>
+      )}
 
-                <div className="dp-form-group dp-form-checkbox-group">
-                  <label className="dp-checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={formData.is_public}
-                      onChange={(e) => setFormData({ ...formData, is_public: e.target.checked })}
-                    />
-                    Documento público (visível para todos)
-                  </label>
-                </div>
-              </div>
+      <div className="tpg-toolbar">
+        <div className="tpg-chips" style={{ marginTop: 0 }}>
+          <button type="button" className="tpg-chip" aria-pressed={!filterType} onClick={() => setFilterType('')}>
+            <i className="ti ti-layout-grid" aria-hidden="true" />Todos
+            {stats && <span className="tpg-chip__count">{count('total')}</span>}
+          </button>
+          {Object.entries(DOC_TYPES).map(([key, t]) => (
+            <button key={key} type="button" className="tpg-chip" aria-pressed={filterType === key} onClick={() => setFilterType(filterType === key ? '' : key)}>
+              <i className={`ti ${t.icon}`} aria-hidden="true" />{t.plural}
+              {stats && <span className="tpg-chip__count">{count(t.stat)}</span>}
+            </button>
+          ))}
+        </div>
+        <div className="tpg-seg" role="group" aria-label="Visibilidade">
+          <button type="button" aria-pressed={filterPublic === ''} onClick={() => setFilterPublic('')}>Todos</button>
+          <button type="button" aria-pressed={filterPublic === 'true'} onClick={() => setFilterPublic('true')}>Públicos</button>
+          <button type="button" aria-pressed={filterPublic === 'false'} onClick={() => setFilterPublic('false')}>Privados</button>
+        </div>
+      </div>
 
-              {!editingDoc && (
-                <div className="dp-form-group">
-                  <label>Arquivo</label>
-                  <div className="dp-file-upload">
-                    <input
-                      type="file"
-                      id="dp-file-input"
-                      onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                      accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png"
-                    />
-                    <label htmlFor="dp-file-input" className="dp-file-label">
-                      <i className="ti ti-upload" />
-                      {selectedFile ? (
-                        <span>{selectedFile.name} ({formatFileSize(selectedFile.size)})</span>
-                      ) : (
-                        <span>Clique para selecionar um arquivo<br /><small>PDF, DOC, XLS, TXT, imagens (máx. 10MB)</small></span>
-                      )}
-                    </label>
+      {loading ? (
+        <div className="dpd-grid">{[0, 1, 2, 3, 4, 5].map((n) => <div key={n} className="tpg-skeleton" style={{ height: 190 }} />)}</div>
+      ) : documents.length === 0 ? (
+        <section className="tpg-card tpg-section">
+          <div className="tpg-empty">
+            <span className="pub-gicon pub-gicon--neutral" aria-hidden="true"><i className={`ti ${debounced || filterType || filterPublic ? 'ti-search-off' : 'ti-folder-open'}`} /></span>
+            <h3>{debounced || filterType || filterPublic ? 'Nenhum documento com esses filtros' : 'Nenhum documento cadastrado'}</h3>
+            <p>{debounced || filterType || filterPublic ? 'Tente outra palavra, tipo ou visibilidade.' : 'Suba o primeiro manual, política ou modelo.'}</p>
+            {!debounced && !filterType && !filterPublic && (
+              <button type="button" className="tpg-btn tpg-btn--primary" onClick={() => openForm()}><i className="ti ti-upload" aria-hidden="true" />Novo documento</button>
+            )}
+          </div>
+        </section>
+      ) : (
+        <ul className="dpd-grid">
+          {documents.map((doc) => {
+            const t = DOC_TYPES[doc.document_type] || DOC_TYPES.other;
+            return (
+              <li key={doc.id} className="tpg-card dpd-card">
+                <div className="dp-card__top">
+                  <span className={`pub-gicon ${t.tone ? `pub-gicon--${t.tone}` : ''} dp-card__icon`} aria-hidden="true">
+                    <i className={`ti ${t.icon}`} />
+                  </span>
+                  <div className="dp-card__tags">
+                    <span className="dp-card__type">{t.label}</span>
+                    <span className={`tpg-badge ${doc.is_public ? 'tpg-badge--ok' : 'tpg-badge--muted'}`}>
+                      <i className={`ti ${doc.is_public ? 'ti-world' : 'ti-lock'}`} aria-hidden="true" />{doc.is_public ? 'Público' : 'Privado'}
+                    </span>
                   </div>
                 </div>
-              )}
+                <h3 className="dp-card__title">{doc.title}</h3>
+                {doc.description && <p className="dp-card__desc">{doc.description}</p>}
+                <p className="dp-card__meta">
+                  {doc.file_url && <span className="dp-ext">{fileExt(doc.file_url)}{doc.file_size ? `, ${fileSize(doc.file_size)}` : ''}</span>}
+                  <span>{new Date(doc.created_at).toLocaleDateString('pt-BR')}</span>
+                  {doc.uploaded_by_name && <span>por {doc.uploaded_by_name}</span>}
+                  <span title="Visualizações"><i className="ti ti-eye" aria-hidden="true" /> {doc.views_count}</span>
+                </p>
+                <div className="dp-card__actions">
+                  {doc.file_url ? (
+                    <button type="button" className="tpg-btn tpg-btn--primary tpg-btn--sm" onClick={() => void download(doc)} disabled={downloadingId === doc.id}>
+                      <i className="ti ti-download" aria-hidden="true" />{downloadingId === doc.id ? 'Baixando…' : 'Baixar'}
+                    </button>
+                  ) : (
+                    <span className="tpg-muted">Sem arquivo</span>
+                  )}
+                  <span className="dp-card__spacer" />
+                  <button type="button" className="tpg-icon-btn" onClick={() => openForm(doc)} title="Editar" aria-label={`Editar ${doc.title}`}><i className="ti ti-pencil" aria-hidden="true" /></button>
+                  <button type="button" className="tpg-icon-btn tpg-icon-btn--danger" onClick={() => setDeleteId(doc.id)} title="Excluir" aria-label={`Excluir ${doc.title}`}><i className="ti ti-trash" aria-hidden="true" /></button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
 
-              <div className="dp-form-actions">
-                <button type="button" className="dp-btn-cancel" onClick={handleCloseForm}>
-                  Cancelar
-                </button>
-                <button type="submit" className="dp-btn-submit" disabled={saving}>
-                  {saving ? 'Salvando...' : editingDoc ? 'Salvar Alterações' : 'Cadastrar Documento'}
+      {showForm && (
+        <div className="tpg-modal" onMouseDown={(e) => { if (e.target === e.currentTarget) closeForm(); }}>
+          <div className="tpg-modal__box" role="dialog" aria-modal="true" aria-labelledby="dp-modal-title">
+            <header className="tpg-modal__head">
+              <div>
+                <h2 id="dp-modal-title">{editing ? 'Editar documento' : 'Novo documento'}</h2>
+                <p>{editing ? 'Para trocar o arquivo, exclua e cadastre de novo.' : 'PDF, Word, Excel, texto ou imagem, até 10 MB.'}</p>
+              </div>
+              <button type="button" className="tpg-icon-btn" onClick={closeForm} aria-label="Fechar"><i className="ti ti-x" aria-hidden="true" /></button>
+            </header>
+            <form className="tpg-form" onSubmit={(e) => void submit(e)}>
+              <label className="tpg-field">
+                <span>Título</span>
+                <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required autoFocus placeholder="Ex.: Política de uso de equipamentos" />
+              </label>
+              <label className="tpg-field">
+                <span>Descrição <span className="tpg-muted">(opcional)</span></span>
+                <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} placeholder="Para que serve e quem deve ler" />
+              </label>
+              <div className="tpg-field">
+                <span>Tipo</span>
+                <div className="dp-types" role="radiogroup" aria-label="Tipo">
+                  {Object.entries(DOC_TYPES).map(([key, t]) => (
+                    <button key={key} type="button" role="radio" aria-checked={form.document_type === key} className="dp-type" onClick={() => setForm({ ...form, document_type: key })}>
+                      <i className={`ti ${t.icon}`} aria-hidden="true" />{t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {!editing && (
+                <div className="tpg-field">
+                  <span>Arquivo</span>
+                  <label className={`dp-drop ${file ? 'has-file' : ''}`}>
+                    <input type="file" className="pub-sr-only" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+                    <i className={`ti ${file ? 'ti-file-check' : 'ti-cloud-upload'}`} aria-hidden="true" />
+                    <span>
+                      <strong>{file ? file.name : 'Escolher arquivo'}</strong>
+                      <small>{file ? fileSize(file.size) : 'Clique para selecionar'}</small>
+                    </span>
+                  </label>
+                </div>
+              )}
+              <label className="tpg-switch">
+                <span>
+                  <strong>Documento público</strong>
+                  <small>Desligado, fica visível só para a equipe interna</small>
+                </span>
+                <input type="checkbox" checked={form.is_public} onChange={(e) => setForm({ ...form, is_public: e.target.checked })} />
+                <i aria-hidden="true" />
+              </label>
+              <div className="tpg-form__actions">
+                <button type="button" className="tpg-btn" onClick={closeForm}>Cancelar</button>
+                <button type="submit" className="tpg-btn tpg-btn--primary" disabled={saving}>
+                  {saving ? 'Salvando…' : editing ? 'Salvar alterações' : 'Cadastrar documento'}
                 </button>
               </div>
             </form>
@@ -366,93 +359,15 @@ export default function DocumentsPage() {
         </div>
       )}
 
-      {/* Documents List */}
-      {loading ? (
-        <div className="dp-loading">
-          <div className="dp-spinner" />
-          <p>Carregando documentos...</p>
-        </div>
-      ) : documents.length === 0 ? (
-        <div className="dp-empty">
-          <i className="ti ti-folder-open dp-empty-icon" />
-          <h3>Nenhum documento cadastrado</h3>
-          <p>Clique em "Novo Documento" para adicionar manuais, políticas e procedimentos.</p>
-          <button className="dp-btn-new" onClick={() => handleOpenForm()}>
-            <i className="ti ti-plus" /> Novo Documento
-          </button>
-        </div>
-      ) : (
-        <div className="dp-grid">
-          {documents.map((doc) => {
-            const typeInfo = DOC_TYPES[doc.document_type] || DOC_TYPES.other;
-            const metaParts: string[] = [];
-            if (doc.file_size) metaParts.push(formatFileSize(doc.file_size));
-            metaParts.push(formatDate(doc.created_at));
-
-            return (
-              <div key={doc.id} className="dp-card">
-                <div className="dp-card-top">
-                  <span
-                    className="dp-type-badge"
-                    style={{ color: typeInfo.color, background: typeInfo.bg }}
-                  >
-                    <i className={`ti ${typeInfo.icon}`} />
-                    {typeInfo.label}
-                  </span>
-                  <span className="dp-visibility" title={doc.is_public ? 'Público' : 'Privado'}>
-                    <i className={`ti ${doc.is_public ? 'ti-world' : 'ti-lock'}`} />
-                  </span>
-                </div>
-
-                <h3 className="dp-card-title">{doc.title}</h3>
-
-                {doc.description && (
-                  <p className="dp-card-desc">{doc.description}</p>
-                )}
-
-                <div className="dp-card-meta">
-                  <span><i className="ti ti-eye" /> {doc.views_count}</span>
-                  {metaParts.map((p, i) => <span key={i}>{p}</span>)}
-                  {doc.uploaded_by_name && <span>Por: {doc.uploaded_by_name}</span>}
-                </div>
-
-                <div className="dp-card-actions">
-                  {doc.file_url && (
-                    <button
-                      className="dp-action-btn dp-action-download"
-                      onClick={() => handleDownload(doc)}
-                      title="Baixar documento"
-                    >
-                      <i className="ti ti-download" /> Baixar
-                    </button>
-                  )}
-                  <button
-                    className="dp-action-btn dp-action-edit"
-                    onClick={() => handleOpenForm(doc)}
-                    title="Editar"
-                  >
-                    <i className="ti ti-pencil" /> Editar
-                  </button>
-                  <button
-                    className="dp-action-icon dp-action-delete"
-                    onClick={() => setDeleteConfirm({ isOpen: true, docId: doc.id })}
-                    title="Excluir"
-                  >
-                    <i className="ti ti-trash" />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
       <ConfirmDialog
-        isOpen={deleteConfirm.isOpen}
-        title="Excluir Documento"
-        message="Tem certeza que deseja excluir este documento? Esta ação não pode ser desfeita."
-        onConfirm={handleDelete}
-        onCancel={() => setDeleteConfirm({ isOpen: false, docId: null })}
+        isOpen={deleteId !== null}
+        title="Excluir documento?"
+        message="O documento e o arquivo saem do portal e não podem ser recuperados."
+        confirmText="Excluir"
+        cancelText="Cancelar"
+        type="danger"
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setDeleteId(null)}
       />
     </div>
   );

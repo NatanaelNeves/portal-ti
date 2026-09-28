@@ -748,6 +748,58 @@
   }
 }
 
+/* ── Texto formatado dos artigos (MiniMarkdown) ───────────────── */
+.pub-md > :first-child {
+  margin-top: 0;
+}
+
+.pub-md p,
+.pub-md ul,
+.pub-md ol {
+  margin: 0 0 0.9em;
+}
+
+.pub-md :is(h2, h3, h4) {
+  margin: 1.3em 0 0.45em;
+  color: var(--pub-ink);
+  font-family: var(--pub-display);
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+}
+
+.pub-md h2 { font-size: 1.35em; }
+.pub-md h3 { font-size: 1.15em; }
+.pub-md h4 { font-size: 1.02em; }
+
+.pub-md ul,
+.pub-md ol {
+  padding-left: 1.4em;
+}
+
+.pub-md li + li {
+  margin-top: 0.3em;
+}
+
+.pub-md ol li::marker {
+  color: var(--pub-leaf);
+  font-weight: 800;
+}
+
+.pub-md code {
+  padding: 0.1em 0.4em;
+  color: #0b5a37;
+  background: var(--pub-leaf-wash);
+  border-radius: 6px;
+  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-size: 0.9em;
+}
+
+.pub-md a {
+  color: var(--pub-leaf);
+  font-weight: 700;
+  text-underline-offset: 3px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .pub-page *,
   .pub-header *,

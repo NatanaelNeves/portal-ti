@@ -1,480 +1,389 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { showToast } from '../utils/toast';
+import { ACTIVE_TICKET_STATUSES } from '../utils/ticketStatus';
+import CountUp from '../components/adm/CountUp';
 import '../styles/AdminStaffDashboardPage.css';
 
-interface RecentTicket {
+interface DashboardData {
+  myUpdatedToday: number;
+  myResolvedToday: number;
+  myResolvedTickets: number;
+  myAverageResolutionHours: number;
+  administrativePendingTotal: number;
+  unassignedAdministrativeTickets: number;
+}
+
+interface QueueTicket {
   id: string;
   title: string;
   status: string;
   priority: string;
+  category?: string;
   created_at: string;
   updated_at: string;
+  assigned_to?: string | null;
   requester_name?: string;
-  department?: string;
-  category?: string;
+  requester_unit?: string;
 }
 
-interface AdminStaffDashboardData {
-  myTicketsTotal: number;
-  myOpenTickets: number;
-  myInProgressTickets: number;
-  myWaitingTickets: number;
-  myResolvedTickets: number;
-  myUpdatedToday: number;
-  myResolvedToday: number;
-  myHighPriorityOpen: number;
-  myOldestPendingDays: number;
-  myAverageResolutionHours: number;
-  myTicketsByPriority: Record<string, number>;
-  administrativePendingTotal: number;
-  unassignedAdministrativeTickets: number;
-  recentTickets: RecentTicket[];
-}
-
-const EMPTY_DATA: AdminStaffDashboardData = {
-  myTicketsTotal: 0,
-  myOpenTickets: 0,
-  myInProgressTickets: 0,
-  myWaitingTickets: 0,
-  myResolvedTickets: 0,
+const EMPTY: DashboardData = {
   myUpdatedToday: 0,
   myResolvedToday: 0,
-  myHighPriorityOpen: 0,
-  myOldestPendingDays: 0,
+  myResolvedTickets: 0,
   myAverageResolutionHours: 0,
-  myTicketsByPriority: {},
   administrativePendingTotal: 0,
   unassignedAdministrativeTickets: 0,
-  recentTickets: [],
 };
 
-const STATUS_LABEL: Record<string, string> = {
-  open: 'Aberto',
-  in_progress: 'Em atendimento',
-  waiting_user: 'Aguardando usuário',
-  resolved: 'Resolvido',
-  closed: 'Fechado',
+/** Cada tipo de pedido tem a cor da sua etiqueta no quadro. */
+const KINDS: Record<string, { label: string; icon: string; tone: string }> = {
+  copia_chave: { label: 'Cópia de chave', icon: 'ti-key', tone: 'key' },
+  apoio_evento: { label: 'Apoio em evento', icon: 'ti-calendar-event', tone: 'event' },
+  buscar_doacao: { label: 'Buscar doação', icon: 'ti-package', tone: 'gift' },
+  solicitar_documento: { label: 'Documento', icon: 'ti-file-text', tone: 'doc' },
 };
+const OTHER_KIND = { label: 'Outro pedido', icon: 'ti-dots', tone: 'other' };
+const kindOf = (category?: string) => (category && KINDS[category]) || OTHER_KIND;
 
-const PRIORITY_LABEL: Record<string, string> = {
-  urgent: 'Urgente',
-  critical: 'Crítica',
-  high: 'Alta',
-  medium: 'Média',
-  low: 'Baixa',
-};
+const URGENT = new Set(['urgent', 'critical', 'high']);
 
-/* Tons de estado — cada um só existe para significar algo.
-   "Resolvido" é deliberadamente neutro: trabalho concluído não deve chamar atenção. */
-const STATUS_TONE: Record<string, string> = {
-  open: 'wait',
-  in_progress: 'active',
-  waiting_user: 'blocked',
-  resolved: 'done',
-  closed: 'done',
-};
+// Quantas etiquetas cabem penduradas antes de virar "+N na fila".
+const RAIL_LIMIT = 6;
 
-const PRIORITY_TONE: Record<string, string> = {
-  urgent: 'sev1',
-  critical: 'sev1',
-  high: 'sev2',
-  medium: 'sev3',
-  low: 'sev4',
-};
+const TRAYS = [
+  { key: 'open', title: 'Para começar', hint: 'Você pegou, falta dar o primeiro passo.', icon: 'ti-inbox' },
+  { key: 'in_progress', title: 'Em andamento', hint: 'Você está cuidando disso agora.', icon: 'ti-run' },
+  { key: 'waiting_user', title: 'Esperando alguém', hint: 'Depende de resposta de quem pediu.', icon: 'ti-hourglass' },
+] as const;
 
-/** Número em destaque dentro da frase de briefing. */
-function N({ children }: { children: React.ReactNode }) {
-  return <span className="asd-n">{children}</span>;
+function ageLabel(iso: string) {
+  const ms = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(ms)) return '';
+  const mins = Math.floor(ms / 60000);
+  if (mins < 60) return `há ${Math.max(1, mins)} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `há ${hours} h`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? 'há 1 dia' : `há ${days} dias`;
+}
+
+const daysSince = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+
+function duration(hours: number) {
+  if (!hours || hours <= 0) return '—';
+  if (hours < 1) return `${Math.max(1, Math.round(hours * 60))} min`;
+  if (hours < 48) return `${Math.round(hours)} h`;
+  return `${Math.round(hours / 24)} dias`;
+}
+
+function readUser(): { id: string; name: string } | null {
+  try {
+    const raw = localStorage.getItem('internal_user');
+    if (!raw) return null;
+    const user = JSON.parse(raw) as { id?: string; name?: string };
+    return { id: user.id ?? '', name: user.name ?? '' };
+  } catch {
+    return null;
+  }
 }
 
 export default function AdminStaffDashboardPage() {
   const navigate = useNavigate();
-  const [data, setData] = useState<AdminStaffDashboardData>(EMPTY_DATA);
+  const me = useMemo(readUser, []);
+  const [data, setData] = useState<DashboardData>(EMPTY);
+  const [tickets, setTickets] = useState<QueueTicket[]>([]);
+  const [listFailed, setListFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [currentUserName, setCurrentUserName] = useState('Assistente Administrativo');
-  const [lastSync, setLastSync] = useState<Date | null>(null);
+  const [taking, setTaking] = useState<string | null>(null);
+  const [justTaken, setJustTaken] = useState<string | null>(null);
+  const [unhooking, setUnhooking] = useState<string | null>(null);
+
+  const load = useCallback(async (quiet = false) => {
+    if (quiet) setRefreshing(true); else setLoading(true);
+    const params = new URLSearchParams();
+    ACTIVE_TICKET_STATUSES.forEach((s) => params.append('status', s));
+    params.append('department', 'administrativo');
+    params.append('limit', '100');
+    params.append('order', 'asc');
+
+    // Números do dia e lista da fila carregam em paralelo; um não derruba o outro.
+    const [summary, list] = await Promise.allSettled([
+      api.get<DashboardData>('/dashboard/admin-staff'),
+      api.get(`/tickets?${params.toString()}`),
+    ]);
+
+    if (summary.status === 'fulfilled') {
+      setData({ ...EMPTY, ...(summary.value.data || {}) });
+      setError('');
+    } else {
+      setError('Não foi possível carregar os números do seu dia. Tente atualizar.');
+    }
+
+    if (list.status === 'fulfilled') {
+      const body = list.value.data;
+      const rows: QueueTicket[] = Array.isArray(body) ? body : body?.data ?? [];
+      // Mais antigo primeiro: quem espera há mais tempo fica na ponta do quadro.
+      setTickets([...rows].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()));
+      setListFailed(false);
+    } else {
+      setListFailed(true);
+    }
+
+    setLoading(false);
+    setRefreshing(false);
+  }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem('internal_token');
-    const userRaw = localStorage.getItem('internal_user');
-    if (!token || !userRaw) { navigate('/admin/login'); return; }
-    try {
-      const user = JSON.parse(userRaw) as { role?: string; name?: string };
-      if (user.role !== 'admin_staff') { navigate('/admin/dashboard'); return; }
-      setCurrentUserName(user.name || 'Assistente Administrativo');
-    } catch {
-      navigate('/admin/login'); return;
-    }
-    void fetchDashboard();
-  }, [navigate]);
+    if (!localStorage.getItem('internal_token') || !me) { navigate('/admin/login'); return; }
+    void load();
+  }, [load, me, navigate]);
 
-  const fetchDashboard = async (isRefresh = false) => {
+  const unclaimed = tickets.filter((t) => !t.assigned_to);
+  const mine = tickets.filter((t) => me && t.assigned_to === me.id);
+  const onRail = unclaimed.slice(0, RAIL_LIMIT);
+  const unclaimedTotal = listFailed ? data.unassignedAdministrativeTickets : unclaimed.length;
+  const oldest = unclaimed[0];
+
+  const takeTicket = async (ticket: QueueTicket) => {
+    if (!me?.id || taking) return;
+    setTaking(ticket.id);
     try {
-      if (isRefresh) setRefreshing(true); else setLoading(true);
-      const response = await api.get<AdminStaffDashboardData>('/dashboard/admin-staff');
-      setData({ ...EMPTY_DATA, ...(response.data || {}) });
-      setLastSync(new Date());
-      setError('');
+      await api.patch(`/tickets/${ticket.id}`, { status: 'in_progress', assigned_to_id: me.id });
+      // A etiqueta mostra o visto, sai do gancho e cai; depois o pedido aparece na mesa.
+      setUnhooking(ticket.id);
+      await new Promise((resolve) => window.setTimeout(resolve, 650));
+      setUnhooking(null);
+      setTickets((list) => list.map((t) => (t.id === ticket.id ? { ...t, assigned_to: me.id, status: 'in_progress', updated_at: new Date().toISOString() } : t)));
+      setJustTaken(ticket.id);
+      window.setTimeout(() => setJustTaken(null), 2400);
+      showToast.success('Pedido na sua mesa.');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Não foi possível carregar o painel. Tente atualizar novamente.');
+      showToast.error(err.response?.data?.error || 'Não foi possível pegar esse pedido. Talvez outra pessoa já tenha pegado.');
+      void load(true);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      setTaking(null);
     }
   };
 
-  const firstName = currentUserName.trim().split(' ')[0] || currentUserName;
+  const firstName = (me?.name || '').trim().split(/\s+/)[0];
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
 
-  const greeting = (() => {
-    const h = new Date().getHours();
-    if (h < 12) return 'Bom dia';
-    if (h < 18) return 'Boa tarde';
-    return 'Boa noite';
+  const railSentence = (() => {
+    if (unclaimedTotal === 0) return 'Nenhum pedido esperando alguém pegar. O quadro está vazio.';
+    const count = unclaimedTotal === 1 ? '1 pedido esperando alguém pegar' : `${unclaimedTotal} pedidos esperando alguém pegar`;
+    if (!oldest) return `${count}.`;
+    return `${count}. O mais antigo chegou ${ageLabel(oldest.created_at)}.`;
   })();
 
-  /** Horas → forma legível. O backend devolve float; nunca mostrar o número cru. */
-  const formatDuration = (hours: number) => {
-    if (!hours || hours <= 0) return '—';
-    if (hours < 1) return `${Math.max(1, Math.round(hours * 60))}min`;
-    if (hours < 48) return `${Math.round(hours)}h`;
-    return `${Math.round(hours / 24)}d`;
-  };
-
-  const formatElapsed = (dateString: string) => {
-    const diffMs = Date.now() - new Date(dateString).getTime();
-    const mins = Math.floor(diffMs / 60000);
-    if (mins < 60) return `${Math.max(mins, 1)}min`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h`;
-    return `${Math.floor(hrs / 24)}d`;
-  };
-
-  const formatClock = (d: Date) =>
-    d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-
-  if (!localStorage.getItem('internal_token')) return null;
-
-  const pendingMine = data.myOpenTickets + data.myInProgressTickets + data.myWaitingTickets;
-  const oldestDays = Math.floor(data.myOldestPendingDays || 0);
-
-  const loadSegments = [
-    { key: 'open',     label: 'Abertos',            value: data.myOpenTickets,       tone: 'wait'    },
-    { key: 'progress', label: 'Em atendimento',     value: data.myInProgressTickets, tone: 'active'  },
-    { key: 'waiting',  label: 'Aguardando usuário', value: data.myWaitingTickets,    tone: 'blocked' },
-  ];
-
-  const priorityRows = [
-    { key: 'urgent',   label: 'Urgente', value: data.myTicketsByPriority?.urgent   ?? 0, tone: 'sev1' },
-    { key: 'critical', label: 'Crítica', value: data.myTicketsByPriority?.critical ?? 0, tone: 'sev1' },
-    { key: 'high',     label: 'Alta',    value: data.myTicketsByPriority?.high     ?? 0, tone: 'sev2' },
-    { key: 'medium',   label: 'Média',   value: data.myTicketsByPriority?.medium   ?? 0, tone: 'sev3' },
-    { key: 'low',      label: 'Baixa',   value: data.myTicketsByPriority?.low      ?? 0, tone: 'sev4' },
-  ].filter((row) => row.value > 0);
-
-  const maxPriority = Math.max(1, ...priorityRows.map((r) => r.value));
-
   return (
-    <div className="asd-page">
-      <div className="asd-shell">
-
-        {/* ── Barra de comando ── */}
-        <header className="asd-topbar">
-          <div className="asd-topbar-id">
-            <h1 className="asd-topbar-title">Quadro de turno</h1>
-            <p className="asd-topbar-meta">
-              <span>{currentUserName}</span>
-              <span className="asd-dot-sep" aria-hidden="true" />
-              <span>Administrativo</span>
-              {lastSync && (
-                <>
-                  <span className="asd-dot-sep" aria-hidden="true" />
-                  <span className="asd-mono">atualizado {formatClock(lastSync)}</span>
-                </>
-              )}
-            </p>
+    <div className="adx">
+      <section className="adx-board" aria-labelledby="adx-title">
+        <div className="adx-board__head">
+          <div>
+            <h1 id="adx-title">{greeting}{firstName ? `, ${firstName}` : ''}.</h1>
+            <p className="adx-board__lead">{loading ? 'Olhando o quadro de pedidos…' : railSentence}</p>
           </div>
-          <div className="asd-topbar-actions">
-            <button
-              type="button"
-              className="asd-btn asd-btn-quiet"
-              onClick={() => void fetchDashboard(true)}
-              disabled={refreshing || loading}
-            >
-              <i className={`ti ti-refresh${refreshing ? ' asd-spin' : ''}`} aria-hidden="true" />
-              {refreshing ? 'Atualizando' : 'Atualizar'}
+          <div className="adx-board__actions">
+            <button type="button" className="adx-btn adx-btn--ghost adx-btn--refresh" onClick={() => void load(true)} disabled={loading || refreshing} aria-label="Atualizar o painel">
+              <i className={`ti ti-refresh${refreshing ? ' adx-spin' : ''}`} aria-hidden="true" />
+              <span>{refreshing ? 'Atualizando' : 'Atualizar'}</span>
             </button>
-            <button
-              type="button"
-              className="asd-btn asd-btn-solid"
-              onClick={() => navigate('/admin/chamados')}
-            >
-              <i className="ti ti-clipboard-list" aria-hidden="true" />
-              Abrir fila completa
+            <button type="button" className="adx-btn adx-btn--brass" onClick={() => navigate('/admin/chamados?aba=quadro')}>
+              <i className="ti ti-list-details" aria-hidden="true" />
+              Ver todos os pedidos
             </button>
           </div>
-        </header>
+        </div>
 
-        {error && (
-          <div className="asd-alert" role="alert">
-            <i className="ti ti-alert-triangle" aria-hidden="true" />
-            <p>{error}</p>
-            <button type="button" className="asd-alert-retry" onClick={() => void fetchDashboard(true)}>
-              Tentar de novo
-            </button>
-          </div>
-        )}
-
-        {loading ? (
-          /* Esqueleto com a forma real da página — nada de spinner solto. */
-          <div className="asd-board" aria-busy="true" aria-label="Carregando painel">
-            <div className="asd-col">
-              <section className="asd-hero asd-hero-sk">
-                <div className="asd-sk asd-sk-line" style={{ width: '82%', height: 34 }} />
-                <div className="asd-sk asd-sk-line" style={{ width: '54%', height: 34 }} />
-                <div className="asd-sk asd-sk-bar" />
-              </section>
-              <section className="asd-panel">
-                <div className="asd-sk asd-sk-line" style={{ width: 160, height: 14 }} />
-                {[0, 1, 2, 3, 4].map((i) => (
-                  <div key={i} className="asd-sk asd-sk-row" style={{ animationDelay: `${i * 70}ms` }} />
-                ))}
-              </section>
+        {/* O quadro de chaves: cada pedido sem responsável é uma etiqueta pendurada. */}
+        <div className="adx-rack">
+          <div className="adx-rail" aria-hidden="true" />
+          {loading ? (
+            <ul className="adx-tags" aria-busy="true">
+              {[0, 1, 2, 3].map((n) => (
+                <li key={n} className="adx-hook"><div className="adx-tag adx-tag--ghost" /></li>
+              ))}
+            </ul>
+          ) : listFailed ? (
+            <div className="adx-rack__note">
+              <i className="ti ti-cloud-off" aria-hidden="true" />
+              <span>A lista de pedidos não carregou. {unclaimedTotal > 0 ? `São ${unclaimedTotal} sem responsável.` : ''}</span>
+              <button type="button" className="adx-btn adx-btn--ghost adx-btn--sm" onClick={() => void load(true)}>Tentar de novo</button>
             </div>
-            <aside className="asd-col">
-              <div className="asd-panel"><div className="asd-sk asd-sk-block" /></div>
-              <div className="asd-panel"><div className="asd-sk asd-sk-block" /></div>
-            </aside>
-          </div>
-        ) : (
-          <div className="asd-board">
-
-            {/* ══ Coluna principal ══ */}
-            <div className="asd-col">
-
-              {/* ── Briefing: a resposta em uma frase, no painel-âncora ── */}
-              <section className="asd-hero">
-                <p className="asd-brief">
-                  {pendingMine === 0 ? (
-                    <>
-                      {greeting}, {firstName}. Sua fila está limpa —{' '}
-                      <N>nenhum</N> chamado pendente atribuído a você.
-                    </>
-                  ) : (
-                    <>
-                      {greeting}, {firstName}. Você tem <N>{pendingMine}</N>{' '}
-                      {pendingMine === 1 ? 'chamado pendente' : 'chamados pendentes'}
-                      {data.myHighPriorityOpen > 0 && (
-                        <>
-                          , <N>{data.myHighPriorityOpen}</N> de prioridade alta
-                        </>
-                      )}
-                      {oldestDays >= 1 && (
-                        <>
-                          {' '}e o mais antigo espera há <N>{oldestDays}</N>{' '}
-                          {oldestDays === 1 ? 'dia' : 'dias'}
-                        </>
-                      )}
-                      .
-                    </>
-                  )}
-                </p>
-
-                {/* ── Carga da fila: uma barra no lugar de oito cartões ── */}
-                {pendingMine > 0 ? (
-                  <div className="asd-load">
-                    <div className="asd-load-track">
-                      {loadSegments
-                        .filter((s) => s.value > 0)
-                        .map((seg, i) => (
-                          <div
-                            key={seg.key}
-                            className={`asd-load-seg asd-tone-${seg.tone}`}
-                            style={{
-                              '--w': `${(seg.value / pendingMine) * 100}%`,
-                              animationDelay: `${i * 90}ms`,
-                            } as React.CSSProperties}
-                            title={`${seg.label}: ${seg.value}`}
-                          >
-                            <span className="asd-load-seg-n">{seg.value}</span>
-                          </div>
-                        ))}
-                    </div>
-                    <ul className="asd-legend">
-                      {loadSegments.map((seg) => (
-                        <li key={seg.key} className={seg.value === 0 ? 'is-zero' : undefined}>
-                          <span className={`asd-swatch asd-tone-${seg.tone}`} aria-hidden="true" />
-                          <span className="asd-legend-label">{seg.label}</span>
-                          <span className="asd-legend-n asd-mono">{seg.value}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : (
-                  <div className="asd-load-empty">
-                    <i className="ti ti-check" aria-hidden="true" />
-                    Nada na sua fila neste momento.
-                  </div>
-                )}
-              </section>
-
-              {/* ── A fila em si: o motivo de a pessoa estar aqui ── */}
-              <section className="asd-panel asd-panel-queue">
-                <div className="asd-panel-hd">
-                  <h2>Seus últimos chamados</h2>
-                  <button
-                    type="button"
-                    className="asd-link"
-                    onClick={() => navigate('/admin/chamados')}
+          ) : onRail.length === 0 ? (
+            <div className="adx-rack__note adx-rack__note--calm">
+              <i className="ti ti-circle-check" aria-hidden="true" />
+              <span>Quando alguém pedir uma chave, um documento ou ajuda num evento, o pedido aparece pendurado aqui.</span>
+            </div>
+          ) : (
+            <ul className="adx-tags">
+              {onRail.map((t, i) => {
+                const kind = kindOf(t.category);
+                const late = daysSince(t.created_at) >= 2;
+                return (
+                  <li
+                    key={t.id}
+                    className="adx-hook"
+                    style={{ '--i': i, '--tilt': `${i % 2 ? 2.2 : -1.6}deg` } as CSSProperties}
                   >
-                    Ver todos <i className="ti ti-arrow-right" aria-hidden="true" />
+                    <article className={`adx-tag adx-tag--${kind.tone}${unhooking === t.id ? ' is-unhooking' : ''}`}>
+                      <span className="adx-tag__eye" aria-hidden="true" />
+                      <header className="adx-tag__kind">
+                        <i className={`ti ${kind.icon}`} aria-hidden="true" />
+                        {kind.label}
+                        {URGENT.has(t.priority) && <span className="adx-tag__flag">Urgente</span>}
+                      </header>
+                      <button type="button" className="adx-tag__title" onClick={() => navigate(`/admin/chamados/${t.id}`)}>
+                        {t.title}
+                      </button>
+                      <p className="adx-tag__who">
+                        {t.requester_name || 'Solicitante sem nome'}
+                        {t.requester_unit && <small>{t.requester_unit}</small>}
+                      </p>
+                      <footer className="adx-tag__foot">
+                        <span className={late ? 'is-late' : undefined}>{ageLabel(t.created_at)}</span>
+                        <button
+                          type="button"
+                          className="adx-take"
+                          onClick={() => void takeTicket(t)}
+                          disabled={taking !== null}
+                          aria-label={`Pegar o pedido: ${t.title}`}
+                        >
+                          {unhooking === t.id
+                            ? <i className="ti ti-check adx-check" aria-hidden="true" />
+                            : taking === t.id
+                              ? <i className="ti ti-loader-2 adx-spin" aria-hidden="true" />
+                              : <i className="ti ti-hand-grab" aria-hidden="true" />}
+                          {unhooking === t.id ? 'Pego' : 'Pegar'}
+                        </button>
+                      </footer>
+                    </article>
+                  </li>
+                );
+              })}
+              {unclaimed.length > RAIL_LIMIT && (
+                <li className="adx-hook adx-hook--more">
+                  <button type="button" className="adx-more" onClick={() => navigate('/admin/chamados?aba=quadro')}>
+                    {/* Pilha de etiquetas que se abre em leque ao passar o mouse */}
+                    <span className="adx-more__stack" aria-hidden="true">
+                      {unclaimed.slice(RAIL_LIMIT, RAIL_LIMIT + 3).map((t) => (
+                        <span key={t.id} className={`adx-more__card adx-tag--${kindOf(t.category).tone}`} />
+                      ))}
+                    </span>
+                    <strong>+{unclaimed.length - RAIL_LIMIT}</strong>
+                    ainda no quadro
                   </button>
-                </div>
-
-                {data.recentTickets.length === 0 ? (
-                  <div className="asd-empty">
-                    <p className="asd-empty-title">Nenhum chamado atribuído a você</p>
-                    <p className="asd-empty-sub">
-                      Assuma um chamado da fila administrativa para começar o turno.
-                    </p>
-                    <button
-                      type="button"
-                      className="asd-btn asd-btn-outline"
-                      onClick={() => navigate('/admin/chamados')}
-                    >
-                      Ver fila administrativa
-                    </button>
-                  </div>
-                ) : (
-                  <ul className="asd-queue">
-                    {data.recentTickets.map((ticket, i) => {
-                      const pTone = PRIORITY_TONE[ticket.priority] ?? 'sev4';
-                      const sTone = STATUS_TONE[ticket.status] ?? 'done';
-                      /* A cor da prioridade vive só na etiqueta — sem ponto duplicando o sinal. */
-                      const isStale = Date.now() - new Date(ticket.updated_at).getTime() > 3 * 86400000;
-                      return (
-                        <li key={ticket.id} style={{ animationDelay: `${Math.min(i, 8) * 34}ms` }}>
-                          <button
-                            type="button"
-                            className="asd-row"
-                            onClick={() => navigate(`/admin/chamados/${ticket.id}`)}
-                          >
-                            <span className="asd-row-main">
-                              <span className="asd-row-title">{ticket.title}</span>
-                              <span className="asd-row-meta">
-                                <i className="ti ti-user" aria-hidden="true" />
-                                {ticket.requester_name || 'Solicitante não informado'}
-                                {ticket.category && (
-                                  <>
-                                    <span className="asd-dot-sep" aria-hidden="true" />
-                                    {ticket.category}
-                                  </>
-                                )}
-                              </span>
-                            </span>
-                            <span className={`asd-tag asd-tone-${pTone}`}>
-                              {PRIORITY_LABEL[ticket.priority] ?? 'Sem prioridade'}
-                            </span>
-                            <span className={`asd-tag asd-tag-status asd-tone-${sTone}`}>
-                              {STATUS_LABEL[ticket.status] ?? ticket.status}
-                            </span>
-                            <span className={`asd-row-age asd-mono${isStale ? ' is-stale' : ''}`}>
-                              {formatElapsed(ticket.updated_at)}
-                            </span>
-                            <i className="ti ti-chevron-right asd-row-go" aria-hidden="true" />
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </section>
-            </div>
-
-            {/* ══ Trilho lateral ══ */}
-            <aside className="asd-col asd-rail-col">
-
-              {/* ── Fila do setor: o único item acionável fora da sua lista ── */}
-              <section
-                className={`asd-panel asd-claim${data.unassignedAdministrativeTickets > 0 ? ' is-live' : ''}`}
-              >
-                <div className="asd-panel-hd">
-                  <h2>Fila administrativa</h2>
-                </div>
-                <p className="asd-claim-n asd-mono">{data.unassignedAdministrativeTickets}</p>
-                <p className="asd-claim-label">
-                  {data.unassignedAdministrativeTickets === 1
-                    ? 'chamado sem responsável'
-                    : 'chamados sem responsável'}
-                </p>
-                <p className="asd-claim-context">
-                  de <strong className="asd-mono">{data.administrativePendingTotal}</strong> pendentes no setor
-                </p>
-                <button
-                  type="button"
-                  className={`asd-btn ${data.unassignedAdministrativeTickets > 0 ? 'asd-btn-solid' : 'asd-btn-outline'} asd-btn-block`}
-                  onClick={() => navigate('/admin/chamados')}
-                >
-                  {data.unassignedAdministrativeTickets > 0 ? 'Assumir um chamado' : 'Ver fila do setor'}
-                </button>
-              </section>
-
-              {/* ── Prioridades ── */}
-              {priorityRows.length > 0 && (
-                <section className="asd-panel">
-                  <div className="asd-panel-hd">
-                    <h2>Por prioridade</h2>
-                    <span className="asd-hd-note asd-mono">{data.myTicketsTotal} total</span>
-                  </div>
-                  <ul className="asd-prio">
-                    {priorityRows.map((row, i) => (
-                      <li key={row.key}>
-                        <span className="asd-prio-label">{row.label}</span>
-                        <span className="asd-prio-track">
-                          <span
-                            className={`asd-prio-fill asd-tone-${row.tone}`}
-                            style={{
-                              '--w': `${(row.value / maxPriority) * 100}%`,
-                              animationDelay: `${i * 60}ms`,
-                            } as React.CSSProperties}
-                          />
-                        </span>
-                        <span className="asd-prio-n asd-mono">{row.value}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
+                </li>
               )}
+            </ul>
+          )}
+        </div>
+      </section>
 
-              {/* ── Ritmo ── */}
-              <section className="asd-panel">
-                <div className="asd-panel-hd">
-                  <h2>Seu ritmo</h2>
-                </div>
-                <dl className="asd-stats">
-                  <div>
-                    <dt>Resolvidos hoje</dt>
-                    <dd className="asd-mono">{data.myResolvedToday}</dd>
-                  </div>
-                  <div>
-                    <dt>Movimentados hoje</dt>
-                    <dd className="asd-mono">{data.myUpdatedToday}</dd>
-                  </div>
-                  <div>
-                    <dt>Tempo médio de resolução</dt>
-                    <dd className="asd-mono">{formatDuration(data.myAverageResolutionHours)}</dd>
-                  </div>
-                  <div>
-                    <dt>Resolvidos no total</dt>
-                    <dd className="asd-mono">{data.myResolvedTickets}</dd>
-                  </div>
-                </dl>
-              </section>
-            </aside>
-          </div>
-        )}
+      {error && (
+        <div className="adx-alert" role="alert">
+          <i className="ti ti-alert-circle" aria-hidden="true" />
+          <span>{error}</span>
+          <button type="button" onClick={() => void load(true)}>Tentar de novo</button>
+        </div>
+      )}
+
+      <div className="adx-lower">
+        <section className="adx-desk" aria-labelledby="adx-desk-title">
+          <header className="adx-desk__head">
+            <h2 id="adx-desk-title">Na sua mesa</h2>
+            <span className="adx-count">{mine.length}</span>
+            <button type="button" className="adx-desk__all" onClick={() => navigate('/admin/chamados?aba=comigo')}>
+              Ver tudo<span className="adx-desk__all-long"> o que está comigo</span> <i className="ti ti-chevron-right" aria-hidden="true" />
+            </button>
+          </header>
+
+          {loading ? (
+            <div className="adx-trays">
+              {TRAYS.map((tray) => <div key={tray.key} className="adx-tray"><div className="adx-slip adx-slip--ghost" /></div>)}
+            </div>
+          ) : mine.length === 0 && !listFailed ? (
+            <div className="adx-desk__empty">
+              <strong>Sua mesa está livre.</strong>
+              <span>{unclaimedTotal > 0 ? 'Pegue um pedido do quadro acima para começar.' : 'Nada com você e nada esperando. Bom momento para respirar.'}</span>
+            </div>
+          ) : (
+            <div className="adx-trays">
+              {TRAYS.map((tray) => {
+                // Tudo que não é "open" nem "in_progress" é espera: pelo solicitante, por compra ou por terceiros.
+                const items = mine.filter((t) => (tray.key === 'waiting_user' ? !['open', 'in_progress'].includes(t.status) : t.status === tray.key));
+                return (
+                  <section key={tray.key} className={`adx-tray adx-tray--${tray.key}`} aria-label={tray.title}>
+                    <header className="adx-tray__head">
+                      <i className={`ti ${tray.icon}`} aria-hidden="true" />
+                      <h3>{tray.title}</h3>
+                      <span>{items.length}</span>
+                    </header>
+                    {items.length === 0 ? (
+                      <p className="adx-tray__empty">{tray.hint}</p>
+                    ) : (
+                      <ul>
+                        {items.map((t) => {
+                          const kind = kindOf(t.category);
+                          const stale = daysSince(t.updated_at) >= 3;
+                          return (
+                            <li key={t.id}>
+                              <button
+                                type="button"
+                                className={`adx-slip adx-slip--${kind.tone}${justTaken === t.id ? ' is-new' : ''}`}
+                                onClick={() => navigate(`/admin/chamados/${t.id}`)}
+                              >
+                                <span className="adx-slip__kind"><i className={`ti ${kind.icon}`} aria-hidden="true" />{kind.label}</span>
+                                <strong>{t.title}</strong>
+                                <span className="adx-slip__meta">
+                                  <span>{t.requester_name || 'Solicitante sem nome'}</span>
+                                  <span className={stale ? 'is-late' : undefined}>
+                                    {stale ? `parado ${ageLabel(t.updated_at)}` : `mexido ${ageLabel(t.updated_at)}`}
+                                  </span>
+                                </span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </section>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        <aside className="adx-day" aria-labelledby="adx-day-title">
+          <h2 id="adx-day-title">Seu dia</h2>
+          <dl>
+            <div className="adx-day__big">
+              <dt>Resolvidos hoje</dt>
+              <dd><CountUp value={data.myResolvedToday} /></dd>
+            </div>
+            <div>
+              <dt>Pedidos mexidos hoje</dt>
+              <dd><CountUp value={data.myUpdatedToday} /></dd>
+            </div>
+            <div>
+              <dt>Tempo médio para resolver</dt>
+              <dd>{duration(data.myAverageResolutionHours)}</dd>
+            </div>
+            <div>
+              <dt>Resolvidos desde o início</dt>
+              <dd><CountUp value={data.myResolvedTickets} duration={1200} /></dd>
+            </div>
+          </dl>
+          <p className="adx-day__foot">
+            O setor tem {data.administrativePendingTotal} {data.administrativePendingTotal === 1 ? 'pedido aberto' : 'pedidos abertos'} no total.
+          </p>
+        </aside>
       </div>
     </div>
   );

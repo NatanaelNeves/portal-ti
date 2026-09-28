@@ -1,7 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import ConfirmDialog from '../components/ConfirmDialog';
+import MiniMarkdown, { stripMarkdown } from '../components/MiniMarkdown';
+import { showToast } from '../utils/toast';
+import { ARTICLE_CATEGORIES, articleCategoryMeta, normalizeArticleCategory } from '../utils/articleCategories';
 import '../styles/KnowledgeManagementPage.css';
 
 interface Article {
@@ -16,33 +19,44 @@ interface Article {
   helpful_no?: number;
 }
 
-const PRESET_CATEGORIES = [
-  'Software', 'Hardware', 'Rede', 'FAQ',
-  'Tutoriais', 'Troubleshooting', 'Institucional',
-];
+type StatusFilter = 'all' | 'public' | 'draft';
 
 const CATEGORY_OTHER = '__outro__';
+
+const TOOLBAR = [
+  { icon: 'ti-bold', title: 'Negrito', prefix: '**', suffix: '**', placeholder: 'texto' },
+  { icon: 'ti-italic', title: 'Itálico', prefix: '_', suffix: '_', placeholder: 'texto' },
+  { icon: 'ti-h-2', title: 'Título', prefix: '## ', suffix: '', placeholder: 'Título', line: true },
+  { icon: 'ti-h-3', title: 'Subtítulo', prefix: '### ', suffix: '', placeholder: 'Subtítulo', line: true },
+  { icon: 'ti-list', title: 'Lista', prefix: '- ', suffix: '', placeholder: 'item', line: true },
+  { icon: 'ti-list-numbers', title: 'Passo a passo', prefix: '1. ', suffix: '', placeholder: 'passo', line: true },
+  { icon: 'ti-code', title: 'Código ou atalho', prefix: '`', suffix: '`', placeholder: 'Ctrl+P' },
+  { icon: 'ti-link', title: 'Link', prefix: '[', suffix: '](https://)', placeholder: 'texto do link' },
+];
 
 function insertMarkdown(
   textarea: HTMLTextAreaElement,
   prefix: string,
   suffix: string,
   placeholder: string,
-  setter: (val: string) => void
+  line: boolean,
+  setter: (val: string) => void,
 ) {
-  const start = textarea.selectionStart;
-  const end = textarea.selectionEnd;
-  const value = textarea.value;
+  const { selectionStart: start, selectionEnd: end, value } = textarea;
+  // Marcações de linha começam no início da linha.
+  const needsBreak = line && start > 0 && value[start - 1] !== '\n';
   const selected = value.slice(start, end) || placeholder;
-  const newValue = value.slice(0, start) + prefix + selected + suffix + value.slice(end);
-  setter(newValue);
-  setTimeout(() => {
+  const before = value.slice(0, start) + (needsBreak ? '\n' : '');
+  const next = before + prefix + selected + suffix + value.slice(end);
+  setter(next);
+  window.setTimeout(() => {
     textarea.focus();
-    const newStart = start + prefix.length;
-    const newEnd = newStart + selected.length;
-    textarea.setSelectionRange(newStart, newEnd);
+    const s = before.length + prefix.length;
+    textarea.setSelectionRange(s, s + selected.length);
   }, 0);
 }
+
+const dateLabel = (iso: string) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : '—');
 
 export default function KnowledgeManagementPage() {
   const navigate = useNavigate();
@@ -53,24 +67,20 @@ export default function KnowledgeManagementPage() {
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingArticle, setEditingArticle] = useState<Article | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; articleId: string | null }>({ isOpen: false, articleId: null });
-
-  const [formData, setFormData] = useState({
-    title: '',
-    content: '',
-    category: '',
-    is_public: true,
-  });
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [formData, setFormData] = useState({ title: '', content: '', is_public: true });
   const [categorySelect, setCategorySelect] = useState('');
   const [customCategory, setCustomCategory] = useState('');
   const [saving, setSaving] = useState(false);
+  const [mode, setMode] = useState<'write' | 'preview'>('write');
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
   useEffect(() => {
-    const token = localStorage.getItem('internal_token');
-    if (!token) { navigate('/admin/login'); return; }
-    fetchArticles();
+    if (!localStorage.getItem('internal_token')) { navigate('/admin/login'); return; }
+    void fetchArticles();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
   const fetchArticles = async () => {
@@ -80,33 +90,27 @@ export default function KnowledgeManagementPage() {
       setArticles(response.data.articles || []);
       setError('');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Erro ao carregar artigos');
+      setError(err.response?.data?.error || 'Não foi possível carregar os artigos.');
     } finally {
       setLoading(false);
     }
   };
 
-  const openNewForm = () => {
-    setEditingArticle(null);
-    setFormData({ title: '', content: '', category: '', is_public: true });
-    setCategorySelect('');
-    setCustomCategory('');
+  const openForm = (article?: Article) => {
+    setEditingArticle(article ?? null);
+    setMode('write');
     setError('');
-    setShowForm(true);
-  };
-
-  const openEditForm = (article: Article) => {
-    setEditingArticle(article);
-    const isPreset = PRESET_CATEGORIES.includes(article.category);
-    setFormData({
-      title: article.title,
-      content: article.content,
-      category: article.category,
-      is_public: article.is_public,
-    });
-    setCategorySelect(isPreset ? article.category : (article.category ? CATEGORY_OTHER : ''));
-    setCustomCategory(isPreset ? '' : article.category);
-    setError('');
+    if (article) {
+      const id = normalizeArticleCategory(article.category);
+      const known = ARTICLE_CATEGORIES.some((c) => c.id === id);
+      setFormData({ title: article.title, content: article.content, is_public: article.is_public });
+      setCategorySelect(known ? id : article.category ? CATEGORY_OTHER : '');
+      setCustomCategory(known ? '' : article.category || '');
+    } else {
+      setFormData({ title: '', content: '', is_public: true });
+      setCategorySelect('');
+      setCustomCategory('');
+    }
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -114,403 +118,380 @@ export default function KnowledgeManagementPage() {
   const closeForm = () => {
     setShowForm(false);
     setEditingArticle(null);
-    setFormData({ title: '', content: '', category: '', is_public: true });
-    setCategorySelect('');
-    setCustomCategory('');
     setError('');
   };
 
-  const resolvedCategory = categorySelect === CATEGORY_OTHER
-    ? customCategory
-    : categorySelect;
+  const resolvedCategory = categorySelect === CATEGORY_OTHER ? customCategory.trim() : categorySelect;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const save = async (asDraft: boolean) => {
     if (!formData.title.trim() || !formData.content.trim()) {
-      setError('Título e conteúdo são obrigatórios');
+      setError('Escreva um título e o conteúdo antes de salvar.');
       return;
     }
     setSaving(true);
     try {
-      const payload = { ...formData, category: resolvedCategory };
-      if (editingArticle) {
-        await api.put(`/knowledge/${editingArticle.id}`, payload);
-      } else {
-        await api.post('/knowledge', payload);
-      }
+      const payload = { ...formData, is_public: asDraft ? false : formData.is_public, category: resolvedCategory };
+      if (editingArticle) await api.put(`/knowledge/${editingArticle.id}`, payload);
+      else await api.post('/knowledge', payload);
+      showToast.success(asDraft || !payload.is_public ? 'Rascunho salvo.' : editingArticle ? 'Artigo atualizado.' : 'Artigo publicado na Central de dúvidas.');
       closeForm();
-      fetchArticles();
+      void fetchArticles();
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Erro ao salvar artigo');
+      setError(err.response?.data?.error || 'Não foi possível salvar o artigo.');
     } finally {
       setSaving(false);
     }
-  };
-
-  const handleSaveDraft = async () => {
-    if (!formData.title.trim() || !formData.content.trim()) {
-      setError('Título e conteúdo são obrigatórios');
-      return;
-    }
-    setSaving(true);
-    try {
-      const payload = { ...formData, category: resolvedCategory, is_public: false };
-      if (editingArticle) {
-        await api.put(`/knowledge/${editingArticle.id}`, payload);
-      } else {
-        await api.post('/knowledge', payload);
-      }
-      closeForm();
-      fetchArticles();
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Erro ao salvar rascunho');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDelete = (id: string) => {
-    setDeleteConfirm({ isOpen: true, articleId: id });
   };
 
   const confirmDelete = async () => {
-    if (!deleteConfirm.articleId) return;
+    if (!deleteId) return;
+    const id = deleteId;
+    setDeleteId(null);
     try {
-      await api.delete(`/knowledge/${deleteConfirm.articleId}`);
-      setError('');
-      fetchArticles();
+      await api.delete(`/knowledge/${id}`);
+      showToast.success('Artigo excluído.');
+      if (editingArticle?.id === id) closeForm();
+      void fetchArticles();
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Erro ao excluir artigo');
+      setError(err.response?.data?.error || 'Não foi possível excluir o artigo.');
     }
   };
 
-  const toolbar = [
-    { label: 'B',      title: 'Negrito',   prefix: '**', suffix: '**', placeholder: 'texto' },
-    { label: 'I',      title: 'Itálico',   prefix: '_',  suffix: '_',  placeholder: 'texto' },
-    { label: '`',      title: 'Código',    prefix: '`',  suffix: '`',  placeholder: 'código' },
-    { label: 'H1',     title: 'Título 1',  prefix: '# ', suffix: '',   placeholder: 'título' },
-    { label: 'H2',     title: 'Título 2',  prefix: '## ',suffix: '',   placeholder: 'título' },
-    { label: 'Link',   title: 'Link',      prefix: '[',  suffix: '](url)', placeholder: 'texto' },
+  // ── Números e filtros ──
+  const published = articles.filter((a) => a.is_public).length;
+  const drafts = articles.length - published;
+  const views = articles.reduce((sum, a) => sum + (Number(a.views_count) || 0), 0);
+  const yes = articles.reduce((sum, a) => sum + (Number(a.helpful_yes) || 0), 0);
+  const no = articles.reduce((sum, a) => sum + (Number(a.helpful_no) || 0), 0);
+
+  const categoryCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    articles.forEach((a) => {
+      const id = normalizeArticleCategory(a.category);
+      if (id) map.set(id, (map.get(id) || 0) + 1);
+    });
+    return map;
+  }, [articles]);
+
+  const categoryChips = [
+    ...ARTICLE_CATEGORIES.map((c) => c.id),
+    ...Array.from(categoryCounts.keys()).filter((id) => !ARTICLE_CATEGORIES.some((c) => c.id === id)),
   ];
 
+  const filtered = articles.filter((a) => {
+    const q = searchTerm.trim().toLowerCase();
+    const matchSearch = !q || a.title.toLowerCase().includes(q) || a.content.toLowerCase().includes(q);
+    const matchCat = !activeCategory || normalizeArticleCategory(a.category) === activeCategory;
+    const matchStatus = statusFilter === 'all' || (statusFilter === 'public' ? a.is_public : !a.is_public);
+    return matchSearch && matchCat && matchStatus;
+  });
+
+  // ── Editor ──
   if (showForm) {
+    const cat = articleCategoryMeta(resolvedCategory);
     return (
-      <div className="km-editor-page">
-        {/* Editor header */}
-        <div className="km-editor-header">
-          <button className="km-back-btn" onClick={closeForm}>
-            <i className="ti ti-arrow-left" /> Voltar
+      <div className="tpg km">
+        <header className="km-editbar">
+          <button type="button" className="tpg-btn" onClick={closeForm}>
+            <i className="ti ti-arrow-left" aria-hidden="true" />Artigos
           </button>
-          <span className="km-editor-title">
-            {editingArticle ? 'Editar Artigo' : 'Novo Artigo'}
+          <h1>{editingArticle ? 'Editar artigo' : 'Novo artigo'}</h1>
+          <span className={`tpg-badge tpg-badge--dot ${formData.is_public ? 'tpg-badge--ok' : 'tpg-badge--muted'}`}>
+            {formData.is_public ? 'Será publicado' : 'Rascunho'}
           </span>
-        </div>
+        </header>
 
         {error && (
-          <div className="km-alert-error">
-            {error}
-            <button onClick={() => setError('')}><i className="ti ti-x" /></button>
+          <div className="tpg-alert" role="alert">
+            <i className="ti ti-alert-circle" aria-hidden="true" /><span>{error}</span>
+            <button type="button" onClick={() => setError('')} aria-label="Fechar aviso"><i className="ti ti-x" aria-hidden="true" /></button>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="km-editor-layout">
-          {/* Main editor column */}
-          <div className="km-editor-main">
-            <div className="km-title-wrap">
-              <input
-                className="km-title-input"
-                type="text"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="Título do artigo..."
-                required
-              />
-            </div>
+        <form className="km-editor" onSubmit={(e) => { e.preventDefault(); void save(false); }}>
+          <section className="tpg-card km-editor__main">
+            <label className="pub-sr-only" htmlFor="km-title">Título do artigo</label>
+            <input
+              id="km-title"
+              className="km-title"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              placeholder="Título do artigo"
+              required
+            />
 
-            <div className="km-divider" />
-
-            <div className="km-content-wrap">
-              <label className="km-content-label">Conteúdo (Markdown)</label>
-
-              {/* Toolbar */}
-              <div className="km-toolbar">
-                {toolbar.map((btn) => (
-                  <button
-                    key={btn.label}
-                    type="button"
-                    title={btn.title}
-                    className="km-toolbar-btn"
-                    onClick={() => {
-                      if (textareaRef.current) {
-                        insertMarkdown(
-                          textareaRef.current,
-                          btn.prefix,
-                          btn.suffix,
-                          btn.placeholder,
-                          (val) => setFormData({ ...formData, content: val })
-                        );
-                      }
-                    }}
-                  >
-                    {btn.label}
-                  </button>
-                ))}
+            <div className="km-editor__bar">
+              <div className="tpg-seg" role="group" aria-label="Modo do editor">
+                <button type="button" aria-pressed={mode === 'write'} onClick={() => setMode('write')}>Escrever</button>
+                <button type="button" aria-pressed={mode === 'preview'} onClick={() => setMode('preview')}>Visualizar</button>
               </div>
-
-              <textarea
-                ref={textareaRef}
-                className="km-content-textarea"
-                value={formData.content}
-                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                placeholder="Escreva o conteúdo em Markdown..."
-                required
-              />
+              {mode === 'write' && (
+                <div className="km-toolbar" role="toolbar" aria-label="Formatação">
+                  {TOOLBAR.map((b) => (
+                    <button
+                      key={b.icon}
+                      type="button"
+                      className="tpg-icon-btn"
+                      title={b.title}
+                      aria-label={b.title}
+                      onClick={() => textareaRef.current && insertMarkdown(
+                        textareaRef.current, b.prefix, b.suffix, b.placeholder, !!b.line,
+                        (val) => setFormData((f) => ({ ...f, content: val })),
+                      )}
+                    >
+                      <i className={`ti ${b.icon}`} aria-hidden="true" />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
 
-          {/* Sidebar */}
-          <aside className="km-editor-sidebar">
-            <div className="km-sidebar-card">
-              <h3 className="km-sidebar-title">Configurações</h3>
+            {mode === 'write' ? (
+              <>
+                <label className="pub-sr-only" htmlFor="km-content">Conteúdo</label>
+                <textarea
+                  id="km-content"
+                  ref={textareaRef}
+                  className="km-content"
+                  value={formData.content}
+                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                  placeholder={'Explique o passo a passo.\n\nUse a barra acima para títulos, listas e links.'}
+                  required
+                />
+              </>
+            ) : (
+              <div className="km-preview">
+                <h2>{formData.title || 'Sem título'}</h2>
+                {formData.content.trim()
+                  ? <MiniMarkdown className="pub-md" source={formData.content} />
+                  : <p className="tpg-muted">Nada escrito ainda.</p>}
+              </div>
+            )}
+          </section>
 
-              {/* Category */}
-              <div className="km-sidebar-field">
-                <label className="km-sidebar-label">Categoria</label>
+          <aside className="km-editor__side">
+            <section className="tpg-card km-side">
+              <h2>Publicação</h2>
+              <label className="tpg-field">
+                <span>Categoria</span>
                 <select
-                  className="km-select"
                   value={categorySelect}
-                  onChange={(e) => {
-                    setCategorySelect(e.target.value);
-                    if (e.target.value !== CATEGORY_OTHER) setCustomCategory('');
-                  }}
+                  onChange={(e) => { setCategorySelect(e.target.value); if (e.target.value !== CATEGORY_OTHER) setCustomCategory(''); }}
                 >
                   <option value="">Sem categoria</option>
-                  {PRESET_CATEGORIES.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                  <option value={CATEGORY_OTHER}>Outro (digitar)</option>
+                  {ARTICLE_CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                  <option value={CATEGORY_OTHER}>Outra (digitar)</option>
                 </select>
-                {categorySelect === CATEGORY_OTHER && (
-                  <input
-                    className="km-input km-input-mt"
-                    type="text"
-                    value={customCategory}
-                    onChange={(e) => setCustomCategory(e.target.value)}
-                    placeholder="Nome da categoria..."
-                  />
+              </label>
+              {categorySelect === CATEGORY_OTHER && (
+                <label className="tpg-field">
+                  <span>Nome da categoria</span>
+                  <input value={customCategory} onChange={(e) => setCustomCategory(e.target.value)} placeholder="Ex.: Impressoras" />
+                </label>
+              )}
+              {resolvedCategory && (
+                <p className="km-side__cat">
+                  <span className={`pub-gicon ${cat.tone ? `pub-gicon--${cat.tone}` : ''}`} aria-hidden="true"><i className={`ti ${cat.icon}`} /></span>
+                  Aparece em "{cat.label}" na central.
+                </p>
+              )}
+
+              <label className="tpg-switch">
+                <span>
+                  <strong>Publicado na central</strong>
+                  <small>Qualquer pessoa pode ler em /central</small>
+                </span>
+                <input type="checkbox" checked={formData.is_public} onChange={(e) => setFormData({ ...formData, is_public: e.target.checked })} />
+                <i aria-hidden="true" />
+              </label>
+
+              <div className="km-side__actions">
+                <button type="submit" className="tpg-btn tpg-btn--primary" disabled={saving}>
+                  <i className="ti ti-send" aria-hidden="true" />
+                  {saving ? 'Salvando…' : !formData.is_public ? 'Salvar' : editingArticle ? 'Salvar alterações' : 'Publicar artigo'}
+                </button>
+                {formData.is_public && (
+                  <button type="button" className="tpg-btn" disabled={saving} onClick={() => void save(true)}>
+                    <i className="ti ti-device-floppy" aria-hidden="true" />Salvar como rascunho
+                  </button>
+                )}
+                {editingArticle && (
+                  <button type="button" className="tpg-btn km-side__delete" onClick={() => setDeleteId(editingArticle.id)}>
+                    <i className="ti ti-trash" aria-hidden="true" />Excluir artigo
+                  </button>
                 )}
               </div>
+            </section>
 
-              {/* Public toggle */}
-              <div className="km-sidebar-field">
-                <div className="km-toggle-row">
-                  <div>
-                    <span className="km-sidebar-label">Artigo público</span>
-                    <p className="km-toggle-desc">Visível para todos os usuários</p>
-                  </div>
-                  <button
-                    type="button"
-                    className={`km-toggle ${formData.is_public ? 'km-toggle-on' : ''}`}
-                    onClick={() => setFormData({ ...formData, is_public: !formData.is_public })}
-                    aria-pressed={formData.is_public}
-                  >
-                    <span className="km-toggle-thumb" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Status */}
-              <div className="km-sidebar-field">
-                <label className="km-sidebar-label">Status</label>
-                <div className="km-status-pills">
-                  <label className={`km-status-pill ${formData.is_public ? 'km-status-active' : ''}`}>
-                    <input
-                      type="radio"
-                      name="km-status"
-                      checked={formData.is_public}
-                      onChange={() => setFormData({ ...formData, is_public: true })}
-                    />
-                    <i className="ti ti-circle-check" /> Publicado
-                  </label>
-                  <label className={`km-status-pill ${!formData.is_public ? 'km-status-active' : ''}`}>
-                    <input
-                      type="radio"
-                      name="km-status"
-                      checked={!formData.is_public}
-                      onChange={() => setFormData({ ...formData, is_public: false })}
-                    />
-                    <i className="ti ti-pencil" /> Rascunho
-                  </label>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="km-sidebar-actions">
-                <button
-                  type="submit"
-                  className="km-btn-publish"
-                  disabled={saving}
-                >
-                  <i className="ti ti-send" />
-                  {saving ? 'Salvando...' : editingArticle ? 'Salvar Alterações' : 'Publicar Artigo'}
-                </button>
-                <button
-                  type="button"
-                  className="km-btn-draft"
-                  disabled={saving}
-                  onClick={handleSaveDraft}
-                >
-                  <i className="ti ti-device-floppy" />
-                  Salvar rascunho
-                </button>
-              </div>
-            </div>
+            <section className="tpg-card km-side km-help">
+              <h2>Dicas</h2>
+              <ul>
+                <li>Título com a dúvida como a pessoa falaria: "Como trocar o toner".</li>
+                <li>Use passo a passo numerado para procedimentos.</li>
+                <li>Confira em "Visualizar" antes de publicar.</li>
+              </ul>
+            </section>
           </aside>
         </form>
+
+        <ConfirmDialog
+          isOpen={deleteId !== null}
+          title="Excluir artigo?"
+          message="O artigo sai da Central de dúvidas e não pode ser recuperado."
+          confirmText="Excluir"
+          cancelText="Cancelar"
+          type="danger"
+          onConfirm={() => void confirmDelete()}
+          onCancel={() => setDeleteId(null)}
+        />
       </div>
     );
   }
 
-  // ── Article list ──
-  const filteredArticles = articles.filter((a) => {
-    const q = searchTerm.toLowerCase();
-    const matchSearch = !q || a.title.toLowerCase().includes(q) || a.content.toLowerCase().includes(q);
-    const matchCat = !activeCategory || a.category === activeCategory;
-    return matchSearch && matchCat;
-  });
-
+  // ── Lista ──
   return (
-    <div className="km-page">
-      <div className="km-list-header">
-        <div>
-          <div className="km-list-title">
-            <i className="ti ti-book" />
-            <span>Base de Conhecimento</span>
+    <div className="tpg km">
+      <header className="tpg-hero pub-aurora">
+        <div className="tpg-hero__top">
+          <div className="tpg-hero__title">
+            <span className="pub-gicon" aria-hidden="true"><i className="ti ti-help-circle" /></span>
+            <div>
+              <h1>Central de dúvidas</h1>
+              <p>Artigos que qualquer pessoa lê na central pública. Rascunhos ficam só para a equipe.</p>
+            </div>
           </div>
-          <p className="km-list-subtitle">Artigos e guias de suporte interno</p>
+          <div className="tpg-hero__actions">
+            <a className="tpg-btn tpg-btn--glass" href="/central" target="_blank" rel="noopener noreferrer">
+              <i className="ti ti-external-link" aria-hidden="true" />Ver central pública
+            </a>
+            <button type="button" className="tpg-btn tpg-btn--sun" onClick={() => openForm()}>
+              <i className="ti ti-plus" aria-hidden="true" />Novo artigo
+            </button>
+          </div>
         </div>
-        <button className="km-btn-new" onClick={openNewForm}>
-          <i className="ti ti-plus" /> Novo Artigo
-        </button>
-      </div>
+
+        <ul className="tpg-stats" aria-label="Resumo">
+          <li className="tpg-stat"><strong>{published}</strong>publicados</li>
+          <li className="tpg-stat"><strong>{drafts}</strong>{drafts === 1 ? 'rascunho' : 'rascunhos'}</li>
+          <li className="tpg-stat"><strong>{views}</strong>leituras</li>
+          {yes + no > 0 && <li className="tpg-stat"><strong>{Math.round((yes / (yes + no)) * 100)}%</strong>marcaram como útil</li>}
+        </ul>
+
+        <div className="tpg-hero__tools">
+          <label className="tpg-search">
+            <i className="ti ti-search" aria-hidden="true" />
+            <span className="pub-sr-only">Buscar artigos</span>
+            <input type="search" placeholder="Buscar por título ou conteúdo" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            {searchTerm && (
+              <button type="button" className="tpg-search__clear" aria-label="Limpar busca" onClick={() => setSearchTerm('')}>
+                <i className="ti ti-x" aria-hidden="true" />
+              </button>
+            )}
+          </label>
+        </div>
+      </header>
 
       {error && (
-        <div className="km-alert-error">
-          {error}
-          <button onClick={() => setError('')}><i className="ti ti-x" /></button>
+        <div className="tpg-alert" role="alert">
+          <i className="ti ti-alert-circle" aria-hidden="true" /><span>{error}</span>
+          <button type="button" onClick={() => setError('')} aria-label="Fechar aviso"><i className="ti ti-x" aria-hidden="true" /></button>
         </div>
       )}
 
-      {/* Search */}
-      <div className="km-search-wrap">
-        <i className="ti ti-search km-search-icon" />
-        <input
-          className="km-search-input"
-          type="text"
-          placeholder="Buscar artigos..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
-
-      {/* Category filter pills */}
-      <div className="km-filter-pills">
-        <button
-          className={`km-filter-pill ${activeCategory === '' ? 'km-filter-pill-active' : ''}`}
-          onClick={() => setActiveCategory('')}
-        >
-          Todos
-        </button>
-        {PRESET_CATEGORIES.map((cat) => (
-          <button
-            key={cat}
-            className={`km-filter-pill ${activeCategory === cat ? 'km-filter-pill-active' : ''}`}
-            onClick={() => setActiveCategory(activeCategory === cat ? '' : cat)}
-          >
-            {cat}
+      <div className="tpg-toolbar">
+        <div className="tpg-chips" style={{ marginTop: 0 }}>
+          <button type="button" className="tpg-chip" aria-pressed={!activeCategory} onClick={() => setActiveCategory('')}>
+            <i className="ti ti-layout-grid" aria-hidden="true" />Todas
+            <span className="tpg-chip__count">{articles.length}</span>
           </button>
-        ))}
+          {categoryChips.map((id) => {
+            const meta = articleCategoryMeta(id);
+            return (
+              <button key={id} type="button" className="tpg-chip" aria-pressed={activeCategory === id} onClick={() => setActiveCategory(activeCategory === id ? '' : id)}>
+                <i className={`ti ${meta.icon}`} aria-hidden="true" />{meta.label}
+                <span className="tpg-chip__count">{categoryCounts.get(id) || 0}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="tpg-seg" role="group" aria-label="Situação">
+          <button type="button" aria-pressed={statusFilter === 'all'} onClick={() => setStatusFilter('all')}>Todos</button>
+          <button type="button" aria-pressed={statusFilter === 'public'} onClick={() => setStatusFilter('public')}>Publicados</button>
+          <button type="button" aria-pressed={statusFilter === 'draft'} onClick={() => setStatusFilter('draft')}>Rascunhos</button>
+        </div>
       </div>
 
-      {loading ? (
-        <div className="km-loading">
-          <div className="km-spinner" />
-          <p>Carregando artigos...</p>
-        </div>
-      ) : filteredArticles.length === 0 ? (
-        <div className="km-empty">
-          <i className="ti ti-book-off km-empty-icon" />
-          <h3>{articles.length === 0 ? 'Nenhum artigo cadastrado' : 'Nenhum resultado encontrado'}</h3>
-          <p>{articles.length === 0 ? 'Crie o primeiro artigo para a base de conhecimento.' : 'Tente outro termo ou categoria.'}</p>
-          {articles.length === 0 && (
-            <button className="km-btn-new" onClick={openNewForm}>
-              <i className="ti ti-plus" /> Novo Artigo
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="km-grid">
-          {filteredArticles.map((article) => (
-            <div key={article.id} className="km-card" onClick={() => openEditForm(article)} style={{ cursor: 'pointer' }}>
-              <div className="km-card-top">
-                <div className="km-card-badges">
-                  <span className={`km-badge-visibility ${article.is_public ? 'km-badge-public' : 'km-badge-private'}`}>
-                    <i className={`ti ${article.is_public ? 'ti-world' : 'ti-lock'}`} />
-                    {article.is_public ? 'Público' : 'Privado'}
-                  </span>
-                  {article.category && (
-                    <span className="km-badge-category">{article.category}</span>
-                  )}
-                </div>
-              </div>
+      <section className="tpg-card tpg-section">
+        <header className="tpg-section__head">
+          <h2>Artigos</h2>
+          <span className="tpg-count">{filtered.length} de {articles.length}</span>
+        </header>
 
-              <h3 className="km-card-title">{article.title}</h3>
-
-              <p className="km-card-excerpt">
-                {article.content.substring(0, 140)}{article.content.length > 140 ? '…' : ''}
-              </p>
-
-              <div className="km-card-footer">
-                <div className="km-card-meta">
-                  <span><i className="ti ti-eye" /> {article.views_count} visualizações</span>
-                  {((article.helpful_yes ?? 0) + (article.helpful_no ?? 0)) > 0 && (
-                    <span title="Feedbacks útil/não útil">
-                      👍 {article.helpful_yes ?? 0} · 👎 {article.helpful_no ?? 0}
+        {loading ? (
+          <div style={{ padding: '0 20px 20px', display: 'grid', gap: 10 }}>{[0, 1, 2].map((n) => <div key={n} className="tpg-skeleton" style={{ height: 70 }} />)}</div>
+        ) : filtered.length === 0 ? (
+          <div className="tpg-empty">
+            <span className="pub-gicon pub-gicon--neutral" aria-hidden="true"><i className={`ti ${articles.length === 0 ? 'ti-book-2' : 'ti-search-off'}`} /></span>
+            <h3>{articles.length === 0 ? 'Nenhum artigo ainda' : 'Nenhum artigo com esses filtros'}</h3>
+            <p>{articles.length === 0 ? 'Escreva o primeiro: o que as pessoas mais perguntam para a TI?' : 'Tente outra palavra, categoria ou situação.'}</p>
+            {articles.length === 0 && (
+              <button type="button" className="tpg-btn tpg-btn--primary" onClick={() => openForm()}><i className="ti ti-plus" aria-hidden="true" />Novo artigo</button>
+            )}
+          </div>
+        ) : (
+          <ul className="tpg-rows">
+            {filtered.map((a) => {
+              const meta = articleCategoryMeta(a.category);
+              const votes = (Number(a.helpful_yes) || 0) + (Number(a.helpful_no) || 0);
+              return (
+                <li key={a.id} className="tpg-row km-row">
+                  <span className={`pub-gicon ${meta.tone ? `pub-gicon--${meta.tone}` : ''} km-row__icon`} aria-hidden="true"><i className={`ti ${meta.icon}`} /></span>
+                  <button type="button" className="km-row__main" onClick={() => openForm(a)}>
+                    <strong>{a.title}</strong>
+                    <span>{stripMarkdown(a.content).slice(0, 150)}</span>
+                  </button>
+                  <div className="km-row__meta">
+                    <span className={`tpg-badge tpg-badge--dot ${a.is_public ? 'tpg-badge--ok' : 'tpg-badge--muted'}`}>{a.is_public ? 'Publicado' : 'Rascunho'}</span>
+                    <span className="km-row__nums">
+                      <span title="Leituras"><i className="ti ti-eye" aria-hidden="true" />{a.views_count || 0}</span>
+                      {votes > 0 && (
+                        <span title="Marcaram como útil / não útil">
+                          <i className="ti ti-thumb-up" aria-hidden="true" />{a.helpful_yes || 0}
+                          <i className="ti ti-thumb-down" aria-hidden="true" />{a.helpful_no || 0}
+                        </span>
+                      )}
+                      <span>{dateLabel(a.created_at)}</span>
                     </span>
-                  )}
-                  <span>{article.created_at ? new Date(article.created_at).toLocaleDateString('pt-BR') : '-'}</span>
-                </div>
-                <div className="km-card-actions" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    className="km-card-btn"
-                    type="button"
-                    onClick={() => openEditForm(article)}
-                  >
-                    <i className="ti ti-pencil" /> Editar
-                  </button>
-                  <button
-                    className="km-card-btn km-card-btn-danger"
-                    type="button"
-                    onClick={() => handleDelete(article.id)}
-                  >
-                    <i className="ti ti-trash" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+                  </div>
+                  <div className="km-row__actions">
+                    {a.is_public && (
+                      <a className="tpg-icon-btn" href={`/central#${a.id}`} target="_blank" rel="noopener noreferrer" title="Ver na central" aria-label={`Ver "${a.title}" na central`}>
+                        <i className="ti ti-external-link" aria-hidden="true" />
+                      </a>
+                    )}
+                    <button type="button" className="tpg-icon-btn" onClick={() => openForm(a)} title="Editar" aria-label={`Editar "${a.title}"`}>
+                      <i className="ti ti-pencil" aria-hidden="true" />
+                    </button>
+                    <button type="button" className="tpg-icon-btn tpg-icon-btn--danger" onClick={() => setDeleteId(a.id)} title="Excluir" aria-label={`Excluir "${a.title}"`}>
+                      <i className="ti ti-trash" aria-hidden="true" />
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
 
       <ConfirmDialog
-        isOpen={deleteConfirm.isOpen}
-        title="Excluir Artigo"
-        message="Deseja realmente excluir este artigo? Esta ação não pode ser desfeita."
+        isOpen={deleteId !== null}
+        title="Excluir artigo?"
+        message="O artigo sai da Central de dúvidas e não pode ser recuperado."
         confirmText="Excluir"
         cancelText="Cancelar"
         type="danger"
-        onConfirm={confirmDelete}
-        onCancel={() => setDeleteConfirm({ isOpen: false, articleId: null })}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setDeleteId(null)}
       />
     </div>
   );

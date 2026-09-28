@@ -1,0 +1,621 @@
+/* ════════════════════════════════════════════════════════════════
+   PEDIDOS DO ADMINISTRATIVO (prefixo axp-)
+   O topo continua o quadro (mesma cor do cabeçalho, com o trilho de
+   latão entre eles). Cada pedido é uma ficha deitada: um toco colorido
+   com ilhós, da cor do tipo, e o papel branco com o conteúdo.
+   ════════════════════════════════════════════════════════════════ */
+
+.axp {
+  min-height: calc(100vh - var(--adm-header-h));
+  color: var(--ti-ink, #13241d);
+  font-family: var(--pub-body);
+}
+
+.axp button:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.axp :focus-visible {
+  outline: 3px solid var(--pub-sun);
+  outline-offset: 2px;
+}
+
+/* ── Topo ──────────────────────────────────────────────────────── */
+.axp-head {
+  padding: 34px 28px 0;
+  color: #eaf6ef;
+  background: var(--adm-grain), linear-gradient(180deg, var(--adm-board), #07442f);
+}
+
+.axp-head__top,
+.axp-tabs {
+  max-width: 1264px;
+  margin-inline: auto;
+}
+
+.axp-head__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px 28px;
+}
+
+.axp-head h1 {
+  margin: 0;
+  color: #fff;
+  font: 800 clamp(2rem, 4vw, 3rem)/1 var(--pub-display);
+  letter-spacing: -0.045em;
+}
+
+.axp-head p {
+  max-width: 60ch;
+  margin: 10px 0 0;
+  color: rgba(234, 246, 239, 0.8);
+  font-size: 1rem;
+  text-wrap: pretty;
+}
+
+.axp-search {
+  position: relative;
+  width: min(100%, 380px);
+  display: flex;
+  align-items: center;
+}
+
+.axp-search > i {
+  position: absolute;
+  left: 16px;
+  color: rgba(234, 246, 239, 0.7);
+  font-size: 1.1rem;
+  pointer-events: none;
+}
+
+.axp-search input {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 44px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  font: 500 0.95rem var(--pub-body);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.axp-search input::placeholder {
+  color: rgba(234, 246, 239, 0.55);
+}
+
+.axp-search input:focus {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: var(--adm-brass);
+  outline: none;
+}
+
+.axp-search button {
+  position: absolute;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+/* Abas: pílula clara que desliza sobre o quadro, colada na borda */
+.axp-tabs {
+  position: relative;
+  display: flex;
+  gap: 4px;
+  margin-top: 26px;
+  padding-bottom: 0;
+}
+
+.axp-tabs__pill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--w);
+  background: var(--adm-canvas);
+  border-radius: 16px 16px 0 0;
+  transform: translateX(var(--x));
+  transition: transform 0.4s cubic-bezier(0.3, 1.2, 0.4, 1), width 0.4s cubic-bezier(0.3, 1.2, 0.4, 1);
+}
+
+.axp-tab {
+  position: relative;
+  z-index: 1;
+  min-height: 50px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 20px;
+  color: rgba(234, 246, 239, 0.78);
+  background: none;
+  border: 0;
+  border-radius: 16px 16px 0 0;
+  font: 800 0.95rem/1 var(--pub-body);
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.axp-tab:hover {
+  color: #fff;
+}
+
+.axp-tab[aria-selected='true'] {
+  color: var(--adm-board);
+}
+
+.axp-tab__n {
+  min-width: 24px;
+  padding: 3px 7px;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.axp-tab[aria-selected='true'] .axp-tab__n {
+  color: #3a2a05;
+  background: var(--adm-brass-hi);
+}
+
+/* ── Corpo ─────────────────────────────────────────────────────── */
+.axp-body {
+  max-width: 1320px;
+  margin-inline: auto;
+  padding: 22px 28px 56px;
+}
+
+.axp-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.axp-kind {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 8px 0 14px;
+  color: var(--ti-ink, #13241d);
+  background: #fff;
+  border: 1.5px solid var(--ti-line, #dfe6e1);
+  border-radius: 999px;
+  font: 700 0.86rem/1 var(--pub-body);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.axp-kind i {
+  color: var(--ac, var(--adm-board));
+  font-size: 1rem;
+}
+
+.axp-kind span {
+  min-width: 24px;
+  padding: 3px 7px;
+  background: var(--adm-canvas);
+  border-radius: 999px;
+  font-size: 0.76rem;
+  text-align: center;
+}
+
+.axp-kind:hover {
+  border-color: var(--ac, var(--adm-board));
+}
+
+.axp-kind[aria-pressed='true'] {
+  color: var(--ink, #fff);
+  background: var(--bg);
+  border-color: var(--ac);
+}
+
+.axp-kind:not([class*='adm-tone'])[aria-pressed='true'] {
+  color: #fff;
+  background: var(--adm-board);
+  border-color: var(--adm-board);
+}
+
+.axp-kind[aria-pressed='true'] span {
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.axp-kind:not([class*='adm-tone'])[aria-pressed='true'] span {
+  color: var(--adm-board);
+  background: var(--adm-brass-hi);
+}
+
+/* ── Fichas ────────────────────────────────────────────────────── */
+.axp-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.axp-slip {
+  position: relative;
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) auto;
+  min-height: 92px;
+  overflow: hidden;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 1px 0 rgba(6, 60, 45, 0.06), 0 14px 30px -26px rgba(6, 60, 45, 0.8);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.axp-slip:hover {
+  box-shadow: 0 0 0 1.5px var(--ac), 0 18px 32px -24px rgba(6, 60, 45, 0.8);
+}
+
+/* O toco colorido, com recorte em V e ilhós, como etiqueta de bagagem */
+.axp-slip__stub {
+  position: relative;
+  display: grid;
+  place-items: center;
+  color: var(--ink);
+  background: var(--bg);
+  border-right: 2px dashed color-mix(in srgb, var(--ac) 45%, transparent);
+  font-size: 1.7rem;
+}
+
+.axp-slip__eye {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 12px;
+  height: 12px;
+  background: var(--adm-canvas);
+  border: 3px solid var(--ac);
+  border-radius: 50%;
+}
+
+.axp-slip__main {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px 18px;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.axp-slip__kind {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.axp-flag {
+  padding: 2px 8px;
+  color: #fff;
+  background: var(--ti-late, #c8372d);
+  border-radius: 999px;
+  font-size: 0.7rem;
+}
+
+.axp-slip__main strong {
+  overflow: hidden;
+  font: 800 1.08rem/1.25 var(--pub-display);
+  letter-spacing: -0.015em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.axp-slip__main:hover strong {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.axp-slip__who {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  color: var(--ti-muted, #5d6f67);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.axp-slip__who small {
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.axp-slip__side {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px 14px 6px;
+}
+
+.axp-age {
+  color: var(--ti-muted, #5d6f67);
+  font-size: 0.84rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.axp-age.is-late {
+  color: var(--ti-late, #c8372d);
+}
+
+.axp-take {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 18px;
+  color: #fff;
+  background: var(--adm-board);
+  border: 0;
+  border-radius: 999px;
+  font: 800 0.88rem/1 var(--pub-body);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.axp-take:hover:not(:disabled) {
+  background: #0f7a4a;
+}
+
+.axp-take:disabled {
+  cursor: default;
+}
+
+.axp-slip:not(.is-leaving) .axp-take:disabled {
+  opacity: 0.55;
+}
+
+.axp-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  color: #1f5f3f;
+  background: #e2f3e8;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.axp-state.is-new {
+  color: #5c3f00;
+  background: #fdf0c8;
+}
+
+.axp-state.is-waiting {
+  color: #7a4e0a;
+  background: #fbe8cf;
+}
+
+.axp-state.is-done {
+  color: var(--ti-muted, #5d6f67);
+  background: #eef1ef;
+}
+
+/* Resposta ao "Pegar": visto que gira e a ficha desliza para a direita */
+.axp-slip.is-leaving {
+  animation: axp-leave 0.55s cubic-bezier(0.5, 0, 0.75, 0) 0.2s forwards;
+}
+
+.axp-slip.is-leaving .axp-take {
+  background: #0f7a4a;
+}
+
+.axp-check {
+  animation: axp-check 0.35s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+@keyframes axp-check {
+  from { transform: rotate(-90deg) scale(0.3); opacity: 0; filter: blur(3px); }
+}
+
+@keyframes axp-leave {
+  to { transform: translateX(40px); opacity: 0; }
+}
+
+/* Erro: a ficha balança para dizer "não deu" */
+.axp-slip.is-shaking {
+  animation: axp-shake 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+@keyframes axp-shake {
+  15%, 85% { transform: translateX(-2px); }
+  30%, 70% { transform: translateX(5px); }
+  45%, 55% { transform: translateX(-7px); }
+}
+
+.axp-slip--ghost {
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: none;
+  animation: axp-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes axp-pulse {
+  50% { opacity: 0.5; }
+}
+
+/* ── Vazio e erro ──────────────────────────────────────────────── */
+.axp-empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 56px 20px;
+  text-align: center;
+  background: #fff;
+  border: 2px dashed #c9d6cd;
+  border-radius: 24px;
+}
+
+.axp-empty__tag {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  color: #3a2a05;
+  background: linear-gradient(160deg, var(--adm-brass-hi), var(--adm-brass));
+  border-radius: 20px 20px 20px 6px;
+  font-size: 1.8rem;
+  transform: rotate(-6deg);
+}
+
+.axp-empty h2 {
+  margin: 10px 0 0;
+  font: 800 1.35rem/1.2 var(--pub-display);
+}
+
+.axp-empty p {
+  max-width: 44ch;
+  margin: 0 0 6px;
+  color: var(--ti-muted, #5d6f67);
+}
+
+.axp-btn {
+  min-height: 42px;
+  padding: 0 18px;
+  color: var(--ti-ink, #13241d);
+  background: #fff;
+  border: 1.5px solid var(--ti-line, #dfe6e1);
+  border-radius: 999px;
+  font: 700 0.9rem/1 var(--pub-body);
+  cursor: pointer;
+}
+
+.axp-btn--brass {
+  color: #3a2a05;
+  background: linear-gradient(180deg, var(--adm-brass-hi), var(--adm-brass));
+  border-color: transparent;
+}
+
+.axp-alert {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 12px 16px;
+  color: var(--pub-danger, #b42318);
+  background: var(--pub-danger-wash, #fbeceb);
+  border-radius: 14px;
+}
+
+.axp-alert span {
+  flex: 1;
+}
+
+.axp-alert button {
+  padding: 6px 12px;
+  color: inherit;
+  background: #fff;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font: 700 0.82rem var(--pub-body);
+  cursor: pointer;
+}
+
+/* ── Telas menores ─────────────────────────────────────────────── */
+@media (max-width: 760px) {
+  .axp-head {
+    padding: 24px 14px 0;
+  }
+
+  .axp-search {
+    width: 100%;
+  }
+
+  .axp-tabs {
+    margin-top: 20px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .axp-tab {
+    flex: 0 0 auto;
+    padding: 0 14px;
+  }
+
+  .axp-body {
+    padding: 16px 12px 32px;
+  }
+
+  .axp-kinds {
+    flex-wrap: nowrap;
+    margin-inline: -12px;
+    padding-inline: 12px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .axp-kind {
+    flex: 0 0 auto;
+  }
+
+  .axp-slip {
+    grid-template-columns: 52px minmax(0, 1fr);
+  }
+
+  .axp-slip__stub {
+    grid-row: span 2;
+    font-size: 1.3rem;
+  }
+
+  .axp-slip__eye {
+    top: 10px;
+    left: 50%;
+    margin-left: -6px;
+  }
+
+  .axp-slip__main {
+    padding: 12px 14px 4px;
+  }
+
+  .axp-slip__main strong {
+    white-space: normal;
+  }
+
+  .axp-slip__side {
+    justify-content: space-between;
+    padding: 6px 14px 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .axp-tabs__pill {
+    transition: none;
+  }
+
+  .axp-slip.is-leaving,
+  .axp-slip.is-shaking,
+  .axp-check,
+  .axp-slip--ghost {
+    animation: none;
+  }
+
+  .axp-slip.is-leaving {
+    opacity: 0.4;
+  }
+}

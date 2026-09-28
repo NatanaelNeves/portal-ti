@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ConfirmDialog from '../components/ConfirmDialog';
-import '../styles/UsersManagementPage.css';
+import { showToast } from '../utils/toast';
 import { BACKEND_URL } from '../services/api';
+import '../styles/UsersManagementPage.css';
 
 interface User {
   id: string;
@@ -13,548 +14,411 @@ interface User {
   created_at: string;
 }
 
-const AVATAR_COLORS = [
-  '#6366F1', '#8B5CF6', '#EC4899', '#F59E0B',
-  '#10B981', '#3B82F6', '#EF4444', '#14B8A6',
+type Modal = null | 'create' | 'edit' | 'password';
+
+// O que cada perfil vê: explicado na hora de criar ou editar.
+const ROLES: Array<{ value: string; label: string; short: string; desc: string; tone: string; adminOnly?: boolean }> = [
+  { value: 'it_staff', label: 'Equipe de TI', short: 'TI', desc: 'Atende chamados de TI e cuida de inventário, documentos e central de dúvidas.', tone: 'ti' },
+  { value: 'admin_staff', label: 'Auxiliar administrativo', short: 'Administrativo', desc: 'Atende os chamados do Administrativo.', tone: 'adm' },
+  { value: 'rh_staff', label: 'Equipe de RH', short: 'RH', desc: 'Atende os chamados do RH na área própria do RH.', tone: 'rh' },
+  { value: 'manager', label: 'Gestão', short: 'Gestão', desc: 'Acompanha painéis, solicitações e relatórios.', tone: 'info', adminOnly: true },
+  { value: 'admin', label: 'Administrador', short: 'Administrador', desc: 'Acesso total, inclusive gerenciar a equipe.', tone: 'admin', adminOnly: true },
 ];
 
-function getAvatarColor(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-}
+const roleMeta = (role?: string) => ROLES.find((r) => r.value === role) ?? { value: role ?? '', label: role || 'Sem perfil', short: role || 'Sem perfil', desc: '', tone: 'muted' };
 
-function getInitials(name: string): string {
-  const parts = name.trim().split(' ').filter(Boolean);
+const initialsOf = (name: string) => {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return '?';
   if (parts.length === 1) return parts[0][0].toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
-const PAGE_SIZE = 10;
+};
 
 export default function UsersManagementPage() {
   const navigate = useNavigate();
+  const token = localStorage.getItem('internal_token');
+  const me = (() => { try { return JSON.parse(localStorage.getItem('internal_user') || 'null'); } catch { return null; } })() as { id?: string; role?: string } | null;
+  const isAdmin = me?.role === 'admin';
+
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [showForm, setShowForm] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [toggleStatusConfirm, setToggleStatusConfirm] = useState<{ isOpen: boolean; userId: string | null }>({ isOpen: false, userId: null });
-  const [deleteUserConfirm, setDeleteUserConfirm] = useState<{ isOpen: boolean; userId: string | null }>({ isOpen: false, userId: null });
-  const [formData, setFormData] = useState({ email: '', name: '', password: '', role: 'it_staff' });
-  const [editFormData, setEditFormData] = useState({ email: '', name: '', role: 'it_staff' });
+  const [modal, setModal] = useState<Modal>(null);
+  const [selected, setSelected] = useState<User | null>(null);
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'it_staff' });
   const [newPassword, setNewPassword] = useState('');
   const [formError, setFormError] = useState('');
-  const [formSuccess, setFormSuccess] = useState('');
-  const [creatingUser, setCreatingUser] = useState(false);
-  const createUserInFlightRef = useRef(false);
-
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterRole, setFilterRole] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
+  const [confirm, setConfirm] = useState<null | { kind: 'toggle' | 'delete'; user: User }>(null);
+  const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
   useEffect(() => {
-    const token = localStorage.getItem('internal_token');
     if (!token) { navigate('/admin/login'); return; }
-    const user = localStorage.getItem('internal_user');
-    if (user) {
-      const userData = JSON.parse(user);
-      if (userData.role !== 'admin' && userData.role !== 'it_staff') {
-        navigate('/admin/dashboard');
-        return;
-      }
-    }
-    fetchUsers(token);
+    if (me?.role !== 'admin' && me?.role !== 'it_staff') { navigate('/admin/dashboard'); return; }
+    void fetchUsers();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
-  const fetchUsers = async (token: string) => {
+  const headers = (json = false): Record<string, string> => ({
+    ...(json ? { 'Content-Type': 'application/json' } : {}),
+    Authorization: `Bearer ${token}`,
+  });
+
+  const readError = async (res: Response, fallback: string) => {
+    const data = await res.json().catch(() => ({}));
+    return (data as { error?: string }).error || fallback;
+  };
+
+  const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${BACKEND_URL}/api/internal-auth/users`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!response.ok) throw new Error('Erro ao carregar usuários');
-      const data = await response.json();
-      setUsers(Array.isArray(data) ? data : (data.users || []));
+      const res = await fetch(`${BACKEND_URL}/api/internal-auth/users`, { headers: headers() });
+      if (!res.ok) throw new Error(await readError(res, 'Não foi possível carregar a equipe.'));
+      const data = await res.json();
+      setUsers(Array.isArray(data) ? data : data.users || []);
+      setError('');
     } catch (err: any) {
-      setError(err.message || 'Erro ao carregar usuários');
+      setError(err instanceof TypeError ? 'Sem conexão com o servidor.' : err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (creatingUser || createUserInFlightRef.current) return;
+  const openCreate = () => {
+    setForm({ name: '', email: '', password: '', role: 'it_staff' });
     setFormError('');
-    setFormSuccess('');
-    createUserInFlightRef.current = true;
-    setCreatingUser(true);
-    try {
-      const token = localStorage.getItem('internal_token');
-      const response = await fetch(`${BACKEND_URL}/api/internal-auth/internal-register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ ...formData, email: formData.email.trim().toLowerCase(), name: formData.name.trim() }),
-      });
-      const contentType = response.headers.get('content-type') || '';
-      let data: any = {};
-      if (contentType.includes('application/json')) {
-        data = await response.json();
-      } else {
-        const text = await response.text();
-        data = { error: text || 'Erro ao criar usuário' };
-      }
-      if (!response.ok) {
-        if (response.status === 409) throw new Error(data.error || 'Já existe um usuário com este e-mail.');
-        throw new Error(data.error || 'Erro ao criar usuário');
-      }
-      setFormSuccess(data.message || 'Usuário criado com sucesso!');
-      setFormData({ email: '', name: '', password: '', role: 'it_staff' });
-      setShowForm(false);
-      if (token) fetchUsers(token);
-    } catch (err: any) {
-      setFormError(err.message || 'Erro ao criar usuário');
-    } finally {
-      createUserInFlightRef.current = false;
-      setCreatingUser(false);
-    }
+    setModal('create');
   };
 
-  const handleEditUser = (user: User) => {
-    setSelectedUser(user);
-    setEditFormData({ email: user.email, name: user.name, role: user.role });
-    setShowEditModal(true);
+  const openEdit = (user: User) => {
+    setSelected(user);
+    setForm({ name: user.name, email: user.email, password: '', role: user.role });
     setFormError('');
+    setModal('edit');
   };
 
-  const handleUpdateUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError('');
-    setFormSuccess('');
-    if (!selectedUser) return;
-    try {
-      const token = localStorage.getItem('internal_token');
-      const response = await fetch(`${BACKEND_URL}/api/internal-auth/users/${selectedUser.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(editFormData),
-      });
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Erro ao atualizar usuário');
-      }
-      setFormSuccess('Usuário atualizado com sucesso!');
-      setShowEditModal(false);
-      setSelectedUser(null);
-      if (token) fetchUsers(token);
-    } catch (err: any) {
-      setFormError(err.message || 'Erro ao atualizar usuário');
-    }
-  };
-
-  const handleToggleStatus = async (userId: string) => {
-    setToggleStatusConfirm({ isOpen: true, userId });
-  };
-
-  const confirmToggleStatus = async () => {
-    if (!toggleStatusConfirm.userId) return;
-    try {
-      const token = localStorage.getItem('internal_token');
-      const response = await fetch(`${BACKEND_URL}/api/internal-auth/users/${toggleStatusConfirm.userId}/toggle-status`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Erro ao alterar status');
-      }
-      setFormSuccess('Status alterado com sucesso!');
-      if (token) fetchUsers(token);
-    } catch (err: any) {
-      setFormError(err.message || 'Erro ao alterar status');
-    }
-  };
-
-  const handleResetPassword = (user: User) => {
-    setSelectedUser(user);
+  const openPassword = (user: User) => {
+    setSelected(user);
     setNewPassword('');
-    setShowPasswordModal(true);
     setFormError('');
+    setModal('password');
   };
 
-  const handleDeleteUser = (userId: string) => {
-    setDeleteUserConfirm({ isOpen: true, userId });
-  };
+  const closeModal = () => { setModal(null); setSelected(null); setFormError(''); };
 
-  const confirmDeleteUser = async () => {
-    if (!deleteUserConfirm.userId) return;
+  const submitCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setBusy(true);
+    setFormError('');
     try {
-      const token = localStorage.getItem('internal_token');
-      const response = await fetch(`${BACKEND_URL}/api/internal-auth/users/${deleteUserConfirm.userId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch(`${BACKEND_URL}/api/internal-auth/internal-register`, {
+        method: 'POST',
+        headers: headers(true),
+        body: JSON.stringify({ ...form, email: form.email.trim().toLowerCase(), name: form.name.trim() }),
       });
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Erro ao excluir usuário');
+      if (!res.ok) {
+        throw new Error(res.status === 409 ? 'Já existe alguém com este e-mail.' : await readError(res, 'Não foi possível criar o acesso.'));
       }
-      setFormSuccess('Usuário excluído com sucesso!');
-      setDeleteUserConfirm({ isOpen: false, userId: null });
-      if (token) fetchUsers(token);
+      showToast.success(`Acesso criado para ${form.name.trim().split(' ')[0]}.`);
+      closeModal();
+      void fetchUsers();
     } catch (err: any) {
-      setFormError(err.message || 'Erro ao excluir usuário');
-      setDeleteUserConfirm({ isOpen: false, userId: null });
+      setFormError(err.message);
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
     }
   };
 
-  const handleSubmitPasswordReset = async (e: React.FormEvent) => {
+  const submitEdit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selected) return;
+    setBusy(true);
     setFormError('');
-    setFormSuccess('');
-    if (!selectedUser) return;
-    if (newPassword.length < 6) { setFormError('A senha deve ter pelo menos 6 caracteres'); return; }
     try {
-      const token = localStorage.getItem('internal_token');
-      const response = await fetch(`${BACKEND_URL}/api/internal-auth/users/${selectedUser.id}/reset-password`, {
+      const res = await fetch(`${BACKEND_URL}/api/internal-auth/users/${selected.id}`, {
+        method: 'PUT',
+        headers: headers(true),
+        body: JSON.stringify({ name: form.name, email: form.email, role: form.role }),
+      });
+      if (!res.ok) throw new Error(await readError(res, 'Não foi possível salvar.'));
+      showToast.success('Dados atualizados.');
+      closeModal();
+      void fetchUsers();
+    } catch (err: any) {
+      setFormError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selected) return;
+    if (newPassword.length < 6) { setFormError('A senha precisa ter pelo menos 6 caracteres.'); return; }
+    setBusy(true);
+    setFormError('');
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/internal-auth/users/${selected.id}/reset-password`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: headers(true),
         body: JSON.stringify({ newPassword }),
       });
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Erro ao resetar senha');
-      }
-      setFormSuccess('Senha resetada com sucesso!');
-      setShowPasswordModal(false);
-      setSelectedUser(null);
-      setNewPassword('');
+      if (!res.ok) throw new Error(await readError(res, 'Não foi possível redefinir a senha.'));
+      showToast.success(`Senha de ${selected.name.split(' ')[0]} redefinida.`);
+      closeModal();
     } catch (err: any) {
-      setFormError(err.message || 'Erro ao resetar senha');
+      setFormError(err.message);
+    } finally {
+      setBusy(false);
     }
   };
 
-  const getRoleLabel = (role: string) => {
-    switch (role) {
-      case 'admin': return 'Administrador';
-      case 'it_staff': return 'Equipe de TI';
-      case 'admin_staff': return 'Assistente Administrativo';
-      case 'rh_staff': return 'Equipe de RH';
-      case 'manager': return 'Gestor';
-      default: return role;
+  const runConfirm = async () => {
+    if (!confirm) return;
+    const { kind, user } = confirm;
+    setConfirm(null);
+    try {
+      const res = kind === 'toggle'
+        ? await fetch(`${BACKEND_URL}/api/internal-auth/users/${user.id}/toggle-status`, { method: 'PATCH', headers: headers() })
+        : await fetch(`${BACKEND_URL}/api/internal-auth/users/${user.id}`, { method: 'DELETE', headers: headers() });
+      if (!res.ok) throw new Error(await readError(res, kind === 'toggle' ? 'Não foi possível alterar o acesso.' : 'Não foi possível excluir.'));
+      showToast.success(kind === 'toggle'
+        ? `${user.name.split(' ')[0]} ${user.is_active ? 'não consegue mais entrar' : 'pode entrar de novo'}.`
+        : `${user.name} saiu da equipe.`);
+      void fetchUsers();
+    } catch (err: any) {
+      showToast.error(err.message);
     }
   };
 
-  const currentUser = localStorage.getItem('internal_user');
-  const currentUserData = currentUser ? JSON.parse(currentUser) : null;
-  const isAdmin = currentUserData?.role === 'admin';
+  const active = users.filter((u) => u.is_active).length;
+  const countRole = (role: string) => users.filter((u) => u.role === role).length;
+  const allowedRoles = ROLES.filter((r) => isAdmin || !r.adminOnly);
 
-  const filteredUsers = users.filter((u) => {
-    const q = searchQuery.toLowerCase();
-    const matchSearch = !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
-    const matchRole = !filterRole || u.role === filterRole;
-    const matchStatus = !filterStatus || (filterStatus === 'active' ? u.is_active : !u.is_active);
-    return matchSearch && matchRole && matchStatus;
-  });
+  const filtered = users.filter((u) => {
+    const q = search.trim().toLowerCase();
+    return (!q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
+      && (!roleFilter || u.role === roleFilter)
+      && (statusFilter === 'all' || (statusFilter === 'active' ? u.is_active : !u.is_active));
+  }).sort((a, b) => Number(b.is_active) - Number(a.is_active) || a.name.localeCompare(b.name, 'pt-BR'));
 
-  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
-  const safePage = Math.min(currentPage, totalPages);
-  const pageStart = (safePage - 1) * PAGE_SIZE;
-  const pageEnd = Math.min(pageStart + PAGE_SIZE, filteredUsers.length);
-  const pagedUsers = filteredUsers.slice(pageStart, pageEnd);
-
-  const handleFilterChange = () => { setCurrentPage(1); };
+  const roleField = (
+    <fieldset className="ump-roles">
+      <legend>O que a pessoa faz</legend>
+      {allowedRoles.map((r) => (
+        <label key={r.value} className={`ump-role ump-role--${r.tone} ${form.role === r.value ? 'is-on' : ''}`}>
+          <input type="radio" name="ump-role" value={r.value} checked={form.role === r.value} onChange={() => setForm({ ...form, role: r.value })} />
+          <span>
+            <strong>{r.label}</strong>
+            <small>{r.desc}</small>
+          </span>
+        </label>
+      ))}
+    </fieldset>
+  );
 
   return (
-    <div className="ump-page">
-      <div className="ump-container">
-        {/* Header */}
-        <div className="ump-header">
-          <div className="ump-title">
-            <i className="ti ti-users" />
-            <span>Gerenciar Equipe {isAdmin ? 'Interna' : 'de TI'}</span>
+    <div className="tpg ump">
+      <header className="tpg-hero pub-aurora">
+        <div className="tpg-hero__top">
+          <div className="tpg-hero__title">
+            <span className="pub-gicon pub-gicon--rh" aria-hidden="true"><i className="ti ti-users" /></span>
+            <div>
+              <h1>Equipe</h1>
+              <p>Quem acessa a área interna e o que cada pessoa pode fazer.</p>
+            </div>
           </div>
-          <button className="ump-btn-new" onClick={() => setShowForm(!showForm)}>
-            <i className="ti ti-user-plus" />
-            {showForm ? 'Cancelar' : 'Novo Usuário'}
-          </button>
+          <div className="tpg-hero__actions">
+            <button type="button" className="tpg-btn tpg-btn--sun" onClick={openCreate}>
+              <i className="ti ti-user-plus" aria-hidden="true" />Novo acesso
+            </button>
+          </div>
         </div>
 
-        {error && <div className="ump-alert ump-alert-error">{error}</div>}
-        {formSuccess && <div className="ump-alert ump-alert-success">{formSuccess}</div>}
+        <ul className="tpg-stats" aria-label="Resumo">
+          <li className="tpg-stat"><strong>{active}</strong>com acesso</li>
+          {users.length - active > 0 && <li className="tpg-stat"><strong>{users.length - active}</strong>desativados</li>}
+          {ROLES.map((r) => countRole(r.value) > 0 && (
+            <li key={r.value} className="tpg-stat"><strong>{countRole(r.value)}</strong>{r.short}</li>
+          ))}
+        </ul>
 
-        {/* Create form */}
-        {showForm && (
-          <div className="ump-form-card">
-            <h2>Criar Novo Usuário</h2>
-            {formError && <div className="ump-alert ump-alert-error">{formError}</div>}
-            <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label>Nome Completo</label>
-                <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required placeholder="Nome do usuário" />
-              </div>
-              <div className="form-group">
-                <label>Email</label>
-                <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required placeholder="email@empresa.com" />
-              </div>
-              <div className="form-group">
-                <label>Senha</label>
-                <input type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} required minLength={6} placeholder="Mínimo 6 caracteres" />
-              </div>
-              <div className="form-group">
-                <label>Função</label>
-                <select value={formData.role} onChange={(e) => setFormData({ ...formData, role: e.target.value })} required>
-                  <option value="it_staff">Equipe de TI</option>
-                  <option value="admin_staff">Auxiliar Administrativo</option>
-                  <option value="rh_staff">Equipe de RH</option>
-                  {isAdmin && <option value="manager">Gestor</option>}
-                  {isAdmin && <option value="admin">Administrador</option>}
-                </select>
-                {!isAdmin && <small className="ump-form-hint">Você pode adicionar membros da equipe de TI ou Assistente Administrativo</small>}
-              </div>
-              <button type="submit" className="ump-btn-submit" disabled={creatingUser}>
-                {creatingUser ? 'Criando...' : 'Criar Usuário'}
-              </button>
-            </form>
-          </div>
-        )}
-
-        {/* Search & filters */}
-        <div className="ump-filters">
-          <div className="ump-search-wrap">
-            <i className="ti ti-search ump-search-icon" />
-            <input
-              className="ump-search-input"
-              type="text"
-              placeholder="Buscar por nome ou email..."
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); handleFilterChange(); }}
-            />
-          </div>
-          <select
-            className="ump-filter-select"
-            value={filterRole}
-            onChange={(e) => { setFilterRole(e.target.value); handleFilterChange(); }}
-          >
-            <option value="">Todas as funções</option>
-            <option value="admin">Administrador</option>
-            <option value="it_staff">Equipe de TI</option>
-            <option value="admin_staff">Assistente Administrativo</option>
-            <option value="rh_staff">Equipe de RH</option>
-            <option value="manager">Gestor</option>
-          </select>
-          <select
-            className="ump-filter-select"
-            value={filterStatus}
-            onChange={(e) => { setFilterStatus(e.target.value); handleFilterChange(); }}
-          >
-            <option value="">Todos os status</option>
-            <option value="active">Ativo</option>
-            <option value="inactive">Inativo</option>
-          </select>
+        <div className="tpg-hero__tools">
+          <label className="tpg-search">
+            <i className="ti ti-search" aria-hidden="true" />
+            <span className="pub-sr-only">Buscar pessoas</span>
+            <input type="search" placeholder="Buscar por nome ou e-mail" value={search} onChange={(e) => setSearch(e.target.value)} />
+            {search && (
+              <button type="button" className="tpg-search__clear" aria-label="Limpar busca" onClick={() => setSearch('')}><i className="ti ti-x" aria-hidden="true" /></button>
+            )}
+          </label>
         </div>
+      </header>
 
-        {/* Table */}
-        {loading ? (
-          <div className="ump-loading">Carregando usuários...</div>
-        ) : (
-          <div className="ump-table-card">
-            <table className="ump-table">
-              <thead>
-                <tr>
-                  <th>Nome</th>
-                  <th>Email</th>
-                  <th>Função</th>
-                  <th>Status</th>
-                  <th>Criado em</th>
-                  {isAdmin && <th>Ações</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {pagedUsers.length === 0 ? (
-                  <tr>
-                    <td colSpan={isAdmin ? 6 : 5} className="ump-empty">Nenhum usuário encontrado</td>
-                  </tr>
-                ) : pagedUsers.map((user) => (
-                  <tr key={user.id} className="ump-row">
-                    <td>
-                      <div className="ump-name-cell">
-                        <span
-                          className="ump-avatar"
-                          style={{ background: getAvatarColor(user.name) }}
-                        >
-                          {getInitials(user.name)}
-                        </span>
-                        <span className="ump-name-text">{user.name}</span>
-                      </div>
-                    </td>
-                    <td className="ump-email">{user.email}</td>
-                    <td className="ump-role-text">{getRoleLabel(user.role)}</td>
-                    <td>
-                      <span className={`ump-status-badge ${user.is_active ? 'ump-status-active' : 'ump-status-inactive'}`}>
-                        {user.is_active ? 'Ativo' : 'Inativo'}
-                      </span>
-                    </td>
-                    <td className="ump-date">{user.created_at ? new Date(user.created_at).toLocaleDateString('pt-BR') : '-'}</td>
-                    {isAdmin && (
-                      <td>
-                        <div className="ump-actions">
-                          <button
-                            className="ump-icon-btn"
-                            onClick={() => handleEditUser(user)}
-                            title="Editar usuário"
-                          >
-                            <i className="ti ti-pencil" />
-                          </button>
-                          <button
-                            className="ump-icon-btn"
-                            onClick={() => handleToggleStatus(user.id)}
-                            title={user.is_active ? 'Desativar usuário' : 'Ativar usuário'}
-                          >
-                            <i className={`ti ${user.is_active ? 'ti-lock' : 'ti-lock-open'}`} />
-                          </button>
-                          <button
-                            className="ump-icon-btn"
-                            onClick={() => handleResetPassword(user)}
-                            title="Redefinir senha"
-                          >
-                            <i className="ti ti-key" />
-                          </button>
-                          <div className="ump-actions-divider" />
-                          <button
-                            className="ump-icon-btn ump-icon-btn-danger"
-                            onClick={() => handleDeleteUser(user.id)}
-                            title="Excluir usuário"
-                          >
-                            <i className="ti ti-trash" />
-                          </button>
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {error && (
+        <div className="tpg-alert" role="alert">
+          <i className="ti ti-alert-circle" aria-hidden="true" /><span>{error}</span>
+          <button type="button" onClick={() => void fetchUsers()} aria-label="Tentar de novo"><i className="ti ti-refresh" aria-hidden="true" /></button>
+        </div>
+      )}
 
-            {/* Pagination */}
-            <div className="ump-pagination">
-              <span className="ump-pagination-info">
-                {filteredUsers.length === 0
-                  ? 'Nenhum resultado'
-                  : `Mostrando ${pageStart + 1} a ${pageEnd} de ${filteredUsers.length} usuário${filteredUsers.length !== 1 ? 's' : ''}`}
-              </span>
-              <div className="ump-pagination-controls">
-                <button
-                  className="ump-page-btn"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={safePage <= 1}
-                >
-                  <i className="ti ti-chevron-left" /> Anterior
-                </button>
-                <span className="ump-page-indicator">{safePage} / {totalPages}</span>
-                <button
-                  className="ump-page-btn"
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={safePage >= totalPages}
-                >
-                  Próximo <i className="ti ti-chevron-right" />
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Edit Modal */}
-        {showEditModal && selectedUser && (
-          <div className="ump-modal-overlay" onClick={() => setShowEditModal(false)}>
-            <div className="ump-modal" onClick={(e) => e.stopPropagation()}>
-              <div className="ump-modal-header">
-                <h2>Editar Usuário</h2>
-                <button className="ump-modal-close" onClick={() => setShowEditModal(false)}>
-                  <i className="ti ti-x" />
-                </button>
-              </div>
-              {formError && <div className="ump-alert ump-alert-error">{formError}</div>}
-              <form onSubmit={handleUpdateUser}>
-                <div className="form-group">
-                  <label>Nome Completo</label>
-                  <input type="text" value={editFormData.name} onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })} required />
-                </div>
-                <div className="form-group">
-                  <label>Email</label>
-                  <input type="email" value={editFormData.email} onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })} required />
-                </div>
-                <div className="form-group">
-                  <label>Função</label>
-                  <select value={editFormData.role} onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value })} required>
-                    <option value="it_staff">Equipe de TI</option>
-                    <option value="admin_staff">Assistente Administrativo</option>
-                    <option value="rh_staff">Equipe de RH</option>
-                    <option value="manager">Gestor</option>
-                    <option value="admin">Administrador</option>
-                  </select>
-                </div>
-                <div className="ump-modal-actions">
-                  <button type="button" className="ump-btn-cancel" onClick={() => setShowEditModal(false)}>Cancelar</button>
-                  <button type="submit" className="ump-btn-submit">Salvar Alterações</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Password Reset Modal */}
-        {showPasswordModal && selectedUser && (
-          <div className="ump-modal-overlay" onClick={() => setShowPasswordModal(false)}>
-            <div className="ump-modal" onClick={(e) => e.stopPropagation()}>
-              <div className="ump-modal-header">
-                <h2>Redefinir Senha</h2>
-                <button className="ump-modal-close" onClick={() => setShowPasswordModal(false)}>
-                  <i className="ti ti-x" />
-                </button>
-              </div>
-              <p className="ump-modal-subtitle">Redefinir senha para: <strong>{selectedUser.name}</strong></p>
-              {formError && <div className="ump-alert ump-alert-error">{formError}</div>}
-              <form onSubmit={handleSubmitPasswordReset}>
-                <div className="form-group">
-                  <label>Nova Senha</label>
-                  <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={6} placeholder="Mínimo 6 caracteres" />
-                  <small className="ump-form-hint">A senha deve ter pelo menos 6 caracteres</small>
-                </div>
-                <div className="ump-modal-actions">
-                  <button type="button" className="ump-btn-cancel" onClick={() => setShowPasswordModal(false)}>Cancelar</button>
-                  <button type="submit" className="ump-btn-submit">Redefinir Senha</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+      <div className="tpg-toolbar">
+        <div className="tpg-chips" style={{ marginTop: 0 }}>
+          <button type="button" className="tpg-chip" aria-pressed={!roleFilter} onClick={() => setRoleFilter('')}>Todos<span className="tpg-chip__count">{users.length}</span></button>
+          {ROLES.filter((r) => countRole(r.value) > 0).map((r) => (
+            <button key={r.value} type="button" className="tpg-chip" aria-pressed={roleFilter === r.value} onClick={() => setRoleFilter(roleFilter === r.value ? '' : r.value)}>
+              <span className={`ump-dot ump-dot--${r.tone}`} aria-hidden="true" />{r.short}
+              <span className="tpg-chip__count">{countRole(r.value)}</span>
+            </button>
+          ))}
+        </div>
+        <div className="tpg-seg" role="group" aria-label="Acesso">
+          <button type="button" aria-pressed={statusFilter === 'all'} onClick={() => setStatusFilter('all')}>Todos</button>
+          <button type="button" aria-pressed={statusFilter === 'active'} onClick={() => setStatusFilter('active')}>Com acesso</button>
+          <button type="button" aria-pressed={statusFilter === 'inactive'} onClick={() => setStatusFilter('inactive')}>Desativados</button>
+        </div>
       </div>
 
-      <ConfirmDialog
-        isOpen={toggleStatusConfirm.isOpen}
-        title="Alterar Status do Usuário"
-        message="Tem certeza que deseja alterar o status deste usuário? Isso afetará seu acesso ao sistema."
-        confirmText="Sim, alterar"
-        cancelText="Cancelar"
-        type="warning"
-        onConfirm={confirmToggleStatus}
-        onCancel={() => setToggleStatusConfirm({ isOpen: false, userId: null })}
-      />
+      <section className="tpg-card tpg-section">
+        <header className="tpg-section__head">
+          <h2>Pessoas</h2>
+          <span className="tpg-count">{filtered.length} de {users.length}</span>
+        </header>
+
+        {loading ? (
+          <div style={{ padding: '0 20px 20px', display: 'grid', gap: 10 }}>{[0, 1, 2].map((n) => <div key={n} className="tpg-skeleton" style={{ height: 58 }} />)}</div>
+        ) : filtered.length === 0 ? (
+          <div className="tpg-empty">
+            <span className="pub-gicon pub-gicon--neutral" aria-hidden="true"><i className="ti ti-user-search" /></span>
+            <h3>{users.length === 0 ? 'Ninguém cadastrado' : 'Ninguém com esses filtros'}</h3>
+            <p>{users.length === 0 ? 'Crie o primeiro acesso da equipe.' : 'Tente outro nome, perfil ou situação.'}</p>
+          </div>
+        ) : (
+          <ul className="tpg-rows">
+            {filtered.map((u) => {
+              const r = roleMeta(u.role);
+              const isMe = u.id === me?.id;
+              return (
+                <li key={u.id} className={`tpg-row ump-row ${u.is_active ? '' : 'is-off'}`}>
+                  <span className={`tpg-avatar ump-avatar--${r.tone}`} aria-hidden="true">{initialsOf(u.name)}</span>
+                  <span className="ump-row__who">
+                    <strong>{u.name}{isMe && <span className="ump-me">você</span>}</strong>
+                    <span>{u.email}</span>
+                  </span>
+                  <span className={`tpg-badge tpg-badge--${r.tone}`}>{r.label}</span>
+                  {isAdmin && !isMe ? (
+                    <button
+                      type="button"
+                      className={`ump-status ${u.is_active ? 'is-on' : ''}`}
+                      onClick={() => setConfirm({ kind: 'toggle', user: u })}
+                      title={u.is_active ? 'Desativar acesso' : 'Reativar acesso'}
+                    >
+                      {u.is_active ? 'Com acesso' : 'Desativado'}
+                    </button>
+                  ) : (
+                    <span className={`ump-status ${u.is_active ? 'is-on' : ''}`}>{u.is_active ? 'Com acesso' : 'Desativado'}</span>
+                  )}
+                  <span className="ump-row__date" title="Criado em">{u.created_at ? new Date(u.created_at).toLocaleDateString('pt-BR') : '—'}</span>
+                  <div className="ump-row__actions">
+                    {isAdmin && (
+                      <>
+                        <button type="button" className="tpg-icon-btn" onClick={() => openEdit(u)} title="Editar" aria-label={`Editar ${u.name}`}><i className="ti ti-pencil" aria-hidden="true" /></button>
+                        <button type="button" className="tpg-icon-btn" onClick={() => openPassword(u)} title="Redefinir senha" aria-label={`Redefinir senha de ${u.name}`}><i className="ti ti-key" aria-hidden="true" /></button>
+                        {!isMe && (
+                          <button type="button" className="tpg-icon-btn tpg-icon-btn--danger" onClick={() => setConfirm({ kind: 'delete', user: u })} title="Excluir" aria-label={`Excluir ${u.name}`}><i className="ti ti-trash" aria-hidden="true" /></button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      {modal && (
+        <div className="tpg-modal" onMouseDown={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
+          <div className="tpg-modal__box" role="dialog" aria-modal="true" aria-labelledby="ump-modal-title">
+            <header className="tpg-modal__head">
+              <div>
+                <h2 id="ump-modal-title">
+                  {modal === 'create' ? 'Novo acesso' : modal === 'edit' ? `Editar ${selected?.name.split(' ')[0]}` : 'Redefinir senha'}
+                </h2>
+                <p>
+                  {modal === 'create' ? 'A pessoa entra em /admin/login com este e-mail e senha.'
+                    : modal === 'edit' ? 'Mudar o perfil muda o que a pessoa vê ao entrar.'
+                      : `Nova senha para ${selected?.name}. Avise a pessoa por um canal seguro.`}
+                </p>
+              </div>
+              <button type="button" className="tpg-icon-btn" onClick={closeModal} aria-label="Fechar"><i className="ti ti-x" aria-hidden="true" /></button>
+            </header>
+
+            {formError && <div className="tpg-alert" role="alert" style={{ marginTop: 0, marginBottom: 14 }}><i className="ti ti-alert-circle" aria-hidden="true" /><span>{formError}</span></div>}
+
+            {modal === 'password' ? (
+              <form className="tpg-form" onSubmit={(e) => void submitPassword(e)}>
+                <label className="tpg-field">
+                  <span>Nova senha</span>
+                  <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} minLength={6} required autoFocus autoComplete="new-password" />
+                  <small>Pelo menos 6 caracteres.</small>
+                </label>
+                <div className="tpg-form__actions">
+                  <button type="button" className="tpg-btn" onClick={closeModal}>Cancelar</button>
+                  <button type="submit" className="tpg-btn tpg-btn--primary" disabled={busy}>{busy ? 'Salvando…' : 'Redefinir senha'}</button>
+                </div>
+              </form>
+            ) : (
+              <form className="tpg-form" onSubmit={(e) => void (modal === 'create' ? submitCreate(e) : submitEdit(e))}>
+                <div className="tpg-form__row">
+                  <label className="tpg-field">
+                    <span>Nome completo</span>
+                    <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required autoFocus />
+                  </label>
+                  <label className="tpg-field">
+                    <span>E-mail</span>
+                    <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required autoComplete="off" />
+                  </label>
+                </div>
+                {modal === 'create' && (
+                  <label className="tpg-field">
+                    <span>Senha inicial</span>
+                    <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} minLength={6} required autoComplete="new-password" />
+                    <small>Pelo menos 6 caracteres.</small>
+                  </label>
+                )}
+                {roleField}
+                <div className="tpg-form__actions">
+                  <button type="button" className="tpg-btn" onClick={closeModal}>Cancelar</button>
+                  <button type="submit" className="tpg-btn tpg-btn--primary" disabled={busy}>
+                    {busy ? 'Salvando…' : modal === 'create' ? 'Criar acesso' : 'Salvar'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
 
       <ConfirmDialog
-        isOpen={deleteUserConfirm.isOpen}
-        title="Excluir Usuário"
-        message="Esta ação é permanente e não poderá ser desfeita. Deseja realmente excluir este usuário?"
-        confirmText="Sim, excluir"
+        isOpen={confirm !== null}
+        title={confirm?.kind === 'delete' ? `Excluir ${confirm.user.name}?` : confirm?.user.is_active ? `Desativar o acesso de ${confirm?.user.name}?` : `Reativar o acesso de ${confirm?.user.name}?`}
+        message={confirm?.kind === 'delete'
+          ? 'A pessoa sai da equipe de vez. Para só bloquear a entrada, use Desativar.'
+          : confirm?.user.is_active
+            ? 'A pessoa não consegue mais entrar, mas o histórico dela continua. Dá para reativar depois.'
+            : 'A pessoa volta a conseguir entrar com a senha atual.'}
+        confirmText={confirm?.kind === 'delete' ? 'Excluir' : confirm?.user.is_active ? 'Desativar' : 'Reativar'}
         cancelText="Cancelar"
-        type="danger"
-        onConfirm={confirmDeleteUser}
-        onCancel={() => setDeleteUserConfirm({ isOpen: false, userId: null })}
+        type={confirm?.kind === 'delete' ? 'danger' : 'warning'}
+        onConfirm={() => void runConfirm()}
+        onCancel={() => setConfirm(null)}
       />
     </div>
   );

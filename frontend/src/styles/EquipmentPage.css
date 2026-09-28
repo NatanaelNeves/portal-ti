@@ -61,11 +61,11 @@
 .eq-btn-outline:hover:not(:disabled) { border-color: #CBD5E1; background: #F8FAFC; }
 
 .eq-btn-primary {
-  background: #4338CA;
+  background: #0f7a4a;
   color: white;
 }
 
-.eq-btn-primary:hover { background: #3730A3; }
+.eq-btn-primary:hover { background: #075039; }
 
 /* â”€â”€ Alert â”€â”€ */
 .eq-alert-error {
@@ -152,7 +152,7 @@
   font-family: 'DM Sans', sans-serif;
 }
 
-.eq-filter-group select:focus { outline: none; border-color: #4338CA; }
+.eq-filter-group select:focus { outline: none; border-color: #0f7a4a; }
 
 /* â”€â”€ Table â”€â”€ */
 .eq-table-wrap {
@@ -217,8 +217,8 @@
 .eq-type-badge {
   display: inline-block;
   padding: 3px 10px;
-  background: #EEF2FF;
-  color: #4338CA;
+  background: #e7f4ec;
+  color: #0f7a4a;
   border-radius: 6px;
   font-size: 0.78rem;
   font-weight: 600;

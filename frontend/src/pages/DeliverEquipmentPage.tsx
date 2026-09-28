@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api, { BACKEND_URL } from '../services/api';
+import InventoryLayout from '../components/InventoryLayout';
 import '../styles/DeliverEquipmentPage.css';
 import { INSTITUTION_UNITS } from '../utils/institutionOptions';
 
@@ -212,6 +213,7 @@ const DeliverEquipmentPage: React.FC = () => {
   const selectedEquipment = availableEquipment.find(eq => eq.id === formData.equipmentId);
 
   return (
+    <InventoryLayout>
     <div className="deliver-equipment-page">
       <div className="page-header">
         <div>
@@ -441,6 +443,7 @@ const DeliverEquipmentPage: React.FC = () => {
         </div>
       </form>
     </div>
+    </InventoryLayout>
   );
 };
 

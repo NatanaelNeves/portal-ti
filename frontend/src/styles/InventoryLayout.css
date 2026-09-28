@@ -1,164 +1,159 @@
-﻿
-.inventory-layout {
-  display: flex;
-  gap: 0;
-  min-height: 100vh;
-  background: var(--ti-canvas, #F8FAFC);
-  font-family: 'DM Sans', sans-serif;
+/* Moldura do inventário: abas horizontais + ações — tokens em TiShell.css */
+
+.inventory-layout.invx {
+  display: block;
+  min-height: calc(100vh - var(--ti-topbar, 0px));
+  background: var(--ti-canvas, #f3f5f3);
+  font-family: var(--pub-body, 'DM Sans', sans-serif);
 }
 
-/* â”€â”€ Sidebar â”€â”€ */
-.inventory-sidebar {
-  width: 248px;
-  background: #FFFFFF;
-  border-right: 1px solid #E2E8F0;
+.invx-bar {
   position: sticky;
   top: var(--ti-topbar, 0px);
-  height: calc(100vh - var(--ti-topbar, 0px));
-  overflow-y: auto;
-  padding: 0;
-  flex-shrink: 0;
-}
-
-.sidebar-header {
-  padding: 20px 20px 16px;
-  border-bottom: 1px solid #E2E8F0;
+  z-index: 60;
   display: flex;
   align-items: center;
-  gap: 10px;
-  color: var(--pub-leaf, #0f7a4a);
+  gap: 12px;
+  padding: 10px 28px;
+  background: rgba(255, 255, 255, 0.94);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--ti-line, #dfe6e1);
 }
 
-.sidebar-header h2 {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--ti-ink, #0F172A);
-  font-family: var(--pub-display, inherit);
-  letter-spacing: -0.01em;
+.invx-bar button:hover {
+  transform: none;
+  box-shadow: none;
 }
 
-/* â”€â”€ Nav â”€â”€ */
-.inventory-nav {
+.invx-bar :focus-visible {
+  outline: 3px solid var(--pub-sun, #f6c350);
+  outline-offset: 2px;
+}
+
+.invx-tabs {
   display: flex;
-  flex-direction: column;
-  padding: 8px 0;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
-.nav-section {
-  margin: 4px 0;
+.invx-tabs::-webkit-scrollbar {
+  display: none;
 }
 
-.nav-section-title {
-  padding: 10px 20px 4px;
-  color: #94A3B8;
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.nav-section .nav-item {
-  padding-left: 28px;
-}
-
-.nav-section .nav-item.active {
-  padding-left: 25px;
-}
-
-.nav-item {
-  display: flex;
+.invx-tab {
+  min-height: 38px;
+  display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
-  gap: 10px;
-  padding: 9px 20px;
+  gap: 7px;
+  padding: 0 14px;
+  color: var(--ti-muted, #5d6f67);
   background: transparent;
-  border: none;
-  border-left: 3px solid transparent;
-  color: #475569;
-  cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 500;
-  transition: background 0.15s, color 0.15s;
-  text-align: left;
-  width: 100%;
-  font-family: 'DM Sans', sans-serif;
+  border: 0;
+  border-radius: 999px;
+  font: 700 0.88rem/1 var(--pub-body, inherit);
+  white-space: nowrap;
+  transition: background-color 0.12s ease, color 0.12s ease;
 }
 
-.nav-item:hover {
-  background: #f3f7f4;
-  color: var(--ti-ink, #0F172A);
+.invx-tab i {
+  font-size: 1.1rem;
 }
 
-.nav-item.active {
-  background: #eef6f1;
-  color: var(--pub-evergreen, #063c2d);
-  border-left-color: var(--pub-sun, #f6c350);
-  font-weight: 700;
+.invx-tab:hover {
+  color: var(--ti-ink, #13241d);
+  background: #eef3ef;
 }
 
-.nav-item.active .icon {
-  color: var(--pub-leaf, #0f7a4a);
+.invx-tab[aria-current='page'] {
+  color: #fff;
+  background: var(--pub-evergreen, #063c2d);
+  box-shadow: 0 8px 18px -10px rgba(6, 60, 45, 0.8);
 }
 
-.nav-item .icon {
+.invx-tab[aria-current='page'] i {
+  color: var(--pub-sun, #f6c350);
+}
+
+.invx-actions {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  flex-shrink: 0;
-  color: inherit;
+  flex: 0 0 auto;
+  gap: 6px;
+  margin-left: auto;
 }
 
-/* â”€â”€ Main â”€â”€ */
+.invx-action {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  color: var(--ti-ink, #13241d);
+  background: #fff;
+  border: 1px solid var(--ti-line, #dfe6e1);
+  border-radius: 999px;
+  font: 700 0.85rem/1 var(--pub-body, inherit);
+  white-space: nowrap;
+}
+
+.invx-action i {
+  color: var(--pub-leaf, #0f7a4a);
+  font-size: 1.05rem;
+}
+
+.invx-action:hover {
+  border-color: #b9c8bd;
+}
+
+.invx-action--primary {
+  color: #fff;
+  background: linear-gradient(180deg, #169a5d, var(--pub-leaf, #0f7a4a));
+  border-color: transparent;
+}
+
+.invx-action--primary i {
+  color: #fff;
+}
+
+.invx-action--primary:hover {
+  border-color: transparent;
+}
+
 .inventory-main {
-  flex: 1;
-  overflow-y: auto;
   min-width: 0;
 }
 
-/* â”€â”€ Responsive â”€â”€ */
-@media (max-width: 768px) {
-  .inventory-layout {
-    flex-direction: column;
+@media (max-width: 1440px) {
+  .invx-action span {
+    display: none;
   }
 
-  .inventory-sidebar {
-    width: 100%;
-    height: auto;
-    position: relative;
-    border-right: none;
-    border-bottom: 1px solid #E2E8F0;
+  .invx-action {
+    width: 38px;
+    justify-content: center;
+    padding: 0;
   }
+}
 
-  .inventory-nav {
-    flex-direction: row;
+@media (max-width: 899px) {
+  .invx-bar {
+    gap: 8px;
     padding: 8px 12px;
-    overflow-x: auto;
-    gap: 4px;
   }
 
-  .nav-section {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 4px;
+  .invx-tabs {
+    flex: 1;
   }
 
-  .nav-section-title { display: none; }
-
-  .nav-item {
-    flex-shrink: 0;
-    padding: 8px 14px;
-    border-left: none;
-    border-bottom: 2px solid transparent;
-    border-radius: 6px;
-    white-space: nowrap;
+  .invx-tab {
+    padding: 0 10px;
   }
 
-  .nav-item.active {
-    border-left: none;
-    border-bottom-color: #4338CA;
-    border-radius: 6px;
+  .invx-action {
+    width: 34px;
+    min-height: 34px;
   }
-
-  .nav-section .nav-item,
-  .nav-section .nav-item.active { padding-left: 14px; }
 }

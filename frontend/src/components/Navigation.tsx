@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import ChatWidget from './ChatWidget';
+import AdmShell from './AdmShell';
 import RhShell from './RhShell';
 import TiShell from './TiShell';
 
@@ -134,6 +135,11 @@ export default function Navigation() {
   // O RH tem moldura própria: abas sempre à vista e "Sair" no topo.
   if (userRole === 'rh_staff') {
     return <RhShell userName={userData?.name || 'Equipe de RH'} onLogout={handleLogout} />;
+  }
+
+  // O Administrativo tem só três áreas: moldura própria, sem barra lateral.
+  if (userRole === 'admin_staff') {
+    return <AdmShell userName={userData?.name || 'Administrativo'} onLogout={handleLogout} />;
   }
 
   return <TiShell userName={userData?.name || 'Equipe'} role={userRole} onLogout={handleLogout} />;

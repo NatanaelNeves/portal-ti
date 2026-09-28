@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api, { BACKEND_URL } from '../services/api';
+import InventoryLayout from '../components/InventoryLayout';
 import '../styles/ReturnEquipmentPage.css';
 
 interface Equipment {
@@ -217,6 +218,7 @@ const ReturnEquipmentPage: React.FC = () => {
   const allChecksPassed = Object.values(formData.checklist).every(v => v);
 
   return (
+    <InventoryLayout>
     <div className="return-equipment-page">
       <div className="page-header">
         <h1><i className="ti ti-arrow-back-up" /> Devolver Equipamento</h1>
@@ -536,6 +538,7 @@ const ReturnEquipmentPage: React.FC = () => {
         )}
       </form>
     </div>
+    </InventoryLayout>
   );
 };
 

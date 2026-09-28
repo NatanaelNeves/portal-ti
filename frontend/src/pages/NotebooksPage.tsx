@@ -45,6 +45,7 @@ const BRAND_COLORS = [
 const CONDITION_LABELS: Record<string, string> = {
   new:            'Novo',
   Novo:           'Novo',
+  excellent:      'Ótimo',
   good:           'Bom',
   Bom:            'Bom',
   regular:        'Regular',
@@ -195,7 +196,7 @@ function ModelGroup({ groupKey, notebooks, colorIdx, search, statusFilter, onNav
                           </div>
                         </div>
                       ) : (
-                        <span className="nb-empty">—</span>
+                        <span className="nb-dash">—</span>
                       )}
                     </td>
                     <td className="nb-unit">{nb.current_unit || '—'}</td>

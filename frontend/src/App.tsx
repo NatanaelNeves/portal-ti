@@ -2,6 +2,7 @@ import './styles/App.css';
 import './styles/PublicShell.css';
 import './styles/RhShell.css';
 import './styles/TiShell.css';
+import './styles/TiPages.css';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useAuthStore } from './stores/authStore';
@@ -28,6 +29,7 @@ import KnowledgeManagementPage from './pages/KnowledgeManagementPage';
 import UsersManagementPage from './pages/UsersManagementPage';
 import ReportsPage from './pages/ReportsPage';
 import AuxAdminReportsPage from './pages/AuxAdminReportsPage';
+import AdmTicketsPage from './pages/AdmTicketsPage';
 
 // Inventory Module Pages
 import InventoryDashboardPage from './pages/InventoryDashboardPage';
@@ -69,6 +71,7 @@ import './styles/AdminSectorScreens.css';
 import './styles/AdminTicketsRefinement.css';
 import './styles/TicketsWorkspace.css';
 import './styles/TicketsSkin.css';
+import './styles/InventorySkin.css';
 
 /**
  * Escolhe o relatorio conforme o perfil. A protecao real esta no backend
@@ -80,6 +83,14 @@ function ReportsRouter() {
   let role = '';
   try { role = stored ? JSON.parse(stored).role || '' : ''; } catch { role = ''; }
   return role === 'admin_staff' ? <AuxAdminReportsPage /> : <ReportsPage />;
+}
+
+/** Pedidos: o Administrativo tem sua própria tela; TI e admin seguem na fila completa. */
+function TicketsRouter() {
+  const stored = localStorage.getItem('internal_user');
+  let role = '';
+  try { role = stored ? JSON.parse(stored).role || '' : ''; } catch { role = ''; }
+  return role === 'admin_staff' ? <AdmTicketsPage /> : <AdminTicketsPage />;
 }
 
 function App() {
@@ -124,7 +135,7 @@ function App() {
             {/* IT Staff Routes */}
             <Route path="/admin/dashboard" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff']}><AdminDashboardPage /></InternalProtectedRoute>} />
             <Route path="/admin/auxiliar/dashboard" element={<InternalProtectedRoute allowedRoles={['admin_staff']}><AdminStaffDashboardPage /></InternalProtectedRoute>} />
-            <Route path="/admin/chamados" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff', 'admin_staff']}><AdminTicketsPage /></InternalProtectedRoute>} />
+            <Route path="/admin/chamados" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff', 'admin_staff']}><TicketsRouter /></InternalProtectedRoute>} />
             <Route path="/admin/chamados/:id" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff', 'admin_staff']}><AdminTicketDetailPage /></InternalProtectedRoute>} />
             <Route path="/admin/conhecimento" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff']}><KnowledgeManagementPage /></InternalProtectedRoute>} />
             <Route path="/admin/usuarios" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff']}><UsersManagementPage /></InternalProtectedRoute>} />

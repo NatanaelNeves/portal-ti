@@ -1,0 +1,464 @@
+/* ════════════════════════════════════════════════════════════════
+   PELE DAS TELAS DE INVENTÁRIO
+   As 13 telas internas do inventário nasceram em épocas diferentes,
+   cada uma com seu vocabulário de classes. Em vez de reescrever a
+   lógica de todas, esta camada (carregada por último, escopo
+   .invx .inventory-main) alinha o que se vê: títulos, números,
+   botões, filtros e tabelas no mesmo idioma do kit tpg-.
+   ════════════════════════════════════════════════════════════════ */
+
+.invx .inventory-main > :not(.tpg) {
+  width: 100%;
+  max-width: 1280px;
+  margin-inline: auto;
+  padding: 24px 28px 48px;
+  color: var(--ti-ink);
+  font-family: var(--pub-body);
+  background: transparent;
+}
+
+/* ── Títulos ──────────────────────────────────────────────────── */
+.invx .inventory-main :is(.page-header, .eq-page-header, .nb-header, .per-header, .page-header-inventory) {
+  min-height: 0;
+  margin: 0 0 18px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.invx .inventory-main :is(.page-header, .eq-page-header, .nb-header, .per-header, .page-header-inventory)::before,
+.invx .inventory-main :is(.page-header, .eq-page-header, .nb-header, .per-header, .page-header-inventory)::after {
+  display: none;
+}
+
+.invx .inventory-main :is(.page-header h1, .eq-title, .nb-title, .per-title, .page-header-inventory h1, .move-header h1) {
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  color: var(--pub-evergreen);
+  font: 800 clamp(1.5rem, 2.4vw, 1.95rem)/1.1 var(--pub-display);
+  letter-spacing: -0.035em;
+  text-shadow: none;
+  -webkit-text-fill-color: currentColor;
+  background: none;
+}
+
+.invx .inventory-main :is(.page-header p, .eq-subtitle, .nb-subtitle, .per-subtitle, .page-header-inventory p) {
+  margin: 4px 0 0;
+  color: var(--ti-muted);
+  font-size: 0.92rem;
+  font-weight: 500;
+  text-align: left;
+}
+
+/* ── Números ──────────────────────────────────────────────────── */
+.invx .inventory-main :is(.stats-grid, .eq-stats-grid, .nb-stats, .per-stats-grid) {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 0 0 14px;
+}
+
+.invx .inventory-main :is(.stat-card, .eq-stat, .nb-stats > *, .per-stat) {
+  position: relative;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 14px 16px;
+  text-align: left;
+  background: #fff;
+  border: 1px solid var(--ti-line);
+  border-radius: 16px;
+  box-shadow: 0 14px 30px -28px rgba(6, 60, 45, 0.7);
+}
+
+.invx .inventory-main :is(.stat-card, .eq-stat, .nb-stats > *, .per-stat)::before {
+  display: none;
+}
+
+.invx .inventory-main :is(.stat-value, .eq-stat-value, .nb-stat-value, .per-stat-value) {
+  color: var(--pub-evergreen);
+  font: 800 1.6rem/1 var(--pub-display);
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.invx .inventory-main :is(.stat-label, .eq-stat-label, .nb-stat-label, .per-stat-label) {
+  color: var(--ti-muted);
+  font-size: 0.84rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.invx .inventory-main .stat-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 4px;
+  color: var(--pub-leaf);
+  background: var(--pub-leaf-wash, #e7f4ec);
+  border-radius: 10px;
+  font-size: 1.1rem;
+}
+
+/* Um fio de cor diz o estado sem pintar o cartão todo */
+.invx .inventory-main :is(.stat-pending, .eq-stat-maint, .stat-maintenance) .stat-value,
+.invx .inventory-main .eq-stat-maint .eq-stat-value { color: #b7791f; }
+.invx .inventory-main .stat-rejected .stat-value { color: var(--ti-late); }
+.invx .inventory-main :is(.stat-approved, .stat-in-use, .eq-stat-inuse) :is(.stat-value, .eq-stat-value) { color: #2d73d2; }
+.invx .inventory-main :is(.stat-received, .stat-completed, .eq-stat-available) :is(.stat-value, .eq-stat-value) { color: var(--pub-leaf); }
+
+/* ── Filtros ──────────────────────────────────────────────────── */
+.invx .inventory-main :is(.filters-bar, .eq-filters, .per-filters, .nb-toolbar) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  background: #fff;
+  border: 1px solid var(--ti-line);
+  border-radius: 16px;
+  box-shadow: none;
+}
+
+.invx .inventory-main :is(.filter-group, .eq-filter-group, .per-filter-group) {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.invx .inventory-main :is(.filter-group, .eq-filter-group, .per-filter-group) label {
+  margin: 0;
+  color: var(--ti-muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.invx .inventory-main :is(.filters-bar, .eq-filters, .per-filters, .nb-toolbar) :is(select, input) {
+  min-height: 36px;
+  padding: 0 12px;
+  color: var(--ti-ink);
+  background-color: var(--ti-canvas);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font: 600 0.86rem var(--pub-body);
+}
+
+/* ── Tabelas ──────────────────────────────────────────────────── */
+.invx .inventory-main :is(.purchases-table, .responsibilities-table, .eq-table-wrap, .per-table-wrap, .nb-group, .notebooks-table-container) {
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid var(--ti-line);
+  border-radius: 18px;
+  box-shadow: 0 18px 40px -36px rgba(6, 60, 45, 0.7);
+}
+
+.invx .inventory-main :is(.purchases-table, .responsibilities-table, .eq-table-wrap, .per-table-wrap, .notebooks-table-container) {
+  overflow-x: auto;
+}
+
+.invx .inventory-main table th {
+  padding: 11px 14px;
+  color: var(--ti-muted);
+  background: #f7faf8;
+  border-bottom: 1px solid var(--ti-line);
+  font: 700 0.78rem/1.2 var(--pub-body);
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.invx .inventory-main table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--ti-line-soft);
+  font-size: 0.88rem;
+  vertical-align: middle;
+}
+
+.invx .inventory-main table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.invx .inventory-main table tbody tr:hover td {
+  background: #f7fbf8;
+}
+
+.invx .inventory-main :is(.person-avatar) {
+  color: #fff;
+  background: linear-gradient(155deg, #25c178, #0b7a47);
+}
+
+.invx .inventory-main :is(.department-badge, .quantity-badge) {
+  display: inline-block;
+  padding: 3px 10px;
+  color: var(--pub-evergreen);
+  background: #eef3ef;
+  border: 0;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.invx .inventory-main .status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-width: 0;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: none;
+}
+
+/* ── Botões ───────────────────────────────────────────────────── */
+.invx .inventory-main :is(.btn, .eq-btn, .nb-btn) {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 16px;
+  color: var(--ti-ink);
+  background: #fff;
+  border: 1px solid var(--ti-line);
+  border-radius: 999px;
+  font: 700 0.86rem/1 var(--pub-body);
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow: none;
+  transform: none;
+  transition: border-color 0.12s ease, background-color 0.12s ease, color 0.12s ease;
+}
+
+.invx .inventory-main :is(.btn, .eq-btn, .nb-btn):hover:not(:disabled) {
+  border-color: #b9c8bd;
+  transform: none;
+  box-shadow: none;
+}
+
+.invx .inventory-main :is(.btn, .eq-btn, .nb-btn) :is(i, .btn-icon) {
+  font-size: 1.05rem;
+}
+
+.invx .inventory-main :is(.btn-primary, .btn-deliver, .btn-success, .btn-submit, .eq-btn-primary, .nb-btn-primary) {
+  color: #fff;
+  background: linear-gradient(180deg, #169a5d, var(--pub-leaf));
+  border-color: transparent;
+}
+
+.invx .inventory-main :is(.btn-primary, .btn-deliver, .btn-success, .btn-submit, .eq-btn-primary, .nb-btn-primary):hover:not(:disabled) {
+  color: #fff;
+  background: linear-gradient(180deg, #13a061, #0c6e42);
+  border-color: transparent;
+}
+
+.invx .inventory-main :is(.btn-danger, .btn-return, .btn-reject) {
+  color: var(--ti-late);
+  background: #fdf0ee;
+  border-color: transparent;
+}
+
+.invx .inventory-main :is(.btn-danger, .btn-return, .btn-reject):hover:not(:disabled) {
+  color: #fff;
+  background: var(--ti-late);
+  border-color: transparent;
+}
+
+.invx .inventory-main :is(.btn-view, .btn-move, .btn-outline, .btn-secondary, .eq-btn-outline) {
+  color: var(--ti-ink);
+  background: #fff;
+}
+
+.invx .inventory-main :is(.btn-view, .btn-move) i {
+  color: var(--pub-leaf);
+}
+
+.invx .inventory-main :is(.btn-sm, .btn-small) {
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 0.8rem;
+}
+
+.invx .inventory-main .btn-group .btn.btn-square {
+  flex: 0 0 34px;
+  width: 34px;
+  min-width: 0;
+  min-height: 34px;
+  padding: 0;
+}
+
+.invx .inventory-main .responsibilities-table td:not(:nth-child(3)) {
+  white-space: nowrap;
+}
+
+.invx .inventory-main :is(.department-badge, .person-info, .eq-code, td code) {
+  white-space: nowrap;
+}
+
+.invx .inventory-main .eq-type-badge {
+  color: var(--ti-muted);
+  background: var(--ti-canvas);
+  border: 0;
+}
+
+.invx .inventory-main .btn-group {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+
+.invx .inventory-main .btn-group .btn {
+  flex: 0 0 auto;
+  width: auto;
+}
+
+.invx .inventory-main :is(.header-actions, .eq-header-actions) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Ações dentro de tabelas: menores, para as colunas respirarem */
+.invx .inventory-main table :is(.nb-btn, .btn) {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 0.78rem;
+}
+
+/* ── Fluxos (entregar, devolver, cadastrar, mover) ────────────── */
+.invx .inventory-main :is(.btn-back, .btn-secondary, .btn-cancel) {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  color: var(--ti-ink);
+  background: #fff;
+  border: 1px solid var(--ti-line);
+  border-radius: 999px;
+  font: 700 0.86rem/1 var(--pub-body);
+  box-shadow: none;
+}
+
+.invx .inventory-main :is(.btn-back, .btn-secondary, .btn-cancel):hover:not(:disabled) {
+  color: var(--ti-ink);
+  background: #fff;
+  border-color: #b9c8bd;
+}
+
+.invx .inventory-main :is(.form-actions) .btn-primary,
+.invx .inventory-main :is(.form-actions) button[type='submit'] {
+  min-height: 42px;
+  padding: 0 20px;
+  color: #fff;
+  background: linear-gradient(180deg, #169a5d, var(--pub-leaf));
+  border: 0;
+  border-radius: 999px;
+  font: 700 0.9rem/1 var(--pub-body);
+}
+
+.invx .inventory-main .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Fluxos de formulário têm coluna única de 860px: o título acompanha */
+.invx .inventory-main > :is(.deliver-equipment-page, .return-equipment-page) {
+  max-width: 916px;
+}
+
+.invx .inventory-main .form-row {
+  margin-bottom: 0;
+}
+
+.invx .inventory-main .form-row > .form-group {
+  margin-bottom: 0;
+}
+
+.invx .inventory-main :is(.form-section, .move-section, .form-container) {
+  background: #fff;
+  border: 1px solid var(--ti-line);
+  border-radius: 18px;
+  box-shadow: 0 18px 40px -36px rgba(6, 60, 45, 0.7);
+}
+
+.invx .inventory-main :is(.form-group, .form-group-move) :is(input, select, textarea) {
+  min-height: 42px;
+  color: var(--ti-ink);
+  background: #fbfcfb;
+  border: 1px solid #d5dfd8;
+  border-radius: 12px;
+  font: 500 0.92rem var(--pub-body);
+}
+
+.invx .inventory-main :is(.form-group, .form-group-move) textarea {
+  min-height: 96px;
+  padding: 10px 12px;
+}
+
+.invx .inventory-main :is(.form-group, .form-group-move) :is(input, select, textarea):focus {
+  border-color: var(--pub-leaf);
+  outline: 3px solid rgba(15, 122, 74, 0.15);
+  outline-offset: 0;
+}
+
+.invx .inventory-main :is(.form-group, .form-group-move) label {
+  color: var(--ti-ink);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+/* ── Estados ──────────────────────────────────────────────────── */
+.invx .inventory-main :is(.empty-state, .eq-empty-state) {
+  padding: 44px 20px;
+  color: var(--ti-muted);
+  text-align: center;
+  background: #fff;
+  border: 1px dashed #c9d6cd;
+  border-radius: 18px;
+}
+
+.invx .inventory-main .empty-icon {
+  font-size: 2rem;
+  color: var(--pub-leaf);
+}
+
+.invx .inventory-main :is(.alert-error, .eq-alert-error, .error-message) {
+  padding: 12px 14px;
+  color: var(--pub-danger, #b42318);
+  background: var(--pub-danger-wash, #fdecea);
+  border: 0;
+  border-radius: 12px;
+}
+
+.invx .inventory-main :focus-visible {
+  outline: 3px solid var(--pub-sun);
+  outline-offset: 2px;
+}
+
+@media (max-width: 720px) {
+  .invx .inventory-main > :not(.tpg) {
+    padding: 16px 14px 40px;
+  }
+
+  .invx .inventory-main :is(.page-header, .eq-page-header, .nb-header, .per-header) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .invx .inventory-main :is(.stats-grid, .eq-stats-grid, .nb-stats, .per-stats-grid) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import MetricCard from '../components/tickets/MetricCard';
-import MetricSkeleton from '../components/tickets/MetricSkeleton';
-import EmptyState from '../components/tickets/EmptyState';
-import type { MetricSpec } from '../components/tickets/sectorProfiles';
-import '../styles/TicketsExperience.css';
+import CountUp from '../components/adm/CountUp';
+import { ADM_KINDS, ADM_URGENT, admKind } from '../components/adm/admKinds';
+import { useSlidingPill } from '../components/adm/useSlidingPill';
 import '../styles/AuxAdminReportsPage.css';
 
 interface AuxAdminReport {
@@ -46,12 +45,12 @@ interface AuxAdminReport {
 
 type PresetKey = '7d' | '30d' | 'month' | 'prev' | 'custom';
 
-const PRESETS: Array<{ key: PresetKey; label: string }> = [
-  { key: '7d', label: 'Últimos 7 dias' },
-  { key: '30d', label: 'Últimos 30 dias' },
-  { key: 'month', label: 'Este mês' },
-  { key: 'prev', label: 'Mês anterior' },
-  { key: 'custom', label: 'Personalizado' },
+const PRESETS: Array<{ key: PresetKey; label: string; phrase: string }> = [
+  { key: '7d', label: '7 dias', phrase: 'Nos últimos 7 dias' },
+  { key: '30d', label: '30 dias', phrase: 'Nos últimos 30 dias' },
+  { key: 'month', label: 'Este mês', phrase: 'Neste mês' },
+  { key: 'prev', label: 'Mês passado', phrase: 'No mês passado' },
+  { key: 'custom', label: 'Escolher datas', phrase: 'No período escolhido' },
 ];
 
 const iso = (date: Date) => date.toISOString().slice(0, 10);
@@ -80,10 +79,11 @@ function presetRange(preset: PresetKey): { from: string; to: string } | null {
 }
 
 const formatDuration = (minutes: number): string => {
-  if (minutes < 60) return `${minutes}min`;
+  if (minutes < 60) return `${minutes} min`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return hours % 60 ? `${hours}h ${minutes % 60}min` : `${hours}h`;
-  return `${Math.floor(hours / 24)}d ${hours % 24}h`;
+  if (hours < 24) return `${hours} h`;
+  const days = Math.round(hours / 24);
+  return days === 1 ? '1 dia' : `${days} dias`;
 };
 
 const PRIORITY_LABEL: Record<string, string> = {
@@ -94,15 +94,24 @@ const PRIORITY_LABEL: Record<string, string> = {
   low: 'Baixa',
 };
 
+/** O relatório devolve a categoria crua; aqui ela vira o nome que o setor usa. */
+const categoryName = (raw: string) => ADM_KINDS[raw]?.label ?? (raw === 'outro' ? 'Outro pedido' : raw);
+
+const STATUS_TONE: Record<string, string> = {
+  open: 'new',
+  in_progress: 'doing',
+  waiting_user: 'waiting',
+  aguardando_confirmacao: 'waiting',
+  aguardando_aquisicao: 'waiting',
+  aguardando_terceiros: 'waiting',
+  resolved: 'done',
+  closed: 'closed',
+};
+
 /**
- * Relatórios Administrativos.
- *
- * Página própria do Auxiliar Administrativo — não o relatório da TI com cards
- * escondidos. Ela responde quatro perguntas de coordenação: o que o setor
- * atende, quanto atende, de onde vem a demanda e o que continua pendente.
- *
- * Nada de infraestrutura, equipamento, inventário, técnico ou SLA operacional
- * de TI: esses conceitos não descrevem este trabalho, então não aparecem.
+ * Relatórios do Administrativo. Responde quatro perguntas de coordenação:
+ * o que o setor atende, quanto atende, de onde vem a demanda e o que
+ * continua pendente. Sem conceitos da TI (equipamento, técnico, SLA).
  */
 export default function AuxAdminReportsPage() {
   const navigate = useNavigate();
@@ -118,18 +127,18 @@ export default function AuxAdminReportsPage() {
   const [category, setCategory] = useState('');
   const [sector, setSector] = useState('');
 
-  const range = useMemo(() => {
-    const preseted = presetRange(preset);
-    return preseted ?? { from, to };
-  }, [preset, from, to]);
+  const presetsRef = useRef<HTMLDivElement | null>(null);
+  const pill = useSlidingPill(presetsRef, '.axq-preset', PRESETS.findIndex((p) => p.key === preset));
+
+  const range = useMemo(() => presetRange(preset) ?? { from, to }, [preset, from, to]);
 
   const load = useCallback(async () => {
     try {
       setError('');
       const params = new URLSearchParams();
       if (range.from) params.append('date_from', range.from);
-      // O middleware do reports exige AAAA-MM-DD estrito; o fim do dia e
-      // resolvido no servidor, que soma um dia na comparacao.
+      // O middleware do reports exige AAAA-MM-DD estrito; o fim do dia é
+      // resolvido no servidor, que soma um dia na comparação.
       if (range.to) params.append('date_to', range.to);
       if (status) params.append('status', status);
       if (priority) params.append('priority', priority);
@@ -139,11 +148,8 @@ export default function AuxAdminReportsPage() {
       const { data } = await api.get(`/reports/auxadmin?${params.toString()}`, { timeout: 20000 });
       setReport(data);
     } catch (err: any) {
-      // O detalhe vem do backend quando o erro e do Postgres; mostra-lo evita
-      // que "erro ao carregar" seja a unica informacao disponivel.
       const data = err?.response?.data;
-      setError([data?.error || 'Não foi possível carregar o relatório', data?.detail]
-        .filter(Boolean).join(' · '));
+      setError([data?.error || 'Não foi possível carregar o relatório', data?.detail].filter(Boolean).join('. '));
     } finally {
       setLoading(false);
     }
@@ -151,378 +157,309 @@ export default function AuxAdminReportsPage() {
 
   useEffect(() => {
     setLoading(true);
-    load();
+    void load();
   }, [load]);
 
-  const activeFilters =
-    (status ? 1 : 0) + (priority ? 1 : 0) + (category ? 1 : 0) + (sector ? 1 : 0);
+  const activeFilters = (status ? 1 : 0) + (priority ? 1 : 0) + (category ? 1 : 0) + (sector ? 1 : 0);
+  const clearFilters = () => { setStatus(''); setPriority(''); setCategory(''); setSector(''); };
 
-  const clearFilters = () => {
-    setStatus('');
-    setPriority('');
-    setCategory('');
-    setSector('');
-  };
-
-  const metrics: MetricSpec[] = useMemo(() => {
-    if (!report) return [];
-    const s = report.summary;
-    return [
-      {
-        key: 'total',
-        icon: 'ti-clipboard-list',
-        label: 'Solicitações no período',
-        value: s.total,
-        detail: s.total === 0 ? null : `${s.resolved} concluídas`,
-        tone: 'neutral',
-        hint: 'Solicitações administrativas abertas dentro do período filtrado.',
-      },
-      {
-        key: 'rate',
-        icon: 'ti-circle-check',
-        label: 'Taxa de conclusão',
-        value: s.resolutionRate,
-        format: (v) => `${v}%`,
-        // Media por dia UTIL: a leitura de volume. A media por dia com
-        // conclusoes vive no tooltip, porque responde outra pergunta.
-        detail: s.perBusinessDay !== null ? `${s.perBusinessDay}/dia útil` : null,
-        tone: 'positive',
-        hint: s.perDayWithResolutions !== null
-          ? `Proporção das solicitações do período já concluídas. Média por dia útil do período (feriados contam como úteis: o sistema não tem calendário). Nos ${s.daysWithResolutions} dias em que houve conclusão, a média foi ${s.perDayWithResolutions}/dia.`
-          : 'Proporção das solicitações do período que já foram concluídas.',
-      },
-      {
-        key: 'in_progress',
-        icon: 'ti-progress',
-        label: 'Em andamento',
-        value: s.inProgress,
-        detail: s.waiting > 0 ? `${s.waiting} aguardando retorno` : null,
-        tone: 'info',
-        hint: 'Solicitações com atendimento já iniciado.',
-      },
-      {
-        key: 'pending',
-        icon: 'ti-inbox',
-        label: 'Sem tratamento',
-        value: s.pending,
-        detail: s.highPriorityOpen > 0 ? `${s.highPriorityOpen} de prioridade alta` : null,
-        tone: s.pending > 0 ? 'warning' : 'neutral',
-        hint: 'Solicitações ainda abertas, sem atendimento iniciado.',
-      },
-      {
-        key: 'avg',
-        icon: 'ti-clock-hour-4',
-        label: 'Tempo médio até concluir',
-        value: s.avgResolutionMinutes,
-        format: formatDuration,
-        detail:
-          s.avgFirstResponseMinutes !== null
-            ? `1ª resposta em ${formatDuration(s.avgFirstResponseMinutes)}`
-            : null,
-        tone: 'neutral',
-        hint: 'Média entre a abertura e a conclusão das solicitações concluídas no período.',
-      },
-    ];
-  }, [report]);
-
-  const volumePeak = useMemo(() => {
-    if (!report) return 1;
-    return Math.max(...report.volume.flatMap((d) => [d.received, d.resolved]), 1);
-  }, [report]);
-
+  const s = report?.summary;
+  const phrase = PRESETS.find((p) => p.key === preset)!.phrase;
+  const volumePeak = useMemo(
+    () => Math.max(1, ...(report?.volume ?? []).flatMap((d) => [d.received, d.resolved])),
+    [report],
+  );
   const hasVolume = report?.volume.some((d) => d.received > 0 || d.resolved > 0) ?? false;
+  const catPeak = Math.max(1, ...(report?.categories ?? []).map((c) => c.total));
+  const sectorPeak = Math.max(1, ...(report?.requesterSectors ?? []).map((c) => c.total));
+  const statusTotal = (report?.byStatus ?? []).reduce((sum, e) => sum + e.total, 0);
+
+  const lead = !s
+    ? 'Juntando os números do setor…'
+    : s.total === 0
+      ? `${phrase} não chegou nenhum pedido${activeFilters ? ' com esses filtros' : ''}.`
+      : `${phrase} chegaram ${s.total} ${s.total === 1 ? 'pedido' : 'pedidos'}${s.resolutionRate !== null ? ` e ${s.resolutionRate}% já estão resolvidos` : ''}.${s.pending > 0 ? ` ${s.pending} ainda não começaram.` : ''}`;
 
   return (
-    <div className="axr-page admin-tickets-dashboard">
-      <header className="tk-hero">
-        <div className="tk-hero-context">
-          <span className="tk-hero-scope">
-            <i className="ti ti-building" aria-hidden="true" />
-            Administrativo
-          </span>
-          <h1 className="tk-hero-title">Relatórios Administrativos</h1>
-          <p className="tk-hero-tagline">
-            Volume, desempenho e perfil das solicitações atendidas pelo setor administrativo.
-          </p>
-          {report?.scope.restrictedToOwn && (
-            <span className="axr-scope-note">
-              <i className="ti ti-info-circle" aria-hidden="true" />
-              Mostrando as solicitações atribuídas a você ou ainda sem responsável.
-            </span>
-          )}
-        </div>
-
-        <div className="tk-hero-tools">
-          <div className="axr-presets" role="group" aria-label="Período">
-            {PRESETS.map((option) => (
-              <button
-                key={option.key}
-                type="button"
-                className={`axr-preset ${preset === option.key ? 'is-active' : ''}`}
-                onClick={() => setPreset(option.key)}
-              >
-                {option.label}
-              </button>
-            ))}
+    <div className="axq">
+      <header className="axq-head">
+        <div className="axq-head__inner">
+          <div>
+            <h1>Relatórios</h1>
+            <p>{lead}</p>
+            {report?.scope.restrictedToOwn && (
+              <p className="axq-scope"><i className="ti ti-info-circle" aria-hidden="true" />Contando os pedidos que estão com você ou sem ninguém.</p>
+            )}
           </div>
 
-          {preset === 'custom' && (
-            <div className="axr-custom-range">
-              <label>
-                <span>De</span>
-                <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-              </label>
-              <label>
-                <span>Até</span>
-                <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-              </label>
+          <div className="axq-period">
+            <div className="axq-presets" ref={presetsRef} role="group" aria-label="Período">
+              {pill.visible && <span className="axq-presets__pill" aria-hidden="true" style={pill.style} />}
+              {PRESETS.map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  className="axq-preset"
+                  aria-pressed={preset === option.key}
+                  onClick={() => setPreset(option.key)}
+                >
+                  {option.label}
+                </button>
+              ))}
             </div>
-          )}
+            {preset === 'custom' && (
+              <div className="axq-range">
+                <label><span>De</span><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+                <label><span>Até</span><input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
-      {/* Filtros — só os que efetivamente alteram a consulta. */}
-      <section className="axr-filters" aria-label="Filtros">
-        <label>
-          <span>Situação</span>
-          <select value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">Todas</option>
-            {(report?.byStatus ?? []).map((option) => (
-              <option key={option.status} value={option.status}>{option.label}</option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          <span>Prioridade</span>
-          <select value={priority} onChange={(e) => setPriority(e.target.value)}>
-            <option value="">Todas</option>
-            {Object.entries(PRIORITY_LABEL).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          <span>Assunto</span>
-          <select value={category} onChange={(e) => setCategory(e.target.value)}>
-            <option value="">Todos</option>
-            {(report?.categories ?? []).map((option) => (
-              <option key={option.label} value={option.label}>{option.label}</option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          <span>Setor solicitante</span>
-          <select value={sector} onChange={(e) => setSector(e.target.value)}>
-            <option value="">Todos</option>
-            {(report?.requesterSectors ?? [])
-              .filter((option) => option.label !== 'Não informado')
-              .map((option) => (
-                <option key={option.label} value={option.label}>{option.label}</option>
+      <div className="axq-body">
+        <section className="axq-filters" aria-label="Filtros">
+          <label>
+            <span>Situação</span>
+            <select value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="">Todas</option>
+              {(report?.byStatus ?? []).map((o) => <option key={o.status} value={o.status}>{o.label}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>Prioridade</span>
+            <select value={priority} onChange={(e) => setPriority(e.target.value)}>
+              <option value="">Todas</option>
+              {Object.entries(PRIORITY_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>Tipo de pedido</span>
+            <select value={category} onChange={(e) => setCategory(e.target.value)}>
+              <option value="">Todos</option>
+              {(report?.categories ?? []).map((o) => <option key={o.label} value={o.label}>{categoryName(o.label)}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>Quem pediu</span>
+            <select value={sector} onChange={(e) => setSector(e.target.value)}>
+              <option value="">Todos os setores</option>
+              {(report?.requesterSectors ?? []).filter((o) => o.label !== 'Não informado').map((o) => (
+                <option key={o.label} value={o.label}>{o.label}</option>
               ))}
-          </select>
-        </label>
+            </select>
+          </label>
+          {activeFilters > 0 && (
+            <button type="button" className="axq-clear" onClick={clearFilters}>
+              <i className="ti ti-x" aria-hidden="true" />Limpar filtros
+            </button>
+          )}
+        </section>
 
-        {activeFilters > 0 && (
-          <button type="button" className="tk-chip-clear axr-clear" onClick={clearFilters}>
-            <i className="ti ti-x" aria-hidden="true" />
-            Limpar filtros
-          </button>
-        )}
-      </section>
-
-      {error && !report && (
-        <div className="tk-panorama-error" role="alert">
-          <i className="ti ti-alert-circle" aria-hidden="true" />
-          <span>{error}</span>
-          <button type="button" onClick={load}>Tentar novamente</button>
-        </div>
-      )}
-
-      {loading && !report ? (
-        <MetricSkeleton count={5} />
-      ) : report && report.summary.total === 0 ? (
-        <EmptyState
-          tone="filtered"
-          icon="ti-calendar-off"
-          title="Nenhuma solicitação neste período"
-          description="Não há solicitações administrativas na janela e nos filtros selecionados."
-          actionLabel={activeFilters > 0 ? 'Limpar filtros' : undefined}
-          onAction={activeFilters > 0 ? clearFilters : undefined}
-        />
-      ) : report ? (
-        <>
-          <div className="tk-metrics">
-            {metrics.map((metric, index) => (
-              <MetricCard key={metric.key} metric={metric} index={index} />
-            ))}
+        {error && !report && (
+          <div className="axq-alert" role="alert">
+            <i className="ti ti-alert-circle" aria-hidden="true" />
+            <span>{error}</span>
+            <button type="button" onClick={() => { setLoading(true); void load(); }}>Tentar de novo</button>
           </div>
+        )}
 
-          <section className="axr-grid">
-            {/* Recebidas x concluídas: a leitura de capacidade. */}
-            <article className="tk-panel axr-panel--wide">
-              <header className="tk-panel-head">
-                <h3>Recebidas e concluídas</h3>
-                <span className="axr-legend-inline">
-                  <span><i className="axr-key axr-key--in" />Recebidas</span>
-                  <span><i className="axr-key axr-key--out" />Concluídas</span>
-                </span>
+        {loading && !report ? (
+          <div className="axq-ghosts" aria-busy="true">
+            <div className="axq-ghost" style={{ height: 120 }} />
+            <div className="axq-ghost" style={{ height: 320 }} />
+          </div>
+        ) : report && s && s.total === 0 ? (
+          <div className="axq-empty">
+            <span className="axq-empty__tag" aria-hidden="true"><i className="ti ti-calendar-off" /></span>
+            <h2>Nenhum pedido neste período</h2>
+            <p>Escolha um período maior{activeFilters > 0 ? ' ou limpe os filtros' : ''} para ver os números.</p>
+            {activeFilters > 0 && <button type="button" className="axq-clear" onClick={clearFilters}>Limpar filtros</button>}
+          </div>
+        ) : report && s ? (
+          <>
+            {/* Números do período numa faixa só */}
+            <dl className="axq-numbers">
+              <div>
+                <dt>Pedidos que chegaram</dt>
+                <dd><CountUp value={s.total} /></dd>
+                <small>{s.resolved} resolvidos</small>
+              </div>
+              <div>
+                <dt>Já resolvidos</dt>
+                <dd>{s.resolutionRate !== null ? <CountUp value={s.resolutionRate} format={(v) => `${v}%`} /> : '—'}</dd>
+                <small>{s.perBusinessDay !== null ? `cerca de ${s.perBusinessDay} por dia útil` : ' '}</small>
+              </div>
+              <div>
+                <dt>Em andamento</dt>
+                <dd><CountUp value={s.inProgress} /></dd>
+                <small>{s.waiting > 0 ? `${s.waiting} esperando alguém` : 'nenhum esperando'}</small>
+              </div>
+              <div className={s.pending > 0 ? 'is-alert' : undefined}>
+                <dt>Ainda não começaram</dt>
+                <dd><CountUp value={s.pending} /></dd>
+                <small>{s.highPriorityOpen > 0 ? `${s.highPriorityOpen} com prioridade alta` : 'nenhum urgente'}</small>
+              </div>
+              <div>
+                <dt>Tempo para resolver</dt>
+                <dd>{s.avgResolutionMinutes !== null ? formatDuration(s.avgResolutionMinutes) : '—'}</dd>
+                <small>{s.avgFirstResponseMinutes !== null ? `primeira resposta em ${formatDuration(s.avgFirstResponseMinutes)}` : 'em média'}</small>
+              </div>
+            </dl>
+
+            {/* O quadro dos tipos: cada tipo é uma etiqueta pendurada, do tamanho da demanda */}
+            <section className="axq-rack" aria-labelledby="axq-rack-title">
+              <header>
+                <h2 id="axq-rack-title">O que mais pediram</h2>
+                <p>Cada etiqueta tem o tamanho da quantidade de pedidos daquele tipo.</p>
               </header>
+              {report.categories.length > 0 ? (
+                <ul className="axq-hang">
+                  {report.categories.map((entry, i) => {
+                    const kind = admKind(entry.label);
+                    const share = s.total > 0 ? Math.round((entry.total / s.total) * 100) : 0;
+                    return (
+                      <li
+                        key={entry.label}
+                        className={`axq-hang__item adm-tone--${kind.tone}`}
+                        style={{ '--h': `${Math.max(18, (entry.total / catPeak) * 100)}%`, '--i': i } as CSSProperties}
+                      >
+                        <button
+                          type="button"
+                          className="axq-hang__tag"
+                          aria-pressed={category === entry.label}
+                          onClick={() => setCategory(category === entry.label ? '' : entry.label)}
+                          title={`Filtrar por ${categoryName(entry.label)}`}
+                        >
+                          <span className="axq-hang__eye" aria-hidden="true" />
+                          <strong>{entry.total}</strong>
+                          <span className="axq-hang__share">{share}%</span>
+                        </button>
+                        <span className="axq-hang__label"><i className={`ti ${kind.icon}`} aria-hidden="true" />{categoryName(entry.label)}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="axq-note">Nenhum pedido com tipo definido no período.</p>
+              )}
+            </section>
 
-              {hasVolume ? (
-                <div className="axr-chart" role="img" aria-label="Solicitações recebidas e concluídas por dia">
-                  {report.volume.map((day) => (
-                    <div className="axr-chart-col" key={day.day} title={`${new Date(day.day).toLocaleDateString('pt-BR')}: ${day.received} recebidas, ${day.resolved} concluídas`}>
-                      <span className="axr-bar axr-bar--in" style={{ height: `${(day.received / volumePeak) * 100}%` }} />
-                      <span className="axr-bar axr-bar--out" style={{ height: `${(day.resolved / volumePeak) * 100}%` }} />
-                    </div>
+            <div className="axq-grid">
+              <section className="axq-panel axq-panel--wide" aria-labelledby="axq-vol-title">
+                <header className="axq-panel__head">
+                  <h2 id="axq-vol-title">Chegaram e foram resolvidos, dia a dia</h2>
+                  <span className="axq-keys">
+                    <span><i className="axq-key axq-key--in" />Chegaram</span>
+                    <span><i className="axq-key axq-key--out" />Resolvidos</span>
+                  </span>
+                </header>
+                {hasVolume ? (
+                  <div className="axq-chart" role="img" aria-label="Pedidos que chegaram e que foram resolvidos por dia">
+                    {report.volume.map((day) => {
+                      const date = new Date(`${day.day.slice(0, 10)}T12:00:00`);
+                      return (
+                        <div
+                          key={day.day}
+                          className="axq-chart__col"
+                          title={`${date.toLocaleDateString('pt-BR')}: ${day.received} chegaram, ${day.resolved} resolvidos`}
+                        >
+                          <span className="axq-bar axq-bar--in" style={{ height: `${(day.received / volumePeak) * 100}%` }} />
+                          <span className="axq-bar axq-bar--out" style={{ height: `${(day.resolved / volumePeak) * 100}%` }} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="axq-note">Sem movimento neste período.</p>
+                )}
+              </section>
+
+              <section className="axq-panel" aria-labelledby="axq-sec-title">
+                <header className="axq-panel__head"><h2 id="axq-sec-title">Setores que mais pediram</h2></header>
+                {report.requesterSectors.length > 0 ? (
+                  <ol className="axq-rank">
+                    {report.requesterSectors.slice(0, 8).map((entry) => (
+                      <li key={entry.label}>
+                        <button
+                          type="button"
+                          aria-pressed={sector === entry.label}
+                          disabled={entry.label === 'Não informado'}
+                          onClick={() => setSector(sector === entry.label ? '' : entry.label)}
+                        >
+                          <span className="axq-rank__label">{entry.label}</span>
+                          <span className="axq-rank__track" aria-hidden="true">
+                            <span style={{ width: `${(entry.total / sectorPeak) * 100}%` }} />
+                          </span>
+                          <strong>{entry.total}</strong>
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="axq-note">Sem informação de setor.</p>
+                )}
+              </section>
+
+              <section className="axq-panel" aria-labelledby="axq-st-title">
+                <header className="axq-panel__head"><h2 id="axq-st-title">Onde os pedidos estão</h2></header>
+                <div className="axq-stack" aria-hidden="true">
+                  {report.byStatus.filter((e) => e.total > 0).map((entry) => (
+                    <span key={entry.status} className={`axq-st--${STATUS_TONE[entry.status] ?? 'closed'}`} style={{ flexGrow: entry.total }} />
                   ))}
                 </div>
-              ) : (
-                <p className="axr-empty-inline">Sem movimento registrado neste período.</p>
-              )}
-            </article>
-
-            <article className="tk-panel">
-              <header className="tk-panel-head"><h3>Solicitações mais frequentes</h3></header>
-              {report.categories.length > 0 ? (
-                <ul className="tk-bar-list">
-                  {report.categories.map((entry, index) => (
-                    <li key={entry.label} style={{ animationDelay: `${index * 45}ms` }}>
-                      <div className="tk-bar-row tk-bar-row--static" title={`${entry.label}: ${entry.total}`}>
-                        <span className="tk-bar-label">{entry.label}</span>
-                        <span className="tk-bar-track" aria-hidden="true">
-                          <span
-                            className="tk-bar-fill tk-tone-administrativo"
-                            style={{ width: `${(entry.total / report.categories[0].total) * 100}%` }}
-                          />
-                        </span>
-                        <span className="tk-bar-value">{entry.total}</span>
-                      </div>
+                <ul className="axq-legend">
+                  {report.byStatus.map((entry) => (
+                    <li key={entry.status}>
+                      <span className={`axq-dot axq-st--${STATUS_TONE[entry.status] ?? 'closed'}`} aria-hidden="true" />
+                      {entry.label}
+                      <strong>{entry.total}</strong>
+                      <small>{statusTotal > 0 ? `${Math.round((entry.total / statusTotal) * 100)}%` : ''}</small>
                     </li>
                   ))}
                 </ul>
-              ) : (
-                <p className="axr-empty-inline">Nenhum assunto classificado no período.</p>
-              )}
-            </article>
+              </section>
+            </div>
 
-            <article className="tk-panel">
-              <header className="tk-panel-head"><h3>Setores que mais solicitaram</h3></header>
-              {report.requesterSectors.length > 0 ? (
-                <ul className="tk-bar-list">
-                  {report.requesterSectors.map((entry, index) => (
-                    <li key={entry.label} style={{ animationDelay: `${index * 45}ms` }}>
-                      <div className="tk-bar-row tk-bar-row--static" title={`${entry.label}: ${entry.total}`}>
-                        <span className="tk-bar-label">{entry.label}</span>
-                        <span className="tk-bar-track" aria-hidden="true">
-                          <span
-                            className="tk-bar-fill tk-tone-neutral"
-                            style={{ width: `${(entry.total / report.requesterSectors[0].total) * 100}%` }}
-                          />
-                        </span>
-                        <span className="tk-bar-value">{entry.total}</span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="axr-empty-inline">Sem informação de setor solicitante.</p>
-              )}
-            </article>
-
-            <article className="tk-panel">
-              <header className="tk-panel-head"><h3>Situação das solicitações</h3></header>
-              <div className="tk-stack" aria-hidden="true">
-                {report.byStatus.map((entry) => (
-                  <span
-                    key={entry.status}
-                    className={`tk-stack-seg axr-status-${entry.status}`}
-                    style={{ flexGrow: entry.total }}
-                    title={`${entry.label}: ${entry.total}`}
-                  />
-                ))}
-              </div>
-              <ul className="tk-legend">
-                {report.byStatus.map((entry) => (
-                  <li key={entry.status}>
-                    <span className={`tk-dot axr-status-${entry.status}`} aria-hidden="true" />
-                    {entry.label}
-                    <strong>{entry.total}</strong>
-                  </li>
-                ))}
-              </ul>
-            </article>
-          </section>
-
-          {/* Exceções — não é uma segunda fila, são os casos que destoam. */}
-          <section className="tk-panel axr-attention">
-            <header className="tk-panel-head">
-              <h3>Precisam de atenção</h3>
-              <span>prioridade alta, sem responsável ou abertas há mais tempo</span>
-            </header>
-
-            {report.attention.length > 0 ? (
-              <div className="axr-table-wrap">
-                <table className="axr-table">
-                  <thead>
-                    <tr>
-                      <th>Solicitação</th>
-                      <th>Solicitante</th>
-                      <th>Situação</th>
-                      <th>Prioridade</th>
-                      <th>Aberta há</th>
-                      <th aria-label="Abrir" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {report.attention.map((item) => (
-                      <tr key={item.id}>
-                        <td>
-                          <span className="axr-cell-title" title={item.title}>{item.title}</span>
-                          {item.category && <span className="axr-cell-sub">{item.category}</span>}
-                        </td>
-                        <td>
-                          <span className="axr-cell-title" title={item.requesterName}>{item.requesterName}</span>
-                          <span className="axr-cell-sub">{item.requesterDepartment}</span>
-                        </td>
-                        <td><span className={`axr-pill axr-status-${item.status}`}>{item.statusLabel}</span></td>
-                        <td>
-                          <span className={`axr-pill axr-prio-${item.priority}`}>
-                            {PRIORITY_LABEL[item.priority] ?? item.priority}
+            <section className="axq-panel axq-attn" aria-labelledby="axq-attn-title">
+              <header className="axq-panel__head">
+                <h2 id="axq-attn-title">Merecem um olhar</h2>
+                <span>urgentes, sem ninguém ou abertos há mais tempo</span>
+              </header>
+              {report.attention.length > 0 ? (
+                <ul className="axq-attn__list">
+                  {report.attention.map((item) => {
+                    const kind = admKind(item.category);
+                    const days = Math.floor(item.openHours / 24);
+                    return (
+                      <li key={item.id}>
+                        <button type="button" className={`axq-attn__row adm-tone--${kind.tone}`} onClick={() => navigate(`/admin/chamados/${item.id}`)}>
+                          <span className="axq-attn__stub" aria-hidden="true"><i className={`ti ${kind.icon}`} /></span>
+                          <span className="axq-attn__main">
+                            <strong>{item.title}</strong>
+                            <small>{item.requesterName}{item.requesterDepartment ? `, ${item.requesterDepartment}` : ''}</small>
                           </span>
-                        </td>
-                        <td className="axr-num" title={new Date(item.createdAt).toLocaleString('pt-BR')}>
-                          {item.openHours >= 24
-                            ? `${Math.floor(item.openHours / 24)}d`
-                            : `${item.openHours}h`}
-                          {!item.assignedToName && <span className="axr-cell-sub">sem responsável</span>}
-                        </td>
-                        <td>
-                          <button
-                            type="button"
-                            className="axr-open"
-                            onClick={() => navigate(`/admin/chamados/${item.id}`)}
-                            aria-label={`Abrir solicitação ${item.title}`}
-                          >
-                            <i className="ti ti-arrow-up-right" aria-hidden="true" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p className="axr-empty-inline">
-                Nenhuma solicitação exigindo atenção neste período.
-              </p>
-            )}
-          </section>
-        </>
-      ) : null}
+                          <span className="axq-attn__tags">
+                            {ADM_URGENT.has(item.priority) && <span className="axq-flag">{PRIORITY_LABEL[item.priority] ?? 'Urgente'}</span>}
+                            {!item.assignedToName && <span className="axq-flag axq-flag--nobody">Sem ninguém</span>}
+                            <span className="axq-attn__state">{item.statusLabel}</span>
+                          </span>
+                          <span className="axq-attn__age">
+                            {days >= 1 ? `${days} ${days === 1 ? 'dia' : 'dias'}` : `${item.openHours} h`}
+                            <small>aberto</small>
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="axq-note">Nada fora do normal neste período.</p>
+              )}
+            </section>
+          </>
+        ) : null}
+      </div>
     </div>
   );
 }
