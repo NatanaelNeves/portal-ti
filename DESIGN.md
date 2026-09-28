@@ -139,6 +139,18 @@ As especificações locais de `frontend/src/pages/AdminTicketsPage.tsx` abaixo s
 - Na Central de Chamados, fila de largura integral em “Atendimento”, indicadores em “Panorama” e detalhe aberto sob demanda.
 - Cor semântica e movimento contido, sempre ligados a estado ou feedback real.
 
+## Revisão 2026-09 (moldura, Painel e chamado)
+
+Esta revisão substitui, na área interna, a moldura, o Painel e a tela do chamado. Os tokens e as regras abaixo continuam valendo; o que muda:
+
+- **Moldura (`TiShell.tsx`, `TiShell.css`):** barra lateral evergreen com luz sutil, só as áreas em uso (Painel, Solicitações, Central de dúvidas, Inventário, Documentos, Relatórios, Equipe), botão "Registrar chamado" em girassol e "Sair da conta" sempre visível no pé (e no topo no celular). Classes com prefixo `tsh-`: nunca usar `ti-` em classes próprias, porque é o prefixo dos ícones Tabler.
+- **Atalhos:** Alt+1…7 troca de área; "/" abre a busca global; Ctrl+K abre a busca da página quando ela existe (`data-page-search`), senão a global.
+- **Painel (`AdminDashboardPage`):** frase de estado da fila sobre a aurora e o gráfico "Idade da fila" (um ponto por chamado aberto, por faixa de idade, cor = prioridade, vazado = sem responsável). É o único elemento chamativo da página; o resto é quieto.
+- **Chamado (`AdminTicketDetailPage`):** trilha Assumir → Responder → Resolver, um bloco "próximo passo" com só as ações válidas (regras de `ticketPermissions.ts`), edição direta na lateral e conversa em formato de chat com nota interna. Ctrl+Enter envia.
+- **Solicitações:** estrutura e comportamento mantidos; `TicketsSkin.css` aplica a pele nova (cabeçalho sobre a aurora, faixa de prioridade à esquerda de cada linha, linhas mais compactas).
+- **Cor de atenção:** girassol (`#f6c350`) marca o que precisa de ação (sem responsável, novidades); vermelho só para atraso real.
+- **Tipografia:** títulos da área interna em Schibsted Grotesk; interface em DM Sans.
+
 ## Colors
 
 A paleta combina verdes institucionais firmes com papel branco e canvas mineral; azul, roxo, laranja e vermelho ficam subordinados a informação, análise, atenção e exceção.

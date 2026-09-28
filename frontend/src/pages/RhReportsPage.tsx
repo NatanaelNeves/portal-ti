@@ -1,12 +1,11 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer,
-  PieChart, Pie, Legend,
-  AreaChart, Area,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import * as XLSX from 'xlsx';
 import { BACKEND_URL } from '../services/api';
+import { initialsOf, RH_CATEGORIES } from '../components/rh/rhLabels';
 import '../styles/RhReportsPage.css';
 
 interface Ticket {
@@ -24,41 +23,25 @@ interface Ticket {
 
 type Period = '7' | '30' | '90' | 'all';
 
-const CATEGORY_LABELS: Record<string, string> = {
-  RH_ATESTADO:    'Atestado Médico',
-  RH_PONTO:       'Ajuste de Ponto',
-  RH_FOLHA:       'Folha de Pagamento',
-  RH_DECLARACAO:  'Declaração',
-  RH_BENEFICIOS:  'Benefícios',
-  RH_OUTROS:      'Outros RH',
-  RH_CONFIDENCIAL:'Confidencial',
-};
+// Mesmos nomes de assunto das outras telas do RH.
+const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(RH_CATEGORIES).map(([code, meta]) => [code, meta.label]),
+);
 
 const STATUS_LABELS: Record<string, string> = {
   open:                  'Aberto',
   in_progress:           'Em Atendimento',
-  waiting_user:          'Aguardando',
-  aguardando_confirmacao:'Ag. Confirmação',
+  waiting_user:          'Aguardando o solicitante',
+  aguardando_confirmacao:'Aguardando confirmação',
   // O RH nao aplica estes estados, mas precisa saber apresenta-los caso um
   // chamado compartilhado apareca com eles.
-  aguardando_aquisicao:'Ag. Aquisição',
-  aguardando_terceiros:'Ag. Terceiros',
+  aguardando_aquisicao:'Aguardando compra',
+  aguardando_terceiros:'Aguardando terceiros',
   resolved:              'Resolvido',
-  closed:                'Fechado',
+  closed:                'Encerrado',
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  open:                  '#ef4444',
-  in_progress:           '#f59e0b',
-  waiting_user:          '#8b5cf6',
-  aguardando_confirmacao:'#6366f1',
-  aguardando_aquisicao:'#7f56c5',
-  aguardando_terceiros:'#5d7f8f',
-  resolved:              '#10b981',
-  closed:                '#6b7280',
-};
 
-const PIE_COLORS = ['#7c3aed','#3b82f6','#10b981','#f59e0b','#ec4899','#8b5cf6'];
 
 const PERIOD_OPTIONS: { value: Period; label: string }[] = [
   { value: '7',   label: 'Últimos 7 dias'  },
@@ -72,8 +55,6 @@ export default function RhReportsPage() {
   const [allTickets, setAllTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [showExportMenu, setShowExportMenu] = useState(false);
-  const exportRef = useRef<HTMLDivElement>(null);
 
   // Filters
   const [period, setPeriod] = useState<Period>('30');
@@ -88,16 +69,6 @@ export default function RhReportsPage() {
     void loadTickets();
   }, []);
 
-  // Close export menu on outside click
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
-        setShowExportMenu(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
 
   const loadTickets = async () => {
     try {
@@ -158,12 +129,6 @@ export default function RhReportsPage() {
       }, 0) / resolvedWithTime.length).toFixed(1)
     : '—';
 
-  // By status (horizontal bar)
-  const byStatus = Object.keys(STATUS_LABELS).map(key => ({
-    name: STATUS_LABELS[key],
-    value: tickets.filter(t => t.status === key).length,
-    color: STATUS_COLORS[key],
-  })).filter(d => d.value > 0);
 
   // By category (pie)
   const catCount: Record<string, number> = {};
@@ -228,9 +193,6 @@ export default function RhReportsPage() {
     }))
     .sort((a, b) => b.total - a.total);
 
-  const byMemberChart = byMember
-    .filter(m => m.name !== 'Não atribuído')
-    .map(m => ({ name: m.name.split(' ')[0], total: m.total, resolvidos: m.resolved }));
 
   // --- Exports ---
   const exportCSV = () => {
@@ -256,7 +218,6 @@ export default function RhReportsPage() {
     a.download = `relatorio-rh-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    setShowExportMenu(false);
   };
 
   const exportExcel = () => {
@@ -276,18 +237,16 @@ export default function RhReportsPage() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Chamados RH');
     XLSX.writeFile(wb, `relatorio-rh-${new Date().toISOString().slice(0, 10)}.xlsx`);
-    setShowExportMenu(false);
   };
 
   const exportPDF = async () => {
-    setShowExportMenu(false);
     const { default: jsPDF } = await import('jspdf');
     const { default: autoTable } = await import('jspdf-autotable');
 
     const doc = new jsPDF({ orientation: 'landscape' });
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(16);
-    doc.text('Relatório — Recursos Humanos', 14, 16);
+    doc.text('Relatório do RH', 14, 16);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
@@ -305,7 +264,7 @@ export default function RhReportsPage() {
       head: [['Total', 'Em Aberto', 'Resolvidos', 'Taxa Resolução', 'Abertos Hoje', 'Tempo Médio']],
       body: [[total, open, resolved, `${resRate}%`, newToday, `${avgResHours}h`]],
       theme: 'grid',
-      headStyles: { fillColor: [124, 58, 237] },
+      headStyles: { fillColor: [91, 63, 208] },
       styles: { fontSize: 10 },
     });
 
@@ -327,7 +286,7 @@ export default function RhReportsPage() {
         new Date(t.created_at).toLocaleDateString('pt-BR'),
       ]),
       theme: 'striped',
-      headStyles: { fillColor: [124, 58, 237] },
+      headStyles: { fillColor: [91, 63, 208] },
       styles: { fontSize: 8, cellPadding: 2 },
       columnStyles: { 0: { cellWidth: 60 } },
     });
@@ -336,263 +295,222 @@ export default function RhReportsPage() {
   };
 
   const kpis = [
-    { cls: 'rhr-kpi--total',    icon: '📋', value: total,        label: 'Total Chamados'    },
-    { cls: 'rhr-kpi--open',     icon: '🟡', value: open,         label: 'Em Aberto'         },
-    { cls: 'rhr-kpi--resolved', icon: '✅', value: resolved,     label: 'Resolvidos'        },
-    { cls: 'rhr-kpi--rate',     icon: '📈', value: `${resRate}%`,label: 'Taxa de Resolução' },
-    { cls: 'rhr-kpi--today',    icon: '📥', value: newToday,     label: 'Abertos Hoje'      },
-    { cls: 'rhr-kpi--time',     icon: '⏱',  value: `${avgResHours}h`, label: 'Tempo Médio Resolução' },
+    { key: 'total', icon: 'ti-inbox', value: String(total), label: total === 1 ? 'chamado recebido' : 'chamados recebidos' },
+    { key: 'open', icon: 'ti-hourglass', value: String(open), label: 'ainda em aberto' },
+    { key: 'resolved', icon: 'ti-circle-check', value: String(resolved), label: total > 0 ? `resolvidos (${resRate}% do total)` : 'resolvidos' },
+    { key: 'time', icon: 'ti-clock', value: friendlyDuration(avgResHours), label: 'em média para resolver' },
   ];
 
+  const maxCategory = Math.max(1, ...byCategory.map((c) => c.value));
+  const periodLabel = PERIOD_OPTIONS.find((p) => p.value === period)?.label ?? '';
+  const extraFilters = (filterStatus !== 'all' ? 1 : 0) + (filterCategory !== 'all' ? 1 : 0) + (filterPriority !== 'all' ? 1 : 0);
+
   return (
-    <div className="rhr-page">
-      {/* Header */}
-      <div className="rhr-header">
-        <div className="rhr-header-info">
-          <h1 className="rhr-title">Relatórios — Recursos Humanos</h1>
-          <p className="rhr-subtitle">Análise e exportação de chamados do departamento de RH</p>
-        </div>
-        <div className="rhr-header-actions">
-          <button className="rhr-btn rhr-btn-secondary" onClick={() => navigate('/rh/dashboard')}>
-            ← Dashboard
-          </button>
-          <button
-            className="rhr-btn rhr-btn-secondary"
-            onClick={() => { void loadTickets(); }}
-            disabled={loading}
-          >
-            ↻ Atualizar
-          </button>
-          <div className="rhr-export-wrap" ref={exportRef}>
-            <button
-              className="rhr-btn rhr-btn-export"
-              onClick={() => setShowExportMenu(v => !v)}
-            >
-              ⬇ Exportar
+    <div className="pub-page rh-page rhrep">
+      <header className="rhrep-head">
+        <div className="rh-wrap rhrep-head__inner">
+          <div>
+            <h1>Relatórios do RH</h1>
+            <p>Quantos chamados chegaram, quantos foram resolvidos e quanto tempo levou.</p>
+          </div>
+          <div className="rhrep-export" aria-label="Baixar relatório">
+            <button type="button" className="pub-btn pub-btn--primary" onClick={exportExcel} disabled={loading || total === 0}>
+              <i className="ti ti-file-spreadsheet" aria-hidden="true" />
+              Baixar planilha
             </button>
-            {showExportMenu && (
-              <div className="rhr-export-dropdown">
-                <button className="rhr-export-item" onClick={exportCSV}>
-                  <span className="rhr-export-icon">📄</span> Exportar CSV
-                </button>
-                <button className="rhr-export-item" onClick={exportExcel}>
-                  <span className="rhr-export-icon">📊</span> Exportar Excel (.xlsx)
-                </button>
-                <button className="rhr-export-item" onClick={() => void exportPDF()}>
-                  <span className="rhr-export-icon">📑</span> Exportar PDF
-                </button>
-              </div>
-            )}
+            <button type="button" className="pub-btn pub-btn--ghost" onClick={() => void exportPDF()} disabled={loading || total === 0}>
+              <i className="ti ti-file-type-pdf" aria-hidden="true" />
+              Baixar PDF
+            </button>
+            <button type="button" className="rhrep-csv" onClick={exportCSV} disabled={loading || total === 0}>
+              ou CSV
+            </button>
           </div>
         </div>
-      </div>
 
-      {error && <div className="rhr-error">{error}</div>}
-
-      {/* Filters */}
-      <div className="rhr-filters">
-        <span className="rhr-filter-label">Filtros:</span>
-        <select className="rhr-filter-select" value={period} onChange={e => setPeriod(e.target.value as Period)}>
-          {PERIOD_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-        <select className="rhr-filter-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-          <option value="all">Todos os status</option>
-          {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
-        <select className="rhr-filter-select" value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
-          <option value="all">Todas as categorias</option>
-          {Object.entries(CATEGORY_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
-        <select className="rhr-filter-select" value={filterPriority} onChange={e => setFilterPriority(e.target.value)}>
-          <option value="all">Todas as prioridades</option>
-          <option value="critical">Crítica</option>
-          <option value="high">Alta</option>
-          <option value="medium">Média</option>
-          <option value="low">Baixa</option>
-        </select>
-      </div>
-
-      {loading ? (
-        <div className="rhr-loading">
-          <span className="rhr-loading-spinner" />
-          Carregando dados...
-        </div>
-      ) : (
-        <>
-          {/* KPI cards */}
-          <div className="rhr-kpi-grid">
-            {kpis.map(k => (
-              <div key={k.label} className={`rhr-kpi-card ${k.cls}`}>
-                <div className="rhr-kpi-top">
-                  <span className="rhr-kpi-icon">{k.icon}</span>
-                </div>
-                <div className="rhr-kpi-value">{k.value}</div>
-                <div className="rhr-kpi-label">{k.label}</div>
-              </div>
+        <div className="rh-wrap rhrep-filters">
+          <div className="rhrep-periods" role="group" aria-label="Período">
+            {PERIOD_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className="rhrep-period"
+                aria-pressed={period === option.value}
+                onClick={() => setPeriod(option.value)}
+              >
+                {option.label}
+              </button>
             ))}
           </div>
 
-          {/* Charts */}
-          <div className="rhr-charts-grid">
-            {/* Pie: by category */}
-            <div className="rhr-chart-card">
-              <h2 className="rhr-chart-title">Chamados por Categoria</h2>
-              {byCategory.length === 0 ? (
-                <p className="rhr-chart-empty">Sem dados</p>
-              ) : (
-                <ResponsiveContainer width="100%" height={280}>
-                  <PieChart>
-                    <Pie
-                      data={byCategory}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="45%"
-                      cy="50%"
-                      outerRadius={95}
-                      label={({ percent }) => `${((percent || 0) * 100).toFixed(0)}%`}
-                      labelLine
-                    >
-                      {byCategory.map((_, i) => (
-                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Legend
-                      layout="vertical"
-                      align="right"
-                      verticalAlign="middle"
-                      formatter={(val: string) => <span style={{ fontSize: '0.78rem', color: '#374151' }}>{val}</span>}
-                    />
-                    <Tooltip formatter={(v: unknown) => [`${v} chamados`]} />
-                  </PieChart>
-                </ResponsiveContainer>
+          <details className="rhrep-more" open={extraFilters > 0 || undefined}>
+            <summary>
+              <i className="ti ti-adjustments-horizontal" aria-hidden="true" />
+              Mais filtros
+              {extraFilters > 0 && <span className="rhrep-more__count">{extraFilters}</span>}
+            </summary>
+            <div className="rhrep-more__grid">
+              <label>
+                <span>Assunto</span>
+                <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+                  <option value="all">Todos os assuntos</option>
+                  {Object.entries(CATEGORY_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </label>
+              <label>
+                <span>Situação</span>
+                <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                  <option value="all">Todas as situações</option>
+                  {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </label>
+              <label>
+                <span>Prioridade</span>
+                <select value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)}>
+                  <option value="all">Todas as prioridades</option>
+                  <option value="critical">Crítica</option>
+                  <option value="high">Alta</option>
+                  <option value="medium">Média</option>
+                  <option value="low">Baixa</option>
+                </select>
+              </label>
+              {extraFilters > 0 && (
+                <button
+                  type="button"
+                  className="rhrep-clear"
+                  onClick={() => { setFilterCategory('all'); setFilterStatus('all'); setFilterPriority('all'); }}
+                >
+                  Limpar filtros
+                </button>
               )}
             </div>
+          </details>
+        </div>
+      </header>
 
-            {/* Horizontal bar: by status */}
-            <div className="rhr-chart-card">
-              <h2 className="rhr-chart-title">Distribuição por Status</h2>
-              {byStatus.length === 0 ? (
-                <p className="rhr-chart-empty">Sem dados</p>
-              ) : (
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart
-                    data={byStatus}
-                    layout="vertical"
-                    margin={{ top: 4, right: 40, left: 10, bottom: 4 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
-                    <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
-                    <Tooltip formatter={(v: unknown) => [`${v} chamados`]} />
-                    <Bar dataKey="value" name="Chamados" radius={[0, 4, 4, 0]} label={{ position: 'right', fontSize: 11, fill: '#6b7280' }}>
-                      {byStatus.map((entry, i) => (
-                        <Cell key={i} fill={entry.color} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-
-            {/* Area chart: monthly trend */}
-            <div className="rhr-chart-card rhr-chart-card--wide">
-              <h2 className="rhr-chart-title">Tendência Mensal (últimos 6 meses)</h2>
-              {monthlyTrend.length === 0 ? (
-                <p className="rhr-chart-empty">Sem dados históricos</p>
-              ) : (
-                <ResponsiveContainer width="100%" height={240}>
-                  <AreaChart data={monthlyTrend} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
-                    <defs>
-                      <linearGradient id="gradAbertos" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%"  stopColor="#7c3aed" stopOpacity={0.35} />
-                        <stop offset="95%" stopColor="#7c3aed" stopOpacity={0}    />
-                      </linearGradient>
-                      <linearGradient id="gradResolvidos" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%"  stopColor="#10b981" stopOpacity={0.35} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}    />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-                    <Tooltip formatter={(v: unknown, name?: string) => [`${v} chamados`, name === 'abertos' ? 'Abertos' : 'Resolvidos']} />
-                    <Legend formatter={(val: string) => val === 'abertos' ? 'Abertos' : 'Resolvidos'} />
-                    <Area type="monotone" dataKey="abertos"    stroke="#7c3aed" strokeWidth={2} fill="url(#gradAbertos)"    dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                    <Area type="monotone" dataKey="resolvidos" stroke="#10b981" strokeWidth={2} fill="url(#gradResolvidos)" dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              )}
-            </div>
+      <div className="rh-wrap rhrep-body">
+        {error && (
+          <div className="pub-alert rhrep-alert" role="alert">
+            <i className="ti ti-alert-circle" aria-hidden="true" />
+            <span>{error}</span>
+            <button type="button" onClick={() => void loadTickets()}>Tentar de novo</button>
           </div>
+        )}
 
-          {/* Team performance */}
-          <div className="rhr-charts-grid" style={{ marginBottom: 0 }}>
-            {/* Bar chart: by member */}
-            {byMemberChart.length > 0 && (
-              <div className="rhr-chart-card">
-                <h2 className="rhr-chart-title">Chamados por Atendente</h2>
-                <ResponsiveContainer width="100%" height={Math.max(180, byMemberChart.length * 44)}>
-                  <BarChart
-                    data={byMemberChart}
-                    layout="vertical"
-                    margin={{ top: 4, right: 50, left: 10, bottom: 4 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
-                    <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 11 }} />
-                    <Tooltip formatter={(v: unknown, name?: string) => [`${v}`, name === 'total' ? 'Total' : 'Resolvidos']} />
-                    <Legend formatter={(val: string) => val === 'total' ? 'Total' : 'Resolvidos'} />
-                    <Bar dataKey="total"      name="total"     fill="#7c3aed" radius={[0, 4, 4, 0]} label={{ position: 'right', fontSize: 11, fill: '#6b7280' }} />
-                    <Bar dataKey="resolvidos" name="resolvidos" fill="#10b981" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+        {loading ? (
+          <div className="rhrep-kpis">{[0, 1, 2, 3].map((n) => <div key={n} className="rh-skeleton" />)}</div>
+        ) : (
+          <>
+            <p className="rhrep-scope">
+              Mostrando <strong>{periodLabel.toLowerCase()}</strong>
+              {extraFilters > 0 && `, com ${extraFilters} ${extraFilters === 1 ? 'filtro' : 'filtros'}`}.
+              {newToday > 0 && (newToday === 1 ? ' Hoje chegou 1 chamado.' : ` Hoje chegaram ${newToday} chamados.`)}
+            </p>
+
+            <div className="rhrep-kpis">
+              {kpis.map((kpi) => (
+                <div key={kpi.key} className={`rh-card rhrep-kpi rhrep-kpi--${kpi.key}`}>
+                  <i className={`ti ${kpi.icon}`} aria-hidden="true" />
+                  <strong>{kpi.value}</strong>
+                  <span>{kpi.label}</span>
+                </div>
+              ))}
+            </div>
+
+            {total === 0 ? (
+              <div className="rh-card rh-empty">
+                <span className="pub-gicon pub-gicon--rh" aria-hidden="true"><i className="ti ti-chart-bar-off" /></span>
+                <h3>Nenhum chamado neste período</h3>
+                <p>Escolha um período maior ou limpe os filtros para ver os números.</p>
+              </div>
+            ) : (
+              <div className="rhrep-grid">
+                <section className="rh-card rhrep-panel" aria-labelledby="rhrep-cat-title">
+                  <h2 id="rhrep-cat-title">Assuntos mais pedidos</h2>
+                  <ul className="rhrep-bars">
+                    {byCategory.map((cat) => (
+                      <li key={cat.name}>
+                        <div className="rhrep-bars__label">
+                          <span>{cat.name}</span>
+                          <strong>{cat.value}</strong>
+                        </div>
+                        <div className="rhrep-bars__track">
+                          <span style={{ width: `${Math.max(4, (cat.value / maxCategory) * 100)}%` }} />
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+
+                <section className="rh-card rhrep-panel" aria-labelledby="rhrep-month-title">
+                  <h2 id="rhrep-month-title">Chamados por mês</h2>
+                  <p className="rhrep-panel__lead">Últimos 6 meses, sem contar os filtros.</p>
+                  {monthlyTrend.length === 0 ? (
+                    <p className="rhrep-panel__empty">Ainda não há meses para comparar.</p>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={260}>
+                      <BarChart data={monthlyTrend} margin={{ top: 10, right: 8, left: -18, bottom: 0 }} barGap={4}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ebe9f2" />
+                        <XAxis dataKey="month" tick={{ fontSize: 13, fill: '#5a6b63' }} axisLine={false} tickLine={false} />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#5a6b63' }} axisLine={false} tickLine={false} />
+                        <Tooltip
+                          cursor={{ fill: 'rgba(91,63,208,0.06)' }}
+                          formatter={(v: unknown, name?: string) => [`${v} chamados`, name === 'abertos' ? 'Recebidos' : 'Resolvidos']}
+                        />
+                        <Legend formatter={(val: string) => (val === 'abertos' ? 'Recebidos' : 'Resolvidos')} />
+                        <Bar dataKey="abertos" fill="#5b3fd0" radius={[6, 6, 0, 0]} />
+                        <Bar dataKey="resolvidos" fill="#1f9d5c" radius={[6, 6, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </section>
+
+                <section className="rh-card rhrep-panel rhrep-panel--wide" aria-labelledby="rhrep-team-title">
+                  <h2 id="rhrep-team-title">Atendimentos por pessoa da equipe</h2>
+                  <ul className="rhrep-team">
+                    {byMember.map((member) => {
+                      const rate = member.total > 0 ? Math.round((member.resolved / member.total) * 100) : 0;
+                      const unassigned = member.name === 'Não atribuído';
+                      return (
+                        <li key={member.name} className={unassigned ? 'is-unassigned' : ''}>
+                          <span className="rh-avatar" aria-hidden="true">{unassigned ? '?' : initialsOf(member.name)}</span>
+                          <div className="rhrep-team__who">
+                            <strong>{unassigned ? 'Sem responsável' : member.name}</strong>
+                            <span>
+                              {member.total} {member.total === 1 ? 'chamado' : 'chamados'}, {member.resolved} {member.resolved === 1 ? 'resolvido' : 'resolvidos'}
+                              {member.open > 0 && `, ${member.open} em aberto`}
+                            </span>
+                          </div>
+                          <div className="rhrep-team__rate" aria-label={`${rate}% resolvidos`}>
+                            <div className="rhrep-bars__track"><span style={{ width: `${rate}%` }} /></div>
+                            <span>{rate}%</span>
+                          </div>
+                          <span className="rhrep-team__time">
+                            {member.avgHours === '—' ? 'Sem tempo médio' : `Média de ${friendlyDuration(member.avgHours)}`}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
               </div>
             )}
-
-            {/* Table: member detail */}
-            <div className="rhr-chart-card" style={{ gridColumn: byMemberChart.length > 0 ? undefined : '1 / -1' }}>
-              <h2 className="rhr-chart-title">Performance Individual da Equipe</h2>
-              {byMember.length === 0 ? (
-                <p className="rhr-chart-empty">Sem dados</p>
-              ) : (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                    <thead>
-                      <tr style={{ background: '#f8f9fc' }}>
-                        {['#', 'Atendente', 'Total', 'Resolvidos', 'Em aberto', 'Tempo médio'].map(h => (
-                          <th key={h} style={{ padding: '0.55rem 0.75rem', textAlign: h === '#' || h === 'Total' || h === 'Resolvidos' || h === 'Em aberto' || h === 'Tempo médio' ? 'center' : 'left', fontSize: '0.68rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '2px solid #e5e7eb', whiteSpace: 'nowrap' }}>
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {byMember.map((m, i) => {
-                        const rate = m.total > 0 ? Math.round((m.resolved / m.total) * 100) : 0;
-                        return (
-                          <tr key={m.name} style={{ borderBottom: '1px solid #f3f4f6', background: i % 2 === 1 ? '#fafafe' : '#fff' }}>
-                            <td style={{ padding: '0.65rem 0.75rem', textAlign: 'center', color: '#9ca3af', fontWeight: 600, fontSize: '0.75rem' }}>{i + 1}</td>
-                            <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600, color: '#111827' }}>{m.name}</td>
-                            <td style={{ padding: '0.65rem 0.75rem', textAlign: 'center', fontWeight: 700, color: '#7c3aed' }}>{m.total}</td>
-                            <td style={{ padding: '0.65rem 0.75rem', textAlign: 'center' }}>
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                                <span style={{ fontWeight: 700, color: '#10b981' }}>{m.resolved}</span>
-                                <span style={{ fontSize: '0.7rem', color: '#9ca3af' }}>({rate}%)</span>
-                              </span>
-                            </td>
-                            <td style={{ padding: '0.65rem 0.75rem', textAlign: 'center', fontWeight: 600, color: m.open > 0 ? '#f59e0b' : '#9ca3af' }}>{m.open}</td>
-                            <td style={{ padding: '0.65rem 0.75rem', textAlign: 'center', color: '#6b7280', fontWeight: 500 }}>{m.avgHours}h</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
+          </>
+        )}
+      </div>
     </div>
   );
+}
+
+/** "3 horas", "2 dias" — tempo como se fala. */
+function friendlyDuration(hours: string) {
+  const value = Number(hours);
+  if (!Number.isFinite(value)) return '—';
+  if (value < 1) return `${Math.max(1, Math.round(value * 60))} min`;
+  if (value < 24) {
+    const h = Math.round(value);
+    return `${h} ${h === 1 ? 'hora' : 'horas'}`;
+  }
+  const days = Math.round((value / 24) * 10) / 10;
+  return `${String(days).replace('.', ',')} ${days === 1 ? 'dia' : 'dias'}`;
 }

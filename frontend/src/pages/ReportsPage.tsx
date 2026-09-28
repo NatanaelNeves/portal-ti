@@ -290,6 +290,10 @@ const ReportsPage: React.FC = () => {
           ),
         ]);
 
+        // Uma resposta de erro não pode virar "dado": a tela quebraria inteira.
+        if (!overviewResponse.ok) {
+          throw new Error(`HTTP error! status: ${overviewResponse.status}`);
+        }
         const overview = await overviewResponse.json();
         setOverviewStats(overview);
 
@@ -305,6 +309,9 @@ const ReportsPage: React.FC = () => {
             signal,
           }
         );
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
         const data = await response.json();
         setTechnicianStats(data);
       } else if (activeTab === 'sla') {
@@ -538,7 +545,7 @@ const ReportsPage: React.FC = () => {
 
   return (
     <div className="reports-page">
-      <div className="reports-header">
+      <div className="reports-header pub-aurora">
         <div>
           <h1 className="page-title">Impacto da operação</h1>
           <p className="reports-subtitle">Uma leitura executiva do volume entregue, da velocidade do atendimento e da qualidade percebida.</p>

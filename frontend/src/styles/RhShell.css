@@ -1,0 +1,611 @@
+/* ════════════════════════════════════════════════════════════════
+   ÁREA DO RH — moldura e tokens compartilhados
+   Pensada para quem usa pouco o computador: tudo à vista, textos
+   grandes, alvos de toque generosos e o botão Sair sempre visível.
+   Reaproveita os tokens --pub-* de PublicShell.css.
+   ════════════════════════════════════════════════════════════════ */
+
+:root {
+  --rh-violet: #5b3fd0;
+  --rh-violet-deep: #3f2a9e;
+  --rh-violet-wash: #efebfd;
+  --rh-canvas: #f4f4f8;
+  --rh-bottom-h: 72px;
+}
+
+.main-content:has(> .rh-page) {
+  padding: 0;
+  background: var(--rh-canvas);
+}
+
+.rh-page {
+  min-height: calc(100vh - var(--pub-header-h));
+  padding-bottom: calc(var(--rh-bottom-h) + env(safe-area-inset-bottom));
+  background: var(--rh-canvas);
+  font-size: 1.0625rem; /* 17px: leitura confortável */
+}
+
+.rh-wrap {
+  width: 100%;
+  max-width: 1120px;
+  margin-inline: auto;
+  padding-inline: var(--pub-gutter);
+}
+
+/* ── Cabeçalho ─────────────────────────────────────────────────── */
+.rhs-header {
+  position: sticky;
+  top: 0;
+  z-index: 900;
+  color: #fff;
+  background: var(--pub-evergreen);
+  border-bottom: 3px solid var(--rh-violet);
+  font-family: var(--pub-body);
+}
+
+.rhs-header__bar {
+  max-width: 1120px;
+  height: var(--pub-header-h);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-inline: auto;
+  padding-inline: var(--pub-gutter);
+}
+
+.rhs-header button:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.rhs-header :focus-visible,
+.rhs-bottom :focus-visible {
+  outline: 3px solid var(--pub-sun);
+  outline-offset: 2px;
+}
+
+.rhs-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  text-align: left;
+}
+
+.rhs-brand__copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.rhs-brand__copy strong {
+  font: 700 1.02rem/1.15 var(--pub-display);
+  white-space: nowrap;
+}
+
+.rhs-brand__copy small {
+  color: rgba(226, 244, 233, 0.72);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.rhs-tabs {
+  display: none;
+}
+
+.rhs-user,
+.rhs-open {
+  display: none;
+}
+
+/* Na barra de baixo, "Abrir chamado" leva o amarelo de ação. */
+.rhs-bottom .rhs-tab:last-child .rhs-tab__icon {
+  color: #7a5200;
+  background: #fdf1dc;
+}
+
+.rhs-bottom .rhs-tab:last-child[aria-current='page'] {
+  color: #7a5200;
+}
+
+.rhs-bottom .rhs-tab:last-child[aria-current='page'] .rhs-tab__icon {
+  background: var(--pub-sun);
+}
+
+/* Páginas de fora da área do RH (abrir chamado, acompanhar pedido)
+   também precisam de espaço para a barra de baixo. */
+@media (max-width: 899px) {
+  body:has(.rhs-bottom) .main-content:not(:has(> .rh-page)) {
+    padding-bottom: calc(var(--rh-bottom-h) + env(safe-area-inset-bottom) + 16px);
+  }
+
+  body:has(.rhs-bottom) .otp-bar {
+    bottom: calc(var(--rh-bottom-h) + env(safe-area-inset-bottom));
+    padding-bottom: 12px;
+    box-shadow: none;
+  }
+}
+
+/* Sair: sempre visível, com texto. Foi o que a equipe não encontrava. */
+.rhs-logout {
+  margin-left: auto;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px 0 14px;
+  color: var(--pub-evergreen);
+  background: #fff;
+  border: 0;
+  border-radius: 999px;
+  font: 700 0.98rem/1 var(--pub-body);
+  white-space: nowrap;
+  transition: background-color 0.15s ease;
+}
+
+.rhs-logout i {
+  font-size: 1.2rem;
+}
+
+.rhs-logout:hover {
+  background: #fde8e6;
+  color: #9c1f16;
+}
+
+/* ── Abas ──────────────────────────────────────────────────────── */
+.rhs-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(236, 248, 241, 0.82);
+  background: none;
+  border: 0;
+  font-family: var(--pub-body);
+}
+
+.rhs-tab__icon {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+}
+
+.rhs-tab__icon i {
+  font-size: 1.3rem;
+}
+
+.rhs-tab__badge {
+  position: absolute;
+  top: -7px;
+  right: -11px;
+  min-width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  padding: 0 5px;
+  color: var(--pub-evergreen);
+  background: var(--pub-sun);
+  border: 2px solid var(--pub-evergreen);
+  border-radius: 999px;
+  font: 800 0.68rem/1 var(--pub-body);
+}
+
+/* Barra inferior (celular) */
+.rhs-bottom {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 900;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.3fr);
+  height: calc(var(--rh-bottom-h) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: #fff;
+  border-top: 1px solid #e3e1ee;
+  box-shadow: 0 -10px 30px -20px rgba(20, 10, 60, 0.35);
+}
+
+.rhs-tab--bottom {
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  color: #5d5a70;
+  border-radius: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.rhs-tab--bottom .rhs-tab__icon {
+  width: 56px;
+  height: 32px;
+  border-radius: 999px;
+  transition: background-color 0.2s ease;
+}
+
+.rhs-tab--bottom[aria-current='page'] {
+  color: var(--rh-violet-deep);
+  font-weight: 800;
+}
+
+.rhs-tab--bottom[aria-current='page'] .rhs-tab__icon {
+  background: var(--rh-violet-wash);
+}
+
+.rhs-tab--bottom .rhs-tab__badge {
+  top: -4px;
+  right: 6px;
+  border-color: #fff;
+}
+
+@media (min-width: 900px) {
+  .rh-page {
+    padding-bottom: 0;
+  }
+
+  .rhs-bottom {
+    display: none;
+  }
+
+  .rhs-tabs {
+    display: flex;
+    align-items: stretch;
+    height: 100%;
+    gap: 4px;
+    margin-left: 28px;
+  }
+
+  .rhs-tab--top {
+    padding: 0 16px;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .rhs-tab--top:hover {
+    color: #fff;
+  }
+
+  .rhs-tab--top[aria-current='page'] {
+    color: #fff;
+    font-weight: 800;
+  }
+
+  .rhs-tab--top[aria-current='page']::after {
+    content: '';
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: -3px;
+    height: 4px;
+    border-radius: 4px 4px 0 0;
+    background: var(--pub-sun);
+  }
+
+  .rhs-open {
+    margin-left: auto;
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 16px 0 14px;
+    color: var(--pub-evergreen);
+    background: linear-gradient(180deg, #ffd978, var(--pub-sun));
+    border: 0;
+    border-radius: 999px;
+    font: 700 0.95rem/1 var(--pub-body);
+    white-space: nowrap;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset;
+  }
+
+  .rhs-open i {
+    font-size: 1.15rem;
+  }
+
+  .rhs-open[aria-current='page'] {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+  }
+
+  .rhs-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: 16px;
+    color: rgba(236, 248, 241, 0.9);
+    font-weight: 600;
+  }
+
+  .rhs-user__avatar {
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    color: #fff;
+    background: var(--rh-violet);
+    border-radius: 50%;
+    font: 800 0.95rem/1 var(--pub-display);
+  }
+
+  .rhs-logout {
+    margin-left: 8px;
+  }
+}
+
+/* ── Primitivas da área do RH ──────────────────────────────────── */
+.rh-page h1,
+.rh-page h2,
+.rh-page h3 {
+  color: var(--pub-ink);
+}
+
+.rh-card {
+  background: #fff;
+  border: 1px solid #e3e1ee;
+  border-radius: 20px;
+  box-shadow: 0 1px 2px rgba(20, 10, 60, 0.04);
+}
+
+.rh-section-title {
+  margin: 0;
+  font: 800 1.35rem/1.2 var(--pub-display);
+  letter-spacing: -0.02em;
+}
+
+.rh-section-lead {
+  margin: 4px 0 0;
+  color: var(--pub-muted);
+  font-size: 1rem;
+}
+
+/* Etiqueta de situação com cor + texto (nunca só cor). */
+.rh-status {
+  --tone: #5d5a70;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 10px;
+  color: var(--tone);
+  background: color-mix(in srgb, var(--tone) 11%, #fff);
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.rh-status::before {
+  content: '';
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.rh-status--new { --tone: #a15c00; }
+.rh-status--progress { --tone: #0f7a4a; }
+.rh-status--waiting { --tone: #5b3fd0; }
+.rh-status--done { --tone: #1f7a4d; }
+.rh-status--closed { --tone: #6b6880; }
+
+.rh-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  color: var(--rh-violet-deep);
+  background: var(--rh-violet-wash);
+  border-radius: 8px;
+  font-size: 0.87rem;
+  font-weight: 700;
+}
+
+.rh-tag--urgent {
+  color: #9c1f16;
+  background: #fde8e6;
+}
+
+.rh-avatar {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--rh-violet-deep);
+  background: var(--rh-violet-wash);
+  border-radius: 50%;
+  font: 800 1rem/1 var(--pub-display);
+}
+
+.rh-empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.rh-empty .pub-gicon {
+  width: 56px;
+  height: 56px;
+  font-size: 1.7rem;
+}
+
+.rh-empty h3 {
+  margin: 8px 0 0;
+  font: 800 1.25rem/1.2 var(--pub-display);
+}
+
+.rh-empty p {
+  max-width: 40ch;
+  margin: 0;
+  color: var(--pub-muted);
+}
+
+.rh-skeleton {
+  height: 120px;
+  background: linear-gradient(90deg, #e9e8f0 0%, #f7f7fb 50%, #e9e8f0 100%);
+  background-size: 200% 100%;
+  border-radius: 20px;
+  animation: rh-shimmer 1.2s linear infinite;
+}
+
+@keyframes rh-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rh-skeleton {
+    animation: none;
+  }
+}
+
+/* ── Cartão de chamado (Início e Chamados) ─────────────────────── */
+.rhc {
+  position: relative;
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  background: #fff;
+  border: 1px solid #e3e1ee;
+  border-radius: 20px;
+  box-shadow: 0 1px 2px rgba(20, 10, 60, 0.04);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.rhc:hover {
+  border-color: #cfc9e8;
+  box-shadow: 0 14px 30px -22px rgba(40, 20, 120, 0.45);
+}
+
+/* Novos sem responsável: borda de atenção à esquerda. */
+.rhc--new {
+  border-color: #f0d9a6;
+  box-shadow: inset 5px 0 0 var(--pub-sun), 0 1px 2px rgba(20, 10, 60, 0.04);
+}
+
+.rhc--new:hover {
+  box-shadow: inset 5px 0 0 var(--pub-sun), 0 14px 30px -22px rgba(40, 20, 120, 0.45);
+}
+
+.rhc__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rhc__cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--rh-violet-deep);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.rhc__cat i {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(155deg, #8f74ff, var(--rh-violet));
+  border-radius: 10px;
+  font-size: 1.1rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.rhc__title {
+  margin: 0;
+  font: 700 1.2rem/1.3 var(--pub-body);
+}
+
+.rhc__title button {
+  padding: 0;
+  color: var(--pub-ink);
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  font: inherit;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.rhc__title button:hover {
+  text-decoration: underline;
+  text-decoration-color: #c9c2ea;
+  text-underline-offset: 4px;
+}
+
+.rhc__person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rhc__person-copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.rhc__person-copy strong {
+  font-size: 1rem;
+}
+
+.rhc__person-copy span {
+  color: var(--pub-muted);
+  font-size: 0.9rem;
+}
+
+.rhc__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  color: var(--pub-muted);
+  font-size: 0.93rem;
+}
+
+.rhc__meta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rhc__meta .is-late {
+  color: #9c1f16;
+  font-weight: 700;
+}
+
+.rhc__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.rhc__actions .pub-btn {
+  min-height: 50px;
+}
+
+.rhc__main {
+  flex: 1 1 220px;
+}
+
+@media (min-width: 720px) {
+  .rhc {
+    padding: 22px 24px;
+  }
+
+  .rhc__main {
+    flex: 0 0 auto;
+  }
+}

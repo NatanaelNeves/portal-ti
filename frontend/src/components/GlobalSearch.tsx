@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { statusPresentation } from '../utils/ticketStatus';
 import '../styles/GlobalSearch.css';
 
 interface SearchResult {
@@ -49,10 +50,25 @@ const GlobalSearch: React.FC = () => {
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Ctrl+K shortcut
+  // Atalhos: "/" sempre abre esta busca; Ctrl+K também, a menos que a página
+  // tenha a própria busca (marcada com data-page-search), que tem prioridade.
+  const location = useLocation();
+  const [pageHasSearch, setPageHasSearch] = useState(false);
+
   useEffect(() => {
+    const timer = window.setTimeout(() => setPageHasSearch(!!document.querySelector('[data-page-search]')), 300);
+    return () => window.clearTimeout(timer);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const isTyping = (target: EventTarget | null) => {
+      const el = target as HTMLElement | null;
+      return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+    };
     const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      const ctrlK = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k';
+      const slash = e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey && !isTyping(e.target);
+      if ((ctrlK && !document.querySelector('[data-page-search]')) || slash) {
         e.preventDefault();
         inputRef.current?.focus();
         setIsOpen(q => query.length >= 2 ? true : q);
@@ -107,9 +123,8 @@ const GlobalSearch: React.FC = () => {
 
       if (ticketRes.status === 'fulfilled') {
         const data = ticketRes.value;
-        setTickets((data.data || []).filter((t: TicketResult) =>
-          t.title?.toLowerCase().includes(query.toLowerCase())
-        ).slice(0, 5));
+        // O servidor já busca em título, descrição e solicitante.
+        setTickets((data.data || []).slice(0, 5));
       }
 
       if (articleRes.status === 'fulfilled') {
@@ -144,160 +159,128 @@ const GlobalSearch: React.FC = () => {
     setIsOpen(false);
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusMap: { [key: string]: { label: string; color: string } } = {
-      available: { label: 'Disponível', color: '#10b981' },
-      in_use: { label: 'Em Uso', color: '#3b82f6' },
-      maintenance: { label: 'Manutenção', color: '#f59e0b' },
-      storage: { label: 'Estoque', color: '#6b7280' },
-      disposed: { label: 'Descartado', color: '#ef4444' }
-    };
-    
-    const config = statusMap[status] || { label: status, color: '#6b7280' };
-    return <span className="status-badge" style={{ backgroundColor: config.color }}>{config.label}</span>;
+  const EQUIPMENT_STATUS: Record<string, { label: string; tone: string }> = {
+    available: { label: 'Disponível', tone: 'ok' },
+    in_use: { label: 'Em uso', tone: 'info' },
+    maintenance: { label: 'Manutenção', tone: 'warn' },
+    storage: { label: 'Estoque', tone: 'muted' },
+    disposed: { label: 'Descartado', tone: 'late' },
   };
+  const PRIORITY: Record<string, string> = { low: 'Baixa', medium: 'Média', high: 'Alta', urgent: 'Urgente', critical: 'Crítica' };
+
+  const close = () => { setIsOpen(false); setQuery(''); };
+  const equipments = results?.results.equipments ?? [];
+  const people = results?.results.people ?? [];
+  const movements = results?.results.movements ?? [];
+  const total = equipments.length + people.length + movements.length + tickets.length + articles.length;
 
   return (
     <div className="global-search" ref={searchRef}>
-      <div className="search-input-wrapper">
+      <label className="gs-input">
+        <i className="ti ti-search" aria-hidden="true" />
+        <span className="pub-sr-only">Buscar chamados, equipamentos, pessoas e artigos</span>
         <input
           ref={inputRef}
-          type="text"
-          className="search-input"
-          placeholder="🔍 Buscar... (Ctrl+K)"
+          type="search"
+          placeholder="Buscar chamados, equipamentos, pessoas…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => query.length >= 2 && setIsOpen(true)}
+          aria-expanded={isOpen}
+          aria-controls="gs-results"
         />
-        {loading && <div className="search-spinner">⏳</div>}
-      </div>
+        {loading
+          ? <span className="gs-spinner" aria-hidden="true" />
+          : <kbd className="gs-kbd" title={pageHasSearch ? 'Ctrl K busca nesta página' : undefined}>{pageHasSearch ? '/' : 'Ctrl K'}</kbd>}
+      </label>
 
-      {isOpen && results && (
-        <div className="search-results-dropdown">
-          <div className="search-results-header">
-            <span>{results.totalResults} resultado{results.totalResults !== 1 ? 's' : ''} para "{results.query}"</span>
-          </div>
+      {isOpen && (
+        <div className="gs-dropdown" id="gs-results">
+          <p className="gs-summary">
+            {total === 0
+              ? `Nada encontrado para "${query}". Tente código, nome, título ou categoria.`
+              : `${total} ${total === 1 ? 'resultado' : 'resultados'} para "${query}"`}
+          </p>
 
-          {/* Equipments Section */}
-          {results.results.equipments.length > 0 && (
-            <div className="results-section">
-              <div className="section-header">💻 Equipamentos ({results.results.equipments.length})</div>
-              {results.results.equipments.map((item, index) => (
-                <div
-                  key={index}
-                  className="result-item"
-                  onClick={() => handleEquipmentClick(item.id!)}
-                >
-                  <div className="result-icon">📦</div>
-                  <div className="result-content">
-                    <div className="result-title">
-                      <strong>{item.code}</strong> - {item.type} {item.brand} {item.model}
-                    </div>
-                    <div className="result-meta">
-                      {item.serial_number && <span>SN: {item.serial_number}</span>}
-                      {item.responsible_name && <span>👤 {item.responsible_name}</span>}
-                      {item.unit && <span>🏢 {item.unit}</span>}
-                    </div>
-                  </div>
-                  <div className="result-badge">
-                    {item.status && getStatusBadge(item.status)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* People Section */}
-          {results.results.people.length > 0 && (
-            <div className="results-section">
-              <div className="section-header">👥 Pessoas ({results.results.people.length})</div>
-              {results.results.people.map((item, index) => (
-                <div
-                  key={index}
-                  className="result-item"
-                  onClick={() => handlePersonClick(item.name!)}
-                >
-                  <div className="result-icon">👤</div>
-                  <div className="result-content">
-                    <div className="result-title">
-                      <strong>{item.name}</strong>
-                    </div>
-                    <div className="result-meta">
-                      {item.department && <span>💼 {item.department}</span>}
-                      {item.unit && <span>🏢 {item.unit}</span>}
-                      {item.equipment_count !== undefined && (
-                        <span>📦 {item.equipment_count} equipamento{item.equipment_count !== 1 ? 's' : ''}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Movements Section */}
-          {results.results.movements.length > 0 && (
-            <div className="results-section">
-              <div className="section-header">🔄 Movimentações ({results.results.movements.length})</div>
-              {results.results.movements.map((item, index) => (
-                <div
-                  key={index}
-                  className="result-item"
-                  onClick={() => handleMovementClick(item.movement_number!)}
-                >
-                  <div className="result-icon">📋</div>
-                  <div className="result-content">
-                    <div className="result-title">
-                      <strong>{item.movement_number}</strong> - {item.type === 'delivery' ? 'Entrega' : 'Devolução'}
-                    </div>
-                    <div className="result-meta">
-                      {item.equipment_code && <span>📦 {item.equipment_code}</span>}
-                      {item.responsible_name && <span>👤 {item.responsible_name}</span>}
-                      {item.date && <span>📅 {new Date(item.date).toLocaleDateString('pt-BR')}</span>}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Tickets Section */}
           {tickets.length > 0 && (
-            <div className="results-section">
-              <div className="section-header">🎫 Chamados ({tickets.length})</div>
-              {tickets.map(t => (
-                <div key={t.id} className="result-item" onClick={() => { navigate(`/admin/chamados/${t.id}`); setIsOpen(false); setQuery(''); }}>
-                  <div className="result-icon">📋</div>
-                  <div className="result-content">
-                    <div className="result-title">{t.title}</div>
-                    <div className="result-meta"><span>{t.status}</span><span>{t.priority}</span></div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <section className="gs-group">
+              <h3><i className="ti ti-inbox" aria-hidden="true" />Chamados</h3>
+              {tickets.map((t) => {
+                const status = statusPresentation(t.status);
+                return (
+                  <button key={t.id} type="button" className="gs-item" onClick={() => { navigate(`/admin/chamados/${t.id}`); close(); }}>
+                    <span className="gs-item__main">
+                      <strong>{t.title}</strong>
+                      <span>#{t.id.substring(0, 8).toUpperCase()}, prioridade {(PRIORITY[t.priority] || t.priority).toLowerCase()}</span>
+                    </span>
+                    <span className="gs-tag">{status.label}</span>
+                  </button>
+                );
+              })}
+            </section>
           )}
 
-          {/* Articles Section */}
+          {equipments.length > 0 && (
+            <section className="gs-group">
+              <h3><i className="ti ti-device-laptop" aria-hidden="true" />Equipamentos</h3>
+              {equipments.map((item, index) => {
+                const st = item.status ? EQUIPMENT_STATUS[item.status] ?? { label: item.status, tone: 'muted' } : null;
+                return (
+                  <button key={item.id || index} type="button" className="gs-item" onClick={() => handleEquipmentClick(item.id!)}>
+                    <span className="gs-item__main">
+                      <strong>{item.code} {[item.type, item.brand, item.model].filter(Boolean).join(' ')}</strong>
+                      <span>{[item.serial_number && `Série ${item.serial_number}`, item.responsible_name, item.unit].filter(Boolean).join(', ')}</span>
+                    </span>
+                    {st && <span className={`gs-tag gs-tag--${st.tone}`}>{st.label}</span>}
+                  </button>
+                );
+              })}
+            </section>
+          )}
+
+          {people.length > 0 && (
+            <section className="gs-group">
+              <h3><i className="ti ti-user" aria-hidden="true" />Pessoas</h3>
+              {people.map((item, index) => (
+                <button key={`${item.name}-${index}`} type="button" className="gs-item" onClick={() => handlePersonClick(item.name!)}>
+                  <span className="gs-item__main">
+                    <strong>{item.name}</strong>
+                    <span>
+                      {[item.department, item.unit].filter(Boolean).join(', ')}
+                      {item.equipment_count !== undefined && ` ${item.equipment_count} ${item.equipment_count === 1 ? 'equipamento' : 'equipamentos'}`}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </section>
+          )}
+
+          {movements.length > 0 && (
+            <section className="gs-group">
+              <h3><i className="ti ti-arrows-exchange" aria-hidden="true" />Movimentações</h3>
+              {movements.map((item, index) => (
+                <button key={item.movement_number || index} type="button" className="gs-item" onClick={() => handleMovementClick(item.movement_number!)}>
+                  <span className="gs-item__main">
+                    <strong>{item.movement_number}, {item.type === 'delivery' ? 'entrega' : 'devolução'}</strong>
+                    <span>{[item.equipment_code, item.responsible_name, item.date && new Date(item.date).toLocaleDateString('pt-BR')].filter(Boolean).join(', ')}</span>
+                  </span>
+                </button>
+              ))}
+            </section>
+          )}
+
           {articles.length > 0 && (
-            <div className="results-section">
-              <div className="section-header">📚 Artigos ({articles.length})</div>
-              {articles.map(a => (
-                <div key={a.id} className="result-item" onClick={() => { navigate('/central'); setIsOpen(false); setQuery(''); }}>
-                  <div className="result-icon">📖</div>
-                  <div className="result-content">
-                    <div className="result-title">{a.title}</div>
-                    <div className="result-meta"><span>{a.category}</span></div>
-                  </div>
-                </div>
+            <section className="gs-group">
+              <h3><i className="ti ti-help-circle" aria-hidden="true" />Central de dúvidas</h3>
+              {articles.map((a) => (
+                <button key={a.id} type="button" className="gs-item" onClick={() => { navigate(`/central#${a.id}`); close(); }}>
+                  <span className="gs-item__main">
+                    <strong>{a.title}</strong>
+                    <span>{a.category}</span>
+                  </span>
+                </button>
               ))}
-            </div>
-          )}
-
-          {(!results || results.totalResults === 0) && tickets.length === 0 && articles.length === 0 && (
-            <div className="no-results">
-              <p>Nenhum resultado encontrado para "{query}"</p>
-              <small>Tente buscar por código, nome, título ou categoria</small>
-            </div>
+            </section>
           )}
         </div>
       )}

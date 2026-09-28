@@ -84,8 +84,17 @@ export default function MyTicketsPage() {
   };
 
   useEffect(() => {
+    // O RH usa esta tela para acompanhar o que pediu a outras equipes; as
+    // demais equipes internas seguem para a própria central.
     const isInternalUser = !!localStorage.getItem('internal_token');
-    if (isInternalUser) {
+    const isRhStaff = (() => {
+      try {
+        return JSON.parse(localStorage.getItem('internal_user') || 'null')?.role === 'rh_staff';
+      } catch {
+        return false;
+      }
+    })();
+    if (isInternalUser && !isRhStaff) {
       navigate('/admin/chamados', { replace: true });
       return;
     }
@@ -97,7 +106,11 @@ export default function MyTicketsPage() {
       setEmail(storedEmail);
       fetchTickets(storedToken);
     } else {
-      setSearchEmail(storedEmail || '');
+      let accountEmail = '';
+      try {
+        accountEmail = JSON.parse(localStorage.getItem('internal_user') || 'null')?.email || '';
+      } catch { /* sem conta interna */ }
+      setSearchEmail(storedEmail || accountEmail);
       setShowEmailForm(true);
       setLoading(false);
     }

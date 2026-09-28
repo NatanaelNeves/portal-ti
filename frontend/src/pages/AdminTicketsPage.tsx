@@ -956,7 +956,7 @@ export default function AdminTicketsPage() {
                     document.getElementById(`ticket-toggle-${ticket.id}`)?.focus({ preventScroll: true });
                   };
                   return (
-                    <article key={ticket.id} role="listitem" className={`ticket-card tk-ticket-row ${expanded ? 'active' : ''} ${selectedIds.has(ticket.id) ? 'ticket-card--selected' : ''}`} onClick={event => {
+                    <article key={ticket.id} role="listitem" data-priority={ticket.priority} data-status={ticket.status} className={`ticket-card tk-ticket-row ${expanded ? 'active' : ''} ${selectedIds.has(ticket.id) ? 'ticket-card--selected' : ''}`} onClick={event => {
                       if (!(event.target as HTMLElement).closest('button, input, a, [role="menu"], .tk-inline-details')) toggleDetails();
                     }}>
                       <input type="checkbox" className="ticket-checkbox" checked={selectedIds.has(ticket.id)} onChange={() => {}} onClick={(e) => toggleSelect(ticket.id, e)} aria-label={`Selecionar ${ticket.title}`} />

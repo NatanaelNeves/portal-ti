@@ -1,0 +1,384 @@
+/* ════════════════════════════════════════════════════════════════
+   SOLICITAÇÕES — pele visual da Central de Chamados
+   Carregada por último e restrita à página dentro da moldura nova.
+   Muda só a aparência: estrutura e comportamento continuam os de
+   AdminTicketsPage (cobertos por testes).
+   ════════════════════════════════════════════════════════════════ */
+
+.tsh-shell ~ .main-content .tk-workspace {
+  --sk-line: var(--ti-line);
+  --sk-soft: var(--ti-line-soft);
+  padding: 22px 28px 40px;
+  background: transparent;
+  font-family: var(--pub-body);
+}
+
+/* ── Cabeçalho: cartão de comando sobre a aurora ───────────────── */
+.tsh-shell ~ .main-content .tk-workspace .tk-hero {
+  padding: 24px 26px 18px;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  box-shadow: 0 30px 60px -40px rgba(3, 40, 28, 0.9);
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-hero-title {
+  color: #fff;
+  font: 800 clamp(1.6rem, 2.6vw, 2.2rem)/1.08 var(--pub-display);
+  letter-spacing: -0.035em;
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-hero-scope {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-weight: 700;
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-hero-scope i {
+  color: var(--pub-sun);
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-hero-tagline {
+  color: rgba(232, 246, 238, 0.8);
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-new-ticket {
+  color: var(--pub-evergreen);
+  background: linear-gradient(180deg, #ffd978, var(--pub-sun));
+  border: 0;
+  border-radius: 999px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset, 0 12px 30px -12px rgba(246, 195, 80, 0.9);
+  font-weight: 800;
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-search {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 999px;
+  box-shadow: 0 16px 36px -22px rgba(0, 0, 0, 0.7);
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-search:focus-within {
+  box-shadow: 0 0 0 4px rgba(246, 195, 80, 0.55), 0 16px 36px -22px rgba(0, 0, 0, 0.7);
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-search input {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-hero .tk-btn--ghost {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-hero .tk-btn--ghost:hover,
+.tsh-shell ~ .main-content .tk-workspace .tk-hero .tk-btn--ghost.is-on {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-hero .tk-refresh-pending {
+  color: var(--pub-evergreen);
+  background: var(--pub-sun);
+  border-color: transparent;
+  animation: sk-nudge 1.8s ease-in-out infinite;
+}
+
+@keyframes sk-nudge {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(246, 195, 80, 0.6); }
+  50% { box-shadow: 0 0 0 8px rgba(246, 195, 80, 0); }
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-sync-status {
+  color: rgba(232, 246, 238, 0.72);
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-sync-status i {
+  color: #7fd9a4;
+}
+
+/* ── Abas Atendimento / Panorama e equipe ──────────────────────── */
+.tsh-shell ~ .main-content .tk-workspace .tk-viewbar {
+  margin-top: 18px;
+  border-bottom: 0;
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-view-switch {
+  gap: 4px;
+  padding: 4px;
+  background: #e8eeea;
+  border-radius: 999px;
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-view-switch button {
+  min-height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--ti-muted);
+  font-weight: 700;
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-view-switch button::after {
+  display: none;
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-view-switch button[aria-selected='true'],
+.tsh-shell ~ .main-content .tk-workspace .tk-view-switch button[aria-pressed='true'],
+.tsh-shell ~ .main-content .tk-workspace .tk-view-switch button.is-active,
+.tsh-shell ~ .main-content .tk-workspace .tk-view-switch button.active {
+  color: var(--ti-ink);
+  background: #fff;
+  box-shadow: 0 4px 12px -6px rgba(6, 60, 45, 0.45);
+}
+
+/* ── Filtros rápidos ───────────────────────────────────────────── */
+.tsh-shell ~ .main-content .tk-workspace .tk-quick {
+  gap: 8px;
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-chip {
+  min-height: 38px;
+  padding: 0 14px;
+  color: var(--ti-ink);
+  background: #fff;
+  border: 1px solid var(--sk-line);
+  border-radius: 999px;
+  font-weight: 700;
+  transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease, transform 0.1s ease;
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-chip:hover {
+  border-color: #b9c8bd;
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-chip:active {
+  transform: scale(0.97);
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-chip.is-active,
+.tsh-shell ~ .main-content .tk-workspace .tk-chip[aria-pressed='true'] {
+  color: #fff;
+  background: var(--pub-evergreen);
+  border-color: var(--pub-evergreen);
+  box-shadow: 0 8px 18px -10px rgba(6, 60, 45, 0.8);
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-chip.is-active i,
+.tsh-shell ~ .main-content .tk-workspace .tk-chip[aria-pressed='true'] i {
+  color: var(--pub-sun);
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-chip-count {
+  min-width: 22px;
+  color: var(--pub-evergreen);
+  background: #eef3ef;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-chip.is-active .tk-chip-count,
+.tsh-shell ~ .main-content .tk-workspace .tk-chip[aria-pressed='true'] .tk-chip-count {
+  background: var(--pub-sun);
+}
+
+/* ── Fila ──────────────────────────────────────────────────────── */
+.tsh-shell ~ .main-content .tk-workspace .ticket-queue {
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid var(--sk-line);
+  border-radius: 22px;
+  box-shadow: 0 24px 50px -44px rgba(6, 60, 45, 0.8);
+}
+
+.tsh-shell ~ .main-content .tk-workspace .queue-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--sk-soft);
+}
+
+.tsh-shell ~ .main-content .tk-workspace .queue-header h2 {
+  font: 800 1.1rem/1.2 var(--pub-display);
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-list-head {
+  color: var(--ti-muted);
+  background: #f7f9f8;
+  font-size: 0.76rem;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Linhas mais compactas, com uma faixa de prioridade à esquerda. */
+.tsh-shell ~ .main-content .tk-workspace .tk-ticket-row {
+  position: relative;
+  padding-top: 11px;
+  padding-bottom: 11px;
+  border-radius: 0;
+  transition: background-color 0.12s ease;
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-ticket-row::before {
+  content: '';
+  display: block;
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 5px;
+  border-radius: 0 5px 5px 0;
+  background: transparent;
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-ticket-row[data-priority='urgent']::before,
+.tsh-shell ~ .main-content .tk-workspace .tk-ticket-row[data-priority='critical']::before,
+.tsh-shell ~ .main-content .tk-workspace .tk-ticket-row[data-priority='high']::before {
+  background: var(--ti-late);
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-ticket-row[data-priority='medium']::before {
+  background: #e3a008;
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-ticket-row[data-priority='low']::before {
+  background: #7fd9a4;
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-ticket-row:hover {
+  background: #f7fbf8;
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-ticket-row.active {
+  background: #f1f8f3;
+  box-shadow: inset 0 0 0 1px #cfe3d6;
+}
+
+.tsh-shell ~ .main-content .tk-workspace .ticket-card--selected {
+  background: #fff8e6;
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-ticket-title {
+  font: 700 1rem/1.3 var(--pub-body);
+}
+
+@media (min-width: 900px) {
+  /* Uma camada antiga fixava 128px por linha; a TI lê mais por tela. */
+  .tsh-shell ~ .main-content .tk-workspace .tk-ticket-row {
+    min-height: 0;
+  }
+
+  .tsh-shell ~ .main-content .tk-workspace .tk-ticket-title {
+    min-height: 30px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-ticket-title:hover span {
+  text-decoration: underline;
+  text-decoration-color: #b9d6c4;
+  text-underline-offset: 4px;
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-ticket-requester {
+  margin-top: 2px;
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-unread-dot {
+  box-shadow: 0 0 0 4px rgba(20, 148, 90, 0.16);
+  animation: sk-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes sk-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(20, 148, 90, 0.35); }
+  50% { box-shadow: 0 0 0 6px rgba(20, 148, 90, 0); }
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-assume {
+  color: #fff;
+  background: linear-gradient(180deg, #169a5d, var(--pub-leaf));
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 12px;
+  box-shadow: 0 6px 14px -8px rgba(15, 122, 74, 0.9);
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-assume:hover {
+  background: var(--pub-leaf-hover);
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-ticket-age.is-overdue {
+  color: var(--ti-late);
+  font-weight: 700;
+}
+
+/* Detalhes abertos na linha */
+.tsh-shell ~ .main-content .tk-workspace .tk-inline-details {
+  border-top: 1px dashed #cfe3d6;
+  background: linear-gradient(180deg, #f5faf7, #fff 120px);
+  animation: sk-open 0.2s ease-out;
+}
+
+@keyframes sk-open {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Paginação */
+.tsh-shell ~ .main-content .tk-workspace .pagination {
+  padding: 14px 20px;
+  border-top: 1px solid var(--sk-soft);
+}
+
+.tsh-shell ~ .main-content .tk-workspace .pagination .btn {
+  border-radius: 999px;
+}
+
+/* ── Panorama ──────────────────────────────────────────────────── */
+.tsh-shell ~ .main-content .tk-workspace .tk-metric {
+  border: 1px solid var(--sk-line);
+  border-radius: 18px;
+  box-shadow: none;
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-metric-icon {
+  color: #fff;
+  background: linear-gradient(155deg, #25c178, #0b7a47);
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 8px 18px -10px rgba(18, 161, 95, 0.7);
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-metric-value {
+  font-family: var(--pub-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.tsh-shell ~ .main-content .tk-workspace .tk-panel,
+.tsh-shell ~ .main-content .tk-workspace .tk-workload,
+.tsh-shell ~ .main-content .tk-workspace .tk-insight {
+  border-radius: 18px;
+}
+
+@media (max-width: 899px) {
+  .tsh-shell ~ .main-content .tk-workspace {
+    padding: 14px 12px 32px;
+  }
+
+  .tsh-shell ~ .main-content .tk-workspace .tk-hero {
+    padding: 18px 16px 14px;
+    border-radius: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tsh-shell ~ .main-content .tk-workspace .tk-unread-dot,
+  .tsh-shell ~ .main-content .tk-workspace .tk-refresh-pending,
+  .tsh-shell ~ .main-content .tk-workspace .tk-inline-details {
+    animation: none;
+  }
+}

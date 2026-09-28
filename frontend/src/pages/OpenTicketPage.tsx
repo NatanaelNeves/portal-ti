@@ -90,7 +90,30 @@ const ALL_CATEGORIES = [...TI_CATEGORIES, ...ADMIN_CATEGORIES, ...RH_CATEGORIES]
 
 const PRIORITY_LABEL: Record<string, string> = { low: 'Baixa', medium: 'Média', high: 'Alta' };
 
+// Setor sugerido para quem está logado, pelo papel da conta.
+const ROLE_SECTOR: Record<string, string> = {
+  rh_staff: 'Recursos Humanos (RH)',
+  admin_staff: 'Administrativo',
+  it_staff: 'Tecnologia da Informação (TI)',
+};
+
+/**
+ * Quem está logado na área da equipe não precisa digitar nome e e-mail de
+ * novo: os dados vêm da conta.
+ */
+const loggedInRequester = (): { name: string; email: string; department: string } | null => {
+  if (!localStorage.getItem('internal_token')) return null;
+  try {
+    const user = JSON.parse(localStorage.getItem('internal_user') || 'null');
+    if (!user?.name || !user?.email) return null;
+    return { name: user.name, email: user.email, department: ROLE_SECTOR[user.role] || '' };
+  } catch {
+    return null;
+  }
+};
+
 const hasStoredRequester = () => {
+  if (loggedInRequester()) return true;
   try {
     const saved = JSON.parse(localStorage.getItem(REQUESTER_STORAGE_KEY) || 'null');
     return !!(saved?.email && saved?.name);
@@ -105,6 +128,7 @@ export default function OpenTicketPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [stepDirection, setStepDirection] = useState<'forward' | 'back'>('forward');
   const [isReturningUser, setIsReturningUser] = useState(false);
+  const [prefillFromAccount, setPrefillFromAccount] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     email: '',
     name: '',
@@ -129,6 +153,18 @@ export default function OpenTicketPage() {
 
   // Load remembered requester (name/email/setor/unidade) from a previous visit
   useEffect(() => {
+    const account = loggedInRequester();
+    if (account) {
+      let savedUnit = '';
+      try {
+        const saved = JSON.parse(localStorage.getItem(REQUESTER_STORAGE_KEY) || 'null');
+        if (saved?.email === account.email) savedUnit = saved.unit || '';
+      } catch { /* ignore */ }
+      setFormData(prev => ({ ...prev, ...account, unit: savedUnit || prev.unit }));
+      setIsReturningUser(true);
+      setPrefillFromAccount(true);
+      return;
+    }
     try {
       const raw = localStorage.getItem(REQUESTER_STORAGE_KEY);
       if (raw) {
@@ -877,7 +913,9 @@ export default function OpenTicketPage() {
                 {isReturningUser && (
                   <p className="otp-note">
                     <i className="ti ti-user-check" aria-hidden="true" />
-                    Preenchemos com os dados do seu último chamado. Se não for você, é só editar.
+                    {prefillFromAccount
+                      ? 'Preenchemos com os dados da sua conta. Confira e siga em frente.'
+                      : 'Preenchemos com os dados do seu último chamado. Se não for você, é só editar.'}
                   </p>
                 )}
 

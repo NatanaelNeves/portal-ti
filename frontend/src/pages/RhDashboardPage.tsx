@@ -1,277 +1,271 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { showToast } from '../utils/toast';
+import useTicketsOverview from '../hooks/useTicketsOverview';
+import RhTicketCard, { type RhTicket } from '../components/rh/RhTicketCard';
+import { ACTIVE_STATUSES, currentInternalUser, greeting } from '../components/rh/rhLabels';
 import '../styles/RhDashboardPage.css';
 
-interface RecentTicket {
-  id: string;
-  title: string;
-  status: string;
-  priority: string;
-  category?: string;
-  created_at: string;
-  updated_at: string;
-  requester_name?: string;
-}
-
-interface RhDashboardData {
-  total: number;
-  open: number;
-  inProgress: number;
-  waiting: number;
-  resolved: number;
-  closed: number;
-  newToday: number;
-  resolvedToday: number;
-  recentTickets: RecentTicket[];
-}
-
-const EMPTY_DATA: RhDashboardData = {
-  total: 0, open: 0, inProgress: 0, waiting: 0,
-  resolved: 0, closed: 0, newToday: 0, resolvedToday: 0,
-  recentTickets: [],
-};
-
-const RH_CATEGORY_LABELS: Record<string, string> = {
-  RH_ATESTADO:    'Atestado Médico',
-  RH_PONTO:       'Ajuste de Ponto',
-  RH_FOLHA:       'Folha de Pagamento',
-  RH_DECLARACAO:  'Declaração',
-  RH_BENEFICIOS:  'Benefícios',
-  RH_OUTROS:      'Outros RH',
-  RH_CONFIDENCIAL:'Confidencial',
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  open:                  'Aberto',
-  in_progress:           'Em Atendimento',
-  waiting_user:          'Aguardando',
-  aguardando_confirmacao:'Ag. Confirmação',
-  aguardando_aquisicao:'Ag. Aquisição',
-  aguardando_terceiros:'Ag. Terceiros',
-  resolved:              'Resolvido',
-  closed:                'Fechado',
-  cancelled:             'Cancelado',
-};
-
-const STATUS_CLASS: Record<string, string> = {
-  open:                  'rhd-badge rhd-badge-open',
-  in_progress:           'rhd-badge rhd-badge-progress',
-  waiting_user:          'rhd-badge rhd-badge-waiting',
-  aguardando_confirmacao:'rhd-badge rhd-badge-waiting',
-  aguardando_aquisicao:'rhd-badge rhd-badge-waiting',
-  aguardando_terceiros:'rhd-badge rhd-badge-waiting',
-  resolved:              'rhd-badge rhd-badge-resolved',
-  closed:                'rhd-badge rhd-badge-closed',
-};
-
-const STATUS_ICON: Record<string, string> = {
-  open: '🔴', in_progress: '🟡', waiting_user: '🟣',
-  aguardando_confirmacao: '🟣', aguardando_aquisicao: '🟣', aguardando_terceiros: '🔵',
-  resolved: '🟢', closed: '⚪',
-};
-
-const PRIORITY_LABEL: Record<string, string> = {
-  high: 'Alta', medium: 'Média', low: 'Baixa', critical: 'Crítica',
-};
-
-const PRIORITY_CLASS: Record<string, string> = {
-  high:     'rhd-badge rhd-badge-high',
-  critical: 'rhd-badge rhd-badge-critical',
-  medium:   'rhd-badge rhd-badge-medium',
-  low:      'rhd-badge rhd-badge-low',
-};
-
-function initials(name?: string) {
-  if (!name) return '?';
-  const parts = name.trim().split(' ').filter(Boolean);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
-function elapsed(dateString: string) {
-  const diffMs = Date.now() - new Date(dateString).getTime();
-  const m = Math.floor(diffMs / 60000);
-  if (m < 60) return `${Math.max(m, 1)} min`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h`;
-  return `${Math.floor(h / 24)}d`;
-}
+const PREVIEW_LIMIT = 4;
 
 export default function RhDashboardPage() {
   const navigate = useNavigate();
-  const [data, setData] = useState<RhDashboardData>(EMPTY_DATA);
+  const user = currentInternalUser();
+  const firstName = (user?.name || '').trim().split(/\s+/)[0];
+  const { overview, reload: reloadOverview } = useTicketsOverview('rh', true);
+
+  const [newTickets, setNewTickets] = useState<RhTicket[]>([]);
+  const [mineTickets, setMineTickets] = useState<RhTicket[]>([]);
+  const [mineTotal, setMineTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [currentUserName, setCurrentUserName] = useState('Equipe de RH');
+  const [assumingId, setAssumingId] = useState('');
 
   useEffect(() => {
     const token = localStorage.getItem('internal_token');
-    const userRaw = localStorage.getItem('internal_user');
-    if (!token || !userRaw) { navigate('/admin/login'); return; }
-    try {
-      const user = JSON.parse(userRaw) as { role?: string; name?: string };
-      if (!['rh_staff', 'admin'].includes(user.role || '')) { navigate('/admin/login'); return; }
-      setCurrentUserName(user.name || 'Equipe de RH');
-    } catch { navigate('/admin/login'); return; }
-    void fetchDashboard();
+    if (!token || !user || !['rh_staff', 'admin'].includes(user.role || '')) {
+      navigate('/admin/login');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
-  const fetchDashboard = async () => {
+  const load = useCallback(async () => {
+    if (!user) return;
     try {
-      setLoading(true);
-      const [allResp, recentResp] = await Promise.all([
-        api.get('/tickets?department=rh&limit=1'),
-        api.get('/tickets?department=rh&limit=10&sort=created_at&order=desc'),
+      const active = ACTIVE_STATUSES.map((s) => `status=${s}`).join('&');
+      const [newResp, mineResp] = await Promise.all([
+        api.get(`/tickets?department=rh&status=open&assigned_to=unassigned&limit=${PREVIEW_LIMIT}&sort=created_at&order=asc`),
+        api.get(`/tickets?department=rh&${active}&assigned_to=${user.id}&limit=${PREVIEW_LIMIT}&sort=updated_at&order=desc`),
       ]);
-      const stats = allResp.data?.stats || {};
-      const tickets: RecentTicket[] = recentResp.data?.data || [];
-      const total = recentResp.data?.pagination?.total || 0;
-      setData({
-        total,
-        open:          stats.waitingUser ?? 0,
-        inProgress:    stats.inProgress  ?? 0,
-        waiting:       0,
-        resolved:      tickets.filter(t => t.status === 'resolved').length,
-        closed:        tickets.filter(t => t.status === 'closed').length,
-        newToday:      stats.newToday     ?? 0,
-        resolvedToday: stats.resolvedToday ?? 0,
-        recentTickets: tickets,
-      });
+      setNewTickets(newResp.data?.data || []);
+      setMineTickets(mineResp.data?.data || []);
+      setMineTotal(mineResp.data?.pagination?.total ?? (mineResp.data?.data || []).length);
       setError('');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Erro ao carregar dashboard');
+      setError(err?.response?.data?.error || 'Não foi possível carregar os chamados. Confira a internet e toque em Tentar de novo.');
     } finally {
       setLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    void load();
+    const refresh = () => void load();
+    const events = ['ticket:new', 'ticket:updated', 'ticket:resolved', 'ticket:reopened'];
+    events.forEach((name) => window.addEventListener(name, refresh));
+    const timer = window.setInterval(refresh, 60_000);
+    return () => {
+      events.forEach((name) => window.removeEventListener(name, refresh));
+      window.clearInterval(timer);
+    };
+  }, [load]);
+
+  const assume = async (ticket: RhTicket) => {
+    if (!user) return;
+    try {
+      setAssumingId(ticket.id);
+      await api.patch(`/tickets/${ticket.id}`, { status: 'in_progress', assigned_to_id: user.id });
+      showToast.success('Chamado assumido. Agora ele está com você.');
+      navigate(`/rh/chamados/${ticket.id}`);
+    } catch (err: any) {
+      showToast.error(err?.response?.data?.error || 'Não foi possível assumir o chamado. Tente de novo.');
+      void load();
+      reloadOverview();
+    } finally {
+      setAssumingId('');
+    }
   };
 
-  const openCount = data.open + data.inProgress + data.waiting;
-  const progressPct = (n: number, max: number) =>
-    max === 0 ? 0 : Math.min(100, Math.round((n / max) * 100));
+  const unassigned = overview?.attention.unassigned ?? newTickets.length;
+  const waitingRequester = overview?.status.waitingUser ?? 0;
+  const resolvedToday = overview?.today.resolved ?? 0;
 
-  const kpis = [
-    {
-      tone: 'open', icon: '📂', label: 'Chamados Abertos',
-      value: openCount, barPct: progressPct(openCount, data.total),
-    },
-    {
-      tone: 'new', icon: '📥', label: 'Novos Hoje',
-      value: data.newToday, barPct: progressPct(data.newToday, Math.max(data.total, 1)),
-    },
-    {
-      tone: 'resolved', icon: '✅', label: 'Resolvidos Hoje',
-      value: data.resolvedToday, barPct: progressPct(data.resolvedToday, Math.max(data.newToday, 1)),
-    },
-    {
-      tone: 'total', icon: '👥', label: 'Total RH',
-      value: data.total, barPct: 100,
-    },
-  ];
+  const summary = loading
+    ? { text: 'Carregando os chamados do RH…', action: null as null | { label: string; tab: string } }
+    : unassigned > 0
+      ? {
+          text: unassigned === 1
+            ? 'Há 1 chamado novo esperando alguém do RH.'
+            : `Há ${unassigned} chamados novos esperando alguém do RH.`,
+          action: { label: 'Ver chamados novos', tab: 'novos' },
+        }
+      : mineTotal > 0
+        ? {
+            text: mineTotal === 1
+              ? 'Nenhum chamado novo. Você tem 1 atendimento em andamento.'
+              : `Nenhum chamado novo. Você tem ${mineTotal} atendimentos em andamento.`,
+            action: { label: 'Continuar meus atendimentos', tab: 'comigo' },
+          }
+        : { text: 'Tudo em dia. Nenhum chamado esperando por você.', action: null };
+
+  const openTab = (tab: string) => navigate(`/rh/chamados?aba=${tab}`);
+  const openTicket = (ticket: RhTicket) => navigate(`/rh/chamados/${ticket.id}`);
 
   return (
-    <div className="rhd-page">
-      {/* Header */}
-      <div className="rhd-header">
-        <div className="rhd-header-info">
-          <h1 className="rhd-title">Dashboard — Recursos Humanos</h1>
-          <p className="rhd-subtitle">Olá, {currentUserName} · {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</p>
-        </div>
-        <div className="rhd-header-actions">
-          <button className="rhd-btn rhd-btn-secondary" onClick={() => void fetchDashboard()}>↻ Atualizar</button>
-          <button className="rhd-btn rhd-btn-primary" onClick={() => navigate('/rh/chamados')}>
-            Ver Todos os Chamados →
-          </button>
-        </div>
-      </div>
+    <div className="pub-page rh-page rhd">
+      <section className="rhd-hero pub-aurora">
+        <div className="rh-wrap rhd-hero__inner">
+          <p className="rhd-hero__hello">
+            {greeting()}{firstName ? `, ${firstName}` : ''}.
+          </p>
+          <h1>{summary.text}</h1>
+          {summary.action && (
+            <button type="button" className="pub-btn pub-btn--sun rhd-hero__cta" onClick={() => openTab(summary.action!.tab)}>
+              <i className="ti ti-arrow-right" aria-hidden="true" />
+              {summary.action.label}
+            </button>
+          )}
 
-      {error && <div className="rhd-error">{error}</div>}
-
-      {loading ? (
-        <div className="rhd-loading">Carregando dashboard...</div>
-      ) : (
-        <>
-          {/* KPI cards */}
-          <div className="rhd-kpi-grid">
-            {kpis.map(kpi => (
-              <div key={kpi.label} className={`rhd-kpi-card rhd-kpi-${kpi.tone}`}>
-                <span className="rhd-kpi-bg-icon">{kpi.icon}</span>
-                <div className="rhd-kpi-label">{kpi.label}</div>
-                <div className="rhd-kpi-value">{kpi.value}</div>
-                <div className="rhd-kpi-bar-wrap">
-                  <div className="rhd-kpi-bar" style={{ width: `${kpi.barPct}%` }} />
-                </div>
-              </div>
-            ))}
+          <div className="rhd-counts" role="list">
+            <button type="button" role="listitem" className={`rhd-count ${unassigned > 0 ? 'is-alert' : ''}`} onClick={() => openTab('novos')}>
+              <strong>{loading ? '–' : unassigned}</strong>
+              <span>{unassigned === 1 ? 'novo esperando' : 'novos esperando'}</span>
+            </button>
+            <button type="button" role="listitem" className="rhd-count" onClick={() => openTab('comigo')}>
+              <strong>{loading ? '–' : mineTotal}</strong>
+              <span>com você</span>
+            </button>
+            <button type="button" role="listitem" className="rhd-count" onClick={() => openTab('abertos')}>
+              <strong>{overview ? waitingRequester : '–'}</strong>
+              <span>aguardando o solicitante</span>
+            </button>
+            <button type="button" role="listitem" className="rhd-count" onClick={() => openTab('encerrados')}>
+              <strong>{overview ? resolvedToday : '–'}</strong>
+              <span>{resolvedToday === 1 ? 'resolvido hoje' : 'resolvidos hoje'}</span>
+            </button>
           </div>
+        </div>
+      </section>
 
-          {/* Recent tickets */}
-          <div className="rhd-section">
-            <div className="rhd-section-header">
-              <div>
-                <div className="rhd-section-title">Chamados Recentes de RH</div>
-                <div className="rhd-section-subtitle">Últimos 10 chamados abertos</div>
-              </div>
-              <button className="rhd-link" onClick={() => navigate('/rh/chamados')}>
-                Ver todos →
-              </button>
+      <div className="rh-wrap rhd-body">
+        <div className="rhd-main">
+          {error && (
+            <div className="pub-alert rhd-alert" role="alert">
+              <i className="ti ti-alert-circle" aria-hidden="true" />
+              <span>{error}</span>
+              <button type="button" onClick={() => { setLoading(true); void load(); reloadOverview(); }}>Tentar de novo</button>
             </div>
+          )}
 
-            {data.recentTickets.length === 0 ? (
-              <div className="rhd-empty">Nenhum chamado de RH no momento.</div>
+          <section className="rhd-block" aria-labelledby="rhd-new-title">
+            <header className="rhd-block__head">
+              <div>
+                <h2 id="rhd-new-title" className="rh-section-title">Esperando alguém assumir</h2>
+                <p className="rh-section-lead">Os mais antigos aparecem primeiro.</p>
+              </div>
+              {unassigned > PREVIEW_LIMIT && (
+                <button type="button" className="rhd-more" onClick={() => openTab('novos')}>
+                  Ver todos os {unassigned}
+                </button>
+              )}
+            </header>
+
+            {loading ? (
+              <div className="rhd-list">{[0, 1].map((n) => <div key={n} className="rh-skeleton" />)}</div>
+            ) : newTickets.length === 0 ? (
+              <div className="rh-card rh-empty">
+                <span className="pub-gicon" aria-hidden="true"><i className="ti ti-mood-check" /></span>
+                <h3>Nenhum chamado novo</h3>
+                <p>Quando alguém pedir algo ao RH, o chamado aparece aqui para você assumir.</p>
+              </div>
             ) : (
-              <div className="rhd-table-wrap">
-                <table className="rhd-table">
-                  <thead>
-                    <tr>
-                      <th>Chamado</th>
-                      <th>Solicitante</th>
-                      <th>Status</th>
-                      <th>Prioridade</th>
-                      <th>Criado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.recentTickets.map((ticket, idx) => (
-                      <tr
-                        key={ticket.id}
-                        className={`rhd-row ${idx % 2 === 1 ? 'rhd-row--alt' : ''}`}
-                        onClick={() => navigate(`/rh/chamados/${ticket.id}`)}
-                      >
-                        <td>
-                          <div className="rhd-ticket-title">{ticket.title}</div>
-                          {ticket.category && (
-                            <div className="rhd-cat-text">
-                              {RH_CATEGORY_LABELS[ticket.category] || ticket.category}
-                            </div>
-                          )}
-                        </td>
-                        <td>
-                          <div className="rhd-avatar-cell">
-                            <div className="rhd-avatar">{initials(ticket.requester_name)}</div>
-                            <span className="rhd-requester-name">{ticket.requester_name || '—'}</span>
-                          </div>
-                        </td>
-                        <td>
-                          <span className={STATUS_CLASS[ticket.status] || 'rhd-badge'}>
-                            {STATUS_ICON[ticket.status] || ''} {STATUS_LABEL[ticket.status] || ticket.status}
-                          </span>
-                        </td>
-                        <td>
-                          <span className={PRIORITY_CLASS[ticket.priority] || 'rhd-badge'}>
-                            {PRIORITY_LABEL[ticket.priority] || ticket.priority}
-                          </span>
-                        </td>
-                        <td className="rhd-elapsed">{elapsed(ticket.created_at)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="rhd-list">
+                {newTickets.map((ticket) => (
+                  <RhTicketCard
+                    key={ticket.id}
+                    ticket={ticket}
+                    currentUserId={user?.id || ''}
+                    onOpen={openTicket}
+                    onAssume={assume}
+                    assuming={assumingId === ticket.id}
+                  />
+                ))}
               </div>
             )}
-          </div>
-        </>
-      )}
+          </section>
+
+          <section className="rhd-block" aria-labelledby="rhd-mine-title">
+            <header className="rhd-block__head">
+              <div>
+                <h2 id="rhd-mine-title" className="rh-section-title">Com você agora</h2>
+                <p className="rh-section-lead">Chamados que você assumiu e ainda não terminou.</p>
+              </div>
+              {mineTotal > PREVIEW_LIMIT && (
+                <button type="button" className="rhd-more" onClick={() => openTab('comigo')}>
+                  Ver todos os {mineTotal}
+                </button>
+              )}
+            </header>
+
+            {loading ? (
+              <div className="rhd-list"><div className="rh-skeleton" /></div>
+            ) : mineTickets.length === 0 ? (
+              <div className="rh-card rh-empty">
+                <span className="pub-gicon pub-gicon--rh" aria-hidden="true"><i className="ti ti-inbox" /></span>
+                <h3>Você não tem atendimentos em andamento</h3>
+                <p>Assuma um chamado novo para começar.</p>
+              </div>
+            ) : (
+              <div className="rhd-list">
+                {mineTickets.map((ticket) => (
+                  <RhTicketCard key={ticket.id} ticket={ticket} currentUserId={user?.id || ''} onOpen={openTicket} />
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+
+        <aside className="rhd-aside">
+          <section className="rh-card rhd-guide" aria-labelledby="rhd-guide-title">
+            <h2 id="rhd-guide-title">Como atender um chamado</h2>
+            <ol>
+              <li>
+                <span className="rhd-guide__n" aria-hidden="true">1</span>
+                <span>
+                  <strong>Assuma</strong>
+                  Toque em "Assumir este chamado". Assim todos sabem que está com você.
+                </span>
+              </li>
+              <li>
+                <span className="rhd-guide__n" aria-hidden="true">2</span>
+                <span>
+                  <strong>Responda</strong>
+                  Escreva para a pessoa pelo próprio chamado. Ela recebe a resposta.
+                </span>
+              </li>
+              <li>
+                <span className="rhd-guide__n" aria-hidden="true">3</span>
+                <span>
+                  <strong>Resolva</strong>
+                  Quando terminar, toque em "Marcar como resolvido".
+                </span>
+              </li>
+            </ol>
+          </section>
+
+          <section className="rh-card rhd-ask" aria-labelledby="rhd-ask-title">
+            <span className="pub-gicon" aria-hidden="true"><i className="ti ti-message-plus" /></span>
+            <h2 id="rhd-ask-title">Precisa de algo da TI ou do Administrativo?</h2>
+            <p>Abra um chamado daqui mesmo, sem sair da sua conta. Seus dados já vêm preenchidos.</p>
+            <button type="button" className="pub-btn pub-btn--primary" onClick={() => navigate('/abrir-chamado')}>
+              <i className="ti ti-message-plus" aria-hidden="true" />
+              Abrir um chamado
+            </button>
+            <button type="button" className="rhd-ask__mine" onClick={() => navigate('/meus-chamados')}>
+              Ver os chamados que eu abri
+            </button>
+          </section>
+
+          <section className="rh-card rhd-exit">
+            <i className="ti ti-logout" aria-hidden="true" />
+            <p>
+              Terminou por hoje? Use o botão <strong>Sair</strong> no alto da tela para fechar sua conta com segurança.
+            </p>
+          </section>
+        </aside>
+      </div>
     </div>
   );
 }

@@ -1,698 +1,497 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { showToast } from '../utils/toast';
+import useTicketsOverview from '../hooks/useTicketsOverview';
 import '../styles/AdminDashboardPage.css';
 
-interface TicketIndicators {
-  openToday: number;
-  inProgressToday: number;
-  totalCreatedToday: number;
-  resolvedChangePercent: number;
-}
+type Scope = 'all' | 'ti' | 'rh' | 'administrativo';
 
-interface AssetIndicators {
-  inStock: number;
-  assigned: number;
-  inMaintenance: number;
-  total: number;
-  assignedToday: number;
-  returnedToday: number;
-  maintenanceToday: number;
-  addedThisMonth: number;
-}
-
-interface RecentActivityItem {
+interface OpenTicket {
   id: string;
-  type: string;
   title: string;
-  detail: string;
-  timestamp: string;
-  route: string;
+  status: string;
+  priority: string;
+  department?: string | null;
+  created_at: string;
+  assigned_to?: string | null;
+  assigned_to_name?: string | null;
+  requester_name?: string | null;
 }
 
 interface DashboardData {
-  totalTickets: number;
-  openTickets: number;
-  inProgressTickets: number;
-  resolvedTickets: number;
-  averageSLA: number;
-  previousAverageSLA: number;
+  assets: { inStock: number; assigned: number; inMaintenance: number; total: number; assignedToday: number; returnedToday: number };
   pendingPurchases: number;
-  ticketsByStatus: Record<string, number>;
-  ticketsByPriority: Record<string, number>;
-  ticketIndicators: TicketIndicators;
-  assets: AssetIndicators;
-  recentActivity: RecentActivityItem[];
-  filters?: {
-    serviceDepartment: 'all' | 'ti' | 'rh' | 'administrativo';
-    serviceDepartmentLabel: string;
-    canSelectServiceDepartment: boolean;
-  };
+  recentActivity: Array<{ id: string; type: string; title: string; detail: string; timestamp: string; route: string }>;
 }
 
-const EMPTY_DASHBOARD_DATA: DashboardData = {
-  totalTickets: 0,
-  openTickets: 0,
-  inProgressTickets: 0,
-  resolvedTickets: 0,
-  averageSLA: 0,
-  previousAverageSLA: 0,
-  pendingPurchases: 0,
-  ticketsByStatus: {},
-  ticketsByPriority: {},
-  ticketIndicators: {
-    openToday: 0,
-    inProgressToday: 0,
-    totalCreatedToday: 0,
-    resolvedChangePercent: 0,
-  },
-  assets: {
-    inStock: 0,
-    assigned: 0,
-    inMaintenance: 0,
-    total: 0,
-    assignedToday: 0,
-    returnedToday: 0,
-    maintenanceToday: 0,
-    addedThisMonth: 0,
-  },
-  recentActivity: [],
+const ACTIVE = ['open', 'in_progress', 'waiting_user', 'aguardando_confirmacao', 'aguardando_aquisicao', 'aguardando_terceiros'];
+
+// Faixas de idade da fila, do mais novo ao mais antigo.
+const AGE_BANDS = [
+  { key: 'h4', label: 'Até 4 horas', maxH: 4 },
+  { key: 'h8', label: '4 a 8 horas', maxH: 8 },
+  { key: 'h24', label: '8 a 24 horas', maxH: 24 },
+  { key: 'd3', label: '1 a 3 dias', maxH: 72 },
+  { key: 'old', label: 'Mais de 3 dias', maxH: Infinity },
+];
+
+const MAX_DOTS = 42;
+
+const PRIORITY_RANK: Record<string, number> = { critical: 0, urgent: 0, high: 1, medium: 2, low: 3 };
+const PRIORITY_LABEL: Record<string, string> = { critical: 'Crítica', urgent: 'Urgente', high: 'Alta', medium: 'Média', low: 'Baixa' };
+const priorityTone = (p: string) => (PRIORITY_RANK[p] ?? 2) <= 1 ? 'high' : p === 'low' ? 'low' : 'medium';
+
+// Assuntos dos formulários de abertura (TI, Administrativo e RH).
+const CATEGORY_LABEL: Record<string, string> = {
+  computador: 'Computador', internet: 'Internet', impressora: 'Impressora', sistema: 'Sistema', outro: 'Outro assunto',
+  copia_chave: 'Cópia de chave', apoio_evento: 'Apoio em evento', buscar_doacao: 'Buscar doação', solicitar_documento: 'Solicitar documento',
+  RH_ATESTADO: 'Atestado médico', RH_PONTO: 'Ajuste de ponto', RH_FOLHA: 'Folha de pagamento', RH_DECLARACAO: 'Declaração',
+  RH_BENEFICIOS: 'Benefícios', RH_OUTROS: 'Outro assunto (RH)', RH_CONFIDENCIAL: 'Confidencial',
+};
+const categoryLabel = (code: string) => CATEGORY_LABEL[code] ?? code.replace(/_/g, ' ');
+
+const TEAM_LABEL: Record<string, string> = { ti: 'TI', rh: 'RH', administrativo: 'Administrativo' };
+
+const ACTIVITY: Record<string, { label: string; icon: string }> = {
+  ticket_created: { label: 'Chamado aberto', icon: 'ti-ticket' },
+  ticket_resolved: { label: 'Chamado resolvido', icon: 'ti-circle-check' },
+  asset_assigned: { label: 'Equipamento entregue', icon: 'ti-device-laptop' },
+  asset_returned: { label: 'Equipamento devolvido', icon: 'ti-arrow-back-up' },
+  asset_maintenance: { label: 'Equipamento em manutenção', icon: 'ti-tool' },
 };
 
-const normalizeDashboardData = (payload: Partial<DashboardData>): DashboardData => {
-  return {
-    totalTickets: payload.totalTickets ?? 0,
-    openTickets: payload.openTickets ?? 0,
-    inProgressTickets: payload.inProgressTickets ?? 0,
-    resolvedTickets: payload.resolvedTickets ?? 0,
-    averageSLA: payload.averageSLA ?? 0,
-    previousAverageSLA: payload.previousAverageSLA ?? 0,
-    pendingPurchases: payload.pendingPurchases ?? 0,
-    ticketsByStatus: payload.ticketsByStatus ?? {},
-    ticketsByPriority: payload.ticketsByPriority ?? {},
-    ticketIndicators: {
-      openToday: payload.ticketIndicators?.openToday ?? 0,
-      inProgressToday: payload.ticketIndicators?.inProgressToday ?? 0,
-      totalCreatedToday: payload.ticketIndicators?.totalCreatedToday ?? 0,
-      resolvedChangePercent: payload.ticketIndicators?.resolvedChangePercent ?? 0,
-    },
-    assets: {
-      inStock: payload.assets?.inStock ?? 0,
-      assigned: payload.assets?.assigned ?? 0,
-      inMaintenance: payload.assets?.inMaintenance ?? 0,
-      total: payload.assets?.total ?? 0,
-      assignedToday: payload.assets?.assignedToday ?? 0,
-      returnedToday: payload.assets?.returnedToday ?? 0,
-      maintenanceToday: payload.assets?.maintenanceToday ?? 0,
-      addedThisMonth: payload.assets?.addedThisMonth ?? 0,
-    },
-    recentActivity: Array.isArray(payload.recentActivity) ? payload.recentActivity : [],
-    filters: payload.filters,
-  };
+const hoursSince = (iso: string) => Math.max(0, (Date.now() - new Date(iso).getTime()) / 3600000);
+
+const ageLabel = (iso: string) => {
+  const h = hoursSince(iso);
+  if (h < 1) return `${Math.max(1, Math.round(h * 60))} min`;
+  if (h < 24) return `${Math.floor(h)} h`;
+  const d = Math.floor(h / 24);
+  return `${d} ${d === 1 ? 'dia' : 'dias'}`;
 };
 
-/* ── SVG icon helpers (Tabler-style, stroke-based) ── */
-const SvgUsers = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/>
-    <path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0-3-3.85"/>
-  </svg>
-);
-
-const SvgHeadset = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M4 14v-3a8 8 0 1 1 16 0v3"/>
-    <path d="M18 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"/>
-    <path d="M4 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2h-3z"/>
-  </svg>
-);
-
-const SvgClock = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>
-  </svg>
-);
-
-/* KPI icon map — id → SVG element */
-const KPI_ICONS: Record<string, JSX.Element> = {
-  'open-tickets': (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M4 6m0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-12a2 2 0 0 1-2-2z"/>
-      <path d="M4 13h3l3 3h4l3-3h3"/>
-    </svg>
-  ),
-  'in-progress-tickets': (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M4 14v-3a8 8 0 1 1 16 0v3"/>
-      <path d="M18 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"/>
-      <path d="M4 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2h-3z"/>
-    </svg>
-  ),
-  'resolved-today': (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="9"/>
-      <path d="M9 12l2 2 4-4"/>
-    </svg>
-  ),
-  'total-tickets': (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="3" y="12" width="4" height="8" rx="1"/>
-      <rect x="9.5" y="7" width="4" height="13" rx="1"/>
-      <rect x="16" y="3" width="4" height="17" rx="1"/>
-    </svg>
-  ),
-  'assets-in-stock': (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 3l9 5v8l-9 5-9-5v-8z"/>
-      <path d="M12 12l9-5M12 12v10M12 12l-9-5"/>
-    </svg>
-  ),
-  'assets-assigned': (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 19h18"/>
-      <rect x="5" y="6" width="14" height="10" rx="1.5"/>
-    </svg>
-  ),
-  'assets-maintenance': (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M7 10h3v3l-1.5 1.5a6 6 0 1 0 3 0l-1.5-1.5v-3h3a6 6 0 0 0-6-3z"/>
-    </svg>
-  ),
-  'total-assets': (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <ellipse cx="12" cy="6" rx="8" ry="3"/>
-      <path d="M4 6v6c0 1.657 3.582 3 8 3s8-1.343 8-3v-6"/>
-      <path d="M4 12v6c0 1.657 3.582 3 8 3s8-1.343 8-3v-6"/>
-    </svg>
-  ),
+const minutesLabel = (m: number | null | undefined) => {
+  if (m == null) return '—';
+  if (m < 60) return `${Math.round(m)} min`;
+  if (m < 60 * 24) return `${(m / 60).toFixed(1).replace('.', ',')} h`;
+  return `${(m / 1440).toFixed(1).replace('.', ',')} dias`;
 };
 
-/* Activity icon map */
-const ACTIVITY_ICONS: Record<string, JSX.Element> = {
-  ticket_created: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-    </svg>
-  ),
-  ticket_resolved: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M5 13l4 4L19 7"/>
-    </svg>
-  ),
-  asset_assigned: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 3l9 5v8l-9 5-9-5v-8z"/>
-    </svg>
-  ),
-  asset_returned: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/>
-    </svg>
-  ),
-  asset_maintenance: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
-    </svg>
-  ),
+const relative = (iso: string) => {
+  const h = hoursSince(iso);
+  if (h < 1 / 60) return 'agora';
+  if (h < 1) return `há ${Math.round(h * 60)} min`;
+  if (h < 24) return `há ${Math.floor(h)} h`;
+  const d = Math.floor(h / 24);
+  return d === 1 ? 'ontem' : `há ${d} dias`;
 };
 
-const ACTIVITY_ICON_STYLE: Record<string, string> = {
-  ticket_created: 'icon-circle-info',
-  ticket_resolved: 'icon-circle-success',
-  asset_assigned: 'icon-circle-warning',
-  asset_returned: 'icon-circle-neutral',
-  asset_maintenance: 'icon-circle-danger',
+const greeting = () => {
+  const hour = new Date().getHours();
+  return hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
 };
 
-/* Quick action icons */
-const QA_ICONS = {
-  chamados: (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
-      <rect x="9" y="3" width="6" height="4" rx="2"/>
-      <path d="M9 12h6M9 16h4"/>
-    </svg>
-  ),
-  ativos: (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 3l9 5v8l-9 5-9-5v-8z"/>
-      <path d="M12 12l9-5M12 12v10M12 12l-9-5"/>
-    </svg>
-  ),
-  conhecimento: (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-    </svg>
-  ),
-  relatorios: (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="3" y="12" width="4" height="8" rx="1"/>
-      <rect x="9.5" y="7" width="4" height="13" rx="1"/>
-      <rect x="16" y="3" width="4" height="17" rx="1"/>
-    </svg>
-  ),
-};
-
-const DONUT_COLORS = ['#28a967', '#2d73d2', '#ed8a22', '#7f56c5', '#d9464f', '#8ca097'];
-
-const DonutChart = ({
-  entries,
-  total,
-  centerLabel,
-}: {
-  entries: Array<{ label: string; count: number }>;
-  total: number;
-  centerLabel: string;
-}) => {
-  const radius = 46;
-  const circumference = 2 * Math.PI * radius;
-  let accumulated = 0;
-
-  return (
-    <div className="donut-visual">
-      <svg viewBox="0 0 120 120" role="img" aria-label={`${centerLabel}: ${total}`}>
-        <circle className="donut-track" cx="60" cy="60" r={radius} />
-        {entries.map((entry, index) => {
-          const fraction = total > 0 ? entry.count / total : 0;
-          const segment = circumference * fraction;
-          const offset = circumference * accumulated;
-          accumulated += fraction;
-          return (
-            <circle
-              key={`${entry.label}-${index}`}
-              className="donut-segment"
-              cx="60"
-              cy="60"
-              r={radius}
-              stroke={DONUT_COLORS[index % DONUT_COLORS.length]}
-              strokeDasharray={`${segment} ${Math.max(0, circumference - segment)}`}
-              strokeDashoffset={-offset}
-            />
-          );
-        })}
-      </svg>
-      <span className="donut-center"><strong>{total}</strong><small>{centerLabel}</small></span>
-    </div>
-  );
+const currentUser = () => {
+  try {
+    return JSON.parse(localStorage.getItem('internal_user') || 'null') as { id?: string; name?: string; role?: string } | null;
+  } catch {
+    return null;
+  }
 };
 
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
-  const [data, setData] = useState<DashboardData>(EMPTY_DASHBOARD_DATA);
+  const user = currentUser();
+  const role = user?.role || '';
+  const canPickScope = role === 'admin';
+  const [scope, setScope] = useState<Scope>('all');
+  const scopeParam = canPickScope && scope !== 'all' ? scope : '';
+
+  const { overview, reload: reloadOverview } = useTicketsOverview(scopeParam, true);
+  const [openTickets, setOpenTickets] = useState<OpenTicket[]>([]);
+  const [openTotal, setOpenTotal] = useState(0);
+  const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [serviceDepartment, setServiceDepartment] = useState<'all' | 'ti' | 'rh' | 'administrativo'>('all');
+  const [assumingId, setAssumingId] = useState('');
 
+  // Cada perfil tem o próprio painel.
   useEffect(() => {
-    const token = localStorage.getItem('internal_token');
-    if (!token) {
-      navigate('/admin/login');
-      return;
-    }
+    if (!localStorage.getItem('internal_token')) { navigate('/admin/login'); return; }
+    if (role === 'admin_staff') navigate('/admin/auxiliar/dashboard', { replace: true });
+    else if (role === 'manager' || role === 'gestor') navigate('/gestor/dashboard', { replace: true });
+  }, [navigate, role]);
 
-    const userRaw = localStorage.getItem('internal_user');
-    if (userRaw) {
-      try {
-        const user = JSON.parse(userRaw) as { role?: string };
-        if (user.role === 'admin_staff') {
-          navigate('/admin/auxiliar/dashboard');
-          return;
-        }
-        if (user.role === 'manager' || user.role === 'gestor') {
-          navigate('/gestor/dashboard');
-          return;
-        }
-      } catch {
-        navigate('/admin/login');
-        return;
-      }
-    }
-
-    const controller = new AbortController();
-    void fetchDashboardData(controller.signal);
-    return () => controller.abort();
-  }, [navigate, serviceDepartment]);
-
-  const fetchDashboardData = async (signal?: AbortSignal) => {
+  const load = useCallback(async (quiet = false) => {
     try {
-      setLoading(true);
-      const response = await api.get<Partial<DashboardData>>('/dashboard/admin', {
-        params: serviceDepartment === 'all' ? undefined : { department: serviceDepartment },
-        signal,
-        timeout: 15000,
-      });
-      setData(normalizeDashboardData(response.data ?? {}));
+      if (!quiet) setLoading(true);
+      const base = new URLSearchParams();
+      ACTIVE.forEach((s) => base.append('status', s));
+      if (scopeParam) base.append('department', scopeParam);
+      base.append('limit', '100');
+      base.append('sort', 'created_at');
+
+      const oldest = new URLSearchParams(base); oldest.append('order', 'asc');
+      const [oldestResp, dashResp] = await Promise.all([
+        api.get(`/tickets?${oldest.toString()}`),
+        api.get('/dashboard/admin', { params: scopeParam ? { department: scopeParam } : undefined, timeout: 15000 })
+          .catch(() => ({ data: null })),
+      ]);
+
+      let list: OpenTicket[] = oldestResp.data?.data || [];
+      const total: number = oldestResp.data?.pagination?.total ?? list.length;
+      if (total > list.length) {
+        const newest = new URLSearchParams(base); newest.append('order', 'desc');
+        const newestResp = await api.get(`/tickets?${newest.toString()}`);
+        const seen = new Set(list.map((t) => t.id));
+        list = [...list, ...(newestResp.data?.data || []).filter((t: OpenTicket) => !seen.has(t.id))];
+      }
+
+      setOpenTickets(list);
+      setOpenTotal(total);
+      if (dashResp.data) setDashboard(dashResp.data as DashboardData);
       setError('');
     } catch (err: any) {
-      const message = err.response?.data?.error || err.message || 'Erro ao carregar dashboard';
-      if (err?.code !== 'ERR_CANCELED') {
-        setError(message);
-        console.error('Dashboard fetch error:', err);
-      }
+      if (!quiet) setError(err?.response?.data?.error || 'Não foi possível carregar o painel. Verifique a conexão e tente de novo.');
     } finally {
-      if (!signal?.aborted) setLoading(false);
+      setLoading(false);
     }
-  };
+  }, [scopeParam]);
 
-  const STATUS_LABELS: Record<string, string> = {
-    open: 'Aberto',
-    in_progress: 'Em Atendimento',
-    waiting_user: 'Aguardando Usuário',
-    aguardando_confirmacao: 'Aguardando Confirmação',
-    aguardando_aquisicao: 'Aguardando Aquisição',
-    aguardando_terceiros: 'Aguardando Terceiros',
-    resolved: 'Resolvido',
-    closed: 'Fechado',
-  };
+  useEffect(() => { void load(); }, [load]);
 
-  const getStatusLabel = (status: string) => STATUS_LABELS[status] ?? status;
-
-  const PRIORITY_LABELS: Record<string, string> = {
-    low: 'Baixa',
-    medium: 'Média',
-    high: 'Alta',
-    urgent: 'Urgente',
-  };
-
-  const getPriorityLabel = (priority: string) => PRIORITY_LABELS[priority] ?? priority;
-
-  const getActivityLabel = (type: string) => {
-    switch (type) {
-      case 'ticket_created':    return 'Chamado criado';
-      case 'ticket_resolved':   return 'Chamado resolvido';
-      case 'asset_assigned':    return 'Ativo atribuído';
-      case 'asset_returned':    return 'Ativo devolvido';
-      case 'asset_maintenance': return 'Ativo em manutenção';
-      default:                  return 'Atualização operacional';
-    }
-  };
-
-  const formatRelativeTime = (timestamp: string) => {
-    const eventDate = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now.getTime() - eventDate.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins <= 1) return 'agora';
-    if (diffMins < 60) return `há ${diffMins} min`;
-    if (diffHours < 24) return `há ${diffHours}h`;
-    if (diffDays === 1) return 'ontem';
-    if (diffDays < 7) return `há ${diffDays} dias`;
-    return eventDate.toLocaleDateString('pt-BR');
-  };
-
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Bom dia';
-    if (hour < 18) return 'Boa tarde';
-    return 'Boa noite';
-  };
-
-  const slaTrend = useMemo(() => {
-    const previous = data.previousAverageSLA;
-    const current = data.averageSLA;
-    if (previous <= 0 || current <= 0) return { trendLabel: '0%', isPositive: true };
-    const changePercent = ((previous - current) / previous) * 100;
-    return {
-      trendLabel: `${Math.abs(changePercent).toFixed(0)}%`,
-      isPositive: changePercent >= 0,
+  // Acompanha a fila em tempo real, sem piscar a tela.
+  useEffect(() => {
+    const refresh = () => void load(true);
+    const events = ['ticket:new', 'ticket:updated', 'ticket:resolved', 'ticket:reopened'];
+    events.forEach((name) => window.addEventListener(name, refresh));
+    const timer = window.setInterval(refresh, 60_000);
+    return () => {
+      events.forEach((name) => window.removeEventListener(name, refresh));
+      window.clearInterval(timer);
     };
-  }, [data.averageSLA, data.previousAverageSLA]);
+  }, [load]);
 
-  const operationsToday = useMemo(() => (
-    data.ticketIndicators.totalCreatedToday +
-    data.resolvedTickets +
-    data.assets.assignedToday +
-    data.assets.returnedToday +
-    data.assets.maintenanceToday
-  ), [data]);
+  const bands = useMemo(() => {
+    const grouped = AGE_BANDS.map((band) => ({ ...band, tickets: [] as OpenTicket[] }));
+    openTickets.forEach((ticket) => {
+      const h = hoursSince(ticket.created_at);
+      const band = grouped.find((b) => h < b.maxH) ?? grouped[grouped.length - 1];
+      band.tickets.push(ticket);
+    });
+    // Mais graves primeiro dentro de cada faixa; sem responsável antes.
+    grouped.forEach((b) => b.tickets.sort((a, c) =>
+      (PRIORITY_RANK[a.priority] ?? 2) - (PRIORITY_RANK[c.priority] ?? 2)
+      || Number(!!a.assigned_to) - Number(!!c.assigned_to)));
+    return grouped;
+  }, [openTickets]);
 
-  const statusEntries = useMemo(
-    () => Object.entries(data.ticketsByStatus).sort((a, b) => b[1] - a[1]),
-    [data.ticketsByStatus],
-  );
+  const unassigned = openTickets.filter((t) => !t.assigned_to && t.status === 'open');
+  const staleUnassigned = unassigned.filter((t) => hoursSince(t.created_at) >= 24);
+  const oldest = openTickets.length > 0
+    ? openTickets.reduce((a, b) => (new Date(a.created_at) < new Date(b.created_at) ? a : b))
+    : null;
 
-  const priorityEntries = useMemo(
-    () => Object.entries(data.ticketsByPriority).sort((a, b) => b[1] - a[1]),
-    [data.ticketsByPriority],
-  );
+  // Precisa de ação: sem responsável (mais antigos e mais graves primeiro),
+  // depois prioridade alta parada há mais de um dia.
+  const needsAction = useMemo(() => {
+    const byUrgency = (a: OpenTicket, b: OpenTicket) =>
+      (PRIORITY_RANK[a.priority] ?? 2) - (PRIORITY_RANK[b.priority] ?? 2)
+      || new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    const first = [...unassigned].sort(byUrgency);
+    const stuck = openTickets
+      .filter((t) => t.assigned_to && (PRIORITY_RANK[t.priority] ?? 2) <= 1 && hoursSince(t.created_at) >= 24)
+      .sort(byUrgency);
+    return [...first, ...stuck].slice(0, 7);
+  }, [openTickets, unassigned]);
 
-  const assetStatusEntries = useMemo(() => {
-    const entries = [
-      { key: 'in-stock',       label: 'Em estoque',     count: data.assets.inStock,       fillClass: 'asset-in-stock' },
-      { key: 'in-use',         label: 'Em uso',         count: data.assets.assigned,      fillClass: 'asset-in-use' },
-      { key: 'in-maintenance', label: 'Em manutenção',  count: data.assets.inMaintenance, fillClass: 'asset-in-maintenance' },
-    ];
-    const total = entries.reduce((sum, item) => sum + item.count, 0);
-    return entries.map(item => ({ ...item, percent: total > 0 ? Math.round((item.count / total) * 100) : 0 }));
-  }, [data.assets.assigned, data.assets.inMaintenance, data.assets.inStock]);
-
-  const totalAssetsForChart = useMemo(() => {
-    const derived = data.assets.inStock + data.assets.assigned + data.assets.inMaintenance;
-    return data.assets.total > 0 ? data.assets.total : derived;
-  }, [data.assets.assigned, data.assets.inMaintenance, data.assets.inStock, data.assets.total]);
-
-  const internalToken = localStorage.getItem('internal_token');
-  if (!internalToken) return null;
-
-  let userName = 'Equipe';
-  let canManageUsers = false;
-  let canSelectServiceDepartment = false;
-
-  const internalUserRaw = localStorage.getItem('internal_user');
-  if (internalUserRaw) {
+  const assume = async (ticket: OpenTicket) => {
+    if (!user?.id) return;
     try {
-      const parsedUser = JSON.parse(internalUserRaw) as { name?: string; role?: string };
-      userName = parsedUser.name?.trim() || 'Equipe';
-      canManageUsers = parsedUser.role === 'admin' || parsedUser.role === 'it_staff';
-      canSelectServiceDepartment = parsedUser.role === 'admin';
-    } catch {
-      userName = 'Equipe';
-      canManageUsers = false;
-      canSelectServiceDepartment = false;
+      setAssumingId(ticket.id);
+      await api.patch(`/tickets/${ticket.id}`, { status: 'in_progress', assigned_to_id: user.id });
+      showToast.success(`Você assumiu "${ticket.title}".`);
+      await load(true);
+      reloadOverview();
+    } catch (err: any) {
+      showToast.error(err?.response?.data?.error || 'Não foi possível assumir o chamado.');
+    } finally {
+      setAssumingId('');
     }
-  }
-
-  const kpiCards = [
-    {
-      id: 'open-tickets',
-      title: 'Chamados Abertos',
-      value: data.openTickets,
-      secondary: `+${data.ticketIndicators.openToday} hoje`,
-      tone: 'critical',
-      category: 'Chamados',
-      action: () => navigate('/admin/chamados?status=open'),
-    },
-    {
-      id: 'in-progress-tickets',
-      title: 'Em Atendimento',
-      value: data.inProgressTickets,
-      secondary: `+${data.ticketIndicators.inProgressToday} atualizados hoje`,
-      tone: 'active',
-      category: 'Chamados',
-      action: () => navigate('/admin/chamados?status=in_progress'),
-    },
-    {
-      id: 'resolved-today',
-      title: 'Resolvidos Hoje',
-      value: data.resolvedTickets,
-      secondary: `${data.ticketIndicators.resolvedChangePercent >= 0 ? '↑' : '↓'} ${Math.abs(data.ticketIndicators.resolvedChangePercent)}%`,
-      tone: 'success',
-      category: 'Chamados',
-      action: () => navigate('/admin/chamados?status=resolved'),
-    },
-    {
-      id: 'total-tickets',
-      title: 'Total de Chamados',
-      value: data.totalTickets,
-      secondary: `+${data.ticketIndicators.totalCreatedToday} criados hoje`,
-      tone: 'info',
-      category: 'Chamados',
-      action: () => navigate('/admin/chamados'),
-    },
-    {
-      id: 'assets-in-stock',
-      title: 'Ativos em Estoque',
-      value: data.assets.inStock,
-      secondary: `+${data.assets.addedThisMonth} no mês`,
-      tone: 'stock',
-      category: 'Ativos',
-      action: () => navigate('/admin/estoque?status=available'),
-    },
-    {
-      id: 'assets-assigned',
-      title: 'Ativos em Uso',
-      value: data.assets.assigned,
-      secondary: `+${data.assets.assignedToday} atribuições hoje`,
-      tone: 'assigned',
-      category: 'Ativos',
-      action: () => navigate('/admin/estoque?status=in_use'),
-    },
-    {
-      id: 'assets-maintenance',
-      title: 'Em Manutenção',
-      value: data.assets.inMaintenance,
-      secondary: `+${data.assets.maintenanceToday} enviados hoje`,
-      tone: 'maintenance',
-      category: 'Ativos',
-      action: () => navigate('/admin/estoque?status=maintenance'),
-    },
-    {
-      id: 'total-assets',
-      title: 'Total de Ativos',
-      value: data.assets.total,
-      secondary: `${data.assets.returnedToday} devoluções hoje`,
-      tone: 'asset-total',
-      category: 'Ativos',
-      action: () => navigate('/admin/estoque'),
-    },
-  ] as const;
-
-  const ticketKpiCards = kpiCards.filter(c => c.category === 'Chamados');
-  const assetKpiCards  = kpiCards.filter(c => c.category === 'Ativos');
-
-  const renderKpiCard = (card: (typeof kpiCards)[number]) => (
-    <button
-      key={card.id}
-      type="button"
-      className={`kpi-card kpi-${card.tone}`}
-      onClick={card.action}
-      aria-label={`${card.title}: ${card.value}`}
-    >
-      <div className="kpi-header-row">
-        <span className="kpi-icon-container">
-          <span className="kpi-icon">{KPI_ICONS[card.id]}</span>
-        </span>
-        <span className="kpi-category-tag">{card.category}</span>
-      </div>
-      <span className="kpi-number">{card.value}</span>
-      <span className="kpi-title">{card.title}</span>
-      <span className="kpi-secondary">{card.secondary}</span>
-      <div className="kpi-bottom-bar" />
-    </button>
-  );
-
-  const renderBarItem = (label: string, count: number, total: number, fillClass: string) => {
-    const percent = total > 0 ? Math.round((count / total) * 100) : 0;
-    return (
-      <div key={label} className="bar-item">
-        <div className="bar-label-row">
-          <span className="bar-label">{label}</span>
-          <span className="bar-right-group">
-            <span className="bar-count">{count}</span>
-            <span className="bar-percent">{percent}%</span>
-          </span>
-        </div>
-        <div className="bar-track">
-          <div
-            className={`bar-fill ${fillClass}`}
-            style={{ width: `${percent}%` }}
-            role="progressbar"
-            aria-valuenow={percent}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label={`${label}: ${count}`}
-          />
-        </div>
-      </div>
-    );
   };
 
-  const assetDonutEntries = assetStatusEntries.map((entry) => ({ label: entry.label, count: entry.count }));
-  const statusDonutEntries = statusEntries.map(([status, count]) => ({ label: getStatusLabel(status), count }));
+  const summary = (() => {
+    if (loading) return 'Lendo a fila…';
+    if (openTotal === 0) return 'Nenhum chamado em aberto. A fila está zerada.';
+    const parts = [`${openTotal} ${openTotal === 1 ? 'chamado em aberto' : 'chamados em aberto'}`];
+    if (unassigned.length > 0) parts.push(`${unassigned.length} sem responsável`);
+    if (staleUnassigned.length > 0) parts.push(`${staleUnassigned.length} ${staleUnassigned.length === 1 ? 'esperando' : 'esperando'} há mais de um dia`);
+    return parts.join(', ') + '.';
+  })();
+
+  const workload = overview?.workload ?? [];
+  const maxLoad = Math.max(1, ...workload.map((w) => w.open));
+  const trend = overview?.trend;
+  const assets = dashboard?.assets;
+  const assetTotal = assets ? assets.inStock + assets.assigned + assets.inMaintenance : 0;
+  const pct = (n: number) => (assetTotal > 0 ? (n / assetTotal) * 100 : 0);
+  const hiddenFromChart = Math.max(0, openTotal - openTickets.length);
 
   return (
-    <div className="admin-dashboard-page">
-      <header className="ops-dashboard-header">
-        <div className="ops-header-content">
-          <h1 className="ops-greeting">{getGreeting()}, <span className="ops-greeting-accent">{userName}</span></h1>
-          <p className="ops-subtitle">Painel operacional — chamados, ativos e movimentações.</p>
-          <div className={`ops-live-badge ${loading ? 'is-syncing' : error ? 'is-offline' : 'is-live'}`}>
-            <span className="ops-live-dot" />
-            {loading ? 'Sincronizando' : error ? 'Dados indisponíveis' : 'Atualizado agora'}
-          </div>
-        </div>
-        <nav className="ops-header-actions" aria-label="Ações do painel">
-          {canSelectServiceDepartment && (
-            <label className="ops-scope-control" htmlFor="dashboard-service-department">
-              <span>Fila responsável</span>
-              <select id="dashboard-service-department" value={serviceDepartment} onChange={(event) => setServiceDepartment(event.target.value as typeof serviceDepartment)}>
-                <option value="all">Todos os atendimentos</option>
-                <option value="ti">TI</option>
-                <option value="rh">Recursos Humanos</option>
-                <option value="administrativo">Administrativo</option>
-              </select>
-            </label>
-          )}
-          <button type="button" className="ops-btn ops-btn-primary" onClick={() => navigate('/admin/chamados')}><SvgHeadset /> Atender chamados</button>
-          {canManageUsers && <button type="button" className="ops-btn ops-btn-secondary" onClick={() => navigate('/admin/usuarios')}><SvgUsers /> Gerenciar equipe</button>}
-        </nav>
-      </header>
-
-      {error && <div className="alert alert-error" role="alert"><div><strong>Não foi possível atualizar o painel.</strong><span>{error}</span></div><button type="button" onClick={() => void fetchDashboardData()}>Tentar novamente</button></div>}
-
-      {loading ? (
-        <div className="loading-container"><div className="spinner" /><p>Carregando painel operacional...</p></div>
-      ) : (
-        <main className="ops-dashboard-content">
-          <section className="kpi-metrics-section">
-            <div className="ops-section-heading"><h2 className="ops-section-title">Indicadores operacionais</h2><span>{data.filters?.serviceDepartmentLabel || 'Todos os atendimentos'}</span></div>
-            <div className="kpi-grid">{ticketKpiCards.map(renderKpiCard)}</div>
-          </section>
-
-          <section className="dashboard-panel asset-summary-section">
-            <div className="panel-heading"><h2>Ativos e inventário</h2><button type="button" onClick={() => navigate('/inventario')}>Ver todos</button></div>
-            <div className="asset-summary-grid">{assetKpiCards.map(renderKpiCard)}</div>
-          </section>
-
-          <section className="dashboard-panel performance-metrics-section">
-            <div className="panel-heading"><h2>Ritmo e desempenho</h2><span>Operação atual</span></div>
-            <div className="performance-card">
-              <div className="performance-header"><div className="performance-header-left"><div className="performance-title-row"><SvgClock /><h3 className="performance-title">SLA Médio Operacional</h3></div><p className="performance-subtitle">Baseado nos chamados resolvidos recentemente</p></div><div className={`performance-trend ${slaTrend.isPositive ? 'positive' : 'negative'}`}><span className="trend-value">{slaTrend.isPositive ? '↓' : '↑'} {slaTrend.trendLabel}</span><span className="trend-label">vs período anterior</span></div></div>
-              <div className="performance-main-metric"><span className="metric-value">{data.averageSLA.toFixed(1)}</span><span className="metric-unit">h</span></div>
-              <div className="performance-stats-grid">
-                <div className="performance-stat"><strong>{operationsToday}</strong><span>Operações hoje</span></div>
-                <div className="performance-stat"><strong>{data.assets.assignedToday}</strong><span>Atribuições de ativo</span></div>
-                <div className="performance-stat"><strong>{data.assets.inMaintenance}</strong><span>Ativos em manutenção</span></div>
-                <div className="performance-stat"><strong>{data.pendingPurchases}</strong><span>Compras pendentes</span></div>
-              </div>
+    <div className="pnl">
+      <section className="pnl-hero pub-aurora">
+        <div className="pnl-wrap">
+          <div className="pnl-hero__top">
+            <div>
+              <p className="pnl-hello">{greeting()}{user?.name ? `, ${user.name.split(' ')[0]}` : ''}.</p>
+              <h1>{summary}</h1>
             </div>
-          </section>
+            <div className="pnl-hero__actions">
+              {canPickScope && (
+                <label className="pnl-scope">
+                  <span>Equipe</span>
+                  <select value={scope} onChange={(e) => setScope(e.target.value as Scope)}>
+                    <option value="all">Todas</option>
+                    <option value="ti">TI</option>
+                    <option value="rh">RH</option>
+                    <option value="administrativo">Administrativo</option>
+                  </select>
+                </label>
+              )}
+              <button type="button" className="pub-btn pub-btn--sun" onClick={() => navigate('/admin/chamados')}>
+                <i className="ti ti-inbox" aria-hidden="true" />
+                Atender a fila
+              </button>
+            </div>
+          </div>
 
-          <section className="dashboard-panel analytics-card asset-overview-section">
-            <div className="panel-heading"><h2>Distribuição de ativos por status</h2><span>{totalAssetsForChart} ativos</span></div>
-            {totalAssetsForChart === 0 ? <div className="empty-state"><p>Nenhum dado disponível</p></div> : <div className="donut-layout"><DonutChart entries={assetDonutEntries} total={totalAssetsForChart} centerLabel="ativos" /><div className="donut-legend">{assetStatusEntries.map((entry, index) => <div key={entry.key}><span className="legend-dot" style={{ backgroundColor: DONUT_COLORS[index] }} /><span>{entry.label}</span><strong>{entry.count}</strong><small>{entry.percent}%</small></div>)}</div></div>}
-          </section>
+          {/* Idade da fila: cada ponto é um chamado aberto. */}
+          <figure className="pnl-age" aria-labelledby="pnl-age-title">
+            <figcaption className="pnl-age__head">
+              <h2 id="pnl-age-title">Idade da fila</h2>
+              <ul className="pnl-age__legend" aria-label="Legenda">
+                <li><span className="pnl-dot pnl-dot--high" />Alta ou urgente</li>
+                <li><span className="pnl-dot pnl-dot--medium" />Média</li>
+                <li><span className="pnl-dot pnl-dot--low" />Baixa</li>
+                <li><span className="pnl-dot pnl-dot--medium is-free" />Sem responsável</li>
+              </ul>
+            </figcaption>
 
-          <section className="dashboard-panel analytics-card ticket-status-section">
-            <div className="panel-heading"><h2>Distribuição de chamados por status</h2><span>{data.totalTickets} chamados</span></div>
-            {data.totalTickets === 0 ? <div className="empty-state"><p>Nenhum dado disponível</p></div> : <div className="donut-layout"><DonutChart entries={statusDonutEntries} total={data.totalTickets} centerLabel="chamados" /><div className="donut-legend">{statusEntries.slice(0, 6).map(([status, count], index) => <div key={status}><span className="legend-dot" style={{ backgroundColor: DONUT_COLORS[index] }} /><span>{getStatusLabel(status)}</span><strong>{count}</strong><small>{Math.round((count / data.totalTickets) * 100)}%</small></div>)}</div></div>}
-          </section>
+            <div className="pnl-age__lanes">
+              {bands.map((band, laneIndex) => (
+                <div key={band.key} className={`pnl-lane pnl-lane--${band.key}`}>
+                  <div className="pnl-lane__dots">
+                    {band.tickets.slice(0, MAX_DOTS).map((t, dotIndex) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        style={{ '--pnl-delay': `${laneIndex * 90 + Math.min(dotIndex, 12) * 35}ms` } as React.CSSProperties}
+                        className={`pnl-dot pnl-dot--${priorityTone(t.priority)} ${!t.assigned_to && t.status === 'open' ? 'is-free' : ''}`}
+                        title={`${t.title}\n${PRIORITY_LABEL[t.priority] || t.priority}, aberto há ${ageLabel(t.created_at)}${t.assigned_to_name ? `, com ${t.assigned_to_name}` : ', sem responsável'}`}
+                        aria-label={`${t.title}, aberto há ${ageLabel(t.created_at)}`}
+                        onClick={() => navigate(`/admin/chamados/${t.id}`)}
+                      />
+                    ))}
+                    {band.tickets.length > MAX_DOTS && (
+                      <span className="pnl-lane__more">+{band.tickets.length - MAX_DOTS}</span>
+                    )}
+                  </div>
+                  <div className="pnl-lane__foot">
+                    <strong>{loading ? '–' : band.tickets.length}</strong>
+                    <span>{band.label}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
 
-          <section className="dashboard-panel recent-activity-section">
-            <div className="panel-heading"><h2>Últimas movimentações</h2><button type="button" onClick={() => navigate('/admin/chamados')}>Ver toda a atividade</button></div>
-            {data.recentActivity.length === 0 ? <div className="empty-state compact-empty-state"><p>Sem eventos operacionais recentes.</p></div> : <ul className="activity-list">{data.recentActivity.slice(0, 5).map((activity) => <li key={activity.id}><button type="button" className="activity-item" onClick={() => navigate(activity.route || '/admin/chamados')}><div className="activity-main"><span className={`activity-icon-circle ${ACTIVITY_ICON_STYLE[activity.type] ?? 'icon-circle-neutral'}`}>{ACTIVITY_ICONS[activity.type] ?? ACTIVITY_ICONS.ticket_created}</span><div className="activity-texts"><span className="activity-event">{getActivityLabel(activity.type)}</span><p className="activity-title">{activity.title}</p><p className="activity-detail">{activity.detail}</p></div></div><div className="activity-meta"><time dateTime={activity.timestamp}>{formatRelativeTime(activity.timestamp)}</time><span className="activity-arrow" aria-hidden="true">→</span></div></button></li>)}</ul>}
-          </section>
+            {!loading && (
+              <p className="pnl-age__note">
+                {oldest
+                  ? <>O mais antigo está aberto há <strong>{ageLabel(oldest.created_at)}</strong>: {oldest.title}.</>
+                  : 'Nenhum chamado aberto agora.'}
+                {hiddenFromChart > 0 && ` ${hiddenFromChart} chamados do meio da fila não aparecem no gráfico.`}
+              </p>
+            )}
+          </figure>
+        </div>
+      </section>
 
-          <section className="dashboard-panel analytics-card priority-section">
-            <div className="panel-heading"><h2>Distribuição de chamados por prioridade</h2><span>{data.totalTickets} chamados</span></div>
-            <div className="chart-bars">{priorityEntries.map(([priority, count]) => renderBarItem(getPriorityLabel(priority), count, data.totalTickets, `priority-${priority}`))}</div>
-          </section>
+      <div className="pnl-wrap pnl-body">
+        {error && (
+          <div className="pnl-alert" role="alert">
+            <i className="ti ti-alert-circle" aria-hidden="true" />
+            <span>{error}</span>
+            <button type="button" onClick={() => { void load(); reloadOverview(); }}>Tentar de novo</button>
+          </div>
+        )}
 
-          <section className="quick-actions-section">
-            <h2 className="ops-section-title">Acesso rápido</h2>
-            <div className="actions-grid">{[
-              { icon: QA_ICONS.chamados, title: 'Central de Chamados', desc: 'Gerenciar chamados em fila', route: '/admin/chamados', label: 'Central de atendimento de chamados' },
-              { icon: QA_ICONS.ativos, title: 'Gestão de Ativos', desc: 'Inventário e movimentações', route: '/inventario', label: 'Gestão de ativos e equipamentos' },
-              { icon: QA_ICONS.conhecimento, title: 'Base de Conhecimento', desc: 'Documentos e playbooks', route: '/admin/documentos', label: 'Base de conhecimento e documentação' },
-              { icon: QA_ICONS.relatorios, title: 'Relatórios', desc: 'Indicadores e tendências', route: '/admin/relatorios', label: 'Relatórios e análises' },
-            ].map(({ icon, title, desc, route, label }) => <button key={route} type="button" className="action-button" onClick={() => navigate(route)} aria-label={label}><div className="action-icon">{icon}</div><div className="action-content"><h4>{title}</h4><p>{desc}</p></div><div className="action-arrow" aria-hidden="true">→</div></button>)}</div>
+        <section className="pnl-card pnl-action" aria-labelledby="pnl-action-title">
+          <header className="pnl-card__head">
+            <h2 id="pnl-action-title"><span className="pub-gicon pnl-icon pub-gicon--administrativo" aria-hidden="true"><i className="ti ti-bolt" /></span>Precisa de ação</h2>
+            <button type="button" className="pnl-link" onClick={() => navigate('/admin/chamados')}>Abrir a fila</button>
+          </header>
+          {loading ? (
+            <div className="pnl-skeleton" />
+          ) : needsAction.length === 0 ? (
+            <p className="pnl-empty"><i className="ti ti-mood-check" aria-hidden="true" />Todos os chamados têm responsável e nada urgente está parado.</p>
+          ) : (
+            <ul className="pnl-list">
+              {needsAction.map((t) => {
+                const free = !t.assigned_to && t.status === 'open';
+                const team = t.department ? TEAM_LABEL[t.department] : null;
+                return (
+                  <li key={t.id} className="pnl-row">
+                    <span className={`pnl-dot pnl-dot--${priorityTone(t.priority)} ${free ? 'is-free' : ''}`} aria-hidden="true" />
+                    <button type="button" className="pnl-row__main" onClick={() => navigate(`/admin/chamados/${t.id}`)}>
+                      <strong>{t.title}</strong>
+                      <span>
+                        {[t.requester_name, team && canPickScope ? team : null, free ? 'sem responsável' : `com ${t.assigned_to_name || 'outra pessoa'}`]
+                          .filter(Boolean).join(', ')}
+                      </span>
+                    </button>
+                    <span className={`pnl-age-tag ${hoursSince(t.created_at) >= 24 ? 'is-late' : ''}`}>{ageLabel(t.created_at)}</span>
+                    {free && (
+                      <button type="button" className="pnl-assume" onClick={() => void assume(t)} disabled={assumingId === t.id}>
+                        {assumingId === t.id ? 'Assumindo…' : 'Assumir'}
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
+        <section className="pnl-card pnl-pace" aria-labelledby="pnl-pace-title">
+          <header className="pnl-card__head">
+            <h2 id="pnl-pace-title"><span className="pub-gicon pnl-icon " aria-hidden="true"><i className="ti ti-activity" /></span>Ritmo</h2>
+            <button type="button" className="pnl-link" onClick={() => navigate('/admin/relatorios')}>Relatórios</button>
+          </header>
+          <dl className="pnl-stats">
+            <div>
+              <dt>Primeira resposta</dt>
+              <dd>{minutesLabel(overview?.timing.firstResponseMinutes)}</dd>
+              <span>em média</span>
+            </div>
+            <div>
+              <dt>Até resolver</dt>
+              <dd>{minutesLabel(overview?.timing.resolutionMinutes)}</dd>
+              {overview?.timing.resolutionDeltaPct != null && (
+                <span className={overview.timing.resolutionDeltaPct <= 0 ? 'is-good' : 'is-bad'}>
+                  {overview.timing.resolutionDeltaPct <= 0 ? 'mais rápido' : 'mais lento'} que o período anterior ({Math.abs(overview.timing.resolutionDeltaPct)}%)
+                </span>
+              )}
+            </div>
+            <div>
+              <dt>Hoje</dt>
+              <dd>{overview ? `${overview.today.created} / ${overview.today.resolved}` : '—'}</dd>
+              <span>abertos / resolvidos</span>
+            </div>
+            <div>
+              <dt>Esta semana</dt>
+              <dd>{trend ? trend.thisWeek : '—'}</dd>
+              {trend && <span>{trend.lastWeek} na semana passada</span>}
+            </div>
+          </dl>
+        </section>
+
+        <section className="pnl-card pnl-load" aria-labelledby="pnl-load-title">
+          <header className="pnl-card__head">
+            <h2 id="pnl-load-title"><span className="pub-gicon pnl-icon pub-gicon--rh" aria-hidden="true"><i className="ti ti-users" /></span>Carga da equipe</h2>
+            <span className="pnl-card__meta">chamados em aberto por pessoa</span>
+          </header>
+          {workload.length === 0 ? (
+            <p className="pnl-empty">Ninguém com chamados em aberto.</p>
+          ) : (
+            <ul className="pnl-bars">
+              {workload.slice(0, 8).map((w) => (
+                <li key={w.userId} className={w.userId === user?.id ? 'is-me' : ''}>
+                  <span className="pnl-bars__name">{w.userId === user?.id ? 'Você' : w.name}</span>
+                  <span className="pnl-bars__track"><span style={{ width: `${(w.open / maxLoad) * 100}%` }} /></span>
+                  <strong>{w.open}</strong>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="pnl-card pnl-assets" aria-labelledby="pnl-assets-title">
+          <header className="pnl-card__head">
+            <h2 id="pnl-assets-title"><span className="pub-gicon pnl-icon pub-gicon--neutral" aria-hidden="true"><i className="ti ti-packages" /></span>Inventário</h2>
+            <button type="button" className="pnl-link" onClick={() => navigate('/inventario')}>Abrir inventário</button>
+          </header>
+          {!assets ? (
+            <p className="pnl-empty">Dados do inventário indisponíveis agora.</p>
+          ) : (
+            <>
+              <div className="pnl-split" role="img" aria-label={`${assets.assigned} em uso, ${assets.inStock} em estoque, ${assets.inMaintenance} em manutenção`}>
+                <span className="is-use" style={{ width: `${pct(assets.assigned)}%` }} />
+                <span className="is-stock" style={{ width: `${pct(assets.inStock)}%` }} />
+                <span className="is-fix" style={{ width: `${pct(assets.inMaintenance)}%` }} />
+              </div>
+              <ul className="pnl-split__legend">
+                <li><span className="is-use" />Em uso <strong>{assets.assigned}</strong></li>
+                <li><span className="is-stock" />Em estoque <strong>{assets.inStock}</strong></li>
+                <li><span className="is-fix" />Em manutenção <strong>{assets.inMaintenance}</strong></li>
+              </ul>
+              <p className="pnl-assets__foot">
+                Hoje: {assets.assignedToday} {assets.assignedToday === 1 ? 'entrega' : 'entregas'}, {assets.returnedToday} {assets.returnedToday === 1 ? 'devolução' : 'devoluções'}.
+                {dashboard && dashboard.pendingPurchases > 0 && (
+                  <> <button type="button" className="pnl-link" onClick={() => navigate('/inventario/compras')}>{dashboard.pendingPurchases} {dashboard.pendingPurchases === 1 ? 'compra pendente' : 'compras pendentes'}</button></>
+                )}
+              </p>
+            </>
+          )}
+        </section>
+
+        <section className="pnl-card pnl-feed" aria-labelledby="pnl-feed-title">
+          <header className="pnl-card__head">
+            <h2 id="pnl-feed-title"><span className="pub-gicon pnl-icon pub-gicon--neutral" aria-hidden="true"><i className="ti ti-history" /></span>Últimas movimentações</h2>
+          </header>
+          {!dashboard || dashboard.recentActivity.length === 0 ? (
+            <p className="pnl-empty">Sem movimentações recentes.</p>
+          ) : (
+            <ul className="pnl-feed__list">
+              {dashboard.recentActivity.slice(0, 6).map((a) => {
+                const meta = ACTIVITY[a.type] ?? { label: 'Atualização', icon: 'ti-point' };
+                return (
+                  <li key={a.id}>
+                    <button type="button" onClick={() => navigate(a.route || '/admin/chamados')}>
+                      <span className={`pnl-feed__icon pnl-feed__icon--${a.type}`} aria-hidden="true"><i className={`ti ${meta.icon}`} /></span>
+                      <span className="pnl-feed__copy">
+                        <strong>{a.title}</strong>
+                        <span>{meta.label}{a.detail ? `, ${a.detail}` : ''}</span>
+                      </span>
+                      <time dateTime={a.timestamp}>{relative(a.timestamp)}</time>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
+        {overview && overview.topCategories.length > 0 && (
+          <section className="pnl-card pnl-cats" aria-labelledby="pnl-cats-title">
+            <header className="pnl-card__head">
+              <h2 id="pnl-cats-title"><span className="pub-gicon pnl-icon " aria-hidden="true"><i className="ti ti-tags" /></span>Assuntos mais pedidos</h2>
+            </header>
+            <ul className="pnl-bars pnl-bars--cats">
+              {overview.topCategories.slice(0, 6).map((c) => {
+                const max = Math.max(1, ...overview.topCategories.map((x) => x.total));
+                return (
+                  <li key={c.category}>
+                    <span className="pnl-bars__name">{categoryLabel(c.category)}</span>
+                    <span className="pnl-bars__track"><span style={{ width: `${(c.total / max) * 100}%` }} /></span>
+                    <strong>{c.total}</strong>
+                  </li>
+                );
+              })}
+            </ul>
           </section>
-        </main>
-      )}
+        )}
+      </div>
     </div>
   );
 }

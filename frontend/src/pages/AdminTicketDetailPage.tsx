@@ -1,14 +1,24 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { showToast } from '../utils/toast';
 import { aiService, type TicketSummary } from '../services/aiService';
-import StatusTimeline from '../components/StatusTimeline';
 import TicketTimeline, { type HistoryEvent } from '../components/tickets/TicketTimeline';
-import { canUseExternalWaitStatuses } from '../components/tickets/ticketPermissions';
 import TicketAttachments from '../components/TicketAttachments';
-import QuickActionsCard from '../components/QuickActionsCard';
-import '../styles/AdminTicketDetailPage.css';
+import ConfirmDialog from '../components/ConfirmDialog';
+import {
+  canAssignToOthers,
+  canAssume,
+  canClose,
+  canEditTicket,
+  canResolve,
+  canUseExternalWaitStatuses,
+  isSlaPaused,
+  PRIORITY_OPTIONS,
+  STATUS_OPTIONS,
+} from '../components/tickets/ticketPermissions';
+import { statusPresentation } from '../utils/ticketStatus';
 import { BACKEND_URL } from '../services/api';
+import '../styles/AdminTicketDetailPage.css';
 
 interface TicketDetail {
   id: string;
@@ -22,11 +32,8 @@ interface TicketDetail {
   metadata?: Record<string, any>;
   created_at: string;
   updated_at: string;
-  resolved_at?: string;
-  closed_at?: string;
   rating?: number | null;
   feedback?: string | null;
-  rated_at?: string | null;
   requester_type: string;
   requester_name?: string;
   requester_email?: string;
@@ -35,6 +42,7 @@ interface TicketDetail {
   requester_id?: string;
   assigned_to?: string;
   linked_equipment_id?: string | null;
+  pause_reason?: string | null;
 }
 
 interface Equipment {
@@ -42,13 +50,6 @@ interface Equipment {
   internal_code: string;
   brand: string;
   model: string;
-  type: string;
-}
-
-interface RhPointAdjustment {
-  date?: string;
-  correctedTime?: string;
-  notes?: string;
 }
 
 interface Message {
@@ -63,934 +64,696 @@ interface Message {
 interface InternalUser {
   id: string;
   name: string;
-  email: string;
 }
+
+type WaitKind = 'aguardando_aquisicao' | 'aguardando_terceiros';
+
+const TEAM: Record<string, { label: string; tone: string }> = {
+  ti: { label: 'TI', tone: 'ti' },
+  administrativo: { label: 'Administrativo', tone: 'adm' },
+  rh: { label: 'RH', tone: 'rh' },
+};
+
+const CATEGORY_LABEL: Record<string, string> = {
+  computador: 'Computador', internet: 'Internet', impressora: 'Impressora', sistema: 'Sistema', outro: 'Outro assunto',
+  copia_chave: 'Cópia de chave', apoio_evento: 'Apoio em evento', buscar_doacao: 'Buscar doação', solicitar_documento: 'Solicitar documento',
+  RH_ATESTADO: 'Atestado médico', RH_PONTO: 'Ajuste de ponto', RH_FOLHA: 'Folha de pagamento', RH_DECLARACAO: 'Declaração',
+  RH_BENEFICIOS: 'Benefícios', RH_OUTROS: 'Outro assunto', RH_CONFIDENCIAL: 'Confidencial',
+};
+
+const PRIORITY_LABEL: Record<string, string> = { urgent: 'Urgente', critical: 'Crítica', high: 'Alta', medium: 'Média', low: 'Baixa' };
+
+const initialsOf = (name?: string | null) =>
+  (name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
+
+const formatDateTime = (iso: string) =>
+  new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+const ageLabel = (iso: string) => {
+  const h = Math.max(0, (Date.now() - new Date(iso).getTime()) / 3600000);
+  if (h < 1) return `${Math.max(1, Math.round(h * 60))} min`;
+  if (h < 24) return `${Math.floor(h)} h`;
+  const d = Math.floor(h / 24);
+  return `${d} ${d === 1 ? 'dia' : 'dias'}`;
+};
+
+const firstName = (name?: string | null) => (name || '').trim().split(/\s+/)[0] || 'o solicitante';
 
 export default function AdminTicketDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const internalToken = localStorage.getItem('internal_token');
+  const me = (() => {
+    try { return JSON.parse(localStorage.getItem('internal_user') || 'null') as { id?: string; name?: string; role?: string } | null; } catch { return null; }
+  })();
+  const role = me?.role || '';
+  const myId = me?.id || '';
+
   const [ticket, setTicket] = useState<TicketDetail | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [users, setUsers] = useState<InternalUser[]>([]);
-  const [newMessage, setNewMessage] = useState('');
-  const [isInternalNote, setIsInternalNote] = useState(false);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
+  const [timeline, setTimeline] = useState<HistoryEvent[]>([]);
+  const [timelineLoading, setTimelineLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [reply, setReply] = useState('');
+  const [internalNote, setInternalNote] = useState(false);
+  const [waitFor, setWaitFor] = useState<WaitKind | null>(null);
+  const [waitReason, setWaitReason] = useState('');
+  const [confirmClose, setConfirmClose] = useState(false);
   const [aiSummary, setAiSummary] = useState<TicketSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
-  const [equipment, setEquipment] = useState<Equipment[]>([]);
-  const [requesterHistory, setRequesterHistory] = useState<any[]>([]);
-  // Histórico real do chamado (ticket_history). Só eventos que o backend
-  // efetivamente registrou — nada é derivado nem preenchido.
-  const [timeline, setTimeline] = useState<HistoryEvent[]>([]);
-  const [timelineLoading, setTimelineLoading] = useState(true);
-  const [showHistory, setShowHistory] = useState(false);
-  const [historyLoading, setHistoryLoading] = useState(false);
+  const [requesterHistory, setRequesterHistory] = useState<Array<{ id: string; title: string; created_at: string; status: string }> | null>(null);
   const [copied, setCopied] = useState(false);
+  const replyRef = useRef<HTMLTextAreaElement | null>(null);
 
-  const internalToken = localStorage.getItem('internal_token');
+  const authHeaders = useCallback((json = false): Record<string, string> => ({
+    ...(json ? { 'Content-Type': 'application/json' } : {}),
+    Authorization: `Bearer ${internalToken}`,
+  }), [internalToken]);
 
-  /** Papel do usuario logado — decide quais acoes sequer sao oferecidas. */
-  const currentUserRole = (() => {
+  const fetchTicket = useCallback(async () => {
+    if (!id) return;
     try {
-      const raw = localStorage.getItem('internal_user');
-      return raw ? (JSON.parse(raw)?.role ?? '') : '';
-    } catch {
-      return '';
-    }
-  })();
-
-  const getBackRoute = () => {
-    const raw = localStorage.getItem('internal_user');
-    const role = raw ? (JSON.parse(raw)?.role ?? '') : '';
-    return role === 'rh_staff' ? '/rh/chamados' : '/admin/chamados';
-  };
-
-  useEffect(() => {
-    if (!internalToken) {
-      navigate('/admin/login');
-      return;
-    }
-    if (id) {
-      fetchTicket(id);
-      fetchUsers();
-      fetchEquipment();
-      fetchHistory(id);
-    }
-  }, [id, internalToken, navigate]);
-
-  const fetchEquipment = async () => {
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/inventory/equipment?limit=200`, {
-        headers: { Authorization: `Bearer ${internalToken}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setEquipment(data.equipment || data.data || []);
-      }
-    } catch { /* silent */ }
-  };
-
-  const loadRequesterHistory = async (requesterId: string) => {
-    if (!requesterId) return;
-    setHistoryLoading(true);
-    setShowHistory(true);
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/tickets?requester_id=${requesterId}&limit=20&sort=created_at&order=desc`, {
-        headers: { Authorization: `Bearer ${internalToken}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setRequesterHistory(data.data || []);
-      }
-    } catch { /* */ }
-    setHistoryLoading(false);
-  };
-
-  const fetchHistory = async (ticketId: string) => {
-    try {
-      setTimelineLoading(true);
-      const res = await fetch(`${BACKEND_URL}/api/tickets/${ticketId}/history`, {
-        headers: { 'Authorization': `Bearer ${internalToken}` },
-      });
-      if (!res.ok) return;
+      const res = await fetch(`${BACKEND_URL}/api/tickets/${id}`, { headers: authHeaders(true) });
+      if (!res.ok) throw new Error(res.status === 404 ? 'Este chamado não existe ou foi removido.' : 'Não foi possível carregar o chamado.');
       const data = await res.json();
-      setTimeline(Array.isArray(data.history) ? data.history : []);
+      if (data.assigned_to_id) data.assigned_to = data.assigned_to_id;
+      setTicket(data);
+      setMessages(data.messages || []);
+      setError('');
+    } catch (err: any) {
+      setError(err instanceof TypeError ? 'Sem conexão com o servidor. Tente de novo.' : err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [id, authHeaders]);
+
+  const fetchHistory = useCallback(async () => {
+    if (!id) return;
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/tickets/${id}/history`, { headers: authHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setTimeline(Array.isArray(data.history) ? data.history : []);
+      }
     } catch {
       // O histórico é complementar: se falhar, o chamado continua utilizável.
     } finally {
       setTimelineLoading(false);
     }
-  };
+  }, [id, authHeaders]);
 
-  const fetchUsers = async () => {
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/internal-auth/users`, {
-        headers: { 'Authorization': `Bearer ${internalToken}` },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setUsers(data.users || []);
-      }
-    } catch (err) {
-      console.error('Error fetching users:', err);
-    }
-  };
+  useEffect(() => {
+    if (!internalToken) { navigate('/admin/login'); return; }
+    void fetchTicket();
+    void fetchHistory();
+    fetch(`${BACKEND_URL}/api/internal-auth/users`, { headers: authHeaders() })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setUsers(Array.isArray(data) ? data : data.users || []))
+      .catch(() => {});
+    fetch(`${BACKEND_URL}/api/inventory/equipment?limit=200`, { headers: authHeaders() })
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((data: { equipment?: Equipment[]; data?: Equipment[] }) => setEquipment(data.equipment || data.data || []))
+      .catch(() => {});
+  }, [internalToken, navigate, fetchTicket, fetchHistory, authHeaders]);
 
-  const fetchTicket = async (ticketId: string) => {
-    try {
-      setLoading(true);
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${internalToken}`,
-      };
-      const ticketRes = await fetch(`${BACKEND_URL}/api/tickets/${ticketId}`, { headers });
-      if (!ticketRes.ok) throw new Error('Erro ao carregar chamado');
-      const ticketData = await ticketRes.json();
-      if (ticketData.assigned_to_id) ticketData.assigned_to = ticketData.assigned_to_id;
-      if (!ticketData.requester_id) ticketData.requester_id = ticketData.requester_id;
-      setTicket(ticketData);
-      setMessages(ticketData.messages || []);
-    } catch (err: any) {
-      setError(err.message || 'Erro ao carregar chamado');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Atualiza sozinho quando alguém responde ou muda o chamado.
+  useEffect(() => {
+    const refresh = (event: Event) => {
+      const ticketId = (event as CustomEvent<any>).detail?.ticketId;
+      if (!ticketId || ticketId === id) { void fetchTicket(); void fetchHistory(); }
+    };
+    const names = ['ticket:updated', 'ticket:resolved', 'ticket:reopened'];
+    names.forEach((n) => window.addEventListener(n, refresh));
+    return () => names.forEach((n) => window.removeEventListener(n, refresh));
+  }, [id, fetchTicket, fetchHistory]);
 
-  const handleUpdateTicket = async (updates: Partial<TicketDetail>) => {
-    if (!id || !internalToken) return;
+  const backRoute = role === 'rh_staff' ? '/rh/chamados' : '/admin/chamados';
+
+  const update = async (payload: Record<string, unknown>, success: string) => {
+    if (!id) return;
     try {
-      setSubmitting(true);
-      const payload: any = {};
-      if ('status' in updates && updates.status !== undefined && updates.status !== '') payload.status = updates.status;
-      if ('priority' in updates && updates.priority !== undefined && updates.priority !== '') payload.priority = updates.priority;
-      if ('pause_reason' in updates && updates.pause_reason) payload.pause_reason = updates.pause_reason;
-      if ('assigned_to' in updates) {
-        const value = updates.assigned_to;
-        payload.assigned_to_id = (value === '' || value === null || value === undefined) ? null : value;
-      }
-      if (Object.keys(payload).length === 0) {
-        setError('Nenhuma alteração para salvar');
-        setSubmitting(false);
-        return;
-      }
-      const response = await fetch(`${BACKEND_URL}/api/tickets/${id}`, {
+      setBusy(true);
+      const res = await fetch(`${BACKEND_URL}/api/tickets/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${internalToken}` },
+        headers: authHeaders(true),
         body: JSON.stringify(payload),
       });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || errorData.error || 'Erro ao atualizar chamado');
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || data.error || 'Não foi possível salvar a alteração.');
       }
-      await fetchTicket(id);
-      await fetchHistory(id);
-      setIsEditing(false);
-      setError('');
-      showToast.success('Chamado atualizado com sucesso!');
+      await Promise.all([fetchTicket(), fetchHistory()]);
+      showToast.success(success);
     } catch (err: any) {
-      console.error('Erro ao atualizar:', err);
-      setError(err.message || 'Erro ao atualizar chamado');
-      showToast.error(err.message || 'Erro ao atualizar chamado');
+      showToast.error(err.message);
     } finally {
-      setSubmitting(false);
+      setBusy(false);
     }
   };
 
-  const handleAddMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMessage.trim() || !id || !internalToken) return;
-    try {
-      setSubmitting(true);
-      const response = await fetch(`${BACKEND_URL}/api/tickets/${id}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${internalToken}` },
-        body: JSON.stringify({ message: newMessage, is_internal: isInternalNote }),
-      });
-      if (!response.ok) throw new Error('Erro ao adicionar mensagem');
-      setNewMessage('');
-      setIsInternalNote(false);
-      await fetchTicket(id);
-      showToast.success(isInternalNote ? 'Nota interna adicionada' : 'Mensagem enviada');
-    } catch (err: any) {
-      setError(err.message || 'Erro ao adicionar mensagem');
-      showToast.error(err.message || 'Erro ao adicionar mensagem');
-    } finally {
-      setSubmitting(false);
-    }
+  const assumeMe = () => update({ status: 'in_progress', assigned_to_id: myId }, 'Chamado assumido. Agora está com você.');
+  const resolve = () => update({ status: 'resolved' }, 'Chamado resolvido. O solicitante foi avisado.');
+  const waitUser = () => update({ status: 'waiting_user' }, 'Aguardando resposta do solicitante.');
+  const resume = () => update({ status: 'in_progress' }, 'Atendimento retomado.');
+  const unassign = () => update({ status: 'open', assigned_to_id: null }, 'Chamado devolvido para a fila.');
+
+  const submitWait = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!waitFor) return;
+    await update({ status: waitFor, pause_reason: waitReason.trim() }, 'Chamado em espera. O prazo fica pausado.');
+    setWaitFor(null);
+    setWaitReason('');
   };
 
-  const rhAdjustments = Array.isArray(ticket?.metadata?.adjustments)
-    ? ticket!.metadata!.adjustments.map((adjustment: any) => ({
-        date: typeof adjustment?.date === 'string' ? adjustment.date : '',
-        correctedTime: typeof adjustment?.correctedTime === 'string' ? adjustment.correctedTime : '',
-        notes: typeof adjustment?.notes === 'string' ? adjustment.notes : '',
-      })) as RhPointAdjustment[]
-    : [];
-
-  const hasRhAdjustments = rhAdjustments.length > 0;
-
-  const getStatusBadge = (status: string) => {
-    const badges: Record<string, { label: string; className: string }> = {
-      open: { label: 'Aberto', className: 'badge-open' },
-      in_progress: { label: 'Em Progresso', className: 'badge-progress' },
-      waiting_user: { label: 'Aguardando Usuário', className: 'badge-waiting' },
-      aguardando_confirmacao: { label: 'Aguardando Confirmação', className: 'badge-waiting' },
-      aguardando_aquisicao: { label: 'Aguardando Aquisição', className: 'badge-status-procurement' },
-      aguardando_terceiros: { label: 'Aguardando Terceiros', className: 'badge-status-external' },
-      resolved: { label: 'Resolvido', className: 'badge-resolved' },
-      closed: { label: 'Concluído', className: 'badge-closed' },
-    };
-    return badges[status] || { label: status, className: '' };
-  };
-
-  const getPriorityBadge = (priority: string) => {
-    const badges: Record<string, { label: string; className: string }> = {
-      low: { label: 'Baixa', className: 'priority-low' },
-      medium: { label: 'Média', className: 'priority-medium' },
-      high: { label: 'Alta', className: 'priority-high' },
-      urgent: { label: 'Urgente', className: 'priority-urgent' },
-    };
-    return badges[priority] || { label: priority, className: '' };
-  };
-
-  const getTypeLabel = (type?: string) => {
-    switch (type) {
-      case 'incident': return 'Incidente';
-      case 'request': return 'Solicitação';
-      case 'change': return 'Mudança';
-      case 'problem': return 'Problema';
-      default: return type || '—';
-    }
-  };
-
-  const getInitials = (name?: string) => {
-    if (!name) return '?';
-    return name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
-  };
-
-  const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleString('pt-BR', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit',
-    });
-
-  const handleQuickAction = async (action: 'assume' | 'waiting' | 'resolve' | 'close' | 'resume') => {
-    if (action === 'close') {
-      if (!id || !internalToken) return;
-      try {
-        setSubmitting(true);
-        const response = await fetch(`${BACKEND_URL}/api/tickets/${id}/manual-close`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${internalToken}` },
-        });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(data.error || 'Erro ao encerrar chamado');
-        await fetchTicket(id);
-        await fetchHistory(id);
-        showToast.success('Chamado encerrado com sucesso');
-      } catch (err: any) {
-        setError(err.message || 'Erro ao encerrar chamado');
-        showToast.error(err.message || 'Erro ao encerrar chamado');
-      } finally {
-        setSubmitting(false);
-      }
-      return;
-    }
-
-    const statusMap = { assume: 'in_progress', waiting: 'waiting_user', resolve: 'resolved', close: 'closed', resume: 'in_progress' };
-    const updates: any = { status: statusMap[action] };
-    if (action === 'assume') {
-      const userData = localStorage.getItem('internal_user');
-      if (userData) updates.assigned_to = JSON.parse(userData).id;
-    }
-    await handleUpdateTicket(updates);
-  };
-
-  /**
-   * Coloca o chamado em espera externa, registrando o motivo.
-   *
-   * O backend valida papel e setor de novo; aqui so evitamos oferecer a acao
-   * a quem receberia 403.
-   */
-  const handleExternalWait = async (
-    waitStatus: 'aguardando_aquisicao' | 'aguardando_terceiros',
-    reason: string,
-  ) => {
-    await handleUpdateTicket({ status: waitStatus, pause_reason: reason } as any);
-  };
-
-  const handleAssignToMe = async () => {
-    const userData = localStorage.getItem('internal_user');
-    if (userData) {
-      const user = JSON.parse(userData);
-      try {
-        await handleUpdateTicket({ assigned_to: user.id, status: 'in_progress' });
-        showToast.success('Chamado atribuído para você e iniciado!');
-      } catch (error) {
-        console.error('Erro ao auto-atribuir:', error);
-      }
-    } else {
-      showToast.error('Usuário não identificado');
-    }
-  };
-
-  const handleUnassign = async () => {
-    try {
-      await handleUpdateTicket({ assigned_to: undefined, status: 'open' });
-      showToast.success('Chamado desatribuído e reaberto');
-    } catch (error) {
-      console.error('Erro ao desatribuir:', error);
-    }
-  };
-
-  const getLoggedUserName = () => {
-    const userData = localStorage.getItem('internal_user');
-    return userData ? JSON.parse(userData).name : null;
-  };
-
-  const isAssignedToMe = () => {
-    const userData = localStorage.getItem('internal_user');
-    if (userData && ticket?.assigned_to) {
-      return JSON.parse(userData).id === ticket.assigned_to;
-    }
-    return false;
-  };
-
-  const handleGenerateSummary = async () => {
+  const closeForGood = async () => {
     if (!id) return;
-    if (aiSummary) { setShowSummary(s => !s); return; }
+    try {
+      setBusy(true);
+      const res = await fetch(`${BACKEND_URL}/api/tickets/${id}/manual-close`, { method: 'POST', headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Não foi possível encerrar o chamado.');
+      await Promise.all([fetchTicket(), fetchHistory()]);
+      showToast.success('Chamado encerrado.');
+    } catch (err: any) {
+      showToast.error(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sendReply = async (event?: React.FormEvent) => {
+    event?.preventDefault();
+    if (!reply.trim() || !id) return;
+    try {
+      setBusy(true);
+      const res = await fetch(`${BACKEND_URL}/api/tickets/${id}/messages`, {
+        method: 'POST',
+        headers: authHeaders(true),
+        body: JSON.stringify({ message: reply.trim(), is_internal: internalNote }),
+      });
+      if (!res.ok) throw new Error('Não foi possível enviar. O texto continua na caixa.');
+      setReply('');
+      await fetchTicket();
+      showToast.success(internalNote ? 'Nota interna salva.' : 'Resposta enviada.');
+    } catch (err: any) {
+      showToast.error(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleSummary = async () => {
+    if (!id) return;
+    if (aiSummary) { setShowSummary((s) => !s); return; }
     setSummaryLoading(true);
     setShowSummary(true);
     const result = await aiService.summarizeTicket(id);
-    if (result) {
-      setAiSummary(result);
-    } else {
-      showToast.error('IA não disponível ou falhou ao gerar resumo');
-      setShowSummary(false);
-    }
+    if (result) setAiSummary(result);
+    else { showToast.error('O resumo com IA não está disponível agora.'); setShowSummary(false); }
     setSummaryLoading(false);
+  };
+
+  const loadRequesterHistory = async () => {
+    if (!ticket?.requester_id) return;
+    if (requesterHistory) { setRequesterHistory(null); return; }
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/tickets?requester_id=${ticket.requester_id}&limit=20&sort=created_at&order=desc`, { headers: authHeaders() });
+      const data = res.ok ? await res.json() : { data: [] };
+      setRequesterHistory((data.data || []).filter((h: { id: string }) => h.id !== ticket.id));
+    } catch {
+      setRequesterHistory([]);
+    }
+  };
+
+  const copyLink = () => {
+    void navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 2000);
   };
 
   if (loading) {
     return (
-      <div className="admin-ticket-detail loading">
-        <div className="loading-spinner" />
-        <span>Carregando chamado...</span>
-      </div>
-    );
-  }
-
-  if (error && !ticket) {
-    return (
-      <div className="admin-ticket-detail">
-        <div className="alert alert-error">{error}</div>
-        <button onClick={() => navigate(getBackRoute())} className="btn-back">← Voltar</button>
+      <div className="tkd">
+        <div className="tkd-wrap tkd-loading">
+          <div className="tkd-skeleton" style={{ height: 150 }} />
+          <div className="tkd-skeleton" style={{ height: 360 }} />
+        </div>
       </div>
     );
   }
 
   if (!ticket) {
     return (
-      <div className="admin-ticket-detail">
-        <div className="alert alert-error">Chamado não encontrado</div>
-        <button onClick={() => navigate(getBackRoute())} className="btn-back">← Voltar</button>
+      <div className="tkd">
+        <div className="tkd-wrap tkd-missing">
+          <i className="ti ti-file-off" aria-hidden="true" />
+          <h1>Chamado não encontrado</h1>
+          <p>{error || 'Este chamado não existe ou foi removido.'}</p>
+          <button type="button" className="tkd-btn tkd-btn--primary" onClick={() => navigate(backRoute)}>Voltar para a fila</button>
+        </div>
       </div>
     );
   }
 
-  const statusBadge = getStatusBadge(ticket.status);
-  const priorityBadge = getPriorityBadge(ticket.priority);
-  const normalizedRating = ticket.rating !== null && ticket.rating !== undefined ? Number(ticket.rating) : null;
-  const elapsedHours = Math.floor((Date.now() - new Date(ticket.created_at).getTime()) / (1000 * 60 * 60));
-  const assigneeName = isAssignedToMe()
-    ? `${getLoggedUserName()} (Você)`
-    : users.find(u => u.id === ticket.assigned_to)?.name || 'Atribuído';
+  const policyTicket = { ...ticket, assigned_to: ticket.assigned_to || undefined };
+  const editable = canEditTicket(policyTicket, role, myId);
+  const mine = !!ticket.assigned_to && ticket.assigned_to === myId;
+  const assigneeName = mine ? 'Você' : users.find((u) => u.id === ticket.assigned_to)?.name || (ticket.assigned_to ? 'Outra pessoa da equipe' : '');
+  const status = statusPresentation(ticket.status);
+  const paused = isSlaPaused(ticket.status);
+  const finished = ['resolved', 'aguardando_confirmacao'].includes(ticket.status);
+  const closed = ticket.status === 'closed';
+  const team = TEAM[ticket.department || 'ti'] ?? TEAM.ti;
+  const requester = firstName(ticket.requester_name);
+  const staffReplied = messages.some((m) => m.author_type === 'it_staff' && !m.is_internal);
+  const externalWaits = canUseExternalWaitStatuses(role) && (ticket.department || 'ti') === 'ti';
+  const linkedEquipment = equipment.find((e) => e.id === ticket.linked_equipment_id);
+  const meta = ticket.metadata || {};
+  const adjustments: Array<{ date?: string; correctedTime?: string; notes?: string }> = Array.isArray(meta.adjustments) ? meta.adjustments : [];
+
+  const steps = [
+    { label: 'Assumir', done: !!ticket.assigned_to || ticket.status !== 'open' },
+    { label: 'Responder', done: staffReplied || finished || closed },
+    { label: 'Resolver', done: finished || closed },
+  ];
+  const currentStep = steps.findIndex((s) => !s.done);
+
+  const focusReply = (note = false) => {
+    setInternalNote(note);
+    replyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    window.setTimeout(() => replyRef.current?.focus(), 300);
+  };
+
+  // O que fazer agora, conforme estado e responsável.
+  const renderNext = () => {
+    if (closed) {
+      return { tone: 'done', title: 'Chamado encerrado', text: 'Nenhuma ação pendente. O histórico continua disponível.', actions: null };
+    }
+    if (!ticket.assigned_to && ticket.status === 'open') {
+      return {
+        tone: 'new',
+        title: `Aberto há ${ageLabel(ticket.created_at)} e ninguém assumiu`,
+        text: 'Assuma para começar o atendimento ou atribua a alguém da equipe.',
+        actions: canAssume(policyTicket, role, myId) && (
+          <button type="button" className="tkd-btn tkd-btn--sun" onClick={() => void assumeMe()} disabled={busy}>
+            <i className="ti ti-hand-grab" aria-hidden="true" />Assumir chamado
+          </button>
+        ),
+      };
+    }
+    if (!mine) {
+      return {
+        tone: 'other',
+        title: `Com ${assigneeName}`,
+        text: finished ? 'Resolvido, aguardando confirmação ou encerramento.' : `Status: ${status.label.toLowerCase()}.`,
+        actions: canAssume(policyTicket, role, myId) && !finished && (
+          <button type="button" className="tkd-btn" onClick={() => void assumeMe()} disabled={busy}>
+            <i className="ti ti-arrows-exchange" aria-hidden="true" />Assumir no lugar
+          </button>
+        ),
+      };
+    }
+    if (finished) {
+      return {
+        tone: 'done',
+        title: 'Você marcou como resolvido',
+        text: `${requester} foi avisado e pode confirmar. Encerre quando não houver mais nada a fazer.`,
+        actions: (
+          <>
+            <button type="button" className="tkd-btn" onClick={() => void resume()} disabled={busy}>
+              <i className="ti ti-arrow-back-up" aria-hidden="true" />Reabrir
+            </button>
+            {canClose(policyTicket, role, myId) && (
+              <button type="button" className="tkd-btn tkd-btn--primary" onClick={() => setConfirmClose(true)} disabled={busy}>
+                <i className="ti ti-lock" aria-hidden="true" />Encerrar
+              </button>
+            )}
+          </>
+        ),
+      };
+    }
+    if (ticket.status === 'waiting_user' || paused) {
+      return {
+        tone: 'wait',
+        title: ticket.status === 'waiting_user' ? `Aguardando ${requester} responder` : status.label,
+        text: paused
+          ? `Prazo pausado.${ticket.pause_reason ? ` Motivo: ${ticket.pause_reason}.` : ''}`
+          : 'A resposta aparece na conversa. Você pode retomar sem esperar.',
+        actions: (
+          <>
+            <button type="button" className="tkd-btn" onClick={() => void resume()} disabled={busy}>
+              <i className="ti ti-player-play" aria-hidden="true" />Retomar
+            </button>
+            <button type="button" className="tkd-btn tkd-btn--primary" onClick={() => void resolve()} disabled={busy}>
+              <i className="ti ti-circle-check" aria-hidden="true" />Resolver
+            </button>
+          </>
+        ),
+      };
+    }
+    return {
+      tone: 'mine',
+      title: staffReplied ? `Terminou com ${requester}?` : `Responda ${requester}`,
+      text: staffReplied ? 'Resolva quando o problema estiver solucionado.' : 'A resposta chega por e-mail. Use nota interna para registrar o que só a equipe precisa ver.',
+      actions: (
+        <>
+          <button type="button" className={`tkd-btn ${staffReplied ? '' : 'tkd-btn--primary'}`} onClick={() => focusReply(false)}>
+            <i className="ti ti-message-reply" aria-hidden="true" />Responder
+          </button>
+          {canResolve(policyTicket, role, myId) && (
+            <button type="button" className={`tkd-btn ${staffReplied ? 'tkd-btn--primary' : ''}`} onClick={() => void resolve()} disabled={busy}>
+              <i className="ti ti-circle-check" aria-hidden="true" />Resolver
+            </button>
+          )}
+        </>
+      ),
+    };
+  };
+
+  const next = renderNext();
 
   return (
-    <div className="admin-ticket-detail">
-
-      {/* ── Compact Header ── */}
-      <header className="ticket-header">
-        <button onClick={() => navigate(getBackRoute())} className="btn-back" aria-label="Voltar para fila">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          Voltar para Fila
-        </button>
-
-        <div className="ticket-header-content">
-          <div className="ticket-header-top">
-            <span className="ticket-id-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+    <div className="tkd">
+      <header className="tkd-head pub-aurora">
+        <div className="tkd-wrap">
+          <div className="tkd-head__bar">
+            <button type="button" className="tkd-back" onClick={() => navigate(backRoute)}>
+              <i className="ti ti-arrow-left" aria-hidden="true" />Fila
+            </button>
+            <button type="button" className="tkd-code" onClick={copyLink} title="Copiar link do chamado">
               #{ticket.id.substring(0, 8).toUpperCase()}
-              <button
-                onClick={() => { navigator.clipboard.writeText(window.location.href); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-                title="Copiar link do chamado"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8rem', color: copied ? '#059669' : '#94a3b8', padding: '0 2px' }}
-              >
-                {copied ? '✓' : '🔗'}
-              </button>
-            </span>
-            <div className="ticket-header-badges">
-              <span className={`badge ${statusBadge.className}`}>{statusBadge.label}</span>
-              <span className={`badge ${priorityBadge.className}`}>{priorityBadge.label}</span>
-            </div>
+              <i className={`ti ${copied ? 'ti-check' : 'ti-link'}`} aria-hidden="true" />
+              <span className="pub-sr-only">{copied ? 'Link copiado' : 'Copiar link'}</span>
+            </button>
             <button
               type="button"
-              className={`btn-ai-summary ${showSummary ? 'active' : ''}`}
-              onClick={handleGenerateSummary}
+              className={`tkd-ai ${showSummary ? 'is-on' : ''}`}
+              onClick={() => void toggleSummary()}
               disabled={summaryLoading}
-              title="Gerar resumo com IA"
             >
-              {summaryLoading ? '⏳ Gerando...' : showSummary ? '✦ Ocultar Resumo' : '✦ Resumo IA'}
+              <i className="ti ti-sparkles" aria-hidden="true" />
+              {summaryLoading ? 'Resumindo…' : showSummary ? 'Ocultar resumo' : 'Resumo com IA'}
             </button>
           </div>
-          <h1 className="ticket-title-heading">{ticket.title}</h1>
+
+          <h1>{ticket.title}</h1>
+
+          <div className="tkd-tags">
+            <span className={`tkd-status tkd-status--${ticket.status}`}>{status.label}</span>
+            <span className={`tkd-prio tkd-prio--${ticket.priority}`}>Prioridade {(PRIORITY_LABEL[ticket.priority] || ticket.priority).toLowerCase()}</span>
+            <span className={`tkd-team tkd-team--${team.tone}`}>{team.label}</span>
+            {ticket.category && <span className="tkd-tag">{CATEGORY_LABEL[ticket.category] || ticket.category}</span>}
+            <span className="tkd-age">Aberto há {ageLabel(ticket.created_at)}, em {formatDateTime(ticket.created_at)}</span>
+          </div>
+
+          <ol className="tkd-steps" aria-label="Etapas do atendimento">
+            {steps.map((step, index) => (
+              <li key={step.label} className={step.done ? 'is-done' : index === currentStep ? 'is-current' : ''} aria-current={index === currentStep ? 'step' : undefined}>
+                <span className="tkd-steps__dot" aria-hidden="true">{step.done ? <i className="ti ti-check" /> : index + 1}</span>
+                {step.label}
+              </li>
+            ))}
+          </ol>
         </div>
       </header>
 
-      {/* ── Painel de Resumo IA ── */}
       {showSummary && (
-        <div className="ai-summary-panel">
-          {summaryLoading ? (
-            <div className="ai-summary-loading">
-              <div className="ai-summary-spinner" />
-              <span>Analisando chamado...</span>
-            </div>
-          ) : aiSummary ? (
-            <>
-              <div className="ai-summary-header">
-                <span>✦ Resumo gerado por IA</span>
-                <small>claude-haiku • apenas contexto</small>
-              </div>
-              <p className="ai-summary-text">{aiSummary.summary}</p>
-              {aiSummary.keyPoints.length > 0 && (
-                <ul className="ai-summary-points">
-                  {aiSummary.keyPoints.map((p, i) => <li key={i}>{p}</li>)}
-                </ul>
-              )}
-              <div className="ai-summary-next">
-                <strong>Próximo passo sugerido:</strong> {aiSummary.suggestedNextStep}
-              </div>
-            </>
-          ) : null}
+        <div className="tkd-wrap">
+          <section className="tkd-summary" aria-live="polite">
+            {summaryLoading ? (
+              <p className="tkd-summary__loading"><span className="tkd-spinner" aria-hidden="true" />Lendo o chamado e a conversa…</p>
+            ) : aiSummary && (
+              <>
+                <h2><i className="ti ti-sparkles" aria-hidden="true" />Resumo com IA</h2>
+                <p>{aiSummary.summary}</p>
+                {aiSummary.keyPoints.length > 0 && <ul>{aiSummary.keyPoints.map((p, i) => <li key={i}>{p}</li>)}</ul>}
+                <p className="tkd-summary__next"><strong>Próximo passo sugerido:</strong> {aiSummary.suggestedNextStep}</p>
+              </>
+            )}
+          </section>
         </div>
       )}
 
-      {error && <div className="alert alert-error">{error}</div>}
-
-      {/* ── Two-column layout ── */}
-      <div className="ticket-layout">
-
-        {/* ════ Main Column ════ */}
-        <main className="ticket-main">
-
-          {/* Stepper */}
-          <div className="stepper-card">
-            <StatusTimeline currentStatus={ticket.status} />
-          </div>
-
-          {/* Details Card */}
-          <section className="ticket-info-card">
-            <div className="card-header">
-              <h2 className="card-title">Detalhes do Chamado</h2>
-              <button onClick={() => setIsEditing(!isEditing)} className="btn-edit" aria-pressed={isEditing}>
-                {isEditing ? 'Cancelar' : 'Editar'}
-              </button>
+      <div className="tkd-wrap tkd-body">
+        <main className="tkd-main">
+          <section className={`tkd-next tkd-next--${next.tone}`} aria-label="Próximo passo">
+            <div>
+              <h2>{next.title}</h2>
+              <p>{next.text}</p>
             </div>
-
-            {/* Title */}
-            <div className="detail-field detail-field-full">
-              <label className="field-label">Título</label>
-              <div className="field-value field-value-title">{ticket.title}</div>
-            </div>
-
-            {/* Description */}
-            <div className="detail-field detail-field-full">
-              <label className="field-label">Descrição</label>
-              <div className="field-value field-value-description">{ticket.description}</div>
-            </div>
-
-            {/* Editable fields grid */}
-            <div className="details-grid">
-
-              {/* Status */}
-              <div className="detail-field">
-                <label className="field-label">Status</label>
-                {isEditing ? (
-                  <select
-                    value={ticket.status}
-                    onChange={(e) => handleUpdateTicket({ status: e.target.value })}
-                    disabled={submitting}
-                    className="select-input"
-                  >
-                    <option value="open">Aberto</option>
-                    <option value="in_progress">Em Progresso</option>
-                    <option value="waiting_user">Aguardando Usuário</option>
-                    <option value="aguardando_confirmacao">Aguardando Confirmação</option>
-                    {canUseExternalWaitStatuses(currentUserRole) && (ticket.department || 'ti') === 'ti' && (
-                      <>
-                        <option value="aguardando_aquisicao">Aguardando Aquisição</option>
-                        <option value="aguardando_terceiros">Aguardando Terceiros</option>
-                      </>
-                    )}
-                    <option value="resolved">Resolvido</option>
-                    <option value="closed">Fechado</option>
-                  </select>
-                ) : (
-                  <div className="field-value">
-                    <span className={`badge ${statusBadge.className}`}>{statusBadge.label}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Priority */}
-              <div className="detail-field">
-                <label className="field-label">Prioridade</label>
-                {isEditing ? (
-                  <select
-                    value={ticket.priority}
-                    onChange={(e) => handleUpdateTicket({ priority: e.target.value })}
-                    disabled={submitting}
-                    className="select-input"
-                  >
-                    <option value="low">Baixa</option>
-                    <option value="medium">Média</option>
-                    <option value="high">Alta</option>
-                    <option value="urgent">Urgente</option>
-                  </select>
-                ) : (
-                  <div className="field-value">
-                    <span className={`badge ${priorityBadge.className}`}>{priorityBadge.label}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Responsible */}
-              <div className="detail-field">
-                <label className="field-label">Responsável</label>
-                {isEditing ? (
-                  <select
-                    value={ticket.assigned_to || ''}
-                    onChange={(e) => handleUpdateTicket({ assigned_to: e.target.value === '' ? undefined : e.target.value })}
-                    disabled={submitting}
-                    className="select-input"
-                  >
-                    <option value="">Não atribuído</option>
-                    {users.map(user => (
-                      <option key={user.id} value={user.id}>{user.name}</option>
-                    ))}
-                  </select>
-                ) : ticket.assigned_to ? (
-                  <div className="field-value assign-container">
-                    <div className="assignee-avatar" aria-hidden="true">
-                      {getInitials(isAssignedToMe() ? getLoggedUserName() : users.find(u => u.id === ticket.assigned_to)?.name)}
-                    </div>
-                    <span className="assignee-name">{assigneeName}</span>
-                    {isAssignedToMe() && (
-                      <button onClick={handleUnassign} className="btn-unassign" disabled={submitting}>
-                        Desatribuir
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="field-value assign-container">
-                    <span className="text-muted">Não atribuído</span>
-                    <button onClick={handleAssignToMe} className="btn-assign-inline" disabled={submitting}>
-                      Atribuir para Mim
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Department */}
-              <div className="detail-field">
-                <label className="field-label">Departamento</label>
-                <div className="field-value">
-                  {ticket.department === 'administrativo' ? 'Administrativo'
-                    : ticket.department === 'rh' ? 'Recursos Humanos'
-                    : 'TI'}
-                </div>
-              </div>
-
-              {/* Linked Equipment */}
-              <div className="detail-field">
-                <label className="field-label">Equipamento</label>
-                {isEditing ? (
-                  <select
-                    value={ticket.linked_equipment_id || ''}
-                    onChange={e => handleUpdateTicket({ linked_equipment_id: e.target.value || null } as any)}
-                    disabled={submitting}
-                    className="select-input"
-                  >
-                    <option value="">Nenhum</option>
-                    {equipment.map(eq => (
-                      <option key={eq.id} value={eq.id}>
-                        {eq.internal_code} — {eq.brand} {eq.model}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <div className="field-value">
-                    {ticket.linked_equipment_id
-                      ? equipment.find(e => e.id === ticket.linked_equipment_id)?.internal_code
-                        ? `${equipment.find(e => e.id === ticket.linked_equipment_id)!.internal_code} — ${equipment.find(e => e.id === ticket.linked_equipment_id)!.brand} ${equipment.find(e => e.id === ticket.linked_equipment_id)!.model}`
-                        : 'Carregando...'
-                      : <span className="text-muted">Sem equipamento vinculado</span>
-                    }
-                  </div>
-                )}
-              </div>
-
-              {/* Category */}
-              {ticket.category && (
-                <div className="detail-field">
-                  <label className="field-label">Categoria</label>
-                  <div className="field-value" style={{ textTransform: 'capitalize' }}>
-                    {ticket.category.replace(/_/g, ' ')}
-                  </div>
-                </div>
-              )}
-
-              {/* Rating */}
-              <div className="detail-field">
-                <label className="field-label">Avaliação</label>
-                <div className="field-value">
-                  {normalizedRating !== null ? (
-                    <span className="rating-stars">
-                      {'★'.repeat(Math.max(0, Math.min(5, normalizedRating)))}
-                      {'☆'.repeat(Math.max(0, 5 - Math.min(5, normalizedRating)))}
-                      <span className="rating-number"> {normalizedRating}/5</span>
-                    </span>
-                  ) : (
-                    <span className="text-muted">Sem avaliação</span>
-                  )}
-                </div>
-              </div>
-
-            </div>
-
-            {/* RH Metadata */}
-            {ticket.department === 'rh' && ticket.metadata && Object.keys(ticket.metadata).length > 0 && (
-              <div className="detail-field detail-field-full rh-metadata-block">
-                <label className="field-label">Detalhes da Solicitação RH</label>
-                <div className="field-value field-value-rh">
-                  {ticket.metadata.medicalLeaveDays && (
-                    <span><strong>Dias de afastamento:</strong> {ticket.metadata.medicalLeaveDays}</span>
-                  )}
-                  {hasRhAdjustments ? (
-                    <div style={{ display: 'grid', gap: '0.75rem', width: '100%' }}>
-                      <strong>Datas de ajuste:</strong>
-                      {rhAdjustments.map((adjustment, index) => (
-                        <div key={`${adjustment.date || 'adjustment'}-${index}`} style={{ display: 'grid', gap: '0.35rem', padding: '0.75rem', border: '1px solid #e5e7eb', borderRadius: '10px', background: '#fafafa' }}>
-                          <span><strong>Data:</strong> {adjustment.date || 'Não informada'}</span>
-                          <span><strong>Horário corrigido:</strong> {adjustment.correctedTime || 'Não informado'}</span>
-                          {adjustment.notes && (
-                            <span><strong>Justificativa:</strong> {adjustment.notes}</span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <>
-                      {ticket.metadata.adjustmentDate && (
-                        <span><strong>Data de ajuste:</strong> {ticket.metadata.adjustmentDate}</span>
-                      )}
-                      {ticket.metadata.correctedTime && (
-                        <span><strong>Horário corrigido:</strong> {ticket.metadata.correctedTime}</span>
-                      )}
-                    </>
-                  )}
-                  {ticket.metadata.payrollMonth && (
-                    <span><strong>Competência:</strong> {ticket.metadata.payrollMonth}</span>
-                  )}
-                  {ticket.metadata.notes && (
-                    <span><strong>Observações:</strong> {ticket.metadata.notes}</span>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Feedback */}
-            <div className="detail-field detail-field-full">
-              <label className="field-label">Feedback do Solicitante</label>
-              <div className="field-value field-value-description">
-                {ticket.feedback?.trim() ? ticket.feedback : (
-                  <span className="text-muted">Nenhum comentário informado</span>
-                )}
-              </div>
-            </div>
-
-            {ticket.rated_at && (
-              <div className="detail-field">
-                <label className="field-label">Avaliado em</label>
-                <div className="field-value field-value-date">{formatDate(ticket.rated_at)}</div>
-              </div>
-            )}
+            {next.actions && <div className="tkd-next__actions">{next.actions}</div>}
           </section>
 
-          {/* Conversation Card */}
-          <section className="messages-card">
-            <h2 className="card-title">Histórico de Conversas</h2>
+          <section className="tkd-card" aria-labelledby="tkd-desc-title">
+            <h2 id="tkd-desc-title">O que foi pedido</h2>
+            <p className="tkd-desc">{ticket.description}</p>
 
-            <div className="messages-list" role="log" aria-label="Histórico de mensagens">
-              {messages.length === 0 ? (
-                <div className="no-messages">
-                  <div className="no-messages-icon" aria-hidden="true">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                    </svg>
-                  </div>
-                  <p>Nenhuma mensagem ainda. Seja o primeiro a responder!</p>
-                </div>
-              ) : (
-                messages.map((msg) => {
-                  const isStaff = msg.author_type === 'it_staff';
-                  const staffFallback =
-                    ticket?.department === 'rh' ? 'Equipe RH'
-                    : ticket?.department === 'administrativo' ? 'Equipe Administrativa'
-                    : 'Equipe TI';
-                  const authorDisplay = isStaff
-                    ? msg.author_name || staffFallback
-                    : msg.author_name || ticket?.requester_name || 'Usuário';
+            {(meta.medicalLeaveDays || meta.payrollMonth || meta.notes || adjustments.length > 0) && (
+              <dl className="tkd-facts">
+                {meta.medicalLeaveDays && <div><dt>Dias de afastamento</dt><dd>{meta.medicalLeaveDays}</dd></div>}
+                {meta.payrollMonth && <div><dt>Competência</dt><dd>{meta.payrollMonth}</dd></div>}
+                {adjustments.map((a, i) => (
+                  <div key={i}><dt>Ajuste de ponto {adjustments.length > 1 ? i + 1 : ''}</dt><dd>{a.date || 'sem data'}, {a.correctedTime || 'sem horário'}{a.notes ? `. ${a.notes}` : ''}</dd></div>
+                ))}
+                {meta.notes && <div className="is-wide"><dt>Observações</dt><dd>{meta.notes}</dd></div>}
+              </dl>
+            )}
+
+            {ticket.rating != null && (
+              <div className="tkd-rating">
+                <span aria-label={`Avaliação ${ticket.rating} de 5`}>
+                  {'★'.repeat(Math.max(0, Math.min(5, Number(ticket.rating))))}
+                  <span className="is-off">{'★'.repeat(Math.max(0, 5 - Math.min(5, Number(ticket.rating))))}</span>
+                </span>
+                {ticket.feedback?.trim() && <q>{ticket.feedback}</q>}
+              </div>
+            )}
+
+            <div className="tkd-attachments">
+              <TicketAttachments ticketId={ticket.id} authToken={internalToken || ''} department={ticket.department} />
+            </div>
+          </section>
+
+          <section className="tkd-card tkd-chat" aria-labelledby="tkd-chat-title">
+            <h2 id="tkd-chat-title">Conversa</h2>
+            {messages.length === 0 ? (
+              <p className="tkd-muted">Nenhuma mensagem ainda.</p>
+            ) : (
+              <ol className="tkd-messages">
+                {messages.map((m) => {
+                  const team = m.author_type === 'it_staff';
+                  const author = team ? m.author_name || 'Equipe' : m.author_name || ticket.requester_name || 'Solicitante';
                   return (
-                    <div
-                      key={msg.id}
-                      className={`message ${isStaff ? 'message-staff' : 'message-user'} ${msg.is_internal ? 'message-internal' : ''}`}
-                    >
-                      <div className="message-header">
-                        <div className={`message-avatar ${isStaff ? 'avatar-staff' : 'avatar-user'}`} aria-hidden="true">
-                          {getInitials(authorDisplay)}
+                    <li key={m.id} className={`tkd-msg ${team ? 'is-team' : 'is-person'} ${m.is_internal ? 'is-note' : ''}`}>
+                      <span className="tkd-msg__avatar" aria-hidden="true">{initialsOf(author)}</span>
+                      <div className="tkd-msg__bubble">
+                        <div className="tkd-msg__head">
+                          <strong>{author}</strong>
+                          {m.is_internal && <span className="tkd-msg__note"><i className="ti ti-eye-off" aria-hidden="true" />Nota interna</span>}
+                          <time dateTime={m.created_at}>{formatDateTime(m.created_at)}</time>
                         </div>
-                        <div className="message-meta">
-                          <span className="message-author">{authorDisplay}</span>
-                          <span className="message-date">
-                            {new Date(msg.created_at).toLocaleString('pt-BR', {
-                              day: '2-digit', month: '2-digit',
-                              hour: '2-digit', minute: '2-digit',
-                            })}
-                          </span>
-                        </div>
-                        {msg.is_internal && (
-                          <span className="internal-badge" role="note">Nota Interna</span>
-                        )}
+                        <p>{m.message}</p>
                       </div>
-                      <div className="message-content">{msg.message}</div>
-                    </div>
+                    </li>
                   );
-                })
-              )}
-            </div>
+                })}
+              </ol>
+            )}
 
-            {/* Reply Form */}
-            <form onSubmit={handleAddMessage} className="message-form" aria-label="Formulário de resposta">
-              <div className="message-form-header">
-                <span className="form-title">Nova Mensagem</span>
-                <div className="internal-toggle-container">
-                  <label className="internal-toggle" htmlFor="internal-note-toggle" aria-label="Ativar nota interna">
-                    <input
-                      id="internal-note-toggle"
-                      type="checkbox"
-                      checked={isInternalNote}
-                      onChange={(e) => setIsInternalNote(e.target.checked)}
-                    />
-                    <span className="toggle-slider"></span>
-                  </label>
-                  <span className={`internal-toggle-label ${isInternalNote ? 'active' : ''}`}>
-                    Nota Interna
-                    {isInternalNote && <span className="internal-badge-inline">ATIVO</span>}
-                  </span>
-                  {isInternalNote && (
-                    <span className="internal-notice">Visível apenas para a equipe</span>
-                  )}
+            {!closed && (
+              <form className={`tkd-reply ${internalNote ? 'is-note' : ''}`} onSubmit={(e) => void sendReply(e)}>
+                <div className="tkd-reply__mode" role="radiogroup" aria-label="Tipo de mensagem">
+                  <button type="button" role="radio" aria-checked={!internalNote} onClick={() => setInternalNote(false)}>
+                    <i className="ti ti-send" aria-hidden="true" />Responder {requester}
+                  </button>
+                  <button type="button" role="radio" aria-checked={internalNote} onClick={() => setInternalNote(true)}>
+                    <i className="ti ti-notes" aria-hidden="true" />Nota interna
+                  </button>
                 </div>
-              </div>
-
-              <textarea
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                placeholder={isInternalNote ? 'Digite uma nota interna para a equipe...' : 'Digite sua resposta ao usuário...'}
-                rows={4}
-                disabled={submitting}
-                className={`message-input ${isInternalNote ? 'internal-mode' : ''}`}
-                aria-label="Texto da mensagem"
-              />
-
-              <div className="message-form-footer">
-                <button
-                  type="submit"
-                  disabled={submitting || !newMessage.trim()}
-                  className="btn btn-send"
-                >
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                    <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
-                  </svg>
-                  {submitting ? 'Enviando...' : isInternalNote ? 'Adicionar Nota' : 'Enviar Resposta'}
-                </button>
-              </div>
-            </form>
+                <label htmlFor="tkd-reply" className="pub-sr-only">{internalNote ? 'Nota interna' : `Resposta para ${requester}`}</label>
+                <textarea
+                  id="tkd-reply"
+                  ref={replyRef}
+                  rows={4}
+                  value={reply}
+                  disabled={busy}
+                  onChange={(e) => setReply(e.target.value)}
+                  onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') void sendReply(); }}
+                  placeholder={internalNote ? 'Anotação que só a equipe vê…' : `Resposta que ${requester} recebe por e-mail…`}
+                />
+                <div className="tkd-reply__foot">
+                  <span className="tkd-muted">Ctrl+Enter envia</span>
+                  <button type="submit" className="tkd-btn tkd-btn--primary" disabled={busy || !reply.trim()}>
+                    <i className={`ti ${internalNote ? 'ti-device-floppy' : 'ti-send'}`} aria-hidden="true" />
+                    {busy ? 'Enviando…' : internalNote ? 'Salvar nota' : 'Enviar resposta'}
+                  </button>
+                </div>
+              </form>
+            )}
           </section>
-
-          {/* Attachments */}
-          <TicketAttachments
-            ticketId={ticket.id}
-            authToken={internalToken || ''}
-            department={ticket.department}
-          />
         </main>
 
-        {/* ════ Sidebar ════ */}
-        <aside className="ticket-sidebar">
+        <aside className="tkd-side">
+          <section className="tkd-card tkd-person" aria-labelledby="tkd-person-title">
+            <h2 id="tkd-person-title">Solicitante</h2>
+            <div className="tkd-person__id">
+              <span className="tkd-avatar" aria-hidden="true">{initialsOf(ticket.requester_name)}</span>
+              <div>
+                <strong>{ticket.requester_name || 'Sem nome'}</strong>
+                <span>{[ticket.requester_department, ticket.requester_unit].filter(Boolean).join(', ') || 'Setor não informado'}</span>
+              </div>
+            </div>
+            {ticket.requester_email && (
+              <a className="tkd-mail" href={`mailto:${ticket.requester_email}`}><i className="ti ti-mail" aria-hidden="true" />{ticket.requester_email}</a>
+            )}
+            {ticket.requester_id && (
+              <button type="button" className="tkd-linkbtn" onClick={() => void loadRequesterHistory()} aria-expanded={!!requesterHistory}>
+                {requesterHistory ? 'Ocultar chamados anteriores' : 'Ver chamados anteriores'}
+              </button>
+            )}
+            {requesterHistory && (
+              requesterHistory.length === 0
+                ? <p className="tkd-muted">Nenhum outro chamado desta pessoa.</p>
+                : (
+                  <ul className="tkd-history">
+                    {requesterHistory.slice(0, 8).map((h) => (
+                      <li key={h.id}>
+                        <button type="button" onClick={() => navigate(`/admin/chamados/${h.id}`)}>
+                          <span>{h.title}</span>
+                          <small>{new Date(h.created_at).toLocaleDateString('pt-BR')}, {statusPresentation(h.status).label.toLowerCase()}</small>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )
+            )}
+          </section>
 
-          {/* Quick Actions */}
-          <QuickActionsCard
-            status={ticket.status as any}
-            isSubmitting={submitting}
-            onAssume={() => handleQuickAction('assume')}
-            onWaitingUser={() => handleQuickAction('waiting')}
-            onResolve={() => handleQuickAction('resolve')}
-            onClose={() => handleQuickAction('close')}
-            onResume={() => handleQuickAction('resume')}
-            onExternalWait={
-              canUseExternalWaitStatuses(currentUserRole) && (ticket.department || 'ti') === 'ti'
-                ? handleExternalWait
-                : undefined
-            }
-          />
+          <section className="tkd-card tkd-fields" aria-labelledby="tkd-fields-title">
+            <h2 id="tkd-fields-title">Atendimento</h2>
+            <label>
+              <span>Responsável</span>
+              <select
+                value={ticket.assigned_to || ''}
+                disabled={busy || !editable || closed || (!canAssignToOthers(role) && !!ticket.assigned_to && !mine)}
+                onChange={(e) => {
+                  const value = e.target.value || null;
+                  void update(
+                    value ? { assigned_to_id: value, ...(ticket.status === 'open' ? { status: 'in_progress' } : {}) } : { assigned_to_id: null, status: 'open' },
+                    value ? `Chamado atribuído a ${value === myId ? 'você' : users.find((u) => u.id === value)?.name || 'outra pessoa'}.` : 'Chamado devolvido para a fila.',
+                  );
+                }}
+              >
+                <option value="">Ninguém (na fila)</option>
+                {(canAssignToOthers(role) ? users : users.filter((u) => u.id === myId)).map((u) => (
+                  <option key={u.id} value={u.id}>{u.id === myId ? `${u.name} (você)` : u.name}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Status</span>
+              <select
+                value={ticket.status}
+                disabled={busy || !editable || closed}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === 'aguardando_aquisicao' || value === 'aguardando_terceiros') { setWaitFor(value); return; }
+                  void update({ status: value }, `Status alterado para ${statusPresentation(value).label.toLowerCase()}.`);
+                }}
+              >
+                {!STATUS_OPTIONS.some((o) => o.value === ticket.status) && <option value={ticket.status}>{status.label}</option>}
+                {STATUS_OPTIONS.filter((o) => externalWaits || !isSlaPaused(o.value)).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </label>
+            <label>
+              <span>Prioridade</span>
+              <select
+                value={ticket.priority}
+                disabled={busy || !editable || closed}
+                onChange={(e) => void update({ priority: e.target.value }, `Prioridade alterada para ${(PRIORITY_LABEL[e.target.value] || e.target.value).toLowerCase()}.`)}
+              >
+                {PRIORITY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </label>
+            {(ticket.department || 'ti') === 'ti' && (
+              <label>
+                <span>Equipamento</span>
+                <select
+                  value={ticket.linked_equipment_id || ''}
+                  disabled={busy || !editable}
+                  onChange={(e) => void update({ linked_equipment_id: e.target.value || null }, e.target.value ? 'Equipamento vinculado.' : 'Equipamento desvinculado.')}
+                >
+                  <option value="">Nenhum</option>
+                  {equipment.map((eq) => <option key={eq.id} value={eq.id}>{eq.internal_code}, {eq.brand} {eq.model}</option>)}
+                </select>
+              </label>
+            )}
+            {linkedEquipment && (
+              <button type="button" className="tkd-linkbtn" onClick={() => navigate(`/inventario/equipamento/${linkedEquipment.id}`)}>
+                Abrir ficha de {linkedEquipment.internal_code}
+              </button>
+            )}
 
-          {/* Requester Info */}
-          {ticket.requester_type === 'public' && (
-            <div className="sidebar-card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                <h3 className="sidebar-card-title" style={{ margin: 0 }}>Solicitante</h3>
-                {ticket.requester_id && (
-                  <button
-                    className="btn-ai-summary"
-                    style={{ fontSize: '0.72rem', padding: '3px 10px' }}
-                    onClick={() => {
-                      if (showHistory) { setShowHistory(false); return; }
-                      loadRequesterHistory(ticket.requester_id!);
-                    }}
-                    title="Ver histórico de chamados deste solicitante"
-                  >
-                    {showHistory ? 'Ocultar' : 'Histórico'}
-                  </button>
+            {waitFor && (
+              <form className="tkd-wait" onSubmit={(e) => void submitWait(e)}>
+                <label htmlFor="tkd-wait-reason">
+                  {waitFor === 'aguardando_aquisicao' ? 'O que precisa ser comprado?' : 'O que está sendo aguardado?'}
+                </label>
+                <input
+                  id="tkd-wait-reason"
+                  autoFocus
+                  maxLength={280}
+                  value={waitReason}
+                  onChange={(e) => setWaitReason(e.target.value)}
+                  placeholder={waitFor === 'aguardando_aquisicao' ? 'Ex.: fonte 500W' : 'Ex.: enviado à assistência'}
+                />
+                <p className="tkd-muted">O prazo fica pausado enquanto o chamado estiver em espera.</p>
+                <div>
+                  <button type="button" className="tkd-btn" onClick={() => setWaitFor(null)}>Cancelar</button>
+                  <button type="submit" className="tkd-btn tkd-btn--primary" disabled={busy}>Colocar em espera</button>
+                </div>
+              </form>
+            )}
+
+            {mine && !finished && !closed && !waitFor && (
+              <div className="tkd-more">
+                {ticket.status !== 'waiting_user' && (
+                  <button type="button" onClick={() => void waitUser()} disabled={busy}><i className="ti ti-hourglass" aria-hidden="true" />Aguardar solicitante</button>
                 )}
+                {externalWaits && !paused && (
+                  <>
+                    <button type="button" onClick={() => setWaitFor('aguardando_aquisicao')} disabled={busy}><i className="ti ti-shopping-cart" aria-hidden="true" />Aguardar compra</button>
+                    <button type="button" onClick={() => setWaitFor('aguardando_terceiros')} disabled={busy}><i className="ti ti-building-store" aria-hidden="true" />Aguardar terceiros</button>
+                  </>
+                )}
+                <button type="button" onClick={() => void unassign()} disabled={busy}><i className="ti ti-arrow-back-up" aria-hidden="true" />Devolver para a fila</button>
+                <button type="button" onClick={() => focusReply(true)}><i className="ti ti-notes" aria-hidden="true" />Nota interna</button>
               </div>
-              <div className="sidebar-meta">
-                <div className="meta-item">
-                  <span className="meta-label">Nome</span>
-                  <span className="meta-value">{ticket.requester_name || '—'}</span>
-                </div>
-                <div className="meta-item">
-                  <span className="meta-label">Email</span>
-                  <span className="meta-value meta-email">{ticket.requester_email || '—'}</span>
-                </div>
-                <div className="meta-item">
-                  <span className="meta-label">Setor</span>
-                  <span className="meta-value">{ticket.requester_department || '—'}</span>
-                </div>
-                <div className="meta-item">
-                  <span className="meta-label">Unidade</span>
-                  <span className="meta-value">{ticket.requester_unit || '—'}</span>
-                </div>
-                <div className="meta-item">
-                  <span className="meta-label">Tipo</span>
-                  <span className="meta-value">{getTypeLabel(ticket.type)}</span>
-                </div>
-              </div>
+            )}
+          </section>
 
-              {/* Histórico 360° */}
-              {showHistory && (
-                <div style={{ marginTop: '0.75rem', borderTop: '1px solid #e5e7eb', paddingTop: '0.75rem' }}>
-                  <strong style={{ fontSize: '0.8rem', color: '#374151' }}>Chamados anteriores</strong>
-                  {historyLoading ? (
-                    <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: '0.5rem 0 0' }}>Carregando...</p>
-                  ) : requesterHistory.length === 0 ? (
-                    <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: '0.5rem 0 0' }}>Nenhum chamado anterior.</p>
-                  ) : (
-                    <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                      {requesterHistory.filter(h => h.id !== ticket.id).slice(0, 8).map((h: any) => (
-                        <a
-                          key={h.id}
-                          href={`/admin/chamados/${h.id}`}
-                          style={{ fontSize: '0.78rem', color: '#1e40af', textDecoration: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0.5rem', background: '#f8fafc', borderRadius: '4px', border: '1px solid #e2e8f0' }}
-                        >
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{h.title}</span>
-                          <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', color: '#64748b', whiteSpace: 'nowrap' }}>
-                            {new Date(h.created_at).toLocaleDateString('pt-BR')}
-                          </span>
-                        </a>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Timeline Info */}
-          <div className="sidebar-card">
-            <h3 className="sidebar-card-title">Linha do tempo</h3>
-            <div className="tk-tl-summary">
-              <span title={formatDate(ticket.created_at)}>
-                <i className="ti ti-calendar-plus" aria-hidden="true" />
-                Aberto {formatDate(ticket.created_at)}
-              </span>
-              <span>
-                <i className="ti ti-clock" aria-hidden="true" />
-                {elapsedHours}h decorridas
-              </span>
-            </div>
+          <section className="tkd-card tkd-log" aria-labelledby="tkd-log-title">
+            <h2 id="tkd-log-title">Linha do tempo</h2>
             <TicketTimeline events={timeline} loading={timelineLoading} />
-          </div>
-
+          </section>
         </aside>
       </div>
+
+      <ConfirmDialog
+        isOpen={confirmClose}
+        title="Encerrar este chamado?"
+        message="O chamado sai da fila e não pode mais ser reaberto pelo solicitante."
+        confirmText="Encerrar"
+        cancelText="Cancelar"
+        type="warning"
+        onConfirm={() => { setConfirmClose(false); void closeForGood(); }}
+        onCancel={() => setConfirmClose(false)}
+      />
     </div>
   );
 }

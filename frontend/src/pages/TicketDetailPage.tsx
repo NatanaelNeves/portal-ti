@@ -102,9 +102,22 @@ export default function TicketDetailPage() {
   const [nowMs, setNowMs] = useState<number>(Date.now());
 
   const token = searchParams.get('token');
-  const isInternalUser = !!localStorage.getItem('internal_token');
   const internalToken = localStorage.getItem('internal_token');
-  const userToken = localStorage.getItem('user_token');
+  // Alguém da equipe logado também pode ser o solicitante: quando abriu este
+  // chamado por este navegador (ticket_token_<id>) ou é do RH, que só atende
+  // chamados do RH e usa esta tela para acompanhar o que pediu a outras
+  // equipes. Nesses casos ele age como solicitante, com o acesso público.
+  const ownTicketToken = id ? localStorage.getItem(`ticket_token_${id}`) : null;
+  const internalRole = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('internal_user') || 'null')?.role ?? null;
+    } catch {
+      return null;
+    }
+  })();
+  const actsAsRequester = !!internalToken && (internalRole === 'rh_staff' || !!ownTicketToken);
+  const isInternalUser = !!internalToken && !actsAsRequester;
+  const userToken = ownTicketToken || localStorage.getItem('user_token');
 
   useEffect(() => {
     if (id) {

@@ -59,7 +59,7 @@ export default function TicketsHero({
   }, []);
 
   return (
-    <header className="tk-hero">
+    <header className="tk-hero pub-aurora">
       <div className="tk-hero-context">
         <div className="tk-heading-line"><h1 className="tk-hero-title">Central de Chamados</h1><span className="tk-hero-scope"><i className={`ti ${profile.icon}`} aria-hidden="true" />{scopeLabel}</span></div>
         <p className="tk-hero-tagline">Mais clareza para cuidar de cada solicitação.</p>
@@ -70,6 +70,7 @@ export default function TicketsHero({
           <i className="ti ti-search" aria-hidden="true" />
           <input
             ref={searchRef}
+            data-page-search
             type="search"
             value={searchValue}
             onChange={(event) => onSearchChange(event.target.value)}

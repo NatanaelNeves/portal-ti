@@ -1,6 +1,8 @@
 import './styles/App.css';
 import './styles/PublicShell.css';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import './styles/RhShell.css';
+import './styles/TiShell.css';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useAuthStore } from './stores/authStore';
 import { Toaster } from 'react-hot-toast';
@@ -44,25 +46,16 @@ import DeliverEquipmentPage from './pages/DeliverEquipmentPage';
 import ReturnEquipmentPage from './pages/ReturnEquipmentPage';
 import MoveEquipmentPage from './pages/MoveEquipmentPage';
 
-// Reservation Module Pages
-import ReservationPublicPage from './pages/ReservationPublicPage';
-import ReservationTrackingPage from './pages/ReservationTrackingPage';
-import MyReservationsPage from './pages/MyReservationsPage';
-import CreateReservationPage from './pages/CreateReservationPage';
-import AdminReservationsPage from './pages/AdminReservationsPage';
-import AdminReservationDetailPage from './pages/AdminReservationDetailPage';
-import AdminEquipmentTypesPage from './pages/AdminEquipmentTypesPage';
 
 // RH Module Pages
 import RhDashboardPage from './pages/RhDashboardPage';
 import RhTicketsPage from './pages/RhTicketsPage';
 import RhReportsPage from './pages/RhReportsPage';
+import RhTicketDetailPage from './pages/RhTicketDetailPage';
 
 // Error pages
 import NotFoundPage from './pages/NotFoundPage';
 import StatusPage from './pages/StatusPage';
-import KpiDashboardPage from './pages/KpiDashboardPage';
-import RecurringTicketsPage from './pages/RecurringTicketsPage';
 
 // Components
 import Navigation from './components/Navigation';
@@ -75,6 +68,7 @@ import './styles/AdminPaletteBridge.css';
 import './styles/AdminSectorScreens.css';
 import './styles/AdminTicketsRefinement.css';
 import './styles/TicketsWorkspace.css';
+import './styles/TicketsSkin.css';
 
 /**
  * Escolhe o relatorio conforme o perfil. A protecao real esta no backend
@@ -121,9 +115,8 @@ function App() {
             <Route path="/chamado/:id" element={<TicketDetailPage />} />
             <Route path="/central" element={<InformationCenterPage />} />
             <Route path="/status" element={<StatusPage />} />
-            <Route path="/reservar" element={<ReservationPublicPage />} />
-            <Route path="/reservar/acompanhar" element={<ReservationTrackingPage />} />
-            <Route path="/reservar/acompanhar/:token" element={<ReservationTrackingPage />} />
+            {/* Reservas de notebook foram descontinuadas: links antigos voltam ao início. */}
+            <Route path="/reservar/*" element={<Navigate to="/" replace />} />
 
    {/* Internal Login */}
             <Route path="/admin/login" element={<InternalLoginPage />} />
@@ -144,8 +137,8 @@ function App() {
                 <ReportsRouter />
               </InternalProtectedRoute>
             } />
-            <Route path="/admin/kpis" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff', 'admin_staff', 'rh_staff', 'manager']}><KpiDashboardPage /></InternalProtectedRoute>} />
-            <Route path="/admin/recorrentes" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff']}><RecurringTicketsPage /></InternalProtectedRoute>} />
+            <Route path="/admin/kpis" element={<Navigate to="/admin/relatorios" replace />} />
+            <Route path="/admin/recorrentes" element={<Navigate to="/admin/chamados" replace />} />
 
             {/* Inventory Module Routes - IT Staff Only */}
             <Route path="/inventario" element={<InternalProtectedRoute requireITStaff={true}><InventoryDashboardPage /></InternalProtectedRoute>} />
@@ -166,17 +159,14 @@ function App() {
             <Route path="/inventario/equipamento/:equipmentId/termo-de-devolucao" element={<InternalProtectedRoute requireITStaff={true}><ReturnTermPage /></InternalProtectedRoute>} />
             <Route path="/inventario/termo/:termId/devolucao" element={<InternalProtectedRoute requireITStaff={true}><ReturnTermPage /></InternalProtectedRoute>} />
 
-            {/* Reservation Module Routes */}
-            <Route path="/reservas" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff', 'admin_staff', 'manager', 'rh_staff']}><MyReservationsPage /></InternalProtectedRoute>} />
-            <Route path="/reservas/nova" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff', 'admin_staff', 'manager', 'rh_staff']}><CreateReservationPage /></InternalProtectedRoute>} />
-            <Route path="/admin/reservas" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff']}><AdminReservationsPage /></InternalProtectedRoute>} />
-            <Route path="/admin/reservas/tipos" element={<InternalProtectedRoute allowedRoles={['admin']}><AdminEquipmentTypesPage /></InternalProtectedRoute>} />
-            <Route path="/admin/reservas/:id" element={<InternalProtectedRoute allowedRoles={['admin', 'it_staff']}><AdminReservationDetailPage /></InternalProtectedRoute>} />
+            {/* Reservas descontinuadas: endereços antigos levam ao painel. */}
+            <Route path="/reservas/*" element={<Navigate to="/admin/dashboard" replace />} />
+            <Route path="/admin/reservas/*" element={<Navigate to="/admin/dashboard" replace />} />
 
             {/* RH Staff Routes */}
             <Route path="/rh/dashboard" element={<InternalProtectedRoute allowedRoles={['rh_staff', 'admin']}><RhDashboardPage /></InternalProtectedRoute>} />
             <Route path="/rh/chamados" element={<InternalProtectedRoute allowedRoles={['rh_staff', 'admin']}><RhTicketsPage /></InternalProtectedRoute>} />
-            <Route path="/rh/chamados/:id" element={<InternalProtectedRoute allowedRoles={['rh_staff', 'admin']}><AdminTicketDetailPage /></InternalProtectedRoute>} />
+            <Route path="/rh/chamados/:id" element={<InternalProtectedRoute allowedRoles={['rh_staff', 'admin']}><RhTicketDetailPage /></InternalProtectedRoute>} />
             <Route path="/rh/relatorios" element={<InternalProtectedRoute allowedRoles={['rh_staff', 'admin']}><RhReportsPage /></InternalProtectedRoute>} />
 
             {/* Gestor/Manager Routes */}
