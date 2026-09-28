@@ -1,8 +1,8 @@
 /* ════════════════════════════════════════════════════════════════
    PEDIDOS DO ADMINISTRATIVO (prefixo axp-)
-   O topo continua o quadro (mesma cor do cabeçalho, com o trilho de
-   aço entre eles). Cada pedido é uma ficha deitada: um toco colorido
-   com ilhós, da cor do tipo, e o papel branco com o conteúdo.
+   O topo tem a cor do quadro de chaves e continua a barra lateral.
+   Cada pedido é uma ficha deitada: um toco colorido com ilhós, da cor
+   do tipo, e o papel branco com o conteúdo.
    ════════════════════════════════════════════════════════════════ */
 
 .axp {
@@ -25,7 +25,11 @@
 .axp-head {
   padding: 34px 28px 0;
   color: #eaf6ef;
-  background: var(--adm-grain), linear-gradient(180deg, var(--adm-board), #07442f);
+  background:
+    var(--adm-grain),
+    radial-gradient(70% 90% at 100% 0%, rgba(95, 220, 160, 0.14), transparent 60%),
+    radial-gradient(50% 80% at 0% 0%, rgba(255, 255, 255, 0.05), transparent 70%),
+    linear-gradient(180deg, var(--adm-board), #07442f);
 }
 
 .axp-head__top,
@@ -333,15 +337,35 @@
 .axp-slip__who {
   display: flex;
   flex-wrap: wrap;
-  gap: 2px 10px;
+  align-items: center;
+  gap: 2px 6px;
   color: var(--ti-muted, #5d6f67);
   font-size: 0.86rem;
   font-weight: 600;
 }
 
+.axp-slip__who i {
+  opacity: 0.7;
+  font-size: 0.95rem;
+}
+
 .axp-slip__who small {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
   font-size: 0.82rem;
   font-weight: 500;
+}
+
+/* O começo do que foi pedido, numa linha, para saber do que se trata */
+.axp-slip__desc {
+  overflow: hidden;
+  color: #4a5c54;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .axp-slip__side {
@@ -617,5 +641,187 @@
 
   .axp-slip.is-leaving {
     opacity: 0.4;
+  }
+}
+
+
+/* ── Ferramentas da lista: tipos à esquerda, ordem à direita ───── */
+.axp-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-bottom: 10px;
+}
+
+.axp-tools .axp-kinds {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.axp-sort {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.axp-sort > i {
+  position: absolute;
+  left: 14px;
+  color: var(--pub-leaf, #0f7a4a);
+  font-size: 1.05rem;
+  pointer-events: none;
+}
+
+.axp-sort select {
+  min-height: 38px;
+  padding: 0 34px 0 38px;
+  color: var(--ti-ink, #13241d);
+  background-color: #fff;
+  border: 1.5px solid var(--ti-line, #dfe6e1);
+  border-radius: 999px;
+  font: 700 0.86rem var(--pub-body);
+  cursor: pointer;
+}
+
+.axp-sort select:hover {
+  border-color: #b9c8bd;
+}
+
+.axp-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 2px 12px;
+  color: var(--ti-muted, #5d6f67);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.axp-summary__urgent {
+  padding: 3px 10px;
+  color: #fff;
+  background: var(--ti-late, #c8372d);
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+/* ── Lado direito da ficha em "Comigo" e "Encerrados" ──────────── */
+.axp-side__info {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+}
+
+.axp-open {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  color: var(--adm-board);
+  background: #fff;
+  border: 1.5px solid var(--ti-line, #dfe6e1);
+  border-radius: 999px;
+  font: 800 0.86rem/1 var(--pub-body);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.axp-open i {
+  transition: transform 0.2s ease;
+}
+
+.axp-open:hover {
+  background: #f3f8f5;
+  border-color: var(--pub-leaf, #0f7a4a);
+}
+
+.axp-open:hover i {
+  transform: translateX(3px);
+}
+
+/* ── "Comigo" em grupos, como as bandejas do Painel ────────────── */
+.axp-groups {
+  display: grid;
+  gap: 22px;
+}
+
+.axp-group__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+  font: 800 1.05rem/1.2 var(--pub-display);
+}
+
+.axp-group__dot {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: #0f7a4a;
+  border-radius: 50%;
+  font-size: 1rem;
+}
+
+.axp-group--open .axp-group__dot {
+  color: var(--adm-mint-ink);
+  background: var(--adm-mint);
+}
+
+.axp-group--waiting .axp-group__dot {
+  background: #c77a1f;
+}
+
+.axp-group__n {
+  min-width: 26px;
+  padding: 3px 8px;
+  color: var(--ti-muted, #5d6f67);
+  background: #fff;
+  border: 1px solid var(--ti-line, #dfe6e1);
+  border-radius: 999px;
+  font: 800 0.8rem/1.2 var(--pub-body);
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .axp-tools {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+  }
+
+  .axp-tools .axp-kinds {
+    flex: none;
+    min-width: 0;
+  }
+
+  .axp-sort select {
+    width: 100%;
+  }
+
+  .axp-slip__desc {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .axp-side__info {
+    justify-items: start;
+  }
+
+  .axp-open {
+    min-height: 38px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .axp-open i {
+    transition: none;
   }
 }

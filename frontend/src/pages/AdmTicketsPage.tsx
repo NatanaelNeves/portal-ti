@@ -27,6 +27,7 @@ interface Ticket {
 }
 
 type Tab = 'quadro' | 'comigo' | 'encerrados';
+type Sort = 'old' | 'new' | 'urgent';
 
 const TABS: Array<{ key: Tab; label: string; icon: string; empty: { title: string; text: string } }> = [
   {
@@ -49,9 +50,37 @@ const TABS: Array<{ key: Tab; label: string; icon: string; empty: { title: strin
   },
 ];
 
+const SORTS: Array<{ key: Sort; label: string }> = [
+  { key: 'old', label: 'Mais antigos primeiro' },
+  { key: 'new', label: 'Mais recentes primeiro' },
+  { key: 'urgent', label: 'Urgentes primeiro' },
+];
+
+// Em "Comigo", os pedidos ficam nos mesmos grupos das bandejas do Painel.
+const GROUPS = [
+  { key: 'open', title: 'Para começar', icon: 'ti-inbox' },
+  { key: 'in_progress', title: 'Em andamento', icon: 'ti-run' },
+  { key: 'waiting', title: 'Esperando alguém', icon: 'ti-hourglass' },
+] as const;
+
+const groupOf = (status: string) => (status === 'open' ? 'open' : status === 'in_progress' ? 'in_progress' : 'waiting');
+
 const isTab = (value: string | null): value is Tab => value === 'quadro' || value === 'comigo' || value === 'encerrados';
 
 const normalize = (text: string) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+const defaultSort = (tab: Tab): Sort => (tab === 'encerrados' ? 'new' : 'old');
+
+/** Quanto tempo levou entre chegar e ser resolvido, em palavras. */
+function tookLabel(from: string, to?: string | null) {
+  if (!to) return '';
+  const hours = (new Date(to).getTime() - new Date(from).getTime()) / 3600000;
+  if (!Number.isFinite(hours) || hours < 0) return '';
+  if (hours < 1) return `resolvido em ${Math.max(1, Math.round(hours * 60))} min`;
+  if (hours < 24) return `resolvido em ${Math.round(hours)} h`;
+  const days = Math.round(hours / 24);
+  return days === 1 ? 'resolvido em 1 dia' : `resolvido em ${days} dias`;
+}
 
 export default function AdmTicketsPage() {
   const navigate = useNavigate();
@@ -65,6 +94,7 @@ export default function AdmTicketsPage() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [kind, setKind] = useState('');
+  const [sort, setSort] = useState<Sort>(defaultSort(tab));
   const [leaving, setLeaving] = useState<string | null>(null);
   const [shaking, setShaking] = useState<string | null>(null);
 
@@ -128,16 +158,24 @@ export default function AdmTicketsPage() {
       if (!q) return true;
       return normalize(`${t.title} ${t.requester_name ?? ''} ${t.requester_unit ?? ''} ${t.description ?? ''}`).includes(q);
     });
-    const time = (t: Ticket) => new Date(tab === 'comigo' ? t.updated_at : t.created_at).getTime();
-    // Quadro: quem chegou antes vem primeiro. Comigo: o que está parado há mais tempo. Encerrados: os mais recentes.
-    return [...filtered].sort((a, b) => (tab === 'encerrados' ? time(b) - time(a) : time(a) - time(b)));
-  }, [base, kind, search, tab]);
+    // Quadro e encerrados contam pela chegada; em "Comigo" conta a última mexida (o parado há mais tempo vem antes).
+    const time = (t: Ticket) => new Date(tab === 'comigo' ? t.updated_at : tab === 'encerrados' ? (t.resolved_at || t.updated_at) : t.created_at).getTime();
+    const byTime = (a: Ticket, b: Ticket) => (sort === 'new' ? time(b) - time(a) : time(a) - time(b));
+    return [...filtered].sort((a, b) => {
+      if (sort === 'urgent') {
+        const diff = Number(ADM_URGENT.has(b.priority)) - Number(ADM_URGENT.has(a.priority));
+        if (diff !== 0) return diff;
+      }
+      return byTime(a, b);
+    });
+  }, [base, kind, search, tab, sort]);
 
   const setTab = (next: Tab) => {
     const p = new URLSearchParams(params);
     p.set('aba', next);
     setParams(p, { replace: true });
     setKind('');
+    setSort(defaultSort(next));
   };
 
   const take = async (ticket: Ticket) => {
@@ -162,12 +200,91 @@ export default function AdmTicketsPage() {
 
   const current = TABS.find((t) => t.key === tab)!;
   const oldest = unclaimed.reduce<Ticket | null>((acc, t) => (!acc || t.created_at < acc.created_at ? t : acc), null);
+  const urgentHere = rows.filter((t) => ADM_URGENT.has(t.priority)).length;
 
   const lead = loading
     ? 'Buscando os pedidos…'
     : unclaimed.length === 0
       ? `Nada no quadro. Você tem ${mine.length} ${mine.length === 1 ? 'pedido' : 'pedidos'} em mãos.`
       : `${unclaimed.length} no quadro esperando alguém${oldest ? `, o mais antigo chegou ${admAge(oldest.created_at)}` : ''}. Você tem ${mine.length} em mãos.`;
+
+  const renderSlip = (t: Ticket, i: number) => {
+    const meta = admKind(t.category);
+    const lateNew = tab === 'quadro' && admDaysSince(t.created_at) >= 2;
+    const stale = tab === 'comigo' && admDaysSince(t.updated_at) >= 3;
+    const waiting = !['open', 'in_progress'].includes(t.status);
+    const excerpt = (t.description ?? '').replace(/\s+/g, ' ').trim();
+    const showExcerpt = excerpt && normalize(excerpt) !== normalize(t.title);
+    return (
+      <li
+        key={t.id}
+        className={`axp-slip adm-tone--${meta.tone}${leaving === t.id ? ' is-leaving' : ''}${shaking === t.id ? ' is-shaking' : ''}`}
+        style={{ '--i': Math.min(i, 10) } as CSSProperties}
+      >
+        <div className="axp-slip__stub" aria-hidden="true">
+          <span className="axp-slip__eye" />
+          <i className={`ti ${meta.icon}`} />
+        </div>
+        <button type="button" className="axp-slip__main" onClick={() => navigate(`/admin/chamados/${t.id}`)}>
+          <span className="axp-slip__kind">
+            {meta.label}
+            {ADM_URGENT.has(t.priority) && <span className="axp-flag">Urgente</span>}
+          </span>
+          <strong>{t.title}</strong>
+          {showExcerpt && <span className="axp-slip__desc">{excerpt}</span>}
+          <span className="axp-slip__who">
+            <i className="ti ti-user" aria-hidden="true" />
+            {t.requester_name || 'Solicitante sem nome'}
+            {t.requester_unit && <small><i className="ti ti-map-pin" aria-hidden="true" />{t.requester_unit}</small>}
+          </span>
+        </button>
+        <div className="axp-slip__side">
+          {tab === 'quadro' && (
+            <>
+              <span className={`axp-age${lateNew ? ' is-late' : ''}`}>chegou {admAge(t.created_at)}</span>
+              <button
+                type="button"
+                className="axp-take"
+                onClick={() => void take(t)}
+                disabled={leaving !== null}
+                aria-label={`Pegar o pedido: ${t.title}`}
+              >
+                {leaving === t.id ? <i className="ti ti-check axp-check" aria-hidden="true" /> : <i className="ti ti-hand-grab" aria-hidden="true" />}
+                {leaving === t.id ? 'Pego' : 'Pegar'}
+              </button>
+            </>
+          )}
+          {tab === 'comigo' && (
+            <>
+              <span className="axp-side__info">
+                {/* O grupo já diz o estado; só a espera ganha etiqueta, para dizer de quem se espera */}
+                {waiting && (
+                  <span className="axp-state is-waiting">{ADM_STATUS_LABEL[t.status] ?? 'Esperando alguém'}</span>
+                )}
+                <span className={`axp-age${stale ? ' is-late' : ''}`}>
+                  {stale ? `parado ${admAge(t.updated_at)}` : `mexido ${admAge(t.updated_at)}`}
+                </span>
+              </span>
+              <button type="button" className="axp-open" onClick={() => navigate(`/admin/chamados/${t.id}`)} aria-label={`Abrir o pedido: ${t.title}`}>
+                Abrir <i className="ti ti-arrow-right" aria-hidden="true" />
+              </button>
+            </>
+          )}
+          {tab === 'encerrados' && (
+            <>
+              <span className="axp-side__info">
+                <span className="axp-state is-done"><i className="ti ti-check" aria-hidden="true" />{ADM_STATUS_LABEL[t.status] ?? 'Encerrado'}</span>
+                <span className="axp-age">{tookLabel(t.created_at, t.resolved_at || t.updated_at) || admAge(t.updated_at)}</span>
+              </span>
+              <button type="button" className="axp-open" onClick={() => navigate(`/admin/chamados/${t.id}`)} aria-label={`Abrir o pedido: ${t.title}`}>
+                Abrir <i className="ti ti-arrow-right" aria-hidden="true" />
+              </button>
+            </>
+          )}
+        </div>
+      </li>
+    );
+  };
 
   return (
     <div className="axp">
@@ -213,27 +330,45 @@ export default function AdmTicketsPage() {
       </header>
 
       <div className="axp-body">
-        <div className="axp-kinds" role="group" aria-label="Tipo de pedido">
-          <button type="button" className="axp-kind" aria-pressed={!kind} onClick={() => setKind('')}>
-            Todos os tipos<span>{base.length}</span>
-          </button>
-          {ADM_KIND_KEYS.filter((k) => kindCounts[k]).map((k) => {
-            const meta = admKindByKey(k);
-            return (
-              <button
-                key={k}
-                type="button"
-                className={`axp-kind adm-tone--${meta.tone}`}
-                aria-pressed={kind === k}
-                onClick={() => setKind(kind === k ? '' : k)}
-              >
-                <i className={`ti ${meta.icon}`} aria-hidden="true" />
-                {meta.plural}
-                <span>{kindCounts[k]}</span>
-              </button>
-            );
-          })}
+        <div className="axp-tools">
+          <div className="axp-kinds" role="group" aria-label="Tipo de pedido">
+            <button type="button" className="axp-kind" aria-pressed={!kind} onClick={() => setKind('')}>
+              Todos os tipos<span>{base.length}</span>
+            </button>
+            {ADM_KIND_KEYS.filter((k) => kindCounts[k]).map((k) => {
+              const meta = admKindByKey(k);
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  className={`axp-kind adm-tone--${meta.tone}`}
+                  aria-pressed={kind === k}
+                  onClick={() => setKind(kind === k ? '' : k)}
+                >
+                  <i className={`ti ${meta.icon}`} aria-hidden="true" />
+                  {meta.plural}
+                  <span>{kindCounts[k]}</span>
+                </button>
+              );
+            })}
+          </div>
+          <label className="axp-sort">
+            <i className="ti ti-arrows-sort" aria-hidden="true" />
+            <span className="pub-sr-only">Ordem dos pedidos</span>
+            <select value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
+              {SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+            </select>
+          </label>
         </div>
+
+        {!loading && rows.length > 0 && (
+          <p className="axp-summary">
+            {rows.length === base.length
+              ? `${rows.length} ${rows.length === 1 ? 'pedido' : 'pedidos'}`
+              : `${rows.length} de ${base.length} pedidos`}
+            {urgentHere > 0 && <span className="axp-summary__urgent">{urgentHere} {urgentHere === 1 ? 'urgente' : 'urgentes'}</span>}
+          </p>
+        )}
 
         {error && (
           <div className="axp-alert" role="alert">
@@ -259,71 +394,25 @@ export default function AdmTicketsPage() {
               <button type="button" className="axp-btn axp-btn--mint" onClick={() => setTab('quadro')}>Ver o quadro ({unclaimed.length})</button>
             )}
           </div>
-        ) : (
-          <ul className="axp-list">
-            {rows.map((t, i) => {
-              const meta = admKind(t.category);
-              const lateNew = tab === 'quadro' && admDaysSince(t.created_at) >= 2;
-              const stale = tab === 'comigo' && admDaysSince(t.updated_at) >= 3;
-              const waiting = !['open', 'in_progress'].includes(t.status);
+        ) : tab === 'comigo' ? (
+          <div className="axp-groups">
+            {GROUPS.map((group) => {
+              const items = rows.filter((t) => groupOf(t.status) === group.key);
+              if (items.length === 0) return null;
               return (
-                <li
-                  key={t.id}
-                  className={`axp-slip adm-tone--${meta.tone}${leaving === t.id ? ' is-leaving' : ''}${shaking === t.id ? ' is-shaking' : ''}`}
-                  style={{ '--i': Math.min(i, 10) } as CSSProperties}
-                >
-                  <div className="axp-slip__stub" aria-hidden="true">
-                    <span className="axp-slip__eye" />
-                    <i className={`ti ${meta.icon}`} />
-                  </div>
-                  <button type="button" className="axp-slip__main" onClick={() => navigate(`/admin/chamados/${t.id}`)}>
-                    <span className="axp-slip__kind">
-                      {meta.label}
-                      {ADM_URGENT.has(t.priority) && <span className="axp-flag">Urgente</span>}
-                    </span>
-                    <strong>{t.title}</strong>
-                    <span className="axp-slip__who">
-                      {t.requester_name || 'Solicitante sem nome'}
-                      {t.requester_unit && <small>{t.requester_unit}</small>}
-                    </span>
-                  </button>
-                  <div className="axp-slip__side">
-                    {tab === 'quadro' && (
-                      <>
-                        <span className={`axp-age${lateNew ? ' is-late' : ''}`}>chegou {admAge(t.created_at)}</span>
-                        <button
-                          type="button"
-                          className="axp-take"
-                          onClick={() => void take(t)}
-                          disabled={leaving !== null}
-                          aria-label={`Pegar o pedido: ${t.title}`}
-                        >
-                          {leaving === t.id ? <i className="ti ti-check axp-check" aria-hidden="true" /> : <i className="ti ti-hand-grab" aria-hidden="true" />}
-                          {leaving === t.id ? 'Pego' : 'Pegar'}
-                        </button>
-                      </>
-                    )}
-                    {tab === 'comigo' && (
-                      <>
-                        <span className={`axp-state${waiting ? ' is-waiting' : t.status === 'open' ? ' is-new' : ''}`}>
-                          {ADM_STATUS_LABEL[t.status] ?? (waiting ? 'Esperando alguém' : t.status)}
-                        </span>
-                        <span className={`axp-age${stale ? ' is-late' : ''}`}>
-                          {stale ? `parado ${admAge(t.updated_at)}` : `mexido ${admAge(t.updated_at)}`}
-                        </span>
-                      </>
-                    )}
-                    {tab === 'encerrados' && (
-                      <>
-                        <span className="axp-state is-done"><i className="ti ti-check" aria-hidden="true" />{ADM_STATUS_LABEL[t.status] ?? 'Encerrado'}</span>
-                        <span className="axp-age">{admAge(t.resolved_at || t.updated_at)}</span>
-                      </>
-                    )}
-                  </div>
-                </li>
+                <section key={group.key} className={`axp-group axp-group--${group.key}`} aria-label={group.title}>
+                  <h2 className="axp-group__head">
+                    <span className="axp-group__dot" aria-hidden="true"><i className={`ti ${group.icon}`} /></span>
+                    {group.title}
+                    <span className="axp-group__n">{items.length}</span>
+                  </h2>
+                  <ul className="axp-list">{items.map(renderSlip)}</ul>
+                </section>
               );
             })}
-          </ul>
+          </div>
+        ) : (
+          <ul className="axp-list">{rows.map(renderSlip)}</ul>
         )}
       </div>
     </div>
