@@ -1,8 +1,9 @@
 /* ════════════════════════════════════════════════════════════════
    MOLDURA DO ADMINISTRATIVO (prefixo axs-) + tokens da área (adm-)
-   Cabeçalho da cor do quadro de chaves, com o trilho de aço como
-   borda de baixo. Os tons das etiquetas vivem aqui para que Painel,
-   Pedidos e Relatórios usem exatamente as mesmas cores por tipo.
+   Barra lateral à esquerda, com as abas uma embaixo da outra: é como o
+   setor prefere navegar. Tem a cor do quadro de chaves, com o trilho de
+   aço descendo pela borda direita. Os tons das etiquetas vivem aqui para
+   que Painel, Pedidos e Relatórios usem as mesmas cores por tipo.
    ════════════════════════════════════════════════════════════════ */
 
 :root {
@@ -16,10 +17,12 @@
   --adm-mint-hi: #c3f6dc;
   --adm-mint-ink: #04382a;
   --adm-canvas: #eef2ee;
-  --adm-header-h: 66px;
-  --adm-bottom-h: 66px;
+  --adm-side-w: 252px;
+  /* Altura de faixa fixa no topo: nenhuma no computador, a do Menu no celular */
+  --adm-header-h: 0px;
   --adm-grain: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.07) 1.2px, transparent 1.6px) 0 0 / 22px 22px;
   --adm-rail: linear-gradient(180deg, var(--adm-steel-hi) 0%, var(--adm-steel) 45%, var(--adm-steel-lo) 100%);
+  --adm-rail-y: linear-gradient(90deg, var(--adm-steel-hi) 0%, var(--adm-steel) 45%, var(--adm-steel-lo) 100%);
 }
 
 /* Tons por tipo de pedido: fundo da etiqueta, tinta e acento */
@@ -29,64 +32,67 @@
 .adm-tone--doc { --bg: #d8e8ff; --ink: #1a4d93; --ac: #3a7ddb; }
 .adm-tone--other { --bg: #eceff0; --ink: #34423c; --ac: #8a9a92; }
 
-/* O conteúdo começa logo abaixo do cabeçalho, sobre o canvas da área */
-body:has(.axs-header) .main-content {
+/* O conteúdo fica à direita da barra, sobre o canvas da área */
+.axs + .main-content {
+  min-height: 100vh;
+  margin-left: var(--adm-side-w);
   padding: 0;
   background: var(--adm-canvas);
 }
 
-body:has(.axs-header) .main-content :is(h1, h2) {
+.axs ~ .main-content :is(h1, h2) {
   font-family: var(--pub-display);
 }
 
-/* ── Cabeçalho ─────────────────────────────────────────────────── */
-.axs-header {
-  position: sticky;
-  top: 0;
-  z-index: 900;
-  color: #eaf6ef;
-  background: var(--adm-grain), linear-gradient(180deg, var(--adm-board-2), var(--adm-board));
-  font-family: var(--pub-body);
-}
-
-/* O trilho de aço */
-.axs-header::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -6px;
-  height: 6px;
-  background: var(--adm-rail);
-  box-shadow: 0 4px 10px -2px rgba(0, 0, 0, 0.25);
-}
-
-.axs-header button:hover {
+.axs button:hover {
   transform: none;
   box-shadow: none;
 }
 
-.axs-header :focus-visible,
-.axs-bottom :focus-visible {
+.axs :focus-visible {
   outline: 3px solid var(--pub-sun);
   outline-offset: 2px;
 }
 
-.axs-bar {
-  max-width: 1320px;
-  height: var(--adm-header-h);
+/* ── Barra lateral ─────────────────────────────────────────────── */
+.axs-side {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 950;
+  width: var(--adm-side-w);
   display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-inline: auto;
-  padding-inline: 28px;
+  flex-direction: column;
+  gap: 18px;
+  padding: 22px 18px 18px 16px;
+  overflow-y: auto;
+  color: #eaf6ef;
+  background:
+    var(--adm-grain),
+    radial-gradient(120% 40% at 0% 0%, rgba(95, 220, 160, 0.14), transparent 70%),
+    linear-gradient(180deg, var(--adm-board-2), var(--adm-board) 55%, #052f24);
+  font-family: var(--pub-body);
+}
+
+/* O trilho de aço descendo pela borda direita */
+.axs-side::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--adm-side-w) - 6px);
+  width: 6px;
+  background: var(--adm-rail-y);
+  box-shadow: 3px 0 10px -2px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
 }
 
 .axs-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0;
+  gap: 11px;
+  padding: 2px 4px;
   color: inherit;
   background: none;
   border: 0;
@@ -96,105 +102,34 @@ body:has(.axs-header) .main-content :is(h1, h2) {
 
 .axs-brand__copy {
   display: grid;
-  line-height: 1.1;
+  line-height: 1.15;
 }
 
 .axs-brand__copy strong {
   color: #fff;
-  font: 800 1.02rem/1.1 var(--pub-display);
+  font: 800 1.08rem/1.1 var(--pub-display);
   letter-spacing: -0.02em;
 }
 
 .axs-brand__copy small {
   color: rgba(234, 246, 239, 0.62);
-  font-size: 0.74rem;
+  font-size: 0.76rem;
   font-weight: 600;
 }
 
-/* Abas com pílula deslizante */
-.axs-tabs {
-  position: relative;
-  display: flex;
-  gap: 2px;
-  margin-left: 12px;
-  padding: 4px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 999px;
-}
-
-.axs-tabs__pill {
-  position: absolute;
-  top: 4px;
-  bottom: 4px;
-  left: 0;
-  width: var(--w);
-  background: #fff;
-  border-radius: 999px;
-  box-shadow: 0 6px 14px -8px rgba(0, 0, 0, 0.6);
-  transform: translateX(var(--x));
-  transition: transform 0.38s cubic-bezier(0.3, 1.25, 0.4, 1), width 0.38s cubic-bezier(0.3, 1.25, 0.4, 1);
-}
-
-.axs-tab {
-  position: relative;
-  z-index: 1;
-  min-height: 38px;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0 16px;
-  color: rgba(234, 246, 239, 0.8);
-  background: none;
-  border: 0;
-  border-radius: 999px;
-  font: 700 0.9rem/1 var(--pub-body);
-  cursor: pointer;
-  transition: color 0.2s ease;
-}
-
-.axs-tab:hover {
-  color: #fff;
-}
-
-.axs-tab[aria-current='page'] {
-  color: var(--adm-board);
-}
-
-.axs-tab[aria-current='page'] i {
-  color: var(--pub-leaf, #0f7a4a);
-}
-
-.axs-badge {
-  min-width: 19px;
-  height: 19px;
-  display: inline-grid;
-  place-items: center;
-  padding: 0 5px;
-  color: #fff;
-  background: var(--ti-late, #c8372d);
-  border-radius: 999px;
-  font: 800 0.7rem/1 var(--pub-body);
-  animation: axs-pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1);
-}
-
-@keyframes axs-pop {
-  from { transform: translate(-4px, 4px) scale(0.4); opacity: 0; }
-}
-
 .axs-new {
-  min-height: 40px;
+  min-height: 46px;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  margin-left: auto;
+  justify-content: center;
+  gap: 8px;
   padding: 0 16px;
   color: var(--adm-mint-ink);
   background: linear-gradient(180deg, var(--adm-mint-hi), var(--adm-mint) 60%, #3fc587);
   border: 0;
-  border-radius: 999px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
-  font: 800 0.88rem/1 var(--pub-body);
+  border-radius: 14px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 12px 24px -14px rgba(95, 220, 160, 0.9);
+  font: 800 0.95rem/1 var(--pub-body);
   cursor: pointer;
 }
 
@@ -202,146 +137,276 @@ body:has(.axs-header) .main-content :is(h1, h2) {
   filter: brightness(1.05);
 }
 
+/* Abas uma embaixo da outra, com a pílula clara deslizando na vertical */
+.axs-nav {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.axs-nav__pill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--h);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  transform: translateY(var(--y));
+  transition: transform 0.4s cubic-bezier(0.3, 1.25, 0.4, 1), height 0.4s cubic-bezier(0.3, 1.25, 0.4, 1);
+}
+
+/* O marcador verde-menta na ponta esquerda da aba ativa */
+.axs-nav__pill::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: -16px;
+  width: 5px;
+  background: var(--adm-mint);
+  border-radius: 0 4px 4px 0;
+  box-shadow: 0 0 12px rgba(95, 220, 160, 0.6);
+}
+
+.axs-tab {
+  position: relative;
+  z-index: 1;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px;
+  color: rgba(234, 246, 239, 0.78);
+  background: none;
+  border: 0;
+  border-radius: 14px;
+  font: 700 0.98rem/1 var(--pub-body);
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.axs-tab i {
+  width: 22px;
+  font-size: 1.25rem;
+  text-align: center;
+}
+
+.axs-tab span:first-of-type {
+  flex: 1;
+}
+
+.axs-tab:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.axs-tab[aria-current='page'] {
+  color: #fff;
+}
+
+.axs-tab[aria-current='page'] i {
+  color: var(--adm-mint);
+}
+
+.axs-badge {
+  min-width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 6px;
+  color: #fff;
+  background: var(--ti-late, #c8372d);
+  border-radius: 999px;
+  font: 800 0.74rem/1 var(--pub-body);
+  animation: axs-pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+@keyframes axs-pop {
+  from { transform: translate(-4px, 4px) scale(0.4); opacity: 0; }
+}
+
+/* Pé da barra: quem está usando e o "Sair" sempre à vista */
+.axs-foot {
+  display: grid;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 .axs-user {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  min-width: 0;
+  padding: 0 4px;
 }
 
 .axs-user__avatar {
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
   display: grid;
+  flex: 0 0 auto;
   place-items: center;
   color: var(--adm-board);
   background: #cfeedd;
   border-radius: 50%;
-  font: 800 0.8rem/1 var(--pub-body);
+  font: 800 0.84rem/1 var(--pub-body);
 }
 
-.axs-user__name {
-  font-size: 0.88rem;
-  font-weight: 700;
+.axs-user__copy {
+  display: grid;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.axs-user__copy strong {
+  overflow: hidden;
+  color: #fff;
+  font-size: 0.92rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.axs-user__copy small {
+  color: rgba(234, 246, 239, 0.62);
+  font-size: 0.78rem;
 }
 
 .axs-logout {
-  min-height: 40px;
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   padding: 0 14px;
   color: #eaf6ef;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 999px;
-  font: 700 0.86rem/1 var(--pub-body);
+  border-radius: 14px;
+  font: 700 0.92rem/1 var(--pub-body);
   cursor: pointer;
 }
 
-.axs-logout:hover {
-  background: rgba(255, 255, 255, 0.14);
+.axs-logout i {
+  font-size: 1.15rem;
 }
 
-/* ── Barra de baixo (celular) ──────────────────────────────────── */
-.axs-bottom {
+.axs-logout:hover {
+  background: rgba(255, 255, 255, 0.13);
+}
+
+/* ── Celular: faixa com Menu, e a barra vira gaveta ────────────── */
+.axs-mobile,
+.axs-scrim {
   display: none;
 }
 
 @media (max-width: 900px) {
-  .axs-user__name,
-  .axs-new span {
-    display: none;
+  :root {
+    --adm-header-h: 60px;
   }
 
-  .axs-new {
-    width: 40px;
-    justify-content: center;
-    padding: 0;
-  }
-}
-
-@media (max-width: 760px) {
-  .axs-bar {
-    gap: 10px;
-    padding-inline: 14px;
+  .axs + .main-content {
+    margin-left: 0;
   }
 
-  .axs-tabs,
-  .axs-new,
-  .axs-user {
-    display: none;
-  }
-
-  .axs-logout {
-    margin-left: auto;
-  }
-
-  .axs-bottom {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
+  .axs-mobile {
+    position: sticky;
+    top: 0;
     z-index: 900;
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    height: calc(var(--adm-bottom-h) + env(safe-area-inset-bottom));
-    padding: 6px 8px env(safe-area-inset-bottom);
-    background: var(--adm-board);
-    border-top: 4px solid var(--adm-steel);
+    height: var(--adm-header-h);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 12px;
+    color: #eaf6ef;
+    background: var(--adm-grain), linear-gradient(180deg, var(--adm-board-2), var(--adm-board));
     font-family: var(--pub-body);
   }
 
-  .axs-bottom__tab {
-    display: grid;
-    justify-items: center;
-    align-content: center;
-    gap: 3px;
-    color: rgba(234, 246, 239, 0.72);
-    background: none;
-    border: 0;
-    border-radius: 14px;
-    font: 700 0.74rem/1 var(--pub-body);
-  }
-
-  .axs-bottom__icon {
-    position: relative;
-    width: 44px;
-    height: 28px;
-    display: grid;
-    place-items: center;
-    border-radius: 999px;
-    font-size: 1.2rem;
-    transition: background-color 0.2s ease;
-  }
-
-  .axs-bottom__icon .axs-badge {
+  /* No celular o trilho de aço fica embaixo da faixa */
+  .axs-mobile::after {
+    content: '';
     position: absolute;
-    top: -4px;
-    right: -2px;
+    left: 0;
+    right: 0;
+    bottom: -5px;
+    height: 5px;
+    background: var(--adm-rail);
   }
 
-  .axs-bottom__tab[aria-current='page'] {
+  .axs-mobile__menu,
+  .axs-mobile__logout {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0 14px;
+    color: #eaf6ef;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 12px;
+    font: 700 0.9rem/1 var(--pub-body);
+    cursor: pointer;
+  }
+
+  .axs-mobile__menu i,
+  .axs-mobile__logout i {
+    font-size: 1.15rem;
+  }
+
+  .axs-mobile__where {
+    flex: 1;
+    overflow: hidden;
     color: #fff;
+    font: 800 1.02rem/1 var(--pub-display);
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .axs-bottom__tab[aria-current='page'] .axs-bottom__icon {
-    color: var(--adm-board);
-    background: #fff;
+  .axs-side {
+    width: min(84vw, 300px);
+    box-shadow: 20px 0 40px -20px rgba(0, 0, 0, 0.6);
+    transform: translateX(-105%);
+    transition: transform 0.3s cubic-bezier(0.3, 1, 0.4, 1);
   }
 
-  .axs-bottom__tab--new .axs-bottom__icon {
-    color: var(--adm-mint-ink);
-    background: var(--adm-mint);
+  .axs-side::after {
+    display: none;
   }
 
-  body:has(.axs-header) .main-content {
-    padding-bottom: calc(var(--adm-bottom-h) + env(safe-area-inset-bottom));
+  .axs.is-open .axs-side {
+    transform: translateX(0);
+  }
+
+  .axs-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 940;
+    display: block;
+    padding: 0;
+    background: rgba(3, 30, 22, 0.45);
+    border: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+
+  .axs.is-open .axs-scrim {
+    opacity: 1;
+    pointer-events: auto;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .axs-tabs__pill,
-  .axs-badge {
+  .axs-nav__pill,
+  .axs-badge,
+  .axs-side,
+  .axs-scrim {
     transition: none;
     animation: none;
   }
