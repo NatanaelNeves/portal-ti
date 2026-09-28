@@ -183,46 +183,60 @@ export default function AdminStaffDashboardPage() {
 
   return (
     <div className="adx">
-      <section className="adx-board" aria-labelledby="adx-title">
-        <div className="adx-board__head">
-          <div>
-            <h1 id="adx-title">{greeting}{firstName ? `, ${firstName}` : ''}.</h1>
-            <p className="adx-board__lead">{loading ? 'Olhando o quadro de pedidos…' : railSentence}</p>
-          </div>
-          <div className="adx-board__actions">
-            <button type="button" className="adx-btn adx-btn--ghost adx-btn--refresh" onClick={() => void load(true)} disabled={loading || refreshing} aria-label="Atualizar o painel">
-              <i className={`ti ti-refresh${refreshing ? ' adx-spin' : ''}`} aria-hidden="true" />
-              <span>{refreshing ? 'Atualizando' : 'Atualizar'}</span>
-            </button>
-            <button type="button" className="adx-btn adx-btn--mint" onClick={() => navigate('/admin/chamados?aba=quadro')}>
-              <i className="ti ti-list-details" aria-hidden="true" />
-              Ver todos os pedidos
-            </button>
-          </div>
+      {/* Saudação sobre o papel claro; o quadro escuro fica logo abaixo */}
+      <header className="adx-hello">
+        <div>
+          <h1>{greeting}{firstName ? `, ${firstName}` : ''}.</h1>
+          <p>{loading ? 'Olhando o quadro de pedidos…' : railSentence}</p>
         </div>
+        <div className="adx-hello__actions">
+          <button type="button" className="adx-btn adx-btn--line adx-btn--refresh" onClick={() => void load(true)} disabled={loading || refreshing} aria-label="Atualizar o painel">
+            <i className={`ti ti-refresh${refreshing ? ' adx-spin' : ''}`} aria-hidden="true" />
+            <span>{refreshing ? 'Atualizando' : 'Atualizar'}</span>
+          </button>
+          <button type="button" className="adx-btn adx-btn--board" onClick={() => navigate('/admin/chamados?aba=quadro')}>
+            <i className="ti ti-list-details" aria-hidden="true" />
+            Ver todos os pedidos
+          </button>
+        </div>
+      </header>
 
-        {/* O quadro de chaves: cada pedido sem responsável é uma etiqueta pendurada. */}
-        <div className="adx-rack">
-          <div className="adx-rail" aria-hidden="true" />
+      {error && (
+        <div className="adx-alert" role="alert">
+          <i className="ti ti-alert-circle" aria-hidden="true" />
+          <span>{error}</span>
+          <button type="button" onClick={() => void load(true)}>Tentar de novo</button>
+        </div>
+      )}
+
+      <div className="adx-cols">
+        {/* O quadro: trilho de aço na vertical e um pedido pendurado embaixo do outro */}
+        <section className="adx-board" aria-labelledby="adx-board-title">
+          <header className="adx-board__head">
+            <h2 id="adx-board-title">No quadro</h2>
+            <span className="adx-board__count">{loading ? '…' : unclaimedTotal}</span>
+            <span className="adx-board__hint">esperando alguém pegar</span>
+          </header>
+
           {loading ? (
-            <ul className="adx-tags" aria-busy="true">
-              {[0, 1, 2, 3].map((n) => (
+            <ol className="adx-rack" aria-busy="true">
+              {[0, 1, 2].map((n) => (
                 <li key={n} className="adx-hook"><div className="adx-tag adx-tag--ghost" /></li>
               ))}
-            </ul>
+            </ol>
           ) : listFailed ? (
-            <div className="adx-rack__note">
+            <div className="adx-note">
               <i className="ti ti-cloud-off" aria-hidden="true" />
               <span>A lista de pedidos não carregou. {unclaimedTotal > 0 ? `São ${unclaimedTotal} sem responsável.` : ''}</span>
               <button type="button" className="adx-btn adx-btn--ghost adx-btn--sm" onClick={() => void load(true)}>Tentar de novo</button>
             </div>
           ) : onRail.length === 0 ? (
-            <div className="adx-rack__note adx-rack__note--calm">
+            <div className="adx-note adx-note--calm">
               <i className="ti ti-circle-check" aria-hidden="true" />
-              <span>Quando alguém pedir uma chave, um documento ou ajuda num evento, o pedido aparece pendurado aqui.</span>
+              <span>Quadro vazio. Quando alguém pedir uma chave, um documento ou ajuda num evento, o pedido aparece pendurado aqui.</span>
             </div>
           ) : (
-            <ul className="adx-tags">
+            <ol className="adx-rack">
               {onRail.map((t, i) => {
                 const kind = kindOf(t.category);
                 const late = daysSince(t.created_at) >= 2;
@@ -230,24 +244,26 @@ export default function AdminStaffDashboardPage() {
                   <li
                     key={t.id}
                     className="adx-hook"
-                    style={{ '--i': i, '--tilt': `${i % 2 ? 2.2 : -1.6}deg` } as CSSProperties}
+                    style={{ '--i': i, '--tilt': `${i % 2 ? 0.6 : -0.5}deg` } as CSSProperties}
                   >
                     <article className={`adx-tag adx-tag--${kind.tone}${unhooking === t.id ? ' is-unhooking' : ''}`}>
                       <span className="adx-tag__eye" aria-hidden="true" />
-                      <header className="adx-tag__kind">
-                        <i className={`ti ${kind.icon}`} aria-hidden="true" />
-                        {kind.label}
-                        {URGENT.has(t.priority) && <span className="adx-tag__flag">Urgente</span>}
-                      </header>
-                      <button type="button" className="adx-tag__title" onClick={() => navigate(`/admin/chamados/${t.id}`)}>
-                        {t.title}
-                      </button>
-                      <p className="adx-tag__who">
-                        {t.requester_name || 'Solicitante sem nome'}
-                        {t.requester_unit && <small>{t.requester_unit}</small>}
-                      </p>
-                      <footer className="adx-tag__foot">
-                        <span className={late ? 'is-late' : undefined}>{ageLabel(t.created_at)}</span>
+                      <span className="adx-tag__icon" aria-hidden="true"><i className={`ti ${kind.icon}`} /></span>
+                      <div className="adx-tag__body">
+                        <span className="adx-tag__kind">
+                          {kind.label}
+                          {URGENT.has(t.priority) && <span className="adx-tag__flag">Urgente</span>}
+                        </span>
+                        <button type="button" className="adx-tag__title" onClick={() => navigate(`/admin/chamados/${t.id}`)}>
+                          {t.title}
+                        </button>
+                        <span className="adx-tag__who">
+                          {t.requester_name || 'Solicitante sem nome'}
+                          {t.requester_unit && <small>{t.requester_unit}</small>}
+                        </span>
+                      </div>
+                      <div className="adx-tag__side">
+                        <span className={`adx-tag__age${late ? ' is-late' : ''}`}>{ageLabel(t.created_at)}</span>
                         <button
                           type="button"
                           className="adx-take"
@@ -262,7 +278,7 @@ export default function AdminStaffDashboardPage() {
                               : <i className="ti ti-hand-grab" aria-hidden="true" />}
                           {unhooking === t.id ? 'Pego' : 'Pegar'}
                         </button>
-                      </footer>
+                      </div>
                     </article>
                   </li>
                 );
@@ -276,114 +292,110 @@ export default function AdminStaffDashboardPage() {
                         <span key={t.id} className={`adx-more__card adx-tag--${kindOf(t.category).tone}`} />
                       ))}
                     </span>
-                    <strong>+{unclaimed.length - RAIL_LIMIT}</strong>
-                    ainda no quadro
+                    <span>
+                      <strong>+{unclaimed.length - RAIL_LIMIT}</strong> ainda no quadro
+                    </span>
+                    <i className="ti ti-chevron-right" aria-hidden="true" />
                   </button>
                 </li>
               )}
-            </ul>
-          )}
-        </div>
-      </section>
-
-      {error && (
-        <div className="adx-alert" role="alert">
-          <i className="ti ti-alert-circle" aria-hidden="true" />
-          <span>{error}</span>
-          <button type="button" onClick={() => void load(true)}>Tentar de novo</button>
-        </div>
-      )}
-
-      <div className="adx-lower">
-        <section className="adx-desk" aria-labelledby="adx-desk-title">
-          <header className="adx-desk__head">
-            <h2 id="adx-desk-title">Na sua mesa</h2>
-            <span className="adx-count">{mine.length}</span>
-            <button type="button" className="adx-desk__all" onClick={() => navigate('/admin/chamados?aba=comigo')}>
-              Ver tudo<span className="adx-desk__all-long"> o que está comigo</span> <i className="ti ti-chevron-right" aria-hidden="true" />
-            </button>
-          </header>
-
-          {loading ? (
-            <div className="adx-trays">
-              {TRAYS.map((tray) => <div key={tray.key} className="adx-tray"><div className="adx-slip adx-slip--ghost" /></div>)}
-            </div>
-          ) : mine.length === 0 && !listFailed ? (
-            <div className="adx-desk__empty">
-              <strong>Sua mesa está livre.</strong>
-              <span>{unclaimedTotal > 0 ? 'Pegue um pedido do quadro acima para começar.' : 'Nada com você e nada esperando. Bom momento para respirar.'}</span>
-            </div>
-          ) : (
-            <div className="adx-trays">
-              {TRAYS.map((tray) => {
-                // Tudo que não é "open" nem "in_progress" é espera: pelo solicitante, por compra ou por terceiros.
-                const items = mine.filter((t) => (tray.key === 'waiting_user' ? !['open', 'in_progress'].includes(t.status) : t.status === tray.key));
-                return (
-                  <section key={tray.key} className={`adx-tray adx-tray--${tray.key}`} aria-label={tray.title}>
-                    <header className="adx-tray__head">
-                      <i className={`ti ${tray.icon}`} aria-hidden="true" />
-                      <h3>{tray.title}</h3>
-                      <span>{items.length}</span>
-                    </header>
-                    {items.length === 0 ? (
-                      <p className="adx-tray__empty">{tray.hint}</p>
-                    ) : (
-                      <ul>
-                        {items.map((t) => {
-                          const kind = kindOf(t.category);
-                          const stale = daysSince(t.updated_at) >= 3;
-                          return (
-                            <li key={t.id}>
-                              <button
-                                type="button"
-                                className={`adx-slip adx-slip--${kind.tone}${justTaken === t.id ? ' is-new' : ''}`}
-                                onClick={() => navigate(`/admin/chamados/${t.id}`)}
-                              >
-                                <span className="adx-slip__kind"><i className={`ti ${kind.icon}`} aria-hidden="true" />{kind.label}</span>
-                                <strong>{t.title}</strong>
-                                <span className="adx-slip__meta">
-                                  <span>{t.requester_name || 'Solicitante sem nome'}</span>
-                                  <span className={stale ? 'is-late' : undefined}>
-                                    {stale ? `parado ${ageLabel(t.updated_at)}` : `mexido ${ageLabel(t.updated_at)}`}
-                                  </span>
-                                </span>
-                              </button>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </section>
-                );
-              })}
-            </div>
+            </ol>
           )}
         </section>
 
-        <aside className="adx-day" aria-labelledby="adx-day-title">
-          <h2 id="adx-day-title">Seu dia</h2>
-          <dl>
-            <div className="adx-day__big">
-              <dt>Resolvidos hoje</dt>
-              <dd><CountUp value={data.myResolvedToday} /></dd>
-            </div>
-            <div>
-              <dt>Pedidos mexidos hoje</dt>
-              <dd><CountUp value={data.myUpdatedToday} /></dd>
-            </div>
-            <div>
-              <dt>Tempo médio para resolver</dt>
-              <dd>{duration(data.myAverageResolutionHours)}</dd>
-            </div>
-            <div>
-              <dt>Resolvidos desde o início</dt>
-              <dd><CountUp value={data.myResolvedTickets} duration={1200} /></dd>
-            </div>
-          </dl>
-          <p className="adx-day__foot">
-            O setor tem {data.administrativePendingTotal} {data.administrativePendingTotal === 1 ? 'pedido aberto' : 'pedidos abertos'} no total.
-          </p>
-        </aside>
+        <div className="adx-side">
+          {/* Na sua mesa: os grupos um embaixo do outro */}
+          <section className="adx-desk" aria-labelledby="adx-desk-title">
+            <header className="adx-side__head">
+              <h2 id="adx-desk-title">Na sua mesa</h2>
+              <span className="adx-count">{mine.length}</span>
+              <button type="button" className="adx-desk__all" onClick={() => navigate('/admin/chamados?aba=comigo')}>
+                Ver tudo <i className="ti ti-chevron-right" aria-hidden="true" />
+              </button>
+            </header>
+
+            {loading ? (
+              <div className="adx-groups">{[0, 1].map((n) => <div key={n} className="adx-slip adx-slip--ghost" />)}</div>
+            ) : mine.length === 0 && !listFailed ? (
+              <div className="adx-desk__empty">
+                <strong>Sua mesa está livre.</strong>
+                <span>{unclaimedTotal > 0 ? 'Pegue um pedido do quadro para começar.' : 'Nada com você e nada esperando. Bom momento para respirar.'}</span>
+              </div>
+            ) : (
+              <div className="adx-groups">
+                {TRAYS.map((tray) => {
+                  // Tudo que não é "open" nem "in_progress" é espera: pelo solicitante, por compra ou por terceiros.
+                  const items = mine.filter((t) => (tray.key === 'waiting_user' ? !['open', 'in_progress'].includes(t.status) : t.status === tray.key));
+                  return (
+                    <section key={tray.key} className={`adx-group adx-group--${tray.key}`} aria-label={tray.title}>
+                      <header className="adx-group__head">
+                        <span className="adx-group__dot" aria-hidden="true"><i className={`ti ${tray.icon}`} /></span>
+                        <h3>{tray.title}</h3>
+                        <span className="adx-group__n">{items.length}</span>
+                      </header>
+                      {items.length === 0 ? (
+                        <p className="adx-group__empty">{tray.hint}</p>
+                      ) : (
+                        <ul>
+                          {items.map((t) => {
+                            const kind = kindOf(t.category);
+                            const stale = daysSince(t.updated_at) >= 3;
+                            return (
+                              <li key={t.id}>
+                                <button
+                                  type="button"
+                                  className={`adx-slip adx-slip--${kind.tone}${justTaken === t.id ? ' is-new' : ''}`}
+                                  onClick={() => navigate(`/admin/chamados/${t.id}`)}
+                                >
+                                  <span className="adx-slip__kind"><i className={`ti ${kind.icon}`} aria-hidden="true" />{kind.label}</span>
+                                  <strong>{t.title}</strong>
+                                  <span className="adx-slip__meta">
+                                    <span>{t.requester_name || 'Solicitante sem nome'}</span>
+                                    <span className={stale ? 'is-late' : undefined}>
+                                      {stale ? `parado ${ageLabel(t.updated_at)}` : `mexido ${ageLabel(t.updated_at)}`}
+                                    </span>
+                                  </span>
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </section>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          {/* Seu dia: uma lista vertical, número grande à direita de cada linha */}
+          <section className="adx-day" aria-labelledby="adx-day-title">
+            <header className="adx-side__head">
+              <h2 id="adx-day-title">Seu dia</h2>
+            </header>
+            <dl>
+              <div className="adx-day__big">
+                <dt>Resolvidos hoje</dt>
+                <dd><CountUp value={data.myResolvedToday} /></dd>
+              </div>
+              <div>
+                <dt>Pedidos mexidos hoje</dt>
+                <dd><CountUp value={data.myUpdatedToday} /></dd>
+              </div>
+              <div>
+                <dt>Tempo médio para resolver</dt>
+                <dd>{duration(data.myAverageResolutionHours)}</dd>
+              </div>
+              <div>
+                <dt>Resolvidos desde o início</dt>
+                <dd><CountUp value={data.myResolvedTickets} duration={1200} /></dd>
+              </div>
+            </dl>
+            <p className="adx-day__foot">
+              O setor tem {data.administrativePendingTotal} {data.administrativePendingTotal === 1 ? 'pedido aberto' : 'pedidos abertos'} no total.
+            </p>
+          </section>
+        </div>
       </div>
     </div>
   );
