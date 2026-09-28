@@ -1,7 +1,7 @@
 /* ════════════════════════════════════════════════════════════════
    PAINEL DO ADMINISTRATIVO — "o quadro de chaves"
    O trabalho do setor é físico: chaves, eventos, doações, documentos.
-   O painel abre com um quadro perfurado e um trilho de latão onde cada
+   O painel abre com um quadro perfurado e um trilho de aço onde cada
    pedido sem responsável fica pendurado como etiqueta de chaveiro.
    Esse é o único elemento chamativo; a mesa e o dia são quietos.
    Prefixo adx-: fora do alcance das camadas antigas (.asd-*).
@@ -10,9 +10,6 @@
 .adx {
   --adx-board: #063c2d;
   --adx-board-2: #0a4d3a;
-  --adx-brass: #d6ad4f;
-  --adx-brass-hi: #f7dc8e;
-  --adx-brass-lo: #9c7424;
   --adx-ink: var(--ti-ink, #13241d);
   --adx-muted: var(--ti-muted, #5d6f67);
   --adx-line: var(--ti-line, #dfe6e1);
@@ -50,7 +47,7 @@
   color: #eaf6ef;
   background:
     radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.07) 1.2px, transparent 1.6px) 0 0 / 22px 22px,
-    radial-gradient(120% 90% at 100% 0%, rgba(246, 195, 80, 0.14), transparent 55%),
+    radial-gradient(120% 90% at 100% 0%, rgba(95, 220, 160, 0.14), transparent 55%),
     linear-gradient(165deg, var(--adx-board-2), var(--adx-board) 60%);
   border-radius: 28px;
   box-shadow:
@@ -118,13 +115,13 @@
   background: rgba(255, 255, 255, 0.12);
 }
 
-.adx-btn--brass {
-  color: #3a2a05;
-  background: linear-gradient(180deg, var(--adx-brass-hi), var(--adx-brass) 55%, #c49636);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 10px 22px -12px rgba(214, 173, 79, 0.9);
+.adx-btn--mint {
+  color: var(--adm-mint-ink);
+  background: linear-gradient(180deg, var(--adm-mint-hi), var(--adm-mint) 60%, #3fc587);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 10px 22px -12px rgba(95, 220, 160, 0.8);
 }
 
-.adx-btn--brass:hover:not(:disabled) {
+.adx-btn--mint:hover:not(:disabled) {
   filter: brightness(1.05);
 }
 
@@ -147,7 +144,7 @@
   left: -28px;
   right: -28px;
   height: 12px;
-  background: linear-gradient(180deg, var(--adx-brass-hi) 0%, var(--adx-brass) 45%, var(--adx-brass-lo) 100%);
+  background: var(--adm-rail);
   box-shadow: 0 6px 12px -4px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
@@ -169,7 +166,7 @@
   padding-top: 34px;
 }
 
-/* O pino de latão no trilho e o cordão até a etiqueta */
+/* O pino de aço no trilho e o cordão até a etiqueta */
 .adx-hook::before {
   content: '';
   position: absolute;
@@ -178,14 +175,14 @@
   width: 12px;
   height: 12px;
   margin-left: -6px;
-  background: radial-gradient(circle at 35% 30%, #fff3c4, var(--adx-brass) 55%, var(--adx-brass-lo));
+  background: radial-gradient(circle at 35% 30%, #ffffff, var(--adm-steel) 55%, var(--adm-steel-lo));
   border-radius: 50%;
   box-shadow: 0 2px 3px rgba(0, 0, 0, 0.45);
   z-index: 1;
 }
 
 /* Cada gancho traz seu pedaço de trilho: se as etiquetas quebram em
-   duas fileiras, a segunda também fica pendurada em latão. */
+   duas fileiras, a segunda também fica pendurada no trilho. */
 .adx-hook::after {
   content: '';
   position: absolute;
@@ -193,7 +190,7 @@
   left: -9px;
   right: -9px;
   height: 12px;
-  background: linear-gradient(180deg, var(--adx-brass-hi) 0%, var(--adx-brass) 45%, var(--adx-brass-lo) 100%);
+  background: var(--adm-rail);
   box-shadow: 0 6px 12px -4px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
@@ -420,7 +417,7 @@
 }
 
 .adx-rack__note > i {
-  color: var(--adx-brass-hi);
+  color: var(--adm-mint);
   font-size: 1.4rem;
 }
 
@@ -611,13 +608,13 @@
   font-weight: 700;
 }
 
-/* Resposta ao "Pegar": o papel recém-chegado pisca em latão */
+/* Resposta ao "Pegar": o papel recém-chegado brilha em verde-menta */
 .adx-slip.is-new {
   animation: adx-arrive 2.2s ease-out;
 }
 
 @keyframes adx-arrive {
-  0% { box-shadow: 0 0 0 4px var(--adx-brass-hi), 0 14px 26px -14px rgba(214, 173, 79, 0.9); transform: translateY(-6px); }
+  0% { box-shadow: 0 0 0 4px var(--adm-mint), 0 14px 26px -14px rgba(95, 220, 160, 0.8); transform: translateY(-6px); }
   30% { transform: translateY(0); }
   100% { box-shadow: 0 8px 18px -14px rgba(6, 60, 45, 0.7); }
 }
@@ -741,7 +738,7 @@
     flex-wrap: nowrap;
   }
 
-  .adx-btn--brass {
+  .adx-btn--mint {
     flex: 1;
     justify-content: center;
   }

@@ -17,7 +17,7 @@ interface AdmShellProps {
 
 /**
  * Moldura do Administrativo. São só três áreas, então nada de barra lateral:
- * um cabeçalho da cor do quadro de chaves, com o trilho de latão embaixo e
+ * um cabeçalho da cor do quadro de chaves, com o trilho de aço embaixo e
  * uma pílula que desliza até a aba atual. No celular as abas descem para
  * uma barra fixa no pé da tela.
  */
@@ -46,7 +46,7 @@ export default function AdmShell({ userName, onLogout }: AdmShellProps) {
       <header className="axs-header">
         <div className="axs-bar">
           <button type="button" className="axs-brand" onClick={() => go(TABS[0].path)}>
-            <span className="axs-brand__mark" aria-hidden="true"><i className="ti ti-key" /></span>
+            <span className="pub-brand__mark axs-brand__mark" aria-hidden="true" />
             <span className="axs-brand__copy">
               <strong>Administrativo</strong>
               <small>Portal de Serviços</small>

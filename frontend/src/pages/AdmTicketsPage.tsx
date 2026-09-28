@@ -256,7 +256,7 @@ export default function AdmTicketsPage() {
               <button type="button" className="axp-btn" onClick={() => { setSearch(''); setKind(''); }}>Limpar filtros</button>
             )}
             {!search && !kind && tab === 'comigo' && unclaimed.length > 0 && (
-              <button type="button" className="axp-btn axp-btn--brass" onClick={() => setTab('quadro')}>Ver o quadro ({unclaimed.length})</button>
+              <button type="button" className="axp-btn axp-btn--mint" onClick={() => setTab('quadro')}>Ver o quadro ({unclaimed.length})</button>
             )}
           </div>
         ) : (

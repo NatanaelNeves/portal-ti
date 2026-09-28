@@ -1,7 +1,7 @@
 /* ════════════════════════════════════════════════════════════════
    RELATÓRIOS DO ADMINISTRATIVO (prefixo axq-)
    Topo da cor do quadro, números numa faixa só e, como peça central,
-   os tipos de pedido pendurados no trilho de latão: cada etiqueta tem
+   os tipos de pedido pendurados no trilho de aço: cada etiqueta tem
    o comprimento da demanda daquele tipo.
    ════════════════════════════════════════════════════════════════ */
 
@@ -83,7 +83,7 @@
   bottom: 4px;
   left: 0;
   width: var(--w);
-  background: linear-gradient(180deg, var(--adm-brass-hi), var(--adm-brass));
+  background: linear-gradient(180deg, var(--adm-mint-hi), var(--adm-mint) 60%, #3fc587);
   border-radius: 999px;
   transform: translateX(var(--x));
   transition: transform 0.38s cubic-bezier(0.3, 1.25, 0.4, 1), width 0.38s cubic-bezier(0.3, 1.25, 0.4, 1);
@@ -104,7 +104,7 @@
 }
 
 .axq-preset[aria-pressed='true'] {
-  color: #3a2a05;
+  color: var(--adm-mint-ink);
 }
 
 .axq-range {
@@ -294,7 +294,7 @@
   width: 12px;
   height: 12px;
   margin-left: -6px;
-  background: radial-gradient(circle at 35% 30%, #fff3c4, var(--adm-brass) 55%, var(--adm-brass-lo));
+  background: radial-gradient(circle at 35% 30%, #ffffff, var(--adm-steel) 55%, var(--adm-steel-lo));
   border-radius: 50%;
   box-shadow: 0 2px 3px rgba(0, 0, 0, 0.45);
 }
@@ -339,7 +339,7 @@
 }
 
 .axq-hang__tag[aria-pressed='true'] {
-  box-shadow: 0 0 0 3px var(--adm-brass-hi), 0 18px 26px -16px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 0 0 3px var(--adm-mint), 0 18px 26px -16px rgba(0, 0, 0, 0.55);
 }
 
 .axq-hang__eye {
@@ -378,7 +378,7 @@
 }
 
 .axq-hang__label i {
-  color: var(--adm-brass-hi);
+  color: var(--adm-mint);
 }
 
 /* ── Painéis ───────────────────────────────────────────────────── */
@@ -439,7 +439,7 @@
 
 .axq-key--in,
 .axq-bar--in {
-  background: linear-gradient(180deg, var(--adm-brass-hi), var(--adm-brass));
+  background: linear-gradient(180deg, #bfe9d3, #86cfa9);
 }
 
 .axq-key--out,
@@ -763,8 +763,8 @@
   height: 64px;
   display: grid;
   place-items: center;
-  color: #3a2a05;
-  background: linear-gradient(160deg, var(--adm-brass-hi), var(--adm-brass));
+  color: var(--adm-mint-ink);
+  background: linear-gradient(160deg, var(--adm-mint-hi), var(--adm-mint));
   border-radius: 20px 20px 20px 6px;
   font-size: 1.8rem;
   transform: rotate(-6deg);

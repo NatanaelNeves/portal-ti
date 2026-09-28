@@ -1,6 +1,6 @@
 /* ════════════════════════════════════════════════════════════════
    MOLDURA DO ADMINISTRATIVO (prefixo axs-) + tokens da área (adm-)
-   Cabeçalho da cor do quadro de chaves, com o trilho de latão como
+   Cabeçalho da cor do quadro de chaves, com o trilho de aço como
    borda de baixo. Os tons das etiquetas vivem aqui para que Painel,
    Pedidos e Relatórios usem exatamente as mesmas cores por tipo.
    ════════════════════════════════════════════════════════════════ */
@@ -8,14 +8,18 @@
 :root {
   --adm-board: #063c2d;
   --adm-board-2: #0a4d3a;
-  --adm-brass: #d6ad4f;
-  --adm-brass-hi: #f7dc8e;
-  --adm-brass-lo: #9c7424;
+  /* Trilho e pinos em aço escovado; destaques em verde-menta */
+  --adm-steel: #b7c3be;
+  --adm-steel-hi: #f3f7f5;
+  --adm-steel-lo: #6b7a74;
+  --adm-mint: #5fdca0;
+  --adm-mint-hi: #c3f6dc;
+  --adm-mint-ink: #04382a;
   --adm-canvas: #eef2ee;
   --adm-header-h: 66px;
   --adm-bottom-h: 66px;
   --adm-grain: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.07) 1.2px, transparent 1.6px) 0 0 / 22px 22px;
-  --adm-rail: linear-gradient(180deg, var(--adm-brass-hi) 0%, var(--adm-brass) 45%, var(--adm-brass-lo) 100%);
+  --adm-rail: linear-gradient(180deg, var(--adm-steel-hi) 0%, var(--adm-steel) 45%, var(--adm-steel-lo) 100%);
 }
 
 /* Tons por tipo de pedido: fundo da etiqueta, tinta e acento */
@@ -45,7 +49,7 @@ body:has(.axs-header) .main-content :is(h1, h2) {
   font-family: var(--pub-body);
 }
 
-/* O trilho de latão */
+/* O trilho de aço */
 .axs-header::after {
   content: '';
   position: absolute;
@@ -88,19 +92,6 @@ body:has(.axs-header) .main-content :is(h1, h2) {
   border: 0;
   text-align: left;
   cursor: pointer;
-}
-
-.axs-brand__mark {
-  width: 38px;
-  height: 38px;
-  display: grid;
-  place-items: center;
-  color: #3a2a05;
-  background: linear-gradient(160deg, var(--adm-brass-hi), var(--adm-brass) 60%, #b68a2e);
-  border-radius: 12px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 6px 14px -8px rgba(214, 173, 79, 0.9);
-  font-size: 1.2rem;
-  transform: rotate(-8deg);
 }
 
 .axs-brand__copy {
@@ -171,7 +162,7 @@ body:has(.axs-header) .main-content :is(h1, h2) {
 }
 
 .axs-tab[aria-current='page'] i {
-  color: #b7801a;
+  color: var(--pub-leaf, #0f7a4a);
 }
 
 .axs-badge {
@@ -198,8 +189,8 @@ body:has(.axs-header) .main-content :is(h1, h2) {
   gap: 7px;
   margin-left: auto;
   padding: 0 16px;
-  color: #3a2a05;
-  background: linear-gradient(180deg, var(--adm-brass-hi), var(--adm-brass) 55%, #c49636);
+  color: var(--adm-mint-ink);
+  background: linear-gradient(180deg, var(--adm-mint-hi), var(--adm-mint) 60%, #3fc587);
   border: 0;
   border-radius: 999px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
@@ -296,7 +287,7 @@ body:has(.axs-header) .main-content :is(h1, h2) {
     height: calc(var(--adm-bottom-h) + env(safe-area-inset-bottom));
     padding: 6px 8px env(safe-area-inset-bottom);
     background: var(--adm-board);
-    border-top: 4px solid var(--adm-brass);
+    border-top: 4px solid var(--adm-steel);
     font-family: var(--pub-body);
   }
 
@@ -339,8 +330,8 @@ body:has(.axs-header) .main-content :is(h1, h2) {
   }
 
   .axs-bottom__tab--new .axs-bottom__icon {
-    color: #3a2a05;
-    background: var(--adm-brass);
+    color: var(--adm-mint-ink);
+    background: var(--adm-mint);
   }
 
   body:has(.axs-header) .main-content {

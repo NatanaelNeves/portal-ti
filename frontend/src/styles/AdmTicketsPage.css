@@ -1,7 +1,7 @@
 /* ════════════════════════════════════════════════════════════════
    PEDIDOS DO ADMINISTRATIVO (prefixo axp-)
    O topo continua o quadro (mesma cor do cabeçalho, com o trilho de
-   latão entre eles). Cada pedido é uma ficha deitada: um toco colorido
+   aço entre eles). Cada pedido é uma ficha deitada: um toco colorido
    com ilhós, da cor do tipo, e o papel branco com o conteúdo.
    ════════════════════════════════════════════════════════════════ */
 
@@ -90,7 +90,7 @@
 
 .axp-search input:focus {
   background: rgba(255, 255, 255, 0.14);
-  border-color: var(--adm-brass);
+  border-color: var(--adm-mint);
   outline: none;
 }
 
@@ -166,8 +166,8 @@
 }
 
 .axp-tab[aria-selected='true'] .axp-tab__n {
-  color: #3a2a05;
-  background: var(--adm-brass-hi);
+  color: var(--adm-mint-ink);
+  background: var(--adm-mint-hi);
 }
 
 /* ── Corpo ─────────────────────────────────────────────────────── */
@@ -235,7 +235,7 @@
 
 .axp-kind:not([class*='adm-tone'])[aria-pressed='true'] span {
   color: var(--adm-board);
-  background: var(--adm-brass-hi);
+  background: var(--adm-mint-hi);
 }
 
 /* ── Fichas ────────────────────────────────────────────────────── */
@@ -476,8 +476,8 @@
   height: 64px;
   display: grid;
   place-items: center;
-  color: #3a2a05;
-  background: linear-gradient(160deg, var(--adm-brass-hi), var(--adm-brass));
+  color: var(--adm-mint-ink);
+  background: linear-gradient(160deg, var(--adm-mint-hi), var(--adm-mint));
   border-radius: 20px 20px 20px 6px;
   font-size: 1.8rem;
   transform: rotate(-6deg);
@@ -505,9 +505,9 @@
   cursor: pointer;
 }
 
-.axp-btn--brass {
-  color: #3a2a05;
-  background: linear-gradient(180deg, var(--adm-brass-hi), var(--adm-brass));
+.axp-btn--mint {
+  color: var(--adm-mint-ink);
+  background: linear-gradient(180deg, var(--adm-mint-hi), var(--adm-mint) 60%, #3fc587);
   border-color: transparent;
 }
 

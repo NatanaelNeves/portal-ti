@@ -194,7 +194,7 @@ export default function AdminStaffDashboardPage() {
               <i className={`ti ti-refresh${refreshing ? ' adx-spin' : ''}`} aria-hidden="true" />
               <span>{refreshing ? 'Atualizando' : 'Atualizar'}</span>
             </button>
-            <button type="button" className="adx-btn adx-btn--brass" onClick={() => navigate('/admin/chamados?aba=quadro')}>
+            <button type="button" className="adx-btn adx-btn--mint" onClick={() => navigate('/admin/chamados?aba=quadro')}>
               <i className="ti ti-list-details" aria-hidden="true" />
               Ver todos os pedidos
             </button>
