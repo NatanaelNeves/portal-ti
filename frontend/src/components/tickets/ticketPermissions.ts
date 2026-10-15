@@ -52,13 +52,17 @@ export const canClose = (ticket: TicketLike, role: Role, userId: string): boolea
 export const canChangePriority = canChangeStatus;
 
 /**
- * Os estados de espera externa pertencem ao fluxo de TI (compra de peça,
- * assistência técnica, fornecedor). Liberá-los para todo perfil só porque
- * existem no banco poluiria a fila do RH e do Administrativo com um vocabulário
- * que não é deles. O backend continua sendo o gate final.
+ * Os estados de espera externa pertencem aos setores que dependem de compra ou
+ * de terceiros: TI (peça, assistência técnica) e Administrativo (lâmpada,
+ * técnico do ar-condicionado). O RH fica de fora para não poluir a fila dele
+ * com um vocabulário que não é seu. O backend continua sendo o gate final.
  */
 export const canUseExternalWaitStatuses = (role: Role): boolean =>
-  ['admin', 'manager', 'it_staff'].includes(role);
+  ['admin', 'manager', 'it_staff', 'admin_staff'].includes(role);
+
+/** Setores cujos chamados podem ficar em espera por compra ou terceiros. */
+export const canPauseDepartment = (department?: string | null): boolean =>
+  ['ti', 'administrativo'].includes(department || 'ti');
 
 export const SLA_PAUSED_STATUSES = ['aguardando_aquisicao', 'aguardando_terceiros'];
 

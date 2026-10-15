@@ -236,10 +236,10 @@ export const STATUS_LABELS: Record<string, string> = {
 /**
  * Quem pode colocar um chamado em espera externa.
  *
- * Aquisição e assistência técnica pertencem ao fluxo operacional da TI. Um
- * auxiliar administrativo ou o RH não compram peça nem acionam fornecedor, e
- * liberar esses estados para eles só porque existem no enum encheria a fila
- * desses setores com um vocabulário que não é deles — e, pior, permitiria
+ * Aquisição e assistência técnica fazem parte do dia a dia da TI (compra de
+ * peça, equipamento na assistência) e do Administrativo (comprar lâmpada,
+ * esperar o técnico do ar-condicionado). O RH não depende de compra nem de
+ * fornecedor para atender, então fica de fora — liberar para ele permitiria
  * pausar o SLA de um chamado que ninguém está esperando.
  *
  * Esta é a MESMA regra que o frontend aplica em
@@ -247,15 +247,15 @@ export const STATUS_LABELS: Record<string, string> = {
  * O frontend evita oferecer a ação; aqui é onde ela é de fato barrada.
  */
 export const canUseExternalWaitStatuses = (role: string): boolean =>
-  [UserRole.ADMIN, UserRole.IT_STAFF, UserRole.MANAGER, 'gestor'].includes(role as UserRole);
+  [UserRole.ADMIN, UserRole.IT_STAFF, UserRole.ADMIN_STAFF, UserRole.MANAGER, 'gestor'].includes(role as UserRole);
 
 /**
- * Um chamado só entra em espera externa se for do setor de TI. O estado
- * descreve uma dependência do fluxo técnico; aplicá-lo a um chamado de RH ou
- * Administrativo distorceria o SLA daquele setor sem significado operacional.
+ * Um chamado só entra em espera externa se for de um setor que de fato
+ * depende de compra ou de terceiros: TI e Administrativo. Aplicá-lo a um
+ * chamado de RH distorceria o SLA daquele setor sem significado operacional.
  */
 export const canPauseTicketDepartment = (department?: string | null): boolean =>
-  (department || 'ti') === 'ti';
+  ['ti', 'administrativo'].includes(department || 'ti');
 
 
 /* ─────────────────────────────────────────────────────────────

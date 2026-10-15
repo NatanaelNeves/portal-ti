@@ -1901,7 +1901,7 @@ ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (r
       if (!canUseExternalWaitStatuses(userRole)) {
         return res.status(403).json({
           error: 'Acesso negado',
-          message: 'Apenas a equipe de TI pode colocar um chamado em espera por aquisição ou terceiros.',
+          message: 'Apenas a TI e o Administrativo podem colocar um chamado em espera por aquisição ou terceiros.',
         });
       }
 
@@ -1915,7 +1915,7 @@ ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (r
       if (!canPauseTicketDepartment(departmentCheck.rows[0].department)) {
         return res.status(403).json({
           error: 'Acesso negado',
-          message: 'Espera por aquisição ou terceiros só se aplica a chamados de TI.',
+          message: 'Espera por aquisição ou terceiros só se aplica a chamados de TI ou do Administrativo.',
         });
       }
     }

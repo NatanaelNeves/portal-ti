@@ -39,6 +39,8 @@ export const ADM_STATUS_LABEL: Record<string, string> = {
   in_progress: 'Em andamento',
   waiting_user: 'Esperando alguém',
   aguardando_confirmacao: 'Esperando confirmação',
+  aguardando_aquisicao: 'Esperando compra',
+  aguardando_terceiros: 'Esperando serviço externo',
   resolved: 'Resolvido',
   closed: 'Encerrado',
 };

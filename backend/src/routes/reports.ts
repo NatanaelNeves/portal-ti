@@ -361,7 +361,7 @@ reportsRouter.get('/auxadmin', async (req: Request, res: Response) => {
            COUNT(*) FILTER (WHERE t.status IN ('resolved', 'closed'))::int AS resolved,
            COUNT(*) FILTER (WHERE t.status = 'in_progress')::int AS in_progress,
            COUNT(*) FILTER (WHERE t.status = 'open')::int AS pending,
-           COUNT(*) FILTER (WHERE t.status IN ('waiting_user', 'aguardando_confirmacao'))::int AS waiting,
+           COUNT(*) FILTER (WHERE t.status IN ('waiting_user', 'aguardando_confirmacao', 'aguardando_aquisicao', 'aguardando_terceiros'))::int AS waiting,
            COUNT(*) FILTER (WHERE t.priority IN ('urgent', 'critical', 'high') AND t.status IN ${ACTIVE})::int AS high_priority_open,
            AVG(EXTRACT(EPOCH FROM (t.resolved_at - t.created_at)) / 60)
              FILTER (WHERE t.resolved_at IS NOT NULL) AS avg_resolution_minutes,

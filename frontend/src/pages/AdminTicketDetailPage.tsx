@@ -11,6 +11,7 @@ import {
   canClose,
   canEditTicket,
   canResolve,
+  canPauseDepartment,
   canUseExternalWaitStatuses,
   isSlaPaused,
   PRIORITY_OPTIONS,
@@ -331,7 +332,14 @@ export default function AdminTicketDetailPage() {
   const team = TEAM[ticket.department || 'ti'] ?? TEAM.ti;
   const requester = firstName(ticket.requester_name);
   const staffReplied = messages.some((m) => m.author_type === 'it_staff' && !m.is_internal);
-  const externalWaits = canUseExternalWaitStatuses(role) && (ticket.department || 'ti') === 'ti';
+  const externalWaits = canUseExternalWaitStatuses(role) && canPauseDepartment(ticket.department);
+  // O Administrativo espera lâmpada e técnico de ar-condicionado, não peça de
+  // computador: mesmo estado, palavras do setor.
+  const admWait = ticket.department === 'administrativo';
+  const waitOptionLabel = (value: string, fallback: string) =>
+    admWait && value === 'aguardando_aquisicao' ? 'Aguardando compra'
+      : admWait && value === 'aguardando_terceiros' ? 'Aguardando serviço externo'
+      : fallback;
   const linkedEquipment = equipment.find((e) => e.id === ticket.linked_equipment_id);
   const meta = ticket.metadata || {};
   const adjustments: Array<{ date?: string; correctedTime?: string; notes?: string }> = Array.isArray(meta.adjustments) ? meta.adjustments : [];
@@ -400,7 +408,7 @@ export default function AdminTicketDetailPage() {
     if (ticket.status === 'waiting_user' || paused) {
       return {
         tone: 'wait',
-        title: ticket.status === 'waiting_user' ? `Aguardando ${requester} responder` : status.label,
+        title: ticket.status === 'waiting_user' ? `Aguardando ${requester} responder` : waitOptionLabel(ticket.status, status.label),
         text: paused
           ? `Prazo pausado.${ticket.pause_reason ? ` Motivo: ${ticket.pause_reason}.` : ''}`
           : 'A resposta aparece na conversa. Você pode retomar sem esperar.',
@@ -667,7 +675,7 @@ export default function AdminTicketDetailPage() {
                 }}
               >
                 {!STATUS_OPTIONS.some((o) => o.value === ticket.status) && <option value={ticket.status}>{status.label}</option>}
-                {STATUS_OPTIONS.filter((o) => externalWaits || !isSlaPaused(o.value)).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                {STATUS_OPTIONS.filter((o) => externalWaits || !isSlaPaused(o.value)).map((o) => <option key={o.value} value={o.value}>{waitOptionLabel(o.value, o.label)}</option>)}
               </select>
             </label>
             <label>
@@ -710,7 +718,9 @@ export default function AdminTicketDetailPage() {
                   maxLength={280}
                   value={waitReason}
                   onChange={(e) => setWaitReason(e.target.value)}
-                  placeholder={waitFor === 'aguardando_aquisicao' ? 'Ex.: fonte 500W' : 'Ex.: enviado à assistência'}
+                  placeholder={waitFor === 'aguardando_aquisicao'
+                    ? (admWait ? 'Ex.: lâmpadas para a sala 3' : 'Ex.: fonte 500W')
+                    : (admWait ? 'Ex.: técnico do ar-condicionado' : 'Ex.: enviado à assistência')}
                 />
                 <p className="tkd-muted">O prazo fica pausado enquanto o chamado estiver em espera.</p>
                 <div>
@@ -728,7 +738,7 @@ export default function AdminTicketDetailPage() {
                 {externalWaits && !paused && (
                   <>
                     <button type="button" onClick={() => setWaitFor('aguardando_aquisicao')} disabled={busy}><i className="ti ti-shopping-cart" aria-hidden="true" />Aguardar compra</button>
-                    <button type="button" onClick={() => setWaitFor('aguardando_terceiros')} disabled={busy}><i className="ti ti-building-store" aria-hidden="true" />Aguardar terceiros</button>
+                    <button type="button" onClick={() => setWaitFor('aguardando_terceiros')} disabled={busy}><i className="ti ti-building-store" aria-hidden="true" />{admWait ? 'Aguardar serviço externo' : 'Aguardar terceiros'}</button>
                   </>
                 )}
                 <button type="button" onClick={() => void unassign()} disabled={busy}><i className="ti ti-arrow-back-up" aria-hidden="true" />Devolver para a fila</button>
