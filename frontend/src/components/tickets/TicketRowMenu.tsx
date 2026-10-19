@@ -105,7 +105,8 @@ export default function TicketRowMenu({
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       // Esc volta um nível antes de fechar, para não perder o caminho.
-      if (panel !== 'root') setPanel('root');
+      if (panel === 'pause') setPanel('status');
+      else if (panel !== 'root') setPanel('root');
       else setOpen(false);
     };
     document.addEventListener('mousedown', onAway);
@@ -133,6 +134,28 @@ export default function TicketRowMenu({
   const mayAssume = canAssume(ticket, role, userId);
   const mayAssignOthers = canAssignToOthers(role) && mayStatus;
 
+  // O painel de espera veste a cor do estado que vai aplicar (as mesmas dos
+  // selos da fila) e fala a língua do setor: TI espera peça e assistência,
+  // o Administrativo espera lâmpada e técnico de ar-condicionado.
+  const adm = ticket.department === 'administrativo';
+  const pauseCopy = pauseStatus === 'aguardando_aquisicao'
+    ? {
+      tone: 'procurement',
+      icon: 'ti-shopping-cart',
+      title: 'Aguardando aquisição',
+      question: 'O que precisa ser comprado?',
+      placeholder: adm ? 'Ex.: lâmpadas para a sala 3' : 'Ex.: fonte de 500 W',
+    }
+    : pauseStatus === 'aguardando_terceiros'
+      ? {
+        tone: 'external',
+        icon: 'ti-building-store',
+        title: adm ? 'Aguardando serviço externo' : 'Aguardando terceiros',
+        question: 'O que está sendo aguardado?',
+        placeholder: adm ? 'Ex.: técnico do ar-condicionado' : 'Ex.: notebook na assistência',
+      }
+      : null;
+
   return (
     <div className="tk-menu" ref={rootRef} onClick={stop}>
       <button
@@ -153,7 +176,7 @@ export default function TicketRowMenu({
       {open && createPortal(
         <div
           ref={popRef}
-          className={`tk-menu-pop tk-menu-pop--${coords.drop}`}
+          className={`tk-menu-pop tk-menu-pop--${coords.drop} ${panel === 'pause' ? 'tk-menu-pop--wide' : ''}`}
           role="menu"
           style={{ top: coords.top, left: coords.left }}
           onClick={(event) => event.stopPropagation()}
@@ -225,7 +248,7 @@ export default function TicketRowMenu({
           )}
 
           {panel !== 'root' && (
-            <button type="button" className="tk-menu-back" onClick={(e) => { e.stopPropagation(); setPanel('root'); }}>
+            <button type="button" className="tk-menu-back" onClick={(e) => { e.stopPropagation(); setPanel(panel === 'pause' ? 'status' : 'root'); }}>
               <i className="ti ti-chevron-left" aria-hidden="true" />
               Voltar
             </button>
@@ -255,7 +278,7 @@ export default function TicketRowMenu({
                 disabled={ticket.status === option.value}
               >
                 <i className={`ti ${option.icon}`} aria-hidden="true" />
-                {option.label}
+                {adm && option.value === 'aguardando_terceiros' ? 'Aguardando serviço externo' : option.label}
                 {ticket.status === option.value && <i className="ti ti-check tk-menu-more" aria-hidden="true" />}
               </button>
             ))}
@@ -275,9 +298,9 @@ export default function TicketRowMenu({
               </button>
             ))}
 
-          {panel === 'pause' && (
+          {panel === 'pause' && pauseCopy && (
             <form
-              className="tk-menu-pause"
+              className={`tk-menu-pause tk-menu-pause--${pauseCopy.tone}`}
               onSubmit={(event) => {
                 event.preventDefault();
                 setOpen(false);
@@ -285,25 +308,29 @@ export default function TicketRowMenu({
                 else onStatus(pauseStatus);
               }}
             >
-              <label htmlFor="tk-pause-reason">
-                {pauseStatus === 'aguardando_aquisicao'
-                  ? 'O que precisa ser adquirido?'
-                  : 'O que está sendo aguardado?'}
-              </label>
+              <div className="tk-pause-head">
+                <span className="tk-pause-icon" aria-hidden="true"><i className={`ti ${pauseCopy.icon}`} /></span>
+                <div>
+                  <strong>{pauseCopy.title}</strong>
+                  <span className="tk-pause-note"><i className="ti ti-player-pause" aria-hidden="true" />O prazo fica pausado até retomar</span>
+                </div>
+              </div>
+              <label htmlFor="tk-pause-reason">{pauseCopy.question}</label>
               <input
                 id="tk-pause-reason"
                 type="text"
                 autoFocus
+                autoComplete="off"
                 maxLength={280}
                 value={pauseReason}
                 onChange={(event) => setPauseReason(event.target.value)}
-                placeholder={pauseStatus === 'aguardando_aquisicao'
-                  ? 'Ex.: compra de fonte 500W'
-                  : 'Ex.: enviado à assistência autorizada'}
+                placeholder={pauseCopy.placeholder}
                 onClick={(event) => event.stopPropagation()}
               />
-              <p className="tk-menu-hint">O SLA fica pausado enquanto o chamado estiver nesse estado.</p>
-              <button type="submit" className="tk-menu-confirm">Colocar em espera</button>
+              <button type="submit" className="tk-pause-submit">
+                <i className="ti ti-player-pause" aria-hidden="true" />
+                Colocar em espera
+              </button>
             </form>
           )}
 
