@@ -1,7 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import StatusTimeline from '../components/StatusTimeline';
-import NextAction from '../components/NextAction';
 import TicketAttachments from '../components/TicketAttachments';
 import '../styles/TicketDetailPage.css';
 import { BACKEND_URL } from '../services/api';
@@ -27,6 +25,9 @@ interface TicketDetail {
   feedback?: string | null;
   rated_at?: string | null;
   sla_due_at?: string | null;
+  requester_closure?: 'self_resolved' | 'not_needed' | null;
+  requester_closure_note?: string | null;
+  pause_reason?: string | null;
   queue_visibility?: {
     state: 'waiting' | 'in_service';
     position: number | null;
@@ -36,6 +37,9 @@ interface TicketDetail {
     updatedAt: string;
   } | null;
 }
+
+/** Estados em que o solicitante pode encerrar sozinho (espelha o backend). */
+const REQUESTER_CLOSABLE = ['open', 'in_progress', 'waiting_user', 'aguardando_aquisicao', 'aguardando_terceiros'];
 
 interface Message {
   id: string;
@@ -57,28 +61,59 @@ interface HistoryItem {
   created_at: string;
 }
 
-const formatEstimatedTime = (slaDueAt: string | null | undefined, nowMs: number): string | undefined => {
-  if (!slaDueAt) return undefined;
+/** Previsão de atendimento, em palavras de quem pediu. */
+const formatEstimatedTime = (slaDueAt: string | null | undefined, nowMs: number): { text: string; late: boolean } | null => {
+  if (!slaDueAt) return null;
 
-  const dueMs = new Date(slaDueAt).getTime();
-  const diffMs = dueMs - nowMs;
+  const diffMs = new Date(slaDueAt).getTime() - nowMs;
+  if (diffMs <= 0) return { text: 'Passou do prazo previsto para o atendimento.', late: true };
 
-  if (diffMs <= 0) {
-    return 'Meta de SLA excedida — a equipe responsável deve atualizar o chamado';
-  }
-
-  const diffHours = diffMs / (1000 * 60 * 60);
-  if (diffHours < 24) {
-    const hours = Math.floor(diffHours);
-    const minutes = Math.round((diffHours - hours) * 60);
+  // Arredonda em minutos inteiros antes de separar, senão 4h59,6 vira "4h 60min".
+  const totalMinutes = Math.max(1, Math.ceil(diffMs / 60000));
+  if (totalMinutes < 24 * 60) {
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
     const parts = [hours > 0 ? `${hours}h` : '', minutes > 0 ? `${minutes}min` : ''].filter(Boolean);
-    return `Meta de SLA para atendimento: em até ${parts.join(' ')}`;
+    return { text: `Previsão de atendimento: em até ${parts.join(' ')}.`, late: false };
   }
 
   const dueDate = new Date(slaDueAt);
   const formattedDate = dueDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
   const formattedTime = dueDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  return `Meta de SLA para atendimento: até ${formattedDate} às ${formattedTime}`;
+  return { text: `Previsão de atendimento: até ${formattedDate} às ${formattedTime}.`, late: false };
+};
+
+/** Cada equipe tem nome e cor próprios no portal (TI verde, Administrativo âmbar, RH violeta). */
+const TEAM: Record<string, { tone: 'ti' | 'administrativo' | 'rh'; label: string; name: string; icon: string }> = {
+  ti: { tone: 'ti', label: 'Suporte de TI', name: 'equipe de TI', icon: 'ti-device-laptop' },
+  administrativo: { tone: 'administrativo', label: 'Administrativo', name: 'equipe do Administrativo', icon: 'ti-building' },
+  rh: { tone: 'rh', label: 'Recursos Humanos', name: 'equipe de RH', icon: 'ti-users' },
+};
+
+const TYPE_LABEL: Record<string, string> = {
+  incident: 'Incidente',
+  request: 'Solicitação',
+  change: 'Mudança',
+  problem: 'Problema',
+};
+
+const PRIORITY_LABEL: Record<string, string> = {
+  low: 'Baixa',
+  medium: 'Média',
+  high: 'Alta',
+  urgent: 'Urgente',
+  critical: 'Crítica',
+};
+
+const formatWhen = (iso?: string | null) =>
+  iso
+    ? new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+    : '';
+
+const initialsOf = (name?: string | null) => {
+  const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '';
+  return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
 };
 
 export default function TicketDetailPage() {
@@ -90,7 +125,11 @@ export default function TicketDetailPage() {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // Erro de uma ação (enviar, confirmar, avaliar) aparece no lugar dela,
+  // sem tirar a pessoa da página.
+  const [actionError, setActionError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const replyRef = useRef<HTMLTextAreaElement>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submittingConfirmation, setSubmittingConfirmation] = useState(false);
   const [submittingRating, setSubmittingRating] = useState(false);
@@ -100,6 +139,12 @@ export default function TicketDetailPage() {
   const [showReopenForm, setShowReopenForm] = useState(false);
   const [reopenReason, setReopenReason] = useState('');
   const [nowMs, setNowMs] = useState<number>(Date.now());
+  // Encerrar pelo próprio solicitante ("já resolvi" / "não preciso mais").
+  const [closeOpen, setCloseOpen] = useState(false);
+  const [closeReason, setCloseReason] = useState<'self_resolved' | 'not_needed' | null>(null);
+  const [closeNote, setCloseNote] = useState('');
+  const [submittingClose, setSubmittingClose] = useState(false);
+  const [closeError, setCloseError] = useState('');
 
   const token = searchParams.get('token');
   const internalToken = localStorage.getItem('internal_token');
@@ -302,9 +347,55 @@ export default function TicketDetailPage() {
       await silentRefresh(id, true);
       setSuccessMessage('Mensagem enviada com sucesso.');
     } catch (err: any) {
-      setError(err.message || 'Erro ao adicionar mensagem');
+      setActionError(err.message || 'Erro ao adicionar mensagem');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleCloseByRequester = async () => {
+    if (!id || isInternalUser || !closeReason) return;
+    try {
+      setSubmittingClose(true);
+      setCloseError('');
+      const response = await fetch(`${BACKEND_URL}/api/tickets/${id}/close-by-requester`, {
+        method: 'POST',
+        headers: buildHeaders(),
+        body: JSON.stringify({ reason: closeReason, note: closeNote.trim() || undefined }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Não foi possível encerrar o chamado');
+
+      await fetchTicket(id);
+      setCloseOpen(false);
+      setCloseReason(null);
+      setCloseNote('');
+      setSuccessMessage('Chamado encerrado. A equipe foi avisada.');
+    } catch (err: any) {
+      setCloseError(err.message || 'Não foi possível encerrar o chamado');
+    } finally {
+      setSubmittingClose(false);
+    }
+  };
+
+  const handleReopenByRequester = async () => {
+    if (!id || isInternalUser) return;
+    try {
+      setSubmittingClose(true);
+      setCloseError('');
+      const response = await fetch(`${BACKEND_URL}/api/tickets/${id}/reopen-by-requester`, {
+        method: 'POST',
+        headers: buildHeaders(),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Não foi possível reabrir o chamado');
+
+      await fetchTicket(id);
+      setSuccessMessage('Chamado reaberto. Ele voltou para a fila da equipe.');
+    } catch (err: any) {
+      setCloseError(err.message || 'Não foi possível reabrir o chamado');
+    } finally {
+      setSubmittingClose(false);
     }
   };
 
@@ -313,7 +404,7 @@ export default function TicketDetailPage() {
 
     try {
       setSubmittingConfirmation(true);
-      setError('');
+      setActionError('');
 
       const response = await fetch(`${BACKEND_URL}/api/tickets/${id}/confirm-resolution`, {
         method: 'POST',
@@ -337,7 +428,7 @@ export default function TicketDetailPage() {
         setSuccessMessage('Chamado reaberto. A equipe foi notificada para continuar o atendimento.');
       }
     } catch (err: any) {
-      setError(err.message || 'Falha ao confirmar resolução');
+      setActionError(err.message || 'Falha ao confirmar resolução');
     } finally {
       setSubmittingConfirmation(false);
     }
@@ -348,7 +439,7 @@ export default function TicketDetailPage() {
 
     try {
       setSubmittingRating(true);
-      setError('');
+      setActionError('');
 
       const response = await fetch(`${BACKEND_URL}/api/tickets/${id}/rating`, {
         method: 'POST',
@@ -366,7 +457,7 @@ export default function TicketDetailPage() {
       setSuccessMessage('Avaliação enviada. Obrigado pelo feedback!');
       await fetchTicket(id);
     } catch (err: any) {
-      setError(err.message || 'Falha ao registrar avaliação');
+      setActionError(err.message || 'Falha ao registrar avaliação');
     } finally {
       setSubmittingRating(false);
     }
@@ -393,7 +484,7 @@ export default function TicketDetailPage() {
 
     try {
       setSubmittingConfirmation(true);
-      setError('');
+      setActionError('');
 
       const response = await fetch(`${BACKEND_URL}/api/tickets/${id}/manual-close`, {
         method: 'POST',
@@ -408,7 +499,7 @@ export default function TicketDetailPage() {
       setSuccessMessage('Chamado encerrado manualmente pelo atendente.');
       await fetchTicket(id);
     } catch (err: any) {
-      setError(err.message || 'Falha ao encerrar chamado');
+      setActionError(err.message || 'Falha ao encerrar chamado');
     } finally {
       setSubmittingConfirmation(false);
     }
@@ -452,445 +543,598 @@ export default function TicketDetailPage() {
       message_added: 'Nova mensagem',
       priority_changed: 'Prioridade alterada',
       pause_reason_added: 'Motivo da espera registrado',
+      closed_by_requester: 'Encerrado por você',
     };
     return labels[action] || action;
   };
 
   if (loading) {
-    return <div className="ticket-detail-page loading">Carregando...</div>;
-  }
-
-  if (error) {
     return (
-      <div className="ticket-detail-page">
-        <div className="alert alert-error">{error}</div>
+      <div className="pub-page tkp">
+        <header className="tkp-hero pub-aurora">
+          <div className="pub-wrap tkp-wrap tkp-hero__inner">
+            <span className="tkp-ghost tkp-ghost--line" />
+            <span className="tkp-ghost tkp-ghost--title" />
+          </div>
+        </header>
+        <div className="pub-wrap tkp-wrap tkp-body" aria-busy="true" aria-label="Carregando chamado">
+          <div className="tkp-ghost tkp-ghost--card" />
+          <div className="tkp-ghost tkp-ghost--card" />
+        </div>
       </div>
     );
   }
 
-  if (!ticket) {
+  if (error || !ticket) {
     return (
-      <div className="ticket-detail-page">
-        <div className="alert alert-error">Chamado não encontrado</div>
+      <div className="pub-page tkp">
+        <header className="tkp-hero pub-aurora">
+          <div className="pub-wrap tkp-wrap tkp-hero__inner">
+            <a className="tkp-back" href="/meus-chamados">
+              <i className="ti ti-chevron-left" aria-hidden="true" />
+              Meus chamados
+            </a>
+            <h1 className="tkp-title">Não foi possível abrir este chamado</h1>
+          </div>
+        </header>
+        <div className="pub-wrap tkp-wrap tkp-body">
+          <section className="tkp-now tkp-now--blocked">
+            <p className="pub-alert" role="alert">
+              <i className="ti ti-alert-circle" aria-hidden="true" />
+              <span>{error || 'Chamado não encontrado.'}</span>
+            </p>
+            <a href="/meus-chamados" className="pub-btn pub-btn--primary">Ver meus chamados</a>
+          </section>
+        </div>
       </div>
     );
   }
 
-  const getStatusColor = (status: string) => {
+  const team = TEAM[ticket.department || 'ti'] ?? TEAM.ti;
+  const isAdm = ticket.department === 'administrativo';
+  const protocol = ticket.id.substring(0, 8).toUpperCase();
+  const status = ticket.status;
+  const finishedStates = ['resolved', 'closed', 'cancelled'];
+  const canReply = !['closed', 'resolved', 'aguardando_confirmacao', 'cancelled'].includes(status);
+  const visibleMessages = messages.filter((m) => !m.is_internal);
+  const estimate = ['open', 'in_progress'].includes(status) ? formatEstimatedTime(ticket.sla_due_at, nowMs) : null;
+  const queue = ticket.queue_visibility;
+  const normalizedRating = ticket.rating !== null && ticket.rating !== undefined ? Number(ticket.rating) : null;
+  // Mesma janela que o backend aplica em /reopen-by-requester.
+  const canReopenRequesterClosure = status === 'cancelled'
+    && !!ticket.requester_closure
+    && !!ticket.closed_at
+    && nowMs - new Date(ticket.closed_at).getTime() <= 7 * 86400000;
+
+  // Em que trecho da jornada o chamado está — as mesmas três etapas da trilha
+  // de "Meus chamados", para a pessoa reconhecer o desenho.
+  const stage = status === 'open' ? 1 : finishedStates.includes(status) || status === 'aguardando_confirmacao' ? 3 : 2;
+  const stageDone = finishedStates.includes(status);
+  const steps = ['Recebido', 'Em atendimento', status === 'cancelled' ? 'Encerrado' : 'Concluído'];
+
+  const focusReply = () => {
+    replyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    window.setTimeout(() => replyRef.current?.focus(), 350);
+  };
+
+  // O que está acontecendo agora, e de quem é a vez.
+  const now = ((): { tone: 'team' | 'you' | 'paused' | 'done'; icon: string; title: string; text: string } => {
     switch (status) {
       case 'open':
-        return 'status-open';
+        return {
+          tone: 'team',
+          icon: 'ti-inbox',
+          title: `Na fila da ${team.name}`,
+          text: queue?.state === 'waiting' && typeof queue.ahead === 'number'
+            ? queue.ahead === 0
+              ? 'Seu pedido é o próximo da fila.'
+              : `${queue.ahead === 1 ? 'Há 1 pedido' : `Há ${queue.ahead} pedidos`} na frente do seu.`
+            : 'Seu pedido chegou. Alguém da equipe vai assumir em breve.',
+        };
       case 'in_progress':
-        return 'status-progress';
+        return {
+          tone: 'team',
+          icon: 'ti-tool',
+          title: 'Em atendimento',
+          text: `A ${team.name} já está cuidando do seu pedido.`,
+        };
       case 'waiting_user':
-        return 'status-waiting';
+        return {
+          tone: 'you',
+          icon: 'ti-message-question',
+          title: 'A equipe precisa de você',
+          text: 'Responda na conversa abaixo para o atendimento continuar.',
+        };
       case 'aguardando_aquisicao':
-        return 'status-waiting';
+        return {
+          tone: 'paused',
+          icon: 'ti-shopping-cart',
+          title: 'Aguardando compra',
+          text: 'A equipe espera a compra ou a chegada do material. Você não precisa fazer nada; avisamos quando o atendimento voltar.',
+        };
       case 'aguardando_terceiros':
-        return 'status-waiting';
+        return {
+          tone: 'paused',
+          icon: 'ti-building-store',
+          title: isAdm ? 'Aguardando serviço externo' : 'Aguardando terceiros',
+          text: isAdm
+            ? 'A equipe espera um técnico ou prestador de fora. Você não precisa fazer nada; avisamos quando o atendimento voltar.'
+            : 'A equipe espera o retorno de um fornecedor ou assistência. Você não precisa fazer nada; avisamos quando o atendimento voltar.',
+        };
       case 'aguardando_confirmacao':
-        return 'status-awaiting-confirmation';
+        return {
+          tone: 'you',
+          icon: 'ti-circle-check',
+          title: 'Seu problema foi resolvido?',
+          text: 'A equipe marcou o pedido como resolvido. Confirme para encerrar, ou diga o que ainda falta.',
+        };
       case 'resolved':
-        return 'status-resolved';
+        return { tone: 'done', icon: 'ti-circle-check', title: 'Resolvido', text: 'A equipe concluiu o atendimento.' };
       case 'closed':
-        return 'status-closed';
+        return {
+          tone: 'done',
+          icon: 'ti-circle-check',
+          title: 'Concluído',
+          text: ticket.auto_closed
+            ? 'O chamado foi encerrado automaticamente depois de dois dias sem confirmação.'
+            : 'Atendimento encerrado. Obrigado por avisar a equipe.',
+        };
+      case 'cancelled':
+        return ticket.requester_closure === 'not_needed'
+          ? { tone: 'done', icon: 'ti-circle-minus', title: 'Você não precisa mais deste atendimento', text: 'O chamado foi encerrado e a equipe foi avisada.' }
+          : { tone: 'done', icon: 'ti-circle-check', title: 'Você resolveu por conta própria', text: 'O chamado foi encerrado e a equipe foi avisada.' };
       default:
-        return 'status-default';
+        return { tone: 'team', icon: 'ti-progress', title: 'Em andamento', text: 'Seu pedido está com a equipe.' };
     }
-  };
+  })();
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'open':
-        return 'Aberto';
-      case 'in_progress':
-        return 'Em Atendimento';
-      case 'waiting_user':
-        return 'Aguardando Você';
-      case 'aguardando_confirmacao':
-        return 'Aguardando Confirmação';
-      // A espera aqui e da equipe, nao do solicitante — por isso "Aguardando
-      // aquisicao", e nao "Aguardando voce".
-      case 'aguardando_aquisicao':
-        return 'Aguardando Aquisição';
-      case 'aguardando_terceiros':
-        return 'Aguardando Terceiros';
-      case 'resolved':
-        return 'Resolvido';
-      case 'closed':
-        return 'Concluído';
-      default:
-        return status;
-    }
-  };
-
-  const getTypeLabel = (type?: string) => {
-    switch (type) {
-      case 'incident': return 'Incidente';
-      case 'request': return 'Solicitação';
-      case 'change': return 'Mudança';
-      case 'problem': return 'Problema';
-      default: return type || '—';
-    }
-  };
-
-  const getPriorityLabel = (priority?: string) => {
-    switch (priority) {
-      case 'low': return 'Baixa';
-      case 'medium': return 'Média';
-      case 'high': return 'Alta';
-      case 'urgent': return 'Urgente';
-      case 'critical': return 'Crítica';
-      default: return priority || '—';
-    }
-  };
-
-  const normalizedRating = ticket.rating !== null && ticket.rating !== undefined
-    ? Number(ticket.rating)
-    : null;
+  const canRate = !isInternalUser && status === 'closed' && ticket.confirmed_resolved && normalizedRating === null;
 
   return (
-    <div className="ticket-detail-page">
-      <div className="ticket-container">
-        {successMessage && <div className="alert alert-success">{successMessage}</div>}
-
-        {/* Cabeçalho com resumo */}
-        <div className="ticket-hero">
-          <div className="hero-badge">
-            <span className={`status-badge-large ${getStatusColor(ticket.status)}`}>
-              {getStatusLabel(ticket.status)}
+    <div className={`pub-page tkp tkp--${team.tone}`}>
+      <header className="tkp-hero pub-aurora">
+        <div className="pub-wrap tkp-wrap tkp-hero__inner">
+          <a className="tkp-back" href="/meus-chamados">
+            <i className="ti ti-chevron-left" aria-hidden="true" />
+            Meus chamados
+          </a>
+          <div className="tkp-team">
+            <span className={`pub-gicon pub-gicon--${team.tone} tkp-team__icon`} aria-hidden="true">
+              <i className={`ti ${team.icon}`} />
             </span>
+            <span>{team.label}</span>
+            <span className="tkp-protocol">Protocolo {protocol}</span>
           </div>
-          <h1 className="ticket-title-large">Solicitação #{ticket.id.substring(0, 8).toUpperCase()}</h1>
-          <p className="ticket-subtitle">{ticket.title}</p>
-          <div className="ticket-meta">
-            <span>📅 Aberto em {new Date(ticket.created_at).toLocaleString('pt-BR', { 
-              day: '2-digit', 
-              month: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit'
-            })}</span>
-            <span>📁 {getTypeLabel(ticket.type)}</span>
-          </div>
+          <h1 className="tkp-title">{ticket.title}</h1>
+          <p className="tkp-opened">
+            Aberto em {new Date(ticket.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}
+            {' às '}
+            {new Date(ticket.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+          </p>
         </div>
+      </header>
 
-        {/* Linha do tempo de status */}
-        <StatusTimeline currentStatus={ticket.status} />
+      <div className="pub-wrap tkp-wrap tkp-body">
+        {successMessage && (
+          <p className="tkp-ok" role="status">
+            <i className="ti ti-circle-check" aria-hidden="true" />
+            <span>{successMessage}</span>
+          </p>
+        )}
 
-        {/* Próxima ação esperada */}
-        <NextAction
-          status={ticket.status}
-          department={ticket.department}
-          lastUpdate={ticket.updated_at}
-          estimatedTime={formatEstimatedTime(ticket.sla_due_at, nowMs)}
-          queueVisibility={ticket.queue_visibility}
-        />
-
-        {ticket.status === 'aguardando_confirmacao' && (
-          <div className="ticket-section resolution-confirmation">
-            <h2 className="section-title">✅ Seu problema foi resolvido?</h2>
-            <p className="confirmation-text">
-              Seu chamado foi marcado como resolvido pela equipe. Confirme para concluirmos o atendimento.
-            </p>
-            <p className="confirmation-warning">
-              O chamado será encerrado automaticamente após 48h sem resposta (com aviso após 24h).
-            </p>
-            {getAutoCloseTimeText() && (
-              <p className="confirmation-time">{getAutoCloseTimeText()}</p>
-            )}
-
-            {!isInternalUser && (
-              <div className="confirmation-actions">
-                <button
-                  type="button"
-                  className="btn btn-success"
-                  disabled={submittingConfirmation}
-                  onClick={() => handleConfirmResolution(true)}
+        {/* Agora: onde o pedido está e o que (se algo) depende da pessoa. */}
+        <section className={`tkp-now tkp-now--${now.tone}`} aria-labelledby="tkp-now-title">
+          <ol className="tkp-rail" aria-label="Etapas do atendimento">
+            {steps.map((label, index) => {
+              const n = index + 1;
+              const done = n < stage || (n === stage && stageDone);
+              const current = n === stage && !stageDone;
+              return (
+                <li
+                  key={label}
+                  className={`${done ? 'is-done' : ''} ${current ? 'is-current' : ''}`}
+                  aria-current={current ? 'step' : undefined}
                 >
-                  {submittingConfirmation ? 'Processando...' : 'Sim, foi resolvido'}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-warning"
-                  disabled={submittingConfirmation}
-                  onClick={() => setShowReopenForm(true)}
-                >
-                  Não, ainda preciso de ajuda
-                </button>
-              </div>
-            )}
+                  <span className="tkp-rail__bar" />
+                  <span className="tkp-rail__label">{label}</span>
+                </li>
+              );
+            })}
+          </ol>
 
-            {!isInternalUser && showReopenForm && (
-              <div className="reopen-form">
-                <label htmlFor="reopen-reason">Descreva o que ainda não foi resolvido</label>
+          <div className="tkp-now__head">
+            <span className="tkp-now__icon" aria-hidden="true"><i className={`ti ${now.icon}`} /></span>
+            <div>
+              <h2 id="tkp-now-title">{now.title}</h2>
+              <p>{now.text}</p>
+              {(status === 'aguardando_aquisicao' || status === 'aguardando_terceiros') && ticket.pause_reason && (
+                <p className="tkp-now__detail">Aguardando: {ticket.pause_reason}</p>
+              )}
+              {status === 'cancelled' && ticket.requester_closure_note && (
+                <p className="tkp-now__detail">“{ticket.requester_closure_note}”</p>
+              )}
+              {estimate && (
+                <p className={`tkp-now__eta ${estimate.late ? 'is-late' : ''}`}>
+                  <i className="ti ti-clock" aria-hidden="true" />
+                  {estimate.text}
+                </p>
+              )}
+              {status === 'aguardando_confirmacao' && getAutoCloseTimeText() && (
+                <p className="tkp-now__eta">
+                  <i className="ti ti-clock" aria-hidden="true" />
+                  {getAutoCloseTimeText()}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {actionError && (
+            <p className="pub-alert tkp-now__error" role="alert">
+              <i className="ti ti-alert-circle" aria-hidden="true" />
+              <span>{actionError}</span>
+            </p>
+          )}
+
+          {!isInternalUser && status === 'waiting_user' && (
+            <div className="tkp-now__actions">
+              <button type="button" className="pub-btn pub-btn--sun" onClick={focusReply}>
+                <i className="ti ti-message-reply" aria-hidden="true" />
+                Responder agora
+              </button>
+            </div>
+          )}
+
+          {!isInternalUser && status === 'aguardando_confirmacao' && !showReopenForm && (
+            <div className="tkp-now__actions">
+              <button
+                type="button"
+                className="pub-btn pub-btn--primary"
+                disabled={submittingConfirmation}
+                onClick={() => handleConfirmResolution(true)}
+              >
+                <i className="ti ti-check" aria-hidden="true" />
+                {submittingConfirmation ? 'Confirmando…' : 'Sim, foi resolvido'}
+              </button>
+              <button
+                type="button"
+                className="pub-btn pub-btn--ghost"
+                disabled={submittingConfirmation}
+                onClick={() => setShowReopenForm(true)}
+              >
+                Ainda preciso de ajuda
+              </button>
+            </div>
+          )}
+
+          {!isInternalUser && status === 'aguardando_confirmacao' && showReopenForm && (
+            <form
+              className="tkp-reopen"
+              onSubmit={(e) => { e.preventDefault(); void handleConfirmResolution(false, reopenReason.trim()); }}
+            >
+              <div className="pub-field">
+                <label htmlFor="tkp-reopen-reason">O que ainda não foi resolvido?</label>
                 <textarea
-                  id="reopen-reason"
+                  id="tkp-reopen-reason"
                   value={reopenReason}
                   onChange={(e) => setReopenReason(e.target.value)}
-                  rows={4}
-                  className="reply-textarea"
-                  placeholder="Explique o que ainda precisa ser ajustado..."
+                  rows={3}
+                  autoFocus
+                  placeholder="Ex.: a impressora voltou a travar depois de algumas folhas"
                 />
-                <div className="confirmation-actions">
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => {
-                      setShowReopenForm(false);
-                      setReopenReason('');
-                    }}
-                    disabled={submittingConfirmation}
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-warning"
-                    disabled={submittingConfirmation || reopenReason.trim().length < 10}
-                    onClick={() => handleConfirmResolution(false, reopenReason.trim())}
-                  >
-                    {submittingConfirmation ? 'Processando...' : 'Confirmar Reabertura'}
-                  </button>
-                </div>
+                <span className="pub-field__hint">Escreva pelo menos 10 letras para a equipe entender.</span>
               </div>
-            )}
-
-            {isInternalUser && canManualClose() && (
-              <div className="confirmation-actions">
+              <div className="tkp-now__actions">
+                <button
+                  type="submit"
+                  className="pub-btn pub-btn--primary"
+                  disabled={submittingConfirmation || reopenReason.trim().length < 10}
+                >
+                  {submittingConfirmation ? 'Reabrindo…' : 'Reabrir chamado'}
+                </button>
                 <button
                   type="button"
-                  className="btn btn-danger"
+                  className="pub-btn pub-btn--ghost"
+                  onClick={() => { setShowReopenForm(false); setReopenReason(''); }}
                   disabled={submittingConfirmation}
-                  onClick={handleManualClose}
                 >
-                  {submittingConfirmation ? 'Encerrando...' : 'Encerrar chamado'}
+                  Voltar
                 </button>
               </div>
-            )}
-          </div>
-        )}
-
-        {/* Descrição inicial */}
-        <div className="ticket-section">
-          <h2 className="section-title">📝 Sua Solicitação</h2>
-          <div className="description-box">
-            <p>{ticket.description}</p>
-          </div>
-        </div>
-
-        {/* Conversa / Atualizações */}
-        <div className="ticket-section">
-          <h2 className="section-title">💬 Conversa e Atualizações</h2>
-
-          {messages.length === 0 ? (
-            <div className="empty-state">
-              <span className="empty-icon">💭</span>
-              <p>Ainda não há atualizações. Você será notificado quando a equipe responder.</p>
-            </div>
-          ) : (
-            <div className="conversation">
-              {messages.map((msg) => {
-                const isStaff = msg.author_type !== 'public';
-                return (
-                <div 
-                  key={msg.id} 
-                  className={`message ${isStaff ? 'message-ti' : 'message-user'}`}
-                >
-                  <div className="message-avatar">
-                    {isStaff ? '🔧' : '👤'}
-                  </div>
-                  <div className="message-content">
-                    <div className="message-header">
-                      <span className="message-author">
-                        {isStaff
-                          ? msg.author_name || (
-                              ticket.department === 'rh' ? 'Equipe RH'
-                              : ticket.department === 'administrativo' ? 'Equipe Administrativa'
-                              : 'Equipe TI'
-                            )
-                          : 'Você'}
-                      </span>
-                      <span className="message-time">
-                        {new Date(msg.created_at).toLocaleString('pt-BR', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </span>
-                    </div>
-                    <p className="message-text">{msg.message}</p>
-                  </div>
-                </div>
-                );
-              })}
-            </div>
-          )}
-
-          {ticket.status !== 'closed' && ticket.status !== 'resolved' && ticket.status !== 'aguardando_confirmacao' && (
-            <form onSubmit={handleAddMessage} className="reply-form">
-              <textarea
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Digite sua mensagem..."
-                rows={4}
-                className="reply-textarea"
-              />
-              <button 
-                type="submit" 
-                className="btn btn-primary" 
-                disabled={submitting || !newMessage.trim()}
-              >
-                {submitting ? 'Enviando...' : '📤 Enviar Mensagem'}
-              </button>
             </form>
           )}
-        </div>
 
-        {/* Anexos */}
-        <TicketAttachments
-          ticketId={id!}
-          userToken={token || userToken || undefined}
-          authToken={isInternalUser && internalToken ? internalToken : undefined}
-          department={ticket.department}
-        />
-
-        {/* Informações técnicas (colapsável) */}
-        <div className="ticket-section">
-          <h2 className="section-title">🕒 Linha do Tempo</h2>
-          {history.length === 0 ? (
-            <p className="confirmation-time">Ainda não há eventos registrados.</p>
-          ) : (
-            <div className="history-timeline">
-              {history.map((item) => (
-                <div key={item.id} className="history-item">
-                  <div className="history-marker" />
-                  <div className="history-content">
-                    <div className="history-title">{getTimelineLabel(item.action)}</div>
-                    <div className="history-meta">
-                      {item.changed_by_name || 'Sistema'} · {new Date(item.created_at).toLocaleString('pt-BR')}
-                    </div>
-                    {item.action === 'pause_reason_added' && item.new_value && (
-                      <div className="history-detail">Aguardando: {String(item.new_value)}</div>
-                    )}
-                    {item.metadata?.reason && (
-                      <div className="history-detail">Motivo: {String(item.metadata.reason)}</div>
-                    )}
-                    {item.metadata?.reopen_reason && (
-                      <div className="history-detail">Justificativa: {String(item.metadata.reopen_reason)}</div>
-                    )}
-                  </div>
-                </div>
-              ))}
+          {isInternalUser && status === 'aguardando_confirmacao' && canManualClose() && (
+            <div className="tkp-now__actions">
+              <button type="button" className="pub-btn pub-btn--ghost" disabled={submittingConfirmation} onClick={handleManualClose}>
+                {submittingConfirmation ? 'Encerrando…' : 'Encerrar chamado'}
+              </button>
             </div>
           )}
-        </div>
 
-        <details className="ticket-details-section">
-          <summary>🔍 Informações Técnicas</summary>
-          <div className="details-grid">
-            <div className="detail-item">
-              <label>ID Completo:</label>
-              <span className="mono">{ticket.id}</span>
+          {canRate && (
+            <div className="tkp-now__actions">
+              <button type="button" className="pub-btn pub-btn--sun" onClick={() => setShowRatingModal(true)}>
+                <i className="ti ti-star" aria-hidden="true" />
+                Avaliar o atendimento
+              </button>
             </div>
-            <div className="detail-item">
-              <label>Tipo:</label>
-              <span>{getTypeLabel(ticket.type)}</span>
+          )}
+
+          {normalizedRating !== null && (
+            <p className="tkp-rated" aria-label={`Sua avaliação: ${normalizedRating} de 5`}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <i key={n} className={`ti ${n <= normalizedRating ? 'ti-star-filled' : 'ti-star'}`} aria-hidden="true" />
+              ))}
+              <span>Sua avaliação</span>
+            </p>
+          )}
+
+          {!isInternalUser && status === 'cancelled' && canReopenRequesterClosure && (
+            <div className="tkp-now__actions">
+              <button type="button" className="pub-btn pub-btn--ghost" onClick={() => void handleReopenByRequester()} disabled={submittingClose}>
+                <i className="ti ti-arrow-back-up" aria-hidden="true" />
+                {submittingClose ? 'Reabrindo…' : 'Reabrir chamado'}
+              </button>
             </div>
-            <div className="detail-item">
-              <label>Prioridade:</label>
-              <span>{getPriorityLabel(ticket.priority)}</span>
-            </div>
-            <div className="detail-item">
-              <label>Criado em:</label>
-              <span>{new Date(ticket.created_at).toLocaleString('pt-BR')}</span>
-            </div>
-            <div className="detail-item">
-              <label>Última atualização:</label>
-              <span>{new Date(ticket.updated_at).toLocaleString('pt-BR')}</span>
-            </div>
-            {ticket.resolved_at && (
-              <div className="detail-item">
-                <label>Resolvido em:</label>
-                <span>{new Date(ticket.resolved_at).toLocaleString('pt-BR')}</span>
+          )}
+          {status === 'cancelled' && closeError && (
+            <p className="pub-alert tkp-now__error" role="alert">
+              <i className="ti ti-alert-circle" aria-hidden="true" />
+              <span>{closeError}</span>
+            </p>
+          )}
+        </section>
+
+        {/* Encerrar pelo próprio solicitante. Discreto até a pessoa escolher:
+            a maioria dos chamados ainda precisa da equipe. */}
+        {!isInternalUser && REQUESTER_CLOSABLE.includes(status) && (
+          <section className={`rq-close ${closeOpen ? 'is-open' : ''}`} aria-labelledby="rq-close-title">
+            {!closeOpen ? (
+              <div className="rq-close__bar">
+                <div className="rq-close__copy">
+                  <h2 id="rq-close-title">Já resolveu ou não precisa mais?</h2>
+                  <p>Encerre o chamado para a equipe não continuar trabalhando nele à toa.</p>
+                </div>
+                <button type="button" className="rq-close__open" onClick={() => { setCloseOpen(true); setCloseError(''); }}>
+                  Encerrar chamado
+                </button>
               </div>
+            ) : (
+              <form className="rq-close__form" onSubmit={(e) => { e.preventDefault(); void handleCloseByRequester(); }}>
+                <h2 id="rq-close-title">Por que você quer encerrar?</h2>
+                <div className="rq-close__choices" role="radiogroup" aria-label="Motivo do encerramento">
+                  {([
+                    { value: 'self_resolved', icon: 'ti-circle-check', title: 'Já resolvi', text: 'Consegui resolver por conta própria.' },
+                    { value: 'not_needed', icon: 'ti-circle-minus', title: 'Não preciso mais', text: 'O pedido deixou de ser necessário.' },
+                  ] as const).map((choice) => (
+                    <label key={choice.value} className={`rq-close__choice ${closeReason === choice.value ? 'is-picked' : ''}`}>
+                      <input
+                        type="radio"
+                        name="rq-close-reason"
+                        value={choice.value}
+                        checked={closeReason === choice.value}
+                        onChange={() => setCloseReason(choice.value)}
+                      />
+                      <i className={`ti ${choice.icon}`} aria-hidden="true" />
+                      <span>
+                        <strong>{choice.title}</strong>
+                        <small>{choice.text}</small>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+
+                {closeReason && (
+                  <div className="pub-field rq-close__note">
+                    <label htmlFor="rq-close-note">
+                      {closeReason === 'self_resolved' ? 'Quer contar o que você fez?' : 'Quer contar o motivo?'}
+                      {' '}<span className="pub-field__optional">(opcional)</span>
+                    </label>
+                    <textarea
+                      id="rq-close-note"
+                      rows={2}
+                      maxLength={500}
+                      value={closeNote}
+                      onChange={(e) => setCloseNote(e.target.value)}
+                      placeholder={closeReason === 'self_resolved'
+                        ? 'Ex.: reiniciei o computador e voltou a funcionar'
+                        : 'Ex.: a reunião foi cancelada'}
+                    />
+                    {closeReason === 'self_resolved' && (
+                      <span className="pub-field__hint">Isso ajuda a equipe a orientar outras pessoas com o mesmo problema.</span>
+                    )}
+                  </div>
+                )}
+
+                {closeError && (
+                  <p className="pub-alert" role="alert">
+                    <i className="ti ti-alert-circle" aria-hidden="true" />
+                    <span>{closeError}</span>
+                  </p>
+                )}
+
+                <div className="rq-close__actions">
+                  <button type="submit" className="pub-btn pub-btn--primary" disabled={!closeReason || submittingClose}>
+                    {submittingClose ? 'Encerrando…' : 'Encerrar chamado'}
+                  </button>
+                  <button
+                    type="button"
+                    className="pub-btn pub-btn--ghost"
+                    onClick={() => { setCloseOpen(false); setCloseReason(null); setCloseNote(''); setCloseError(''); }}
+                    disabled={submittingClose}
+                  >
+                    Voltar
+                  </button>
+                </div>
+                <p className="rq-close__fine">A equipe é avisada. Se mudar de ideia, dá para reabrir por 7 dias.</p>
+              </form>
             )}
-            <div className="detail-item">
-              <label>Avaliação:</label>
-              <span>
-                {normalizedRating !== null
-                  ? `${'★'.repeat(Math.max(0, Math.min(5, normalizedRating)))} (${normalizedRating}/5)`
-                  : 'Sem avaliação registrada'}
-              </span>
-            </div>
-            <div className="detail-item">
-              <label>Feedback:</label>
-              <span>{ticket.feedback?.trim() ? ticket.feedback : 'Nenhum comentário informado'}</span>
-            </div>
-            {ticket.rated_at && (
-              <div className="detail-item">
-                <label>Avaliado em:</label>
-                <span>{new Date(ticket.rated_at).toLocaleString('pt-BR')}</span>
+          </section>
+        )}
+
+        {/* Conversa: o pedido original abre o fio, como a primeira mensagem. */}
+        <section className="tkp-talk" aria-labelledby="tkp-talk-title">
+          <h2 id="tkp-talk-title" className="tkp-h2">Conversa com a {team.name}</h2>
+          <ol className="tkp-thread">
+            <li className="tkp-msg tkp-msg--me">
+              <div className="tkp-msg__bubble">
+                <span className="tkp-msg__who">
+                  Seu pedido
+                  <time dateTime={ticket.created_at}>{formatWhen(ticket.created_at)}</time>
+                </span>
+                <p>{ticket.description}</p>
               </div>
+            </li>
+            {visibleMessages.map((msg) => {
+              const isStaff = msg.author_type !== 'public';
+              const name = isStaff ? msg.author_name || team.label : 'Você';
+              return (
+                <li key={msg.id} className={`tkp-msg ${isStaff ? 'tkp-msg--team' : 'tkp-msg--me'}`}>
+                  {isStaff && (
+                    <span className="tkp-msg__avatar" aria-hidden="true">
+                      {initialsOf(msg.author_name) || <i className={`ti ${team.icon}`} />}
+                    </span>
+                  )}
+                  <div className="tkp-msg__bubble">
+                    <span className="tkp-msg__who">
+                      {name}
+                      <time dateTime={msg.created_at}>{formatWhen(msg.created_at)}</time>
+                    </span>
+                    <p>{msg.message}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+
+          {visibleMessages.length === 0 && canReply && (
+            <p className="tkp-quiet">A resposta da equipe aparece aqui. Você também recebe um aviso por e-mail.</p>
+          )}
+
+          {canReply && (
+            <form onSubmit={handleAddMessage} className={`tkp-compose ${status === 'waiting_user' ? 'is-asked' : ''}`}>
+              <label htmlFor="tkp-reply">
+                {status === 'waiting_user' ? 'A equipe espera sua resposta' : 'Escrever para a equipe'}
+              </label>
+              <textarea
+                id="tkp-reply"
+                ref={replyRef}
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Escreva sua mensagem"
+                rows={3}
+              />
+              <div className="tkp-compose__bar">
+                <button type="submit" className="pub-btn pub-btn--primary" disabled={submitting || !newMessage.trim()}>
+                  <i className="ti ti-send" aria-hidden="true" />
+                  {submitting ? 'Enviando…' : 'Enviar mensagem'}
+                </button>
+              </div>
+            </form>
+          )}
+        </section>
+
+        <section className="tkp-attach" aria-label="Anexos">
+          <TicketAttachments
+            ticketId={id!}
+            userToken={token || userToken || undefined}
+            authToken={isInternalUser && internalToken ? internalToken : undefined}
+            department={ticket.department}
+          />
+        </section>
+
+        {/* Histórico e dados de referência: úteis às vezes, nunca no caminho. */}
+        <details className="tkp-more">
+          <summary>
+            <span>Histórico e detalhes</span>
+            <i className="ti ti-chevron-down" aria-hidden="true" />
+          </summary>
+
+          <div className="tkp-more__body">
+            {history.length === 0 ? (
+              <p className="tkp-quiet">Ainda não há eventos registrados.</p>
+            ) : (
+              <ol className="tkp-log">
+                {history.map((item) => (
+                  <li key={item.id}>
+                    <strong>{getTimelineLabel(item.action)}</strong>
+                    <span>
+                      {item.changed_by_type === 'public' ? 'Você' : item.changed_by_name || 'Sistema'}, {formatWhen(item.created_at)}
+                    </span>
+                    {item.action === 'pause_reason_added' && item.new_value && (
+                      <em>Aguardando: {String(item.new_value)}</em>
+                    )}
+                    {item.metadata?.reopen_reason && <em>Motivo: {String(item.metadata.reopen_reason)}</em>}
+                    {item.action === 'closed_by_requester' && item.metadata?.note && <em>“{String(item.metadata.note)}”</em>}
+                  </li>
+                ))}
+              </ol>
             )}
+
+            <dl className="tkp-facts">
+              <div><dt>Protocolo completo</dt><dd className="tkp-facts__id">{ticket.id}</dd></div>
+              <div><dt>Tipo</dt><dd>{TYPE_LABEL[ticket.type] || ticket.type || 'Não informado'}</dd></div>
+              <div><dt>Prioridade</dt><dd>{PRIORITY_LABEL[ticket.priority] || ticket.priority || 'Não informada'}</dd></div>
+              <div><dt>Última atualização</dt><dd>{formatWhen(ticket.updated_at)}</dd></div>
+              {ticket.resolved_at && <div><dt>Resolvido em</dt><dd>{formatWhen(ticket.resolved_at)}</dd></div>}
+              {ticket.feedback?.trim() && <div><dt>Seu comentário na avaliação</dt><dd>{ticket.feedback}</dd></div>}
+            </dl>
           </div>
         </details>
+      </div>
 
-        <div className="action-buttons">
-          <a href="/meus-chamados" className="btn btn-secondary">
-            ← Voltar para Minhas Solicitações
-          </a>
-        </div>
+      {showRatingModal && (
+        <div className="tkp-modal" role="dialog" aria-modal="true" aria-labelledby="tkp-rate-title">
+          <div className="tkp-modal__card">
+            <h2 id="tkp-rate-title">Como foi o atendimento?</h2>
+            <p>Sua nota ajuda a {team.name} a melhorar.</p>
 
-        {showRatingModal && (
-          <div className="rating-modal-overlay" role="dialog" aria-modal="true">
-            <div className="rating-modal">
-              <h3>Avalie o atendimento</h3>
-              <p>Sua avaliação ajuda a melhorar o serviço.</p>
+            <div className="tkp-stars" role="radiogroup" aria-label="Nota de 1 a 5">
+              {[1, 2, 3, 4, 5].map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={ratingValue === value}
+                  aria-label={`${value} de 5`}
+                  className={ratingValue >= value ? 'is-on' : ''}
+                  onClick={() => setRatingValue(value)}
+                >
+                  <i className={`ti ${ratingValue >= value ? 'ti-star-filled' : 'ti-star'}`} aria-hidden="true" />
+                </button>
+              ))}
+            </div>
 
-              <div className="rating-options">
-                {[1, 2, 3, 4, 5].map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    className={`rating-star ${ratingValue >= value ? 'selected' : ''}`}
-                    onClick={() => setRatingValue(value)}
-                  >
-                    ★
-                  </button>
-                ))}
-              </div>
-
+            <div className="pub-field">
+              <label htmlFor="tkp-rate-note">
+                Quer deixar um comentário? <span className="pub-field__optional">(opcional)</span>
+              </label>
               <textarea
-                className="rating-feedback"
-                placeholder="Comentário opcional"
+                id="tkp-rate-note"
                 value={ratingFeedback}
                 onChange={(e) => setRatingFeedback(e.target.value)}
-                rows={4}
+                rows={3}
               />
+            </div>
 
-              <div className="rating-actions">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setShowRatingModal(false)}
-                  disabled={submittingRating}
-                >
-                  Agora não
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={handleSubmitRating}
-                  disabled={submittingRating}
-                >
-                  {submittingRating ? 'Enviando...' : 'Enviar avaliação'}
-                </button>
-              </div>
+            {actionError && (
+              <p className="pub-alert" role="alert">
+                <i className="ti ti-alert-circle" aria-hidden="true" />
+                <span>{actionError}</span>
+              </p>
+            )}
+
+            <div className="tkp-modal__actions">
+              <button type="button" className="pub-btn pub-btn--primary" onClick={handleSubmitRating} disabled={submittingRating}>
+                {submittingRating ? 'Enviando…' : 'Enviar avaliação'}
+              </button>
+              <button type="button" className="pub-btn pub-btn--ghost" onClick={() => setShowRatingModal(false)} disabled={submittingRating}>
+                Agora não
+              </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

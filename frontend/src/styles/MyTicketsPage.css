@@ -131,23 +131,63 @@
 }
 
 /* ── Lista ─────────────────────────────────────────────────────── */
-.mtk-callout {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin: 0 0 12px;
-  padding: 12px 14px;
-  color: var(--pub-warn);
-  background: var(--pub-warn-wash);
-  border: 1px solid #f3d9a4;
-  border-radius: 14px;
-  font-size: 0.95rem;
-  font-weight: 700;
+/* ── Grupos: o que depende de você, o que anda, o que acabou ─────── */
+.mtk-group + .mtk-group {
+  margin-top: 26px;
 }
 
-.mtk-callout i {
-  margin-top: 1px;
-  font-size: 1.2rem;
+.mtk-group__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font: 800 1.05rem/1.2 var(--pub-display);
+  letter-spacing: -0.01em;
+}
+
+/* O primeiro grupo encosta na aurora: o título precisa de fundo. */
+.mtk-group:first-of-type .mtk-group__title {
+  justify-self: start;
+  width: fit-content;
+  padding: 6px 12px 6px 14px;
+  background: var(--pub-paper);
+  border: 1px solid var(--pub-line);
+  border-radius: 999px;
+}
+
+.mtk-group__count {
+  min-width: 24px;
+  padding: 2px 8px;
+  color: var(--pub-muted);
+  background: #e8eee9;
+  border-radius: 999px;
+  font: 700 0.8rem/1.3 var(--pub-body);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.mtk-group--you .mtk-group__count {
+  color: var(--pub-evergreen);
+  background: var(--pub-sun);
+}
+
+.mtk-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  color: var(--pub-ink);
+  background: var(--pub-paper);
+  border: 1px solid var(--pub-line);
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mtk-more:hover {
+  border-color: #b9c8bd;
 }
 
 .mtk-list {
@@ -195,6 +235,37 @@
   border-color: #f0cf88;
   box-shadow: 0 0 0 3px rgba(246, 195, 80, 0.2);
 }
+
+.mtk-item__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+}
+
+.mtk-item__when {
+  color: var(--pub-muted);
+  font-size: 0.84rem;
+}
+
+.mtk-team {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.mtk-team::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+  background: var(--pub-leaf);
+}
+
+.mtk-team--administrativo::before { background: #e08a0b; }
+.mtk-team--rh::before { background: #5f40d6; }
 
 .mtk-item__title {
   font: 700 1.07rem/1.3 var(--pub-body);

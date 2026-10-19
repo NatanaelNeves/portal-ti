@@ -28,7 +28,7 @@ const PUBLIC_STATUS: Record<string, { label: string; tone: StatusTone }> = {
   aguardando_terceiros: { label: 'Aguardando fornecedor', tone: 'waiting' },
   resolved: { label: 'Resolvido', tone: 'done' },
   closed: { label: 'Concluído', tone: 'closed' },
-  cancelled: { label: 'Cancelado', tone: 'closed' },
+  cancelled: { label: 'Encerrado por você', tone: 'closed' },
 };
 
 // `fetch` rejeita com TypeError quando não há conexão com o servidor.
@@ -43,17 +43,39 @@ const DEPARTMENT_LABEL: Record<string, string> = {
   rh: 'RH',
 };
 
+/** "há 3 h", "ontem", "há 5 dias": quando o chamado mexeu pela última vez. */
+const updatedAgo = (iso?: string): string => {
+  if (!iso) return '';
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (Number.isNaN(mins)) return '';
+  if (mins < 1) return 'agora há pouco';
+  if (mins < 60) return `há ${mins} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `há ${hours} h`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return 'ontem';
+  if (days < 30) return `há ${days} dias`;
+  return `em ${new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}`;
+};
+
+/** Agrupamento da lista: o que depende da pessoa primeiro, o concluído por último. */
+const GROUPS: Array<{ key: 'you' | 'active' | 'done'; title: string; tones: StatusTone[] }> = [
+  { key: 'you', title: 'Precisam de você', tones: ['you'] },
+  { key: 'active', title: 'Em andamento', tones: ['new', 'progress', 'waiting'] },
+  { key: 'done', title: 'Concluídos', tones: ['done', 'closed'] },
+];
+
 const formatSla = (slaDueAt: string | null | undefined): { text: string; late: boolean } | null => {
   if (!slaDueAt) return null;
 
   const diffMs = new Date(slaDueAt).getTime() - Date.now();
-  if (diffMs <= 0) return { text: 'Meta de atendimento excedida', late: true };
+  if (diffMs <= 0) return { text: 'Passou do prazo previsto', late: true };
 
   const diffHours = diffMs / (1000 * 60 * 60);
-  if (diffHours < 24) return { text: `Meta: em até ${Math.max(1, Math.ceil(diffHours))}h`, late: false };
+  if (diffHours < 24) return { text: `Previsão: em até ${Math.max(1, Math.ceil(diffHours))}h`, late: false };
 
   const dueDate = new Date(slaDueAt);
-  return { text: `Meta: até ${dueDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`, late: false };
+  return { text: `Previsão: até ${dueDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`, late: false };
 };
 
 const normalizeTickets = (data: any): Ticket[] => {
@@ -72,6 +94,7 @@ export default function MyTicketsPage() {
   const [searchEmail, setSearchEmail] = useState('');
   const [searchCode, setSearchCode] = useState('');
   const [changeEmailConfirm, setChangeEmailConfirm] = useState(false);
+  const [showDone, setShowDone] = useState(false);
 
   const confirmChangeEmail = () => {
     localStorage.removeItem('user_token');
@@ -333,51 +356,65 @@ export default function MyTicketsPage() {
           </div>
         )}
 
-        {!showEmailForm && !loading && tickets.length > 0 && (
-          <>
-            {waitingOnYou > 0 && (
-              <p className="mtk-callout">
-                <i className="ti ti-hand-finger" aria-hidden="true" />
-                {waitingOnYou === 1
-                  ? 'Um chamado espera uma resposta sua. Ele está no topo da lista.'
-                  : `${waitingOnYou} chamados esperam uma resposta sua. Eles estão no topo da lista.`}
-              </p>
-            )}
-            <ul className="mtk-list">
-              {[...tickets]
-                .sort((a, b) => Number(toneOf(b.status) === 'you') - Number(toneOf(a.status) === 'you'))
-                .map((ticket) => {
-                const status = PUBLIC_STATUS[ticket.status] ?? { label: ticket.status, tone: 'closed' as StatusTone };
-                const stage = TONE_STAGE[status.tone];
-                const sla = status.tone === 'done' || status.tone === 'closed' ? null : formatSla(ticket.sla_due_at);
-                return (
-                  <li key={ticket.id}>
-                    <a href={`/chamado/${ticket.id}`} className={`mtk-item mtk-item--${status.tone}`}>
-                      <span className={`mtk-status mtk-status--${status.tone}`}>{status.label}</span>
-                      <strong className="mtk-item__title">{ticket.title}</strong>
-                      <span className="mtk-item__meta">
-                        <span>#{ticket.id.substring(0, 8).toUpperCase()}</span>
-                        {ticket.department && DEPARTMENT_LABEL[ticket.department] && (
-                          <span>{DEPARTMENT_LABEL[ticket.department]}</span>
-                        )}
-                        <span>
-                          Aberto em {ticket.created_at ? new Date(ticket.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '-'}
-                        </span>
-                      </span>
-                      <span className="mtk-track" aria-hidden="true">
-                        {[1, 2, 3].map((n) => (
-                          <span key={n} className={n <= stage ? 'is-on' : ''} />
-                        ))}
-                      </span>
-                      {sla && <span className={`mtk-item__sla ${sla.late ? 'is-late' : ''}`}>{sla.text}</span>}
-                      <i className="ti ti-chevron-right mtk-item__chevron" aria-hidden="true" />
-                    </a>
-                  </li>
-                );
-              })}
-            </ul>
-          </>
-        )}
+        {!showEmailForm && !loading && tickets.length > 0 && GROUPS.map((group) => {
+          const items = [...tickets]
+            .filter((t) => group.tones.includes(toneOf(t.status)))
+            .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+          if (!items.length) return null;
+
+          // Concluídos ficam recolhidos quando há algo em aberto: a lista
+          // existe para acompanhar o que ainda anda.
+          const hasOpen = tickets.some((t) => TONE_STAGE[toneOf(t.status)] < 3);
+          const collapsed = group.key === 'done' && hasOpen && !showDone;
+
+          return (
+            <section key={group.key} className={`mtk-group mtk-group--${group.key}`} aria-labelledby={`mtk-group-${group.key}`}>
+              <h2 id={`mtk-group-${group.key}`} className="mtk-group__title">
+                {group.title}
+                <span className="mtk-group__count">{items.length}</span>
+              </h2>
+
+              {collapsed ? (
+                <button type="button" className="mtk-more" onClick={() => setShowDone(true)}>
+                  Mostrar {items.length === 1 ? 'o chamado concluído' : `os ${items.length} chamados concluídos`}
+                  <i className="ti ti-chevron-down" aria-hidden="true" />
+                </button>
+              ) : (
+                <ul className="mtk-list">
+                  {items.map((ticket) => {
+                    const status = PUBLIC_STATUS[ticket.status] ?? { label: ticket.status, tone: 'closed' as StatusTone };
+                    const stage = TONE_STAGE[status.tone];
+                    // Em espera externa o prazo está pausado: mostrar previsão enganaria.
+                    const sla = ['new', 'progress'].includes(status.tone) ? formatSla(ticket.sla_due_at) : null;
+                    const dept = ticket.department && DEPARTMENT_LABEL[ticket.department] ? ticket.department : null;
+                    return (
+                      <li key={ticket.id}>
+                        <a href={`/chamado/${ticket.id}`} className={`mtk-item mtk-item--${status.tone}`}>
+                          <span className="mtk-item__top">
+                            <span className={`mtk-status mtk-status--${status.tone}`}>{status.label}</span>
+                            <span className="mtk-item__when">Atualizado {updatedAgo(ticket.updated_at)}</span>
+                          </span>
+                          <strong className="mtk-item__title">{ticket.title}</strong>
+                          <span className="mtk-item__meta">
+                            {dept && <span className={`mtk-team mtk-team--${dept}`}>{DEPARTMENT_LABEL[dept]}</span>}
+                            <span>Protocolo {ticket.id.substring(0, 8).toUpperCase()}</span>
+                          </span>
+                          <span className="mtk-track" aria-hidden="true">
+                            {[1, 2, 3].map((n) => (
+                              <span key={n} className={n <= stage ? 'is-on' : ''} />
+                            ))}
+                          </span>
+                          {sla && <span className={`mtk-item__sla ${sla.late ? 'is-late' : ''}`}>{sla.text}</span>}
+                          <i className="ti ti-chevron-right mtk-item__chevron" aria-hidden="true" />
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+          );
+        })}
       </div>
 
       <ConfirmDialog
