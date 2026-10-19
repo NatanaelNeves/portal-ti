@@ -1389,8 +1389,11 @@ ticketsRouter.get('/:id/messages', async (req: Request, res: Response) => {
        LEFT JOIN internal_users iu ON tm.author_type = 'it_staff' AND iu.id::text = tm.author_id::text
        LEFT JOIN public_users pu ON tm.author_type = 'public' AND pu.id::text = tm.author_id::text
        WHERE tm.ticket_id = $1
+         -- Nota interna é conversa da equipe: o solicitante (acesso por
+         -- X-User-Token) nunca recebe, nem que a tela esqueça de filtrar.
+         AND ($2::boolean = false OR COALESCE(tm.is_internal, false) = false)
        ORDER BY tm.created_at ASC`,
-      [id]
+      [id, Boolean(userToken)]
     );
 
     res.json({ messages: messages.rows });
@@ -2739,6 +2742,19 @@ ticketsRouter.get('/:id/history', async (req: Request, res: Response) => {
       if (!publicUser.rows.length || ticket.rows[0].requester_id !== publicUser.rows[0].id) {
         return res.status(403).json({ error: 'Acesso negado' });
       }
+    } else {
+      // Sem esta verificação, qualquer valor no cabeçalho Authorization
+      // liberava o histórico de qualquer chamado.
+      const jwt = require('jsonwebtoken');
+      const { config } = require('../config/environment');
+      try {
+        const decoded = jwt.verify(authHeader.replace(/^Bearer\s+/i, ''), config.jwt.secret) as any;
+        if (!canViewTicketsAsInternalRole(decoded.role)) {
+          return res.status(403).json({ error: 'Acesso negado' });
+        }
+      } catch {
+        return res.status(401).json({ error: 'Token inválido' });
+      }
     }
 
     // Buscar histórico
@@ -2761,9 +2777,14 @@ ticketsRouter.get('/:id/history', async (req: Request, res: Response) => {
        LEFT JOIN internal_users new_user
          ON h.action IN ('assigned', 'unassigned')
         AND new_user.id::text = h.new_value
-       WHERE h.ticket_id = $1 
+       WHERE h.ticket_id = $1
+         -- O solicitante não vê o rastro das notas internas da equipe.
+         AND ($2::boolean = false OR NOT (
+           h.action = 'message_added'
+           AND COALESCE((h.metadata->>'is_internal')::boolean, false)
+         ))
        ORDER BY h.created_at DESC`,
-      [id]
+      [id, Boolean(userToken)]
     );
 
     res.json({ history: history.rows });
