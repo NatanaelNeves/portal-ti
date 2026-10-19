@@ -65,6 +65,25 @@ const GROUPS = [
 
 const groupOf = (status: string) => (status === 'open' ? 'open' : status === 'in_progress' ? 'in_progress' : 'waiting');
 
+type WaitKind = 'aguardando_aquisicao' | 'aguardando_terceiros';
+
+/**
+ * O próximo passo natural de cada estado, no botão principal da ficha.
+ * Esperando confirmação não tem: a vez é de quem pediu.
+ */
+const NEXT_STEP: Record<string, { label: string; icon: string; status: string; toast: string }> = {
+  open: { label: 'Começar', icon: 'ti-player-play', status: 'in_progress', toast: 'Pedido em andamento.' },
+  in_progress: { label: 'Concluir', icon: 'ti-check', status: 'resolved', toast: 'Pedido concluído. Quem pediu foi avisado para confirmar.' },
+  waiting_user: { label: 'Retomar', icon: 'ti-player-play', status: 'in_progress', toast: 'Pedido retomado.' },
+  aguardando_aquisicao: { label: 'Retomar', icon: 'ti-player-play', status: 'in_progress', toast: 'Pedido retomado. O prazo volta a contar.' },
+  aguardando_terceiros: { label: 'Retomar', icon: 'ti-player-play', status: 'in_progress', toast: 'Pedido retomado. O prazo volta a contar.' },
+};
+
+const WAIT_COPY: Record<WaitKind, { question: string; placeholder: string }> = {
+  aguardando_aquisicao: { question: 'O que precisa ser comprado?', placeholder: 'Ex.: lâmpadas para a sala 3' },
+  aguardando_terceiros: { question: 'O que está sendo aguardado?', placeholder: 'Ex.: técnico do ar-condicionado' },
+};
+
 const isTab = (value: string | null): value is Tab => value === 'quadro' || value === 'comigo' || value === 'encerrados';
 
 const normalize = (text: string) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -97,6 +116,11 @@ export default function AdmTicketsPage() {
   const [sort, setSort] = useState<Sort>(defaultSort(tab));
   const [leaving, setLeaving] = useState<string | null>(null);
   const [shaking, setShaking] = useState<string | null>(null);
+  // Gaveta de ações de uma ficha em "Comigo" (uma aberta por vez).
+  const [drawer, setDrawer] = useState<string | null>(null);
+  const [waitFor, setWaitFor] = useState<WaitKind | null>(null);
+  const [waitReason, setWaitReason] = useState('');
+  const [working, setWorking] = useState<string | null>(null);
 
   const tabsRef = useRef<HTMLDivElement | null>(null);
   const pill = useSlidingPill(tabsRef, '.axp-tab', TABS.findIndex((t) => t.key === tab));
@@ -198,6 +222,43 @@ export default function AdmTicketsPage() {
     }
   };
 
+  const closeDrawer = () => { setDrawer(null); setWaitFor(null); setWaitReason(''); };
+
+  useEffect(() => {
+    if (!drawer) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (waitFor) setWaitFor(null);
+      else closeDrawer();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [drawer, waitFor]);
+
+  /** Muda o pedido sem sair da lista; a ficha troca de grupo sozinha. */
+  const change = async (ticket: Ticket, payload: Record<string, unknown>, toast: string) => {
+    if (working) return;
+    setWorking(ticket.id);
+    try {
+      const { data } = await api.patch(`/tickets/${ticket.id}`, payload);
+      setActive((list) => list.map((t) => (t.id === ticket.id
+        ? {
+          ...t,
+          status: data?.status ?? (payload.status as string) ?? t.status,
+          assigned_to: 'assigned_to_id' in payload ? (payload.assigned_to_id as string | null) : t.assigned_to,
+          updated_at: new Date().toISOString(),
+        }
+        : t)));
+      closeDrawer();
+      showToast.success(toast);
+    } catch (err: any) {
+      showToast.error(err.response?.data?.message || err.response?.data?.error || 'Não foi possível mudar esse pedido. Tente de novo.');
+      void loadActive();
+    } finally {
+      setWorking(null);
+    }
+  };
+
   const current = TABS.find((t) => t.key === tab)!;
   const oldest = unclaimed.reduce<Ticket | null>((acc, t) => (!acc || t.created_at < acc.created_at ? t : acc), null);
   const urgentHere = rows.filter((t) => ADM_URGENT.has(t.priority)).length;
@@ -215,10 +276,11 @@ export default function AdmTicketsPage() {
     const waiting = !['open', 'in_progress'].includes(t.status);
     const excerpt = (t.description ?? '').replace(/\s+/g, ' ').trim();
     const showExcerpt = excerpt && normalize(excerpt) !== normalize(t.title);
+    const drawerOpen = tab === 'comigo' && drawer === t.id;
     return (
       <li
         key={t.id}
-        className={`axp-slip adm-tone--${meta.tone}${leaving === t.id ? ' is-leaving' : ''}${shaking === t.id ? ' is-shaking' : ''}`}
+        className={`axp-slip adm-tone--${meta.tone}${leaving === t.id ? ' is-leaving' : ''}${shaking === t.id ? ' is-shaking' : ''}${drawerOpen ? ' is-open' : ''}`}
         style={{ '--i': Math.min(i, 10) } as CSSProperties}
       >
         <div className="axp-slip__stub" aria-hidden="true">
@@ -265,9 +327,34 @@ export default function AdmTicketsPage() {
                   {stale ? `parado ${admAge(t.updated_at)}` : `mexido ${admAge(t.updated_at)}`}
                 </span>
               </span>
-              <button type="button" className="axp-open" onClick={() => navigate(`/admin/chamados/${t.id}`)} aria-label={`Abrir o pedido: ${t.title}`}>
-                Abrir <i className="ti ti-arrow-right" aria-hidden="true" />
-              </button>
+              <span className="axp-acts">
+                {NEXT_STEP[t.status] ? (
+                  <button
+                    type="button"
+                    className={`axp-step axp-step--${NEXT_STEP[t.status].status === 'resolved' ? 'done' : 'go'}`}
+                    onClick={() => void change(t, { status: NEXT_STEP[t.status].status }, NEXT_STEP[t.status].toast)}
+                    disabled={working !== null}
+                  >
+                    <i className={`ti ${working === t.id ? 'ti-loader-2 axp-spin' : NEXT_STEP[t.status].icon}`} aria-hidden="true" />
+                    {NEXT_STEP[t.status].label}
+                  </button>
+                ) : (
+                  <button type="button" className="axp-open" onClick={() => navigate(`/admin/chamados/${t.id}`)} aria-label={`Abrir o pedido: ${t.title}`}>
+                    Abrir <i className="ti ti-arrow-right" aria-hidden="true" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="axp-more"
+                  aria-expanded={drawerOpen}
+                  aria-controls={`axp-drawer-${t.id}`}
+                  aria-label={drawerOpen ? 'Fechar opções' : `Mais opções para: ${t.title}`}
+                  onClick={() => (drawerOpen ? closeDrawer() : (closeDrawer(), setDrawer(t.id)))}
+                >
+                  <i className={`ti ${drawerOpen ? 'ti-x' : 'ti-dots'}`} aria-hidden="true" />
+                  <span>{drawerOpen ? 'Fechar' : 'Mais'}</span>
+                </button>
+              </span>
             </>
           )}
           {tab === 'encerrados' && (
@@ -282,6 +369,99 @@ export default function AdmTicketsPage() {
             </>
           )}
         </div>
+
+        {/* Gaveta da ficha: as outras mudanças possíveis, sem sair da lista. */}
+        {drawerOpen && (
+          <div className="axp-drawer" id={`axp-drawer-${t.id}`}>
+            {!waitFor ? (
+              <>
+                <span className="axp-drawer__title">Mudar este pedido</span>
+                <div className="axp-drawer__acts">
+                  {t.status !== 'waiting_user' && t.status !== 'aguardando_confirmacao' && (
+                    <button
+                      type="button"
+                      className="axp-chip"
+                      disabled={working !== null}
+                      onClick={() => void change(t, { status: 'waiting_user' }, 'Esperando quem pediu responder.')}
+                    >
+                      <i className="ti ti-message-question" aria-hidden="true" />Esperar quem pediu
+                    </button>
+                  )}
+                  {t.status !== 'aguardando_aquisicao' && t.status !== 'aguardando_confirmacao' && (
+                    <button type="button" className="axp-chip" disabled={working !== null} onClick={() => setWaitFor('aguardando_aquisicao')}>
+                      <i className="ti ti-shopping-cart" aria-hidden="true" />Esperar compra
+                    </button>
+                  )}
+                  {t.status !== 'aguardando_terceiros' && t.status !== 'aguardando_confirmacao' && (
+                    <button type="button" className="axp-chip" disabled={working !== null} onClick={() => setWaitFor('aguardando_terceiros')}>
+                      <i className="ti ti-tool" aria-hidden="true" />Esperar serviço externo
+                    </button>
+                  )}
+                  {t.status !== 'in_progress' && t.status !== 'open' && t.status !== 'aguardando_confirmacao' && (
+                    <button
+                      type="button"
+                      className="axp-chip"
+                      disabled={working !== null}
+                      onClick={() => void change(t, { status: 'resolved' }, NEXT_STEP.in_progress.toast)}
+                    >
+                      <i className="ti ti-check" aria-hidden="true" />Concluir
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="axp-chip"
+                    disabled={working !== null}
+                    onClick={() => void change(t, { status: 'open', assigned_to_id: null }, 'Pedido devolvido ao quadro.')}
+                  >
+                    <i className="ti ti-arrow-back-up" aria-hidden="true" />Devolver ao quadro
+                  </button>
+                  <button type="button" className="axp-chip axp-chip--plain" onClick={() => navigate(`/admin/chamados/${t.id}`)}>
+                    Abrir o pedido<i className="ti ti-arrow-right" aria-hidden="true" />
+                  </button>
+                </div>
+              </>
+            ) : (
+              <form
+                className={`axp-wait axp-wait--${waitFor === 'aguardando_aquisicao' ? 'buy' : 'out'}`}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void change(
+                    t,
+                    { status: waitFor, pause_reason: waitReason.trim() },
+                    waitFor === 'aguardando_aquisicao'
+                      ? 'Pedido esperando compra. O prazo fica pausado.'
+                      : 'Pedido esperando serviço externo. O prazo fica pausado.',
+                  );
+                }}
+              >
+                <label htmlFor={`axp-wait-${t.id}`}>
+                  <i className={`ti ${waitFor === 'aguardando_aquisicao' ? 'ti-shopping-cart' : 'ti-tool'}`} aria-hidden="true" />
+                  {WAIT_COPY[waitFor].question}
+                </label>
+                <div className="axp-wait__row">
+                  <input
+                    id={`axp-wait-${t.id}`}
+                    type="text"
+                    autoFocus
+                    autoComplete="off"
+                    maxLength={280}
+                    value={waitReason}
+                    onChange={(e) => setWaitReason(e.target.value)}
+                    placeholder={WAIT_COPY[waitFor].placeholder}
+                  />
+                  <button type="submit" className="axp-step axp-step--go" disabled={working !== null}>
+                    <i className={`ti ${working === t.id ? 'ti-loader-2 axp-spin' : 'ti-player-pause'}`} aria-hidden="true" />
+                    Colocar em espera
+                  </button>
+                </div>
+                <p className="axp-wait__hint">
+                  O prazo fica pausado até você retomar.
+                  <button type="button" onClick={() => { setWaitFor(null); setWaitReason(''); }}>Voltar</button>
+                </p>
+              </form>
+            )}
+          </div>
+        )}
       </li>
     );
   };

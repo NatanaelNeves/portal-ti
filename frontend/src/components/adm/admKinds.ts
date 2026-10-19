@@ -37,7 +37,7 @@ export const ADM_URGENT = new Set(['urgent', 'critical', 'high']);
 export const ADM_STATUS_LABEL: Record<string, string> = {
   open: 'Para começar',
   in_progress: 'Em andamento',
-  waiting_user: 'Esperando alguém',
+  waiting_user: 'Esperando quem pediu',
   aguardando_confirmacao: 'Esperando confirmação',
   aguardando_aquisicao: 'Esperando compra',
   aguardando_terceiros: 'Esperando serviço externo',

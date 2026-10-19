@@ -825,3 +825,282 @@
     transition: none;
   }
 }
+
+/* ── Ações da ficha em "Comigo" ────────────────────────────────────
+   Um botão com o próximo passo natural (Começar, Concluir, Retomar) e
+   "Mais", que abre uma gaveta embaixo da própria ficha com o resto das
+   mudanças. Gaveta e não menu flutuante: a ficha corta o que transborda
+   e, no toque, um menu pequeno é difícil de acertar. */
+.axp-acts {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.axp-step {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  font: 800 0.88rem/1 var(--pub-body);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease, filter 0.15s ease;
+}
+
+.axp-step i {
+  font-size: 1.05rem;
+}
+
+.axp-step--go {
+  color: #fff;
+  background: var(--adm-board);
+}
+
+.axp-step--go:hover:not(:disabled) {
+  background: #0f7a4a;
+}
+
+.axp-step--done {
+  color: var(--adm-mint-ink);
+  background: var(--adm-mint);
+  box-shadow: 0 8px 18px -10px rgba(31, 157, 92, 0.8);
+}
+
+.axp-step--done:hover:not(:disabled) {
+  filter: brightness(0.95);
+}
+
+.axp-step:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.axp-more {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  color: var(--adm-board);
+  background: #fff;
+  border: 1.5px solid var(--ti-line, #dfe6e1);
+  border-radius: 999px;
+  font: 800 0.86rem/1 var(--pub-body);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.axp-more:hover,
+.axp-more[aria-expanded='true'] {
+  background: #f3f8f5;
+  border-color: var(--adm-board);
+}
+
+.axp-more i {
+  font-size: 1.1rem;
+}
+
+.axp-spin {
+  animation: axp-spin 0.8s linear infinite;
+}
+
+@keyframes axp-spin {
+  to { transform: rotate(360deg); }
+}
+
+.axp-slip.is-open {
+  box-shadow: 0 0 0 1.5px var(--ac), 0 18px 32px -24px rgba(6, 60, 45, 0.8);
+}
+
+/* A gaveta ocupa a largura toda, separada pelo mesmo picote do toco. */
+.axp-drawer {
+  grid-column: 1 / -1;
+  padding: 14px 18px 16px;
+  background: color-mix(in srgb, var(--bg) 35%, #fff);
+  border-top: 2px dashed color-mix(in srgb, var(--ac) 45%, transparent);
+  animation: axp-drawer-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes axp-drawer-in {
+  from { opacity: 0; transform: translateY(-6px); }
+}
+
+.axp-drawer__title {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.axp-drawer__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.axp-chip {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 14px;
+  color: var(--adm-board);
+  background: #fff;
+  border: 1.5px solid var(--ti-line, #dfe6e1);
+  border-radius: 999px;
+  font: 700 0.86rem/1 var(--pub-body);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.axp-chip i {
+  font-size: 1.05rem;
+}
+
+.axp-chip:hover:not(:disabled) {
+  border-color: var(--adm-board);
+}
+
+.axp-chip:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.axp-chip--plain {
+  margin-left: auto;
+  background: transparent;
+  border-color: transparent;
+}
+
+.axp-chip--plain:hover:not(:disabled) {
+  background: #fff;
+}
+
+/* Espera: roxo para compra, azul-ardósia para serviço externo, os mesmos
+   tons que esses estados têm no resto do sistema. */
+.axp-wait {
+  --wait: #6b4f9e;
+  --wait-wash: #f1ecfa;
+}
+
+.axp-wait--out {
+  --wait: #3f5c6b;
+  --wait-wash: #eaf1f4;
+}
+
+.axp-wait label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--wait);
+  font: 800 0.95rem/1.2 var(--pub-display);
+}
+
+.axp-wait label i {
+  font-size: 1.15rem;
+}
+
+.axp-wait__row {
+  display: flex;
+  gap: 8px;
+}
+
+.axp-wait input {
+  flex: 1;
+  min-width: 0;
+  min-height: 42px;
+  padding: 0 14px;
+  color: var(--pub-ink, #13241d);
+  background: #fff;
+  border: 1.5px solid var(--ti-line, #dfe6e1);
+  border-radius: 12px;
+  font: 500 0.95rem/1 var(--pub-body);
+}
+
+.axp-wait input:focus {
+  outline: none;
+  border-color: var(--wait);
+  box-shadow: 0 0 0 3px var(--wait-wash);
+}
+
+.axp-wait .axp-step--go {
+  background: var(--wait);
+}
+
+.axp-wait .axp-step--go:hover:not(:disabled) {
+  background: var(--wait);
+  filter: brightness(0.9);
+}
+
+.axp-wait__hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin: 8px 0 0;
+  color: var(--ti-muted, #5d6f67);
+  font-size: 0.82rem;
+}
+
+.axp-wait__hint button {
+  padding: 4px 0;
+  color: var(--adm-board);
+  background: none;
+  border: 0;
+  font: 800 0.82rem/1 var(--pub-body);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+@media (max-width: 760px) {
+  .axp-slip__side {
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+
+  .axp-acts {
+    flex: 1 1 100%;
+  }
+
+  .axp-acts .axp-step,
+  .axp-acts .axp-open {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .axp-drawer {
+    padding: 12px 14px 14px;
+  }
+
+  .axp-chip {
+    flex: 1 1 calc(50% - 4px);
+    justify-content: center;
+  }
+
+  .axp-chip--plain {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+
+  .axp-wait__row {
+    flex-direction: column;
+  }
+
+  .axp-wait__row .axp-step {
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .axp-drawer,
+  .axp-spin {
+    animation: none;
+  }
+}
