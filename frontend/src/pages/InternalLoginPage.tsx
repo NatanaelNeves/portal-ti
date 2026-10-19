@@ -37,7 +37,7 @@ export default function InternalLoginPage() {
       // Store token interno e refresh token
       localStorage.setItem('internal_token', token);
       localStorage.setItem('internal_user', JSON.stringify(user));
-      
+
       if (refreshToken) {
         localStorage.setItem('refreshToken', refreshToken);
       }
@@ -62,37 +62,49 @@ export default function InternalLoginPage() {
   return (
     <div className="pub-page ilogin pub-aurora">
       <section className="ilogin__brand">
-        <a href="/" className="pub-brand ilogin__home">
-          <span className="pub-brand__mark" aria-hidden="true" />
-          <span className="pub-brand__copy">
-            <strong>Portal de Serviços</strong>
-            <small>O Pequeno Nazareno</small>
-          </span>
-        </a>
-        <div className="ilogin__intro">
-          <h1>Área da equipe</h1>
-          <p>Onde a TI, o RH e o Administrativo atendem os pedidos da instituição.</p>
-          <ul className="ilogin__features">
-            <li>
-              <span className="pub-gicon"><i className="ti ti-ticket" aria-hidden="true" /></span>
-              <span><strong>Fila de chamados</strong>Priorize, atenda e responda</span>
-            </li>
-            <li>
-              <span className="pub-gicon pub-gicon--administrativo"><i className="ti ti-packages" aria-hidden="true" /></span>
-              <span><strong>Inventário</strong>Equipamentos e termos de responsabilidade</span>
-            </li>
-            <li>
-              <span className="pub-gicon pub-gicon--rh"><i className="ti ti-chart-bar" aria-hidden="true" /></span>
-              <span><strong>Relatórios</strong>Volume, prazos e qualidade do atendimento</span>
-            </li>
-          </ul>
+        <div className="ilogin__top">
+          <a href="/" className="pub-brand ilogin__home">
+            <span className="pub-brand__mark" aria-hidden="true" />
+            <span className="pub-brand__copy">
+              <strong>Portal de Serviços</strong>
+              <small>O Pequeno Nazareno</small>
+            </span>
+          </a>
+          <a href="/" className="ilogin__exit">
+            <i className="ti ti-arrow-left" aria-hidden="true" />
+            Voltar ao portal
+          </a>
         </div>
+
+        <div className="ilogin__intro">
+          <h1>Acesso só para as equipes</h1>
+          <p>Esta entrada é de quem atende os pedidos: TI, RH, Administrativo e coordenação.</p>
+        </div>
+
+        {/* Quem chega aqui por engano quase sempre queria pedir ajuda: o
+            caminho certo vem antes do formulário, e sem login. */}
+        <aside className="ilogin__visitor" aria-labelledby="ilogin-visitor-title">
+          <h2 id="ilogin-visitor-title">Veio pedir ajuda? Você não precisa entrar.</h2>
+          <p>Para abrir ou acompanhar um chamado, basta o seu e-mail. Não existe senha para isso.</p>
+          <div className="ilogin__visitor-actions">
+            <a href="/abrir-chamado" className="pub-btn ilogin__visitor-main">
+              <i className="ti ti-message-plus" aria-hidden="true" />
+              Abrir um chamado
+            </a>
+            <a href="/meus-chamados" className="pub-btn ilogin__visitor-alt">
+              Acompanhar meus chamados
+            </a>
+          </div>
+        </aside>
       </section>
 
       <section className="ilogin__form-wrap">
         <form onSubmit={handleSubmit} className="ilogin__form">
-          <h2>Entrar</h2>
-          <p className="ilogin__form-lead">Use o e-mail e a senha da sua conta da equipe.</p>
+          <h2>
+            <i className="ti ti-lock" aria-hidden="true" />
+            Entrar como equipe
+          </h2>
+          <p className="ilogin__form-lead">Use o e-mail e a senha da conta que a TI criou para você atender os chamados.</p>
 
           {error && (
             <div className="pub-alert" role="alert">
@@ -102,7 +114,7 @@ export default function InternalLoginPage() {
           )}
 
           <div className="pub-field">
-            <label htmlFor="email">E-mail</label>
+            <label htmlFor="email">E-mail da equipe</label>
             <input
               id="email"
               type="email"
@@ -112,7 +124,7 @@ export default function InternalLoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              placeholder="nome@exemplo.com"
+              placeholder="nome@opequenonazareno.org.br"
             />
           </div>
 
@@ -143,10 +155,7 @@ export default function InternalLoginPage() {
             {loading ? 'Entrando…' : 'Entrar'}
           </button>
 
-          <a href="/" className="ilogin__back">
-            <i className="ti ti-arrow-left" aria-hidden="true" />
-            Voltar ao portal
-          </a>
+          <p className="ilogin__help">Esqueceu a senha ou ainda não tem conta? Fale com a TI.</p>
         </form>
       </section>
     </div>

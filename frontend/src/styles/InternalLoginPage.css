@@ -1,5 +1,10 @@
 /* Login da equipe — página inteira sobre a aurora, sem o cabeçalho público.
-   Tokens e primitivas em PublicShell.css. */
+   Tokens e primitivas em PublicShell.css.
+
+   Muita gente chega aqui por engano, achando que precisa entrar para abrir
+   um chamado. Por isso a página diz logo de cara que o login é só das
+   equipes, mostra a saída no topo e põe o caminho certo (sem senha) antes
+   do formulário. */
 
 .ilogin {
   min-height: 100vh;
@@ -13,8 +18,40 @@
   padding: 20px var(--pub-gutter) 40px;
 }
 
+.ilogin__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+
 .ilogin__home {
   min-height: 44px;
+}
+
+/* A página não tem o cabeçalho do portal: a saída precisa estar à vista. */
+.ilogin__exit {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  font-size: 0.93rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.ilogin__exit:hover {
+  background: rgba(255, 255, 255, 0.17);
+}
+
+.ilogin__exit i {
+  font-size: 1.1rem;
 }
 
 .ilogin__intro {
@@ -22,20 +59,70 @@
 }
 
 .ilogin__intro h1 {
+  max-width: 12ch;
   margin: 0;
-  font: 800 clamp(2.5rem, 11vw, 4.4rem)/0.98 var(--pub-display);
+  font: 800 clamp(2.3rem, 10vw, 4.2rem)/0.98 var(--pub-display);
   letter-spacing: -0.04em;
 }
 
 .ilogin__intro > p {
-  max-width: 34ch;
+  max-width: 38ch;
   margin: 14px 0 0;
-  color: rgba(232, 246, 238, 0.82);
+  color: rgba(232, 246, 238, 0.86);
   font-size: 1.05rem;
 }
 
-.ilogin__features {
-  display: none;
+/* ── Para quem caiu aqui querendo pedir ajuda ──────────────────── */
+.ilogin__visitor {
+  margin-top: 26px;
+  padding: 20px 18px;
+  color: var(--pub-evergreen);
+  background: linear-gradient(160deg, #ffe08f 0%, var(--pub-sun) 100%);
+  border-radius: 20px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset, 0 22px 44px -22px rgba(246, 195, 80, 0.7);
+}
+
+.ilogin__visitor h2 {
+  margin: 0;
+  font: 800 clamp(1.25rem, 5vw, 1.45rem)/1.2 var(--pub-display);
+  letter-spacing: -0.02em;
+}
+
+.ilogin__visitor p {
+  margin: 8px 0 0;
+  color: rgba(6, 60, 45, 0.86);
+  font-size: 0.98rem;
+}
+
+.ilogin__visitor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.ilogin__visitor-main {
+  color: #fff;
+  background: var(--pub-evergreen);
+  box-shadow: 0 10px 22px -12px rgba(6, 60, 45, 0.9);
+}
+
+.pub-page .ilogin__visitor-main:hover {
+  background: var(--pub-evergreen-2);
+}
+
+.ilogin__visitor-alt {
+  color: var(--pub-evergreen);
+  background: rgba(255, 255, 255, 0.4);
+  border-color: rgba(6, 60, 45, 0.25);
+}
+
+.pub-page .ilogin__visitor-alt:hover {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.ilogin__visitor :focus-visible {
+  outline-color: var(--pub-evergreen);
 }
 
 /* ── Cartão de login ───────────────────────────────────────────── */
@@ -56,9 +143,17 @@
 }
 
 .ilogin__form h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin: 0;
   font: 800 1.6rem/1.15 var(--pub-display);
   letter-spacing: -0.02em;
+}
+
+.ilogin__form h2 i {
+  color: var(--pub-leaf);
+  font-size: 1.35rem;
 }
 
 .ilogin__form-lead {
@@ -74,6 +169,12 @@
 .ilogin__form > .pub-btn {
   margin-top: 26px;
   min-height: 56px;
+}
+
+.ilogin__help {
+  margin: 16px 0 0;
+  color: var(--pub-muted);
+  font-size: 0.9rem;
 }
 
 .pub-field .ilogin__password input {
@@ -105,17 +206,6 @@
   transform: translateY(-50%);
 }
 
-.ilogin__back {
-  min-height: 48px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 14px;
-  color: var(--pub-leaf);
-  font-weight: 700;
-  text-decoration: none;
-}
-
 @media (min-width: 900px) {
   .ilogin {
     display: grid;
@@ -132,42 +222,20 @@
     padding: 32px 0 56px;
   }
 
+  .ilogin__top {
+    justify-content: flex-start;
+    gap: 20px;
+  }
+
   .ilogin__intro {
     margin-top: auto;
+  }
+
+  .ilogin__visitor {
+    max-width: 460px;
+    margin-top: 32px;
     margin-bottom: auto;
-  }
-
-  .ilogin__features {
-    display: grid;
-    gap: 10px;
-    max-width: 420px;
-    margin: 36px 0 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .ilogin__features li {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 12px 14px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 16px;
-    -webkit-backdrop-filter: blur(8px);
-    backdrop-filter: blur(8px);
-  }
-
-  .ilogin__features li > span:last-child {
-    display: grid;
-    gap: 2px;
-    color: rgba(226, 244, 233, 0.75);
-    font-size: 0.88rem;
-  }
-
-  .ilogin__features strong {
-    color: #fff;
-    font-size: 1rem;
+    padding: 24px;
   }
 
   .ilogin__form-wrap {
