@@ -15,6 +15,7 @@ interface AuxAdminReport {
     inProgress: number;
     pending: number;
     waiting: number;
+    closedByRequester?: number;
     highPriorityOpen: number;
     resolutionRate: number | null;
     avgResolutionMinutes: number | null;
@@ -283,7 +284,10 @@ export default function AuxAdminReportsPage() {
               <div>
                 <dt>Pedidos que chegaram</dt>
                 <dd><CountUp value={s.total} /></dd>
-                <small>{s.resolved} resolvidos</small>
+                <small>
+                  {s.resolved} resolvidos
+                  {(s.closedByRequester ?? 0) > 0 && `, ${s.closedByRequester} encerrados por quem pediu`}
+                </small>
               </div>
               <div>
                 <dt>Já resolvidos</dt>

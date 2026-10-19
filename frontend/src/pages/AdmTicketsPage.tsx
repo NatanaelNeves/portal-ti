@@ -129,7 +129,7 @@ export default function AdmTicketsPage() {
   // Os encerrados só carregam quando alguém abre a aba.
   useEffect(() => {
     if (tab !== 'encerrados' || closed !== null) return;
-    fetchList(['resolved', 'closed'])
+    fetchList(['resolved', 'closed', 'cancelled'])
       .then((rows) => setClosed(rows.filter((t) => t.assigned_to === me?.id)))
       .catch(() => setClosed([]));
   }, [tab, closed, fetchList, me]);

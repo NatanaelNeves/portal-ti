@@ -107,6 +107,8 @@ class WebSocketClient {
         showToast.info('Chamado encerrado automaticamente por prazo');
       } else if (action === 'manual_closed') {
         showToast.success('Chamado encerrado manualmente');
+      } else if (action === 'closed_by_requester') {
+        showToast.info('O solicitante encerrou um chamado: não precisa mais de atendimento');
       } else {
         showToast.info('Um chamado foi atualizado');
       }

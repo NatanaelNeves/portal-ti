@@ -417,6 +417,7 @@ export class EmailService {
       aguardando_terceiros: 'Aguardando Terceiros',
       resolved: 'Resolvido',
       closed: 'Fechado',
+      cancelled: 'Encerrado pelo solicitante',
     };
 
     // Um status sem rotulo no mapa virava 'undefined' no assunto e no corpo do

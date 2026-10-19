@@ -362,6 +362,7 @@ reportsRouter.get('/auxadmin', async (req: Request, res: Response) => {
            COUNT(*) FILTER (WHERE t.status = 'in_progress')::int AS in_progress,
            COUNT(*) FILTER (WHERE t.status = 'open')::int AS pending,
            COUNT(*) FILTER (WHERE t.status IN ('waiting_user', 'aguardando_confirmacao', 'aguardando_aquisicao', 'aguardando_terceiros'))::int AS waiting,
+           COUNT(*) FILTER (WHERE t.status = 'cancelled')::int AS closed_by_requester,
            COUNT(*) FILTER (WHERE t.priority IN ('urgent', 'critical', 'high') AND t.status IN ${ACTIVE})::int AS high_priority_open,
            AVG(EXTRACT(EPOCH FROM (t.resolved_at - t.created_at)) / 60)
              FILTER (WHERE t.resolved_at IS NOT NULL) AS avg_resolution_minutes,
@@ -466,6 +467,10 @@ reportsRouter.get('/auxadmin', async (req: Request, res: Response) => {
 
     const total = s.total ?? 0;
     const resolved = s.resolved ?? 0;
+    // Pedido que a própria pessoa encerrou não passou pela equipe: fica fora
+    // da taxa de resolução, senão cada "já resolvi" derrubaria o percentual.
+    const closedByRequester = s.closed_by_requester ?? 0;
+    const handledTotal = total - closedByRequester;
     const days = s.days_with_resolution ?? 0;
     const businessDays = businessDaysRow.rows[0]?.business_days ?? 0;
 
@@ -483,7 +488,8 @@ reportsRouter.get('/auxadmin', async (req: Request, res: Response) => {
         pending: s.pending ?? 0,
         waiting: s.waiting ?? 0,
         highPriorityOpen: s.high_priority_open ?? 0,
-        resolutionRate: total > 0 ? Math.round((resolved / total) * 100) : null,
+        closedByRequester,
+        resolutionRate: handledTotal > 0 ? Math.round((resolved / handledTotal) * 100) : null,
         // Operacional: desempenho da equipe, ja sem os periodos pausados.
         avgResolutionMinutes: toMin(s.avg_resolution_minutes),
         avgFirstResponseMinutes: toMin(s.avg_first_response_minutes),
@@ -755,6 +761,7 @@ reportsRouter.get('/stats/overview', async (req: Request, res: Response) => {
            COALESCE(department, 'ti') as team,
            COUNT(*) as total_tickets,
            COUNT(*) FILTER (WHERE status IN ('resolved', 'closed')) as resolved_tickets,
+           COUNT(*) FILTER (WHERE status = 'cancelled') as closed_by_requester,
            COUNT(*) FILTER (WHERE status IN ('open', 'in_progress', 'waiting_user', 'aguardando_confirmacao', 'aguardando_aquisicao', 'aguardando_terceiros')) as pending_tickets,
            COALESCE(
              AVG(EXTRACT(EPOCH FROM (COALESCE(resolved_at, updated_at) - created_at)) / 3600)
@@ -796,7 +803,7 @@ reportsRouter.get('/stats/overview', async (req: Request, res: Response) => {
         `${filtered.sql}
          SELECT
            COUNT(CASE WHEN status IN ('resolved', 'closed') THEN 1 END) as resolved,
-           COUNT(*) as total
+           COUNT(*) FILTER (WHERE status <> 'cancelled') as total
          FROM filtered_tickets`,
         filtered.params,
       ),
@@ -819,6 +826,8 @@ reportsRouter.get('/stats/overview', async (req: Request, res: Response) => {
       teamBreakdown: teamBreakdown.rows.map((row: any) => {
         const teamTotal = toInt(row.total_tickets);
         const teamResolved = toInt(row.resolved_tickets);
+        // Encerrados pelo solicitante não passaram pela equipe: fora da taxa.
+        const teamHandled = teamTotal - toInt(row.closed_by_requester);
         return {
           key: row.team,
           label: formatTeamLabel(row.team),
@@ -826,7 +835,7 @@ reportsRouter.get('/stats/overview', async (req: Request, res: Response) => {
           resolved: teamResolved,
           pending: toInt(row.pending_tickets),
           avgResolutionHours: toFloat(row.avg_resolution_hours).toFixed(1),
-          resolutionRate: teamTotal > 0 ? parseFloat(((teamResolved / teamTotal) * 100).toFixed(1)) : 0,
+          resolutionRate: teamHandled > 0 ? parseFloat(((teamResolved / teamHandled) * 100).toFixed(1)) : 0,
         };
       }),
       avgFirstResponseHours: toFloat(avgFirstResponse.rows[0]?.avg_hours).toFixed(1),

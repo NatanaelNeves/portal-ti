@@ -739,6 +739,19 @@ export async function initializeDatabase(): Promise<void> {
           ALTER TABLE tickets ADD COLUMN auto_close_warning_sent_at TIMESTAMP;
         END IF;
 
+        -- Encerramento pelo próprio solicitante ("já resolvi" / "não preciso
+        -- mais"). O chamado vai para 'cancelled' e o motivo fica aqui, para
+        -- os relatórios separarem o que a equipe resolveu do que não precisou.
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name='tickets' AND column_name='requester_closure') THEN
+          ALTER TABLE tickets ADD COLUMN requester_closure VARCHAR(30);
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name='tickets' AND column_name='requester_closure_note') THEN
+          ALTER TABLE tickets ADD COLUMN requester_closure_note TEXT;
+        END IF;
+
         IF NOT EXISTS (
           SELECT 1 FROM pg_constraint
           WHERE conname = 'tickets_rating_range_check'

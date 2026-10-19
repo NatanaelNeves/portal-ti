@@ -43,6 +43,7 @@ export const ADM_STATUS_LABEL: Record<string, string> = {
   aguardando_terceiros: 'Esperando serviço externo',
   resolved: 'Resolvido',
   closed: 'Encerrado',
+  cancelled: 'Encerrado por quem pediu',
 };
 
 export function admAge(iso: string) {

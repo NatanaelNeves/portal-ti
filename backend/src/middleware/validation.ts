@@ -134,6 +134,11 @@ export const confirmResolutionSchema = z.object({
   }
 });
 
+export const closeByRequesterSchema = z.object({
+  reason: z.enum(['self_resolved', 'not_needed']),
+  note: z.string().trim().max(500, 'Comentário deve ter no máximo 500 caracteres').optional(),
+});
+
 export const ticketRatingSchema = z.object({
   rating: z.number().int().min(1).max(5),
   feedback: z.string().max(2000, 'Comentário deve ter no máximo 2000 caracteres').optional(),

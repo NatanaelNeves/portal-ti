@@ -44,6 +44,8 @@ interface TicketDetail {
   assigned_to?: string;
   linked_equipment_id?: string | null;
   pause_reason?: string | null;
+  requester_closure?: 'self_resolved' | 'not_needed' | null;
+  requester_closure_note?: string | null;
 }
 
 interface Equipment {
@@ -328,8 +330,10 @@ export default function AdminTicketDetailPage() {
   const status = statusPresentation(ticket.status);
   const paused = isSlaPaused(ticket.status);
   const finished = ['resolved', 'aguardando_confirmacao'].includes(ticket.status);
-  const closed = ticket.status === 'closed';
-  const team = TEAM[ticket.department || 'ti'] ?? TEAM.ti;
+  // 'cancelled' só acontece quando o próprio solicitante encerra.
+  const closedByRequester = ticket.status === 'cancelled';
+  const closed = ticket.status === 'closed' || closedByRequester;
+  const team =TEAM[ticket.department || 'ti'] ?? TEAM.ti;
   const requester = firstName(ticket.requester_name);
   const staffReplied = messages.some((m) => m.author_type === 'it_staff' && !m.is_internal);
   const externalWaits = canUseExternalWaitStatuses(role) && canPauseDepartment(ticket.department);
@@ -359,6 +363,19 @@ export default function AdminTicketDetailPage() {
 
   // O que fazer agora, conforme estado e responsável.
   const renderNext = () => {
+    if (closedByRequester) {
+      const why = ticket.requester_closure === 'not_needed'
+        ? `${requester} não precisa mais deste atendimento`
+        : `${requester} resolveu por conta própria`;
+      return {
+        tone: 'done',
+        title: 'Encerrado pelo solicitante',
+        text: ticket.requester_closure_note
+          ? `${why}: “${ticket.requester_closure_note}”`
+          : `${why}. Nenhuma ação pendente.`,
+        actions: null,
+      };
+    }
     if (closed) {
       return { tone: 'done', title: 'Chamado encerrado', text: 'Nenhuma ação pendente. O histórico continua disponível.', actions: null };
     }

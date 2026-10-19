@@ -221,8 +221,8 @@ export default function RhTicketDetailPage() {
     ? 'você'
     : ticket.assigned_to_name || users.find((u) => u.id === assignedId)?.name || 'outra pessoa da equipe';
   const requesterFirst = firstNameOf(ticket.requester_name) || 'a pessoa';
-  const finished = ['resolved', 'closed', 'aguardando_confirmacao'].includes(ticket.status);
-  const closed = ticket.status === 'closed';
+  const finished = ['resolved', 'closed', 'cancelled', 'aguardando_confirmacao'].includes(ticket.status);
+  const closed = ticket.status === 'closed' || ticket.status === 'cancelled';
   const staffReplied = messages.some((m) => m.author_type === 'it_staff' && !m.is_internal);
 
   // Trilha: assumir, responder, resolver.

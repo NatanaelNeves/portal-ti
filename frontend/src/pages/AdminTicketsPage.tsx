@@ -447,6 +447,8 @@ export default function AdminTicketsPage() {
         return 'Resolvido';
       case 'closed':
         return 'Fechado';
+      case 'cancelled':
+        return 'Encerrado pelo solicitante';
       default:
         return status;
     }
@@ -500,6 +502,7 @@ export default function AdminTicketsPage() {
       case 'resolved':
         return 'badge-status-success';
       case 'closed':
+      case 'cancelled':
         return 'badge-status-closed';
       default:
         return 'badge-status-open';
@@ -539,7 +542,7 @@ export default function AdminTicketsPage() {
   };
 
   const isTicketOverdue = (ticket: Ticket) => {
-    if (ticket.status === 'closed' || ticket.status === 'resolved') return false;
+    if (['closed', 'resolved', 'cancelled'].includes(ticket.status)) return false;
     // Espera externa congela o prazo: nao ha atraso atribuivel a equipe.
     if (isSlaPaused(ticket.status)) return false;
     return getSlaElapsedHours(ticket) > getSLAThresholdHours(ticket.priority);

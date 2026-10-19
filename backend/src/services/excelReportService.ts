@@ -309,7 +309,8 @@ export class ExcelReportService {
       aguardando_aquisicao: 'Aguardando Aquisição',
       aguardando_terceiros: 'Aguardando Terceiros',
       resolved: 'Resolvido',
-      closed: 'Fechado'
+      closed: 'Fechado',
+      cancelled: 'Encerrado pelo solicitante'
     };
     return translations[status] || status;
   }

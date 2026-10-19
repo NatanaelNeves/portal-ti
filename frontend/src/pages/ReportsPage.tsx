@@ -466,7 +466,8 @@ const ReportsPage: React.FC = () => {
       aguardando_aquisicao: 'Aguardando Aquisição',
       aguardando_terceiros: 'Aguardando Terceiros',
       resolved: 'Resolvido',
-      closed: 'Concluído'
+      closed: 'Concluído',
+      cancelled: 'Encerrado pelo solicitante'
     };
     return labels[status] || status;
   };

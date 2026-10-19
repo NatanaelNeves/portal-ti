@@ -43,7 +43,8 @@ export const TICKET_STATUS: Record<string, StatusPresentation> = {
   },
   resolved: { label: 'Resolvido', badgeClass: 'badge-status-success', icon: 'ti-circle-check' },
   closed: { label: 'Fechado', badgeClass: 'badge-status-closed', icon: 'ti-lock' },
-  cancelled: { label: 'Cancelado', badgeClass: 'badge-status-closed', icon: 'ti-ban' },
+  // Hoje só o próprio solicitante leva um chamado para este estado.
+  cancelled: { label: 'Encerrado pelo solicitante', badgeClass: 'badge-status-closed', icon: 'ti-hand-stop' },
 };
 
 /**

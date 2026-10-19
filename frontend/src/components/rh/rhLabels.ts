@@ -34,7 +34,7 @@ export const rhStatus = (status: string, assigned?: string | null): { label: str
     case 'aguardando_terceiros': return { label: 'Aguardando terceiros', tone: 'waiting' };
     case 'resolved': return { label: 'Resolvido', tone: 'done' };
     case 'closed': return { label: 'Encerrado', tone: 'closed' };
-    case 'cancelled': return { label: 'Cancelado', tone: 'closed' };
+    case 'cancelled': return { label: 'Encerrado pelo solicitante', tone: 'closed' };
     default: return { label: status, tone: 'closed' };
   }
 };

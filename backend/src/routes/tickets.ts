@@ -11,6 +11,7 @@ import {
   updateTicketSchema,
   addMessageSchema,
   confirmResolutionSchema,
+  closeByRequesterSchema,
   ticketRatingSchema,
 } from '../middleware/validation';
 import { pollingLimiter } from '../middleware/rateLimiter';
@@ -237,6 +238,48 @@ const notifyResponsibleTeamForReopenedTicket = async (ticket: any): Promise<void
     }
   } catch (error) {
     console.error('Error notifying team about reopened ticket:', error);
+  }
+};
+
+const REQUESTER_CLOSURE_LABEL: Record<string, string> = {
+  self_resolved: 'resolveu por conta própria',
+  not_needed: 'não precisa mais do atendimento',
+};
+
+/**
+ * Avisa por e-mail quem tinha assumido o chamado, para não seguir trabalhando
+ * nele. Sem responsável não há a quem avisar: o chamado só sai da fila, e a
+ * notificação em tempo real já cobre quem estiver olhando.
+ */
+const notifyAssigneeOfRequesterClosure = async (ticket: any): Promise<void> => {
+  if (!ticket.assigned_to_id) return;
+  try {
+    const assignee = await database.query(
+      'SELECT email FROM internal_users WHERE id = $1 AND is_active = true',
+      [ticket.assigned_to_id],
+    );
+    const email = assignee.rows[0]?.email;
+    if (!email) return;
+
+    const what = REQUESTER_CLOSURE_LABEL[ticket.requester_closure] || 'encerrou o chamado';
+    const note = ticket.requester_closure_note
+      ? `<p><strong>Comentário:</strong> ${String(ticket.requester_closure_note).replace(/</g, '&lt;')}</p>`
+      : '';
+
+    await EmailService.sendEmail({
+      to: email,
+      subject: `✋ Chamado encerrado pelo solicitante: ${ticket.title}`,
+      html: `
+        <p>O solicitante encerrou este chamado: ${what}. Não é preciso continuar o atendimento.</p>
+        <p><strong>Chamado:</strong> ${ticket.title}</p>
+        <p><strong>ID:</strong> #${String(ticket.id).substring(0, 8)}</p>
+        ${note}
+        <p><a href="${process.env.FRONTEND_URL || ''}/admin/chamados/${ticket.id}">Abrir chamado</a></p>
+      `,
+      text: `O solicitante encerrou o chamado (${what}). ID: ${ticket.id}. Título: ${ticket.title}`,
+    });
+  } catch (error) {
+    console.error('Error notifying assignee about requester closure:', error);
   }
 };
 
@@ -1684,6 +1727,178 @@ ticketsRouter.post('/:id/confirm-resolution', validate(confirmResolutionSchema),
   } catch (error) {
     console.error('Error confirming resolution:', error);
     return res.status(500).json({ error: 'Falha ao confirmar resolução' });
+  }
+});
+
+/**
+ * POST /:id/close-by-requester - O próprio solicitante encerra o chamado.
+ *
+ * Para quando a pessoa resolveu sozinha ou não precisa mais. O chamado vai
+ * para 'cancelled', não para 'resolved'/'closed': esses contam como
+ * atendimento feito pela equipe, e somar estes casos inflaria a taxa de
+ * resolução e o tempo médio nos relatórios.
+ */
+const REQUESTER_CLOSABLE_STATUSES = ACTIVE_STATUSES.filter((s) => s !== STATUS_AWAITING_CONFIRMATION);
+
+ticketsRouter.post('/:id/close-by-requester', validate(closeByRequesterSchema), async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { reason, note } = req.body as { reason: 'self_resolved' | 'not_needed'; note?: string };
+  const userToken = req.headers['x-user-token'] as string;
+
+  if (!userToken) {
+    return res.status(401).json({ error: 'Token do usuário é obrigatório' });
+  }
+
+  const client = await database.getClient();
+  try {
+    const publicUser = await client.query('SELECT id FROM public_users WHERE user_token = $1', [userToken]);
+    if (!publicUser.rows.length) {
+      return res.status(401).json({ error: 'Token inválido' });
+    }
+    const requesterId = publicUser.rows[0].id;
+
+    await client.query('BEGIN');
+    const current = await client.query('SELECT * FROM tickets WHERE id = $1 FOR UPDATE', [id]);
+    if (!current.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Chamado não encontrado' });
+    }
+
+    const ticket = current.rows[0];
+    if (ticket.requester_id !== requesterId) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+    if (!REQUESTER_CLOSABLE_STATUSES.includes(ticket.status)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        error: ticket.status === STATUS_AWAITING_CONFIRMATION
+          ? 'Este chamado aguarda sua confirmação. Use "Sim, foi resolvido".'
+          : 'Este chamado já foi encerrado.',
+      });
+    }
+
+    const cleanNote = note && note.trim() ? note.trim() : null;
+    const updated = await client.query(
+      `UPDATE tickets
+          SET status = 'cancelled',
+              requester_closure = $2,
+              requester_closure_note = $3,
+              auto_closed = false,
+              closed_at = NOW(),
+              updated_at = NOW()
+        WHERE id = $1
+        RETURNING *, assigned_to_id as assigned_to`,
+      [id, reason, cleanNote],
+    );
+
+    // Se estava em espera externa, a pausa de SLA precisa fechar junto.
+    await reconcileSlaPause(id, 'cancelled', null, null, client);
+
+    await client.query(
+      `INSERT INTO ticket_history (
+        ticket_id, action, changed_by_type, changed_by_id, old_value, new_value, metadata
+      ) VALUES ($1, 'closed_by_requester', 'public', $2, $3, 'cancelled', $4::jsonb)`,
+      [id, requesterId, ticket.status, JSON.stringify({ reason, note: cleanNote })],
+    );
+
+    await client.query('COMMIT');
+
+    const row = updated.rows[0];
+    void notifyAssigneeOfRequesterClosure(row);
+    emitTicketUpdatedEvent({
+      ticketId: id,
+      title: ticket.title,
+      action: 'closed_by_requester',
+      oldStatus: ticket.status,
+      status: 'cancelled',
+      requester_closure: reason,
+    });
+
+    return res.json({ message: 'Chamado encerrado', ticket: row });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    console.error('Error closing ticket by requester:', error);
+    return res.status(500).json({ error: 'Não foi possível encerrar o chamado' });
+  } finally {
+    client.release();
+  }
+});
+
+/**
+ * POST /:id/reopen-by-requester - Desfaz o encerramento feito pelo solicitante.
+ *
+ * Cobre o clique sem querer e o "achei que tinha resolvido". Só vale para
+ * chamados que a própria pessoa encerrou, e por 7 dias: depois disso o
+ * problema provavelmente é outro e merece um chamado novo.
+ */
+const REQUESTER_REOPEN_WINDOW_DAYS = 7;
+
+ticketsRouter.post('/:id/reopen-by-requester', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userToken = req.headers['x-user-token'] as string;
+    if (!userToken) {
+      return res.status(401).json({ error: 'Token do usuário é obrigatório' });
+    }
+
+    const publicUser = await database.query('SELECT id FROM public_users WHERE user_token = $1', [userToken]);
+    if (!publicUser.rows.length) {
+      return res.status(401).json({ error: 'Token inválido' });
+    }
+
+    const current = await database.query('SELECT * FROM tickets WHERE id = $1', [id]);
+    if (!current.rows.length) {
+      return res.status(404).json({ error: 'Chamado não encontrado' });
+    }
+    const ticket = current.rows[0];
+    if (ticket.requester_id !== publicUser.rows[0].id) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+    if (ticket.status !== 'cancelled' || !ticket.requester_closure) {
+      return res.status(400).json({ error: 'Só é possível reabrir um chamado que você mesmo encerrou.' });
+    }
+
+    const closedAt = ticket.closed_at ? new Date(ticket.closed_at).getTime() : 0;
+    if (Date.now() - closedAt > REQUESTER_REOPEN_WINDOW_DAYS * 86400000) {
+      return res.status(400).json({ error: 'Este chamado foi encerrado há mais de 7 dias. Abra um novo chamado.' });
+    }
+
+    const reopened = await database.query(
+      `UPDATE tickets
+          SET status = 'open',
+              requester_closure = NULL,
+              requester_closure_note = NULL,
+              closed_at = NULL,
+              updated_at = NOW()
+        WHERE id = $1 AND status = 'cancelled'
+        RETURNING *, assigned_to_id as assigned_to`,
+      [id],
+    );
+    if (!reopened.rows.length) {
+      return res.status(409).json({ error: 'O chamado mudou enquanto você reabria. Atualize a página.' });
+    }
+
+    await database.query(
+      `INSERT INTO ticket_history (
+        ticket_id, action, changed_by_type, changed_by_id, old_value, new_value, metadata
+      ) VALUES ($1, 'reopened_by_requester', 'public', $2, 'cancelled', 'open', $3::jsonb)`,
+      [id, publicUser.rows[0].id, JSON.stringify({ undo_requester_closure: ticket.requester_closure })],
+    ).catch(() => undefined);
+
+    void notifyResponsibleTeamForReopenedTicket(reopened.rows[0]);
+    emitTicketUpdatedEvent({
+      ticketId: id,
+      title: ticket.title,
+      action: 'reopened_by_requester',
+      oldStatus: 'cancelled',
+      status: 'open',
+    });
+
+    return res.json({ message: 'Chamado reaberto', ticket: reopened.rows[0] });
+  } catch (error) {
+    console.error('Error reopening ticket by requester:', error);
+    return res.status(500).json({ error: 'Não foi possível reabrir o chamado' });
   }
 });
 

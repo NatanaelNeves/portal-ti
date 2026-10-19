@@ -313,6 +313,14 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           if (action === 'marked_resolved_pending_confirmation') return { title: 'Chamado aguardando confirmação do usuário', body: ticketTitle };
           if (action === 'auto_closed') return { title: 'Chamado encerrado automaticamente por prazo', body: ticketTitle };
           if (action === 'manual_closed') return { title: 'Chamado encerrado manualmente', body: ticketTitle };
+          if (action === 'closed_by_requester') {
+            return {
+              title: detail?.requester_closure === 'not_needed'
+                ? 'Solicitante não precisa mais do atendimento'
+                : 'Solicitante resolveu por conta própria',
+              body: ticketTitle,
+            };
+          }
           return { title: 'Um chamado foi atualizado', body: ticketTitle };
         }
       }

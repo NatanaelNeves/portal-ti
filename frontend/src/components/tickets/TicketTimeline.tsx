@@ -20,6 +20,7 @@ const STATUS_LABEL: Record<string, string> = {
   aguardando_terceiros: 'Aguardando terceiros',
   resolved: 'Resolvido',
   closed: 'Fechado',
+  cancelled: 'Encerrado pelo solicitante',
 };
 
 const PRIORITY_LABEL: Record<string, string> = {
@@ -101,6 +102,12 @@ function describe(event: HistoryEvent): Rendered {
 
     case 'reopened_by_requester':
       return { icon: 'ti-refresh-alert', tone: 'danger', text: 'Reaberto pelo solicitante' };
+
+    case 'closed_by_requester': {
+      const why = event.metadata?.reason === 'not_needed' ? 'não precisa mais' : 'resolveu por conta própria';
+      const note = event.metadata?.note ? `: “${event.metadata.note}”` : '';
+      return { icon: 'ti-hand-stop', tone: 'neutral', text: `Encerrado pelo solicitante, que ${why}${note}` };
+    }
 
     case 'rating_submitted':
       return {

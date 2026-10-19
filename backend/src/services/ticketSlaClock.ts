@@ -230,6 +230,7 @@ export const STATUS_LABELS: Record<string, string> = {
   aguardando_terceiros: 'Aguardando terceiros',
   resolved: 'Resolvido',
   closed: 'Fechado',
+  cancelled: 'Encerrado pelo solicitante',
 };
 
 

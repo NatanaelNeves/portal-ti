@@ -18,7 +18,7 @@ export interface TicketLike {
   first_response_at?: string | null;
 }
 
-const CLOSED = ['closed', 'resolved'];
+const CLOSED = ['closed', 'resolved', 'cancelled'];
 
 /** Auxiliar administrativo só alcança chamados do setor dele, seus ou livres. */
 export const canEditTicket = (ticket: TicketLike, role: Role, userId: string): boolean => {
