@@ -18,6 +18,13 @@ export const RH_CATEGORY_SCHEMAS: Record<string, RhCategorySchema> = {
     optional: ['correctedTime', 'adjustments', 'notes'],
     visibility: 'public',
   },
+  // Senha bloqueada ou sem acesso ao aplicativo do ponto (iPonto).
+  // Quem resolve é o RH, não a TI.
+  RH_ACESSO_PONTO: {
+    required: [],
+    optional: ['notes'],
+    visibility: 'public',
+  },
   RH_FOLHA: {
     required: ['payrollMonth'],
     optional: ['employeeId', 'notes'],
@@ -53,6 +60,22 @@ export const RH_INTERNAL_CATEGORIES = RH_CATEGORIES.filter(
   (category) => RH_CATEGORY_SCHEMAS[category].visibility === 'internal',
 );
 
+export type ServiceTeam = 'ti' | 'administrativo' | 'rh';
+
+// Assuntos que cada equipe recebe, os mesmos do formulário de abertura.
+// Usado ao encaminhar um chamado de uma equipe para outra.
+export const TEAM_CATEGORIES: Record<ServiceTeam, string[]> = {
+  ti: ['computador', 'internet', 'impressora', 'sistema', 'outro'],
+  administrativo: ['copia_chave', 'apoio_evento', 'buscar_doacao', 'solicitar_documento', 'outro'],
+  rh: RH_PUBLIC_CATEGORIES,
+};
+
+export const TEAM_DEFAULT_CATEGORY: Record<ServiceTeam, string> = {
+  ti: 'outro',
+  administrativo: 'outro',
+  rh: 'RH_OUTROS',
+};
+
 export const CATEGORY_SECTOR_MAP: Record<string, TicketSector> = {
   // TI categories
   computador: 'TI',
@@ -70,6 +93,7 @@ export const CATEGORY_SECTOR_MAP: Record<string, TicketSector> = {
   // RH categories
   RH_ATESTADO: 'RH',
   RH_PONTO: 'RH',
+  RH_ACESSO_PONTO: 'RH',
   RH_FOLHA: 'RH',
   RH_DECLARACAO: 'RH',
   RH_BENEFICIOS: 'RH',

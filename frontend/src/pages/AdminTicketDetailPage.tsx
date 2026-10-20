@@ -5,6 +5,7 @@ import { aiService, type TicketSummary } from '../services/aiService';
 import TicketTimeline, { type HistoryEvent } from '../components/tickets/TicketTimeline';
 import TicketAttachments from '../components/TicketAttachments';
 import ConfirmDialog from '../components/ConfirmDialog';
+import TicketForward, { canForwardTicket } from '../components/tickets/TicketForward';
 import {
   canAssignToOthers,
   canAssume,
@@ -80,7 +81,7 @@ const TEAM: Record<string, { label: string; tone: string }> = {
 const CATEGORY_LABEL: Record<string, string> = {
   computador: 'Computador', internet: 'Internet', impressora: 'Impressora', sistema: 'Sistema', outro: 'Outro assunto',
   copia_chave: 'Cópia de chave', apoio_evento: 'Apoio em evento', buscar_doacao: 'Buscar doação', solicitar_documento: 'Solicitar documento',
-  RH_ATESTADO: 'Atestado médico', RH_PONTO: 'Ajuste de ponto', RH_FOLHA: 'Folha de pagamento', RH_DECLARACAO: 'Declaração',
+  RH_ATESTADO: 'Atestado médico', RH_PONTO: 'Ajuste de ponto', RH_ACESSO_PONTO: 'Acesso ao iPonto', RH_FOLHA: 'Folha de pagamento', RH_DECLARACAO: 'Declaração',
   RH_BENEFICIOS: 'Benefícios', RH_OUTROS: 'Outro assunto', RH_CONFIDENCIAL: 'Confidencial',
 };
 
@@ -763,6 +764,10 @@ export default function AdminTicketDetailPage() {
               </div>
             )}
           </section>
+
+          {canForwardTicket(policyTicket, role, myId) && (
+            <TicketForward ticket={policyTicket} cardClassName="tkd-card" onForwarded={() => navigate(backRoute)} />
+          )}
 
           <section className="tkd-card tkd-log" aria-labelledby="tkd-log-title">
             <h2 id="tkd-log-title">Linha do tempo</h2>

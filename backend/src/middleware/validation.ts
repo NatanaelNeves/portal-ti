@@ -139,6 +139,13 @@ export const closeByRequesterSchema = z.object({
   note: z.string().trim().max(500, 'Comentário deve ter no máximo 500 caracteres').optional(),
 });
 
+// Encaminhar um chamado aberto para a equipe errada.
+export const forwardTicketSchema = z.object({
+  department: z.enum(['ti', 'administrativo', 'rh'], { message: 'Equipe inválida' }),
+  category: z.string().trim().max(100, 'Assunto muito longo').optional(),
+  note: z.string().trim().max(500, 'Observação deve ter no máximo 500 caracteres').optional(),
+});
+
 export const ticketRatingSchema = z.object({
   rating: z.number().int().min(1).max(5),
   feedback: z.string().max(2000, 'Comentário deve ter no máximo 2000 caracteres').optional(),

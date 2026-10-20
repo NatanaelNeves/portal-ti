@@ -31,6 +31,12 @@ const PRIORITY_LABEL: Record<string, string> = {
   low: 'Baixa',
 };
 
+const TEAM_LABEL: Record<string, string> = {
+  ti: 'TI',
+  administrativo: 'Administrativo',
+  rh: 'RH',
+};
+
 interface Rendered {
   icon: string;
   tone: 'neutral' | 'info' | 'positive' | 'warning' | 'danger';
@@ -84,6 +90,17 @@ function describe(event: HistoryEvent): Rendered {
         icon: 'ti-flag',
         tone: 'warning',
         text: before ? `Prioridade: ${before} → ${after}` : `Prioridade definida como ${after}`,
+      };
+    }
+
+    case 'department_changed': {
+      const fromTeam = TEAM_LABEL[event.old_value || ''] ?? event.old_value ?? 'outra equipe';
+      const toTeam = TEAM_LABEL[event.new_value || ''] ?? event.new_value ?? 'outra equipe';
+      const note = event.metadata?.note ? `: “${event.metadata.note}”` : '';
+      return {
+        icon: 'ti-arrow-forward-up',
+        tone: 'info',
+        text: `${who} encaminhou de ${fromTeam} para ${toTeam}${note}`,
       };
     }
 

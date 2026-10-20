@@ -543,6 +543,7 @@ export default function TicketDetailPage() {
       message_added: 'Nova mensagem',
       priority_changed: 'Prioridade alterada',
       pause_reason_added: 'Motivo da espera registrado',
+      department_changed: 'Passado para outra equipe',
       closed_by_requester: 'Encerrado por você',
     };
     return labels[action] || action;
@@ -1061,6 +1062,9 @@ export default function TicketDetailPage() {
                     <span>
                       {item.changed_by_type === 'public' ? 'Você' : item.changed_by_name || 'Sistema'}, {formatWhen(item.created_at)}
                     </span>
+                    {item.action === 'department_changed' && item.new_value && TEAM[String(item.new_value)] && (
+                      <em>Agora quem cuida é a {TEAM[String(item.new_value)].name}.</em>
+                    )}
                     {item.action === 'pause_reason_added' && item.new_value && (
                       <em>Aguardando: {String(item.new_value)}</em>
                     )}

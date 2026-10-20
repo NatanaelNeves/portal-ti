@@ -13,7 +13,9 @@ import {
   confirmResolutionSchema,
   closeByRequesterSchema,
   ticketRatingSchema,
+  forwardTicketSchema,
 } from '../middleware/validation';
+import { TEAM_CATEGORIES, TEAM_DEFAULT_CATEGORY, type ServiceTeam } from '../config/ticketCategories';
 import { pollingLimiter } from '../middleware/rateLimiter';
 import { getWebSocketService } from '../services/websocketService';
 import path from 'path';
@@ -1214,7 +1216,9 @@ ticketsRouter.post('/', validate(createTicketSchema), async (req: Request, res: 
              WHERE id = $5`,
             [
               classification.type,
-              classification.category,
+              // O assunto do RH vem do formulário e define as telas do RH;
+              // a IA não troca por um texto livre.
+              department === 'rh' ? null : classification.category,
               classification.priority,
               JSON.stringify({ ai_classification: classification }),
               ticket.rows[0].id,
@@ -2066,6 +2070,198 @@ ticketsRouter.post('/:id/manual-close', authenticate, async (req: Request, res: 
   }
 });
 
+const TEAM_ROLES: Record<ServiceTeam, string[]> = {
+  ti: ['it_staff', 'admin'],
+  administrativo: ['admin_staff', 'admin'],
+  rh: ['rh_staff', 'admin'],
+};
+
+const TEAM_NAME: Record<ServiceTeam, string> = {
+  ti: 'TI',
+  administrativo: 'Administrativo',
+  rh: 'RH',
+};
+
+// Já resolvido ou encerrado não muda de equipe: não há mais o que atender.
+const NOT_FORWARDABLE_STATUSES = ['resolved', 'aguardando_confirmacao', 'closed', 'cancelled'];
+
+/**
+ * Quem pode tirar o chamado da fila atual: a equipe dona dele, ou
+ * administração/gestão. O auxiliar administrativo segue a mesma regra de
+ * acesso que tem para ver e atualizar o chamado.
+ */
+const canForwardTicket = (role: string, ticket: TicketAccessRow, userId: string) => {
+  if (role === UserRole.ADMIN || isManagerRole(role)) return true;
+  const department = ticket.department || 'ti';
+  if (role === UserRole.IT_STAFF) return department === 'ti';
+  if (role === UserRole.RH_STAFF) return department === 'rh';
+  if (role === UserRole.ADMIN_STAFF) return canAdminStaffAccessAdministrativeTicket(ticket, userId);
+  return false;
+};
+
+/**
+ * POST /:id/encaminhar - Passa o chamado para outra equipe
+ *
+ * Para chamados abertos na equipe errada (ex.: senha do iPonto aberta para a
+ * TI). O chamado volta para a fila da nova equipe como novo: sem responsável e
+ * com status "aberto". A observação de quem encaminhou fica como nota interna.
+ */
+ticketsRouter.post('/:id/encaminhar', authenticate, validate(forwardTicketSchema), async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const user = req.user!;
+  const target = req.body.department as ServiceTeam;
+  const note: string = req.body.note || '';
+  const category: string = req.body.category || TEAM_DEFAULT_CATEGORY[target];
+
+  if (!TEAM_CATEGORIES[target].includes(category)) {
+    return res.status(400).json({ error: 'Assunto não pertence à equipe escolhida' });
+  }
+
+  const client = await database.getClient();
+  let ticket: any;
+  let from: ServiceTeam;
+
+  try {
+    await client.query('BEGIN');
+
+    const locked = await client.query(
+      `SELECT id, title, status, priority, department, category, assigned_to_id, requester_type, requester_id
+       FROM tickets WHERE id = $1 FOR UPDATE`,
+      [id],
+    );
+    if (!locked.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Chamado não encontrado' });
+    }
+
+    const current = locked.rows[0];
+    from = (current.department || 'ti') as ServiceTeam;
+
+    if (!canForwardTicket(user.role, current, user.id)) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({
+        error: 'Acesso negado',
+        message: 'Só a equipe responsável pelo chamado pode encaminhá-lo.',
+      });
+    }
+    if (current.category === 'RH_CONFIDENCIAL') {
+      await client.query('ROLLBACK');
+      return res.status(403).json({
+        error: 'Acesso negado',
+        message: 'Chamados confidenciais do RH não podem sair do RH.',
+      });
+    }
+    if (from === target) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: `O chamado já está com ${TEAM_NAME[target]}` });
+    }
+    if (NOT_FORWARDABLE_STATUSES.includes(current.status)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Chamado resolvido ou encerrado não pode ser encaminhado' });
+    }
+
+    const updated = await client.query(
+      `UPDATE tickets
+          SET department = $1,
+              category = $2,
+              type = $3,
+              status = 'open',
+              assigned_to_id = NULL,
+              updated_at = NOW()
+        WHERE id = $4
+        RETURNING *, assigned_to_id as assigned_to`,
+      [target, category, target === 'ti' ? 'incident' : 'request', id],
+    );
+    ticket = updated.rows[0];
+
+    // Se estava em espera, o prazo volta a correr com a nova equipe.
+    await reconcileSlaPause(id, 'open', null, user.id, client);
+
+    const actorType = getHistoryInternalActorType(user.role);
+    await client.query(
+      `INSERT INTO ticket_history (
+        ticket_id, action, changed_by_type, changed_by_id, old_value, new_value, metadata
+      ) VALUES ($1, 'department_changed', $2, $3, $4, $5, $6::jsonb)`,
+      [
+        id,
+        actorType,
+        user.id,
+        from,
+        target,
+        JSON.stringify({
+          old_category: current.category,
+          new_category: category,
+          old_status: current.status,
+          old_assigned_to_id: current.assigned_to_id,
+          ...(note ? { note } : {}),
+        }),
+      ],
+    );
+
+    if (note) {
+      await client.query(
+        `INSERT INTO ticket_messages (ticket_id, author_type, author_id, message, is_internal, created_at)
+         VALUES ($1, 'it_staff', $2, $3, true, NOW())`,
+        [id, user.id, `Encaminhado de ${TEAM_NAME[from]} para ${TEAM_NAME[target]}: ${note}`],
+      );
+    }
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    console.error('Error forwarding ticket:', error);
+    return res.status(500).json({ error: 'Não foi possível encaminhar o chamado. Nada foi alterado.' });
+  } finally {
+    client.release();
+  }
+
+  // A fila antiga tira o chamado; a nova recebe como chegada.
+  emitTicketUpdatedEvent({
+    ticketId: id,
+    action: 'department_changed',
+    oldDepartment: from,
+    department: target,
+    status: 'open',
+  });
+  emitTicketEvent('ticket:new', {
+    ticketId: id,
+    title: ticket.title,
+    status: ticket.status,
+    priority: ticket.priority,
+    department: target,
+    action: 'forwarded',
+  });
+
+  try {
+    const [staff, requester] = await Promise.all([
+      database.query(
+        'SELECT email FROM internal_users WHERE role = ANY($1) AND is_active = true',
+        [TEAM_ROLES[target]],
+      ),
+      ticket.requester_type === 'public'
+        ? database.query('SELECT name FROM public_users WHERE id = $1', [ticket.requester_id])
+        : Promise.resolve({ rows: [] as any[] }),
+    ]);
+    const emails = staff.rows.map((u: any) => u.email);
+    if (emails.length) {
+      void EmailService.notifyNewTicket(
+        ticket.id,
+        ticket.title,
+        requester.rows[0]?.name || 'Usuário',
+        ticket.priority || 'medium',
+        emails,
+      ).catch((emailError) => console.error('Error sending notification email:', emailError));
+    }
+  } catch (emailError) {
+    console.error('Error sending notification email:', emailError);
+  }
+
+  return res.json({
+    message: `Chamado encaminhado para ${TEAM_NAME[target]}`,
+    ticket,
+  });
+});
+
 /**
  * PATCH /:id - Atualizar chamado (status, prioridade, atribuição)
  * 
@@ -2787,7 +2983,16 @@ ticketsRouter.get('/:id/history', async (req: Request, res: Response) => {
       [id, Boolean(userToken)]
     );
 
-    res.json({ history: history.rows });
+    // A observação de quem encaminhou é conversa da equipe, não do solicitante.
+    const rows = userToken
+      ? history.rows.map((row: any) => {
+        if (row.action !== 'department_changed' || !row.metadata?.note) return row;
+        const { note: _note, ...metadata } = row.metadata;
+        return { ...row, metadata };
+      })
+      : history.rows;
+
+    res.json({ history: rows });
   } catch (error) {
     console.error('Error fetching ticket history:', error);
     res.status(500).json({ error: 'Failed to fetch ticket history' });

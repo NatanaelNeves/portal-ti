@@ -8,6 +8,7 @@
 export const RH_CATEGORIES: Record<string, { label: string; icon: string }> = {
   RH_ATESTADO: { label: 'Atestado médico', icon: 'ti-stethoscope' },
   RH_PONTO: { label: 'Ajuste de ponto', icon: 'ti-clock-edit' },
+  RH_ACESSO_PONTO: { label: 'Acesso ao iPonto', icon: 'ti-lock-access' },
   RH_FOLHA: { label: 'Folha de pagamento', icon: 'ti-cash' },
   RH_DECLARACAO: { label: 'Declaração', icon: 'ti-file-certificate' },
   RH_BENEFICIOS: { label: 'Benefícios', icon: 'ti-gift' },

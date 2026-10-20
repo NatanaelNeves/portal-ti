@@ -379,6 +379,44 @@
   color: var(--pub-muted);
 }
 
+/* Assunto do ponto aberto para outra equipe: oferece mandar para o RH */
+.otp-redirect {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 14px;
+  background: #eee8f8;
+  border-radius: 10px;
+}
+
+.otp-redirect .pub-gicon {
+  flex: 0 0 auto;
+}
+
+.otp-redirect__copy {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.otp-redirect__copy strong {
+  color: #3d2a73;
+  font-size: 0.98rem;
+}
+
+.otp-redirect__copy p {
+  margin: 0;
+  color: #4a3d66;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.otp-redirect__copy .pub-btn {
+  justify-self: start;
+  margin-top: 4px;
+}
+
 /* Ajustes de ponto (RH) */
 .otp-adjustments {
   display: grid;

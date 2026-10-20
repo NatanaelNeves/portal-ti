@@ -5,6 +5,7 @@ import { showToast } from '../utils/toast';
 import TicketTimeline, { type HistoryEvent } from '../components/tickets/TicketTimeline';
 import TicketAttachments from '../components/TicketAttachments';
 import ConfirmDialog from '../components/ConfirmDialog';
+import TicketForward, { canForwardTicket } from '../components/tickets/TicketForward';
 import { currentInternalUser, initialsOf, isUrgent, rhCategory, rhStatus, timeAgo } from '../components/rh/rhLabels';
 import '../styles/RhTicketDetailPage.css';
 
@@ -224,6 +225,7 @@ export default function RhTicketDetailPage() {
   const finished = ['resolved', 'closed', 'cancelled', 'aguardando_confirmacao'].includes(ticket.status);
   const closed = ticket.status === 'closed' || ticket.status === 'cancelled';
   const staffReplied = messages.some((m) => m.author_type === 'it_staff' && !m.is_internal);
+  const forwardable = { ...ticket, assigned_to: assignedId };
 
   // Trilha: assumir, responder, resolver.
   const steps = [
@@ -587,6 +589,10 @@ export default function RhTicketDetailPage() {
               </div>
             )}
           </section>
+
+          {canForwardTicket(forwardable, user?.role || '', user?.id || '') && (
+            <TicketForward ticket={forwardable} cardClassName="rh-card" onForwarded={() => navigate('/rh/chamados')} />
+          )}
 
           {ticket.rating != null && (
             <section className="rh-card rhdt-rating">

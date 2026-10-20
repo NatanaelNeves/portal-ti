@@ -5,6 +5,7 @@ import '../styles/OpenTicketPage.css';
 import { BACKEND_URL } from '../services/api';
 import { INSTITUTION_DEPARTMENTS, INSTITUTION_UNITS } from '../utils/institutionOptions';
 import { findShortcut, TICKET_SHORTCUTS, type TicketShortcut } from '../utils/ticketShortcuts';
+import { ADMIN_CATEGORIES, mentionsPonto, pontoCategory, RH_CATEGORIES, TI_CATEGORIES } from '../utils/ticketCategories';
 import { aiService, type ArticleSuggestion } from '../services/aiService';
 
 interface FormData {
@@ -56,34 +57,6 @@ const DEPARTMENTS = [
   { value: 'ti', label: 'Suporte de TI', icon: 'ti-device-laptop', desc: 'Computador, internet, acessos, impressora e sistemas' },
   { value: 'administrativo', label: 'Administrativo', icon: 'ti-building', desc: 'Cópia de chave, apoio em evento, doações e documentos' },
   { value: 'rh', label: 'Recursos Humanos', icon: 'ti-users', desc: 'Atestado, ponto, folha de pagamento, benefícios e declarações' },
-];
-
-// TI categories
-const TI_CATEGORIES = [
-  { value: 'computador', label: 'Computador', icon: 'ti-device-desktop' },
-  { value: 'internet', label: 'Internet', icon: 'ti-wifi' },
-  { value: 'impressora', label: 'Impressora', icon: 'ti-printer' },
-  { value: 'sistema', label: 'Sistema', icon: 'ti-apps' },
-  { value: 'outro', label: 'Outro assunto', icon: 'ti-dots' },
-];
-
-// Administrative categories
-const ADMIN_CATEGORIES = [
-  { value: 'copia_chave', label: 'Cópia de chave', icon: 'ti-key' },
-  { value: 'apoio_evento', label: 'Apoio em evento', icon: 'ti-calendar-event' },
-  { value: 'buscar_doacao', label: 'Buscar doação', icon: 'ti-package' },
-  { value: 'solicitar_documento', label: 'Solicitar documento', icon: 'ti-file-text' },
-  { value: 'outro', label: 'Outro assunto', icon: 'ti-dots' },
-];
-
-// RH public categories (confidential excluded from public form)
-const RH_CATEGORIES = [
-  { value: 'RH_ATESTADO', label: 'Atestado médico', icon: 'ti-stethoscope' },
-  { value: 'RH_PONTO', label: 'Ajuste de ponto', icon: 'ti-clock-edit' },
-  { value: 'RH_FOLHA', label: 'Folha de pagamento', icon: 'ti-cash' },
-  { value: 'RH_DECLARACAO', label: 'Declaração', icon: 'ti-file-certificate' },
-  { value: 'RH_BENEFICIOS', label: 'Benefícios', icon: 'ti-gift' },
-  { value: 'RH_OUTROS', label: 'Outro assunto', icon: 'ti-dots' },
 ];
 
 const ALL_CATEGORIES = [...TI_CATEGORIES, ...ADMIN_CATEGORIES, ...RH_CATEGORIES];
@@ -510,6 +483,22 @@ export default function OpenTicketPage() {
       requestDetails: catValue === 'RH_PONTO' ? { adjustments: [createEmptyRhAdjustment()] } : {},
     }));
     goToStep(hasContactInfo() ? 4 : 3);
+  };
+
+  const ticketText = `${formData.title} ${formData.description}`;
+  const showPontoRedirect = formData.ticketDepartment !== 'rh' && mentionsPonto(ticketText);
+
+  // Leva o chamado para o RH sem perder o que a pessoa já escreveu.
+  const handleSendPontoToRh = () => {
+    const category = pontoCategory(ticketText);
+    setFormData(prev => ({
+      ...prev,
+      ticketDepartment: 'rh',
+      type: 'request',
+      category,
+      requestDetails: category === 'RH_PONTO' ? { adjustments: [createEmptyRhAdjustment()] } : {},
+    }));
+    showToast.success('Pronto: o chamado agora vai para o RH.');
   };
 
   const activeCategories = formData.ticketDepartment === 'ti'
@@ -1046,6 +1035,27 @@ export default function OpenTicketPage() {
                           <span>{formData.description.length}/2000</span>
                         </span>
                       )}
+
+                    <div role="status" aria-live="polite">
+                      {showPontoRedirect && (
+                        <div className="otp-redirect">
+                          <span className="pub-gicon pub-gicon--rh" aria-hidden="true">
+                            <i className="ti ti-clock-edit" />
+                          </span>
+                          <div className="otp-redirect__copy">
+                            <strong>Ponto e iPonto são com o RH</strong>
+                            <p>
+                              Senha bloqueada, acesso ao iPonto ou ajuste de horário quem resolve é o RH.
+                              A TI não consegue liberar o ponto.
+                            </p>
+                            <button type="button" className="pub-btn pub-btn--primary" onClick={handleSendPontoToRh}>
+                              <i className="ti ti-arrow-right" aria-hidden="true" />
+                              Mandar para o RH
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
 
                     {(suggestionsLoading || articleSuggestions.length > 0) && (
                       <div className="otp-kb">

@@ -1,0 +1,209 @@
+/* "Equipe errada?" — encaminhar chamado para outra equipe.
+   Fica dentro do cartão de cada área (tkd-card, rh-card); aqui só o miolo. */
+.tfw {
+  display: grid;
+  gap: 12px;
+}
+
+.rh-card.tfw {
+  padding: 20px;
+}
+
+.tfw-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  color: var(--pub-muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.tfw-hint--ponto {
+  padding: 10px 12px;
+  color: #3d2a73;
+  background: #eee8f8;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.tfw-hint--ponto i {
+  flex: 0 0 auto;
+  font-size: 1.15rem;
+}
+
+.tfw-open {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  color: var(--pub-ink);
+  background: #fff;
+  border: 1px solid var(--pub-line);
+  border-radius: 12px;
+  font: 700 0.95rem/1.2 var(--pub-body);
+  text-align: left;
+}
+
+.tfw-open:hover {
+  border-color: #b9c8bd;
+}
+
+.tfw-open i {
+  font-size: 1.15rem;
+}
+
+.tfw-form {
+  display: grid;
+  gap: 14px;
+}
+
+.tfw-form fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.tfw-form legend,
+.tfw-field > span {
+  margin-bottom: 6px;
+  padding: 0;
+  color: var(--pub-ink);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.tfw-field > span small {
+  color: var(--pub-muted);
+  font-weight: 500;
+}
+
+.tfw-teams {
+  display: grid;
+  gap: 8px;
+}
+
+.tfw-team {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid var(--pub-line);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.tfw-team input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tfw-team:has(input:focus-visible) {
+  outline: 2px solid var(--pub-leaf);
+  outline-offset: 2px;
+}
+
+.tfw-team > i {
+  flex: 0 0 auto;
+  font-size: 1.3rem;
+  color: var(--pub-muted);
+}
+
+.tfw-team span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tfw-team strong {
+  font-size: 0.95rem;
+}
+
+.tfw-team small {
+  color: var(--pub-muted);
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+
+.tfw-team.is-on {
+  background: #eef7f1;
+  border-color: var(--pub-leaf);
+  box-shadow: inset 0 0 0 1px var(--pub-leaf);
+}
+
+.tfw-team.is-on > i {
+  color: var(--pub-leaf);
+}
+
+.tfw-field {
+  display: grid;
+}
+
+.tfw-field select,
+.tfw-field textarea {
+  width: 100%;
+  padding: 9px 10px;
+  color: var(--pub-ink);
+  background: #fff;
+  border: 1px solid var(--pub-line);
+  border-radius: 10px;
+  font: 500 0.92rem/1.35 var(--pub-body);
+}
+
+.tfw-field select {
+  min-height: 42px;
+}
+
+.tfw-field textarea {
+  resize: vertical;
+}
+
+.tfw-field select:focus,
+.tfw-field textarea:focus {
+  outline: none;
+  border-color: var(--pub-leaf);
+  box-shadow: 0 0 0 3px rgba(15, 122, 74, 0.15);
+}
+
+.tfw-muted {
+  margin-top: 6px;
+  color: var(--pub-muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.tfw-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.tfw-btn {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  color: var(--pub-ink);
+  background: #fff;
+  border: 1px solid var(--pub-line);
+  border-radius: 999px;
+  font: 700 0.9rem/1 var(--pub-body);
+}
+
+.tfw-btn--primary {
+  color: #fff;
+  background: var(--pub-leaf);
+  border-color: var(--pub-leaf);
+}
+
+.tfw-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
