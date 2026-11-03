@@ -54,7 +54,8 @@ const ReturnEquipmentPage: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [generateTerm, setGenerateTerm] = useState(false);
-  
+  const [returnTermUrl, setReturnTermUrl] = useState('');
+
   const [formData, setFormData] = useState<ReturnForm>({
     equipmentId: '',
     returnCondition: '',
@@ -188,19 +189,23 @@ const ReturnEquipmentPage: React.FC = () => {
         payload
       );
 
-      setSuccess(generateTerm
-        ? 'Equipamento devolvido com sucesso! Termo de devolução gerado.'
-        : 'Equipamento devolvido com sucesso! Movimentação registrada sem gerar termo.');
-      
-      // Abrir PDF do termo em nova aba (somente se houver termo)
       const termId = response.data.term_id;
+
       if (termId) {
         const token = localStorage.getItem('internal_token');
         const url = token
           ? `${BACKEND_URL}/api/inventory/terms/${termId}/return-pdf?token=${token}`
           : `${BACKEND_URL}/api/inventory/terms/${termId}/return-pdf`;
+        setSuccess('Equipamento devolvido com sucesso! Termo de devolução gerado.');
+        setReturnTermUrl(url);
+        // O navegador pode bloquear a nova aba; o botão na mensagem fica como garantia
         window.open(url, '_blank');
+        return;
       }
+
+      setSuccess(generateTerm
+        ? 'Equipamento devolvido, mas o termo de devolução não foi gerado. Abra o equipamento e use "Termo Devolução".'
+        : 'Equipamento devolvido com sucesso! Movimentação registrada sem gerar termo.');
 
       // Redirecionar após 2 segundos
       setTimeout(() => {
@@ -228,7 +233,21 @@ const ReturnEquipmentPage: React.FC = () => {
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
-      {success && <div className="alert alert-success">{success}</div>}
+      {success && (
+        <div className="alert alert-success">
+          {success}
+          {returnTermUrl && (
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+              <a className="btn-primary" href={returnTermUrl} target="_blank" rel="noreferrer">
+                <i className="ti ti-file-download" /> Abrir termo de devolução
+              </a>
+              <button type="button" className="btn-secondary" onClick={() => navigate('/inventario')}>
+                Voltar ao inventário
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="return-form">
         <div className="form-section">
@@ -525,7 +544,7 @@ const ReturnEquipmentPage: React.FC = () => {
           <button 
             type="submit" 
             className="btn-primary" 
-            disabled={loading || !allChecksPassed}
+            disabled={loading || !allChecksPassed || !!returnTermUrl}
           >
             {loading ? 'Processando...' : (generateTerm ? 'Gerar Termo de Devolução' : 'Registrar Devolução')}
           </button>

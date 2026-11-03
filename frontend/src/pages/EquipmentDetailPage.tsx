@@ -271,11 +271,9 @@ export default function EquipmentDetailPage() {
                       <span className="btn-icon">✍️</span> Criar Termo
                     </button>
                   )}
-                  {equipment.current_status === 'in_use' && (
-                    <button className="btn btn-new-term" onClick={() => navigate(`/inventario/equipamento/${equipmentId}/termo-de-devolucao`)}>
-                      <span className="btn-icon">🗂️</span> Termo Devolução
-                    </button>
-                  )}
+                  <button className="btn btn-new-term" onClick={() => navigate(`/inventario/equipamento/${equipmentId}/termo-de-devolucao`)}>
+                    <span className="btn-icon">🗂️</span> Termo Devolução
+                  </button>
                   <button className="btn btn-print" onClick={() => window.print()}>
                     <span className="btn-icon">🖨️</span> Imprimir
                   </button>
@@ -346,6 +344,17 @@ export default function EquipmentDetailPage() {
                         >
                           📄 Ver PDF
                         </button>
+                        {t.returned_date && (
+                          <button
+                            className="btn btn-small"
+                            onClick={() => {
+                              const token = localStorage.getItem('internal_token');
+                              window.open(`${BACKEND_URL}/api/inventory/terms/${t.id}/return-pdf?token=${token}`, '_blank');
+                            }}
+                          >
+                            📥 Termo de devolução
+                          </button>
+                        )}
                         {t.status === 'active' && <button className="btn btn-small btn-danger" onClick={() => navigate(`/inventario/termo/${t.id}/devolucao`)}>📥 Devolver</button>}
                       </div>
                     </div>

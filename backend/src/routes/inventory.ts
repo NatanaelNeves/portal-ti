@@ -812,7 +812,6 @@ inventoryRouter.post('/movements/return', async (req: Request, res: Response) =>
       ]);
     }
 
-    // Criar movimentação de devolução
     const eq = equipment.rows[0];
 
     // registered_by_id é NOT NULL — usar received_by_id ou buscar um admin
@@ -824,6 +823,49 @@ inventoryRouter.post('/movements/return', async (req: Request, res: Response) =>
       `);
       registeredById = adminUser.rows.length > 0 ? adminUser.rows[0].id : null;
     }
+
+    // Equipamento entregue sem termo de entrega: criar o termo já devolvido
+    // com os dados de quem estava com ele, para o termo de devolução sair.
+    if (shouldGenerateTerm && !term) {
+      const lastDelivery = await database.query(`
+        SELECT movement_date FROM equipment_movements
+        WHERE equipment_id = $1 AND movement_type = 'delivery'
+        ORDER BY movement_date DESC
+        LIMIT 1
+      `, [equipment_id]);
+
+      const issuedDate = lastDelivery.rows[0]?.movement_date || eq.acquisition_date || new Date();
+
+      const created = await database.query(`
+        INSERT INTO responsibility_terms (
+          equipment_id, responsible_id, responsible_name, responsible_department,
+          responsible_unit, issued_date, delivery_reason, issued_by_id, issued_by_name,
+          returned_date, return_condition, return_checklist, return_problems,
+          return_destination, received_by_id, received_by, status
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_DATE, $10, $11, $12, $13, $14, $15, 'returned')
+        RETURNING *
+      `, [
+        equipment_id,
+        eq.current_responsible_id || null,
+        eq.current_responsible_name || 'Não informado',
+        eq.current_unit || '',
+        eq.current_unit || '',
+        issuedDate,
+        'Entrega registrada sem termo',
+        registeredById,
+        received_by_name || 'Sistema',
+        return_condition,
+        JSON.stringify(return_checklist || {}),
+        return_problems,
+        return_destination,
+        received_by_id || null,
+        received_by_name || 'Sistema'
+      ]);
+
+      term = created.rows[0];
+    }
+
+    // Criar movimentação de devolução
 
     // Armazenar returned_items no campo notes como JSON
     const movementNotes = JSON.stringify({
@@ -1145,8 +1187,18 @@ inventoryRouter.post('/terms/retroactive-return', async (req: Request, res: Resp
       return_problems,
       return_destination,
       issued_by_id,
-      issued_by_name
+      issued_by_name,
+      received_by,
+      equipment_condition
     } = req.body;
+
+    // A tela de termo retroativo manda o estado como perfeito/desgaste/avarias
+    const conditionFromForm: Record<string, string> = {
+      perfeito: 'excellent',
+      desgaste: 'fair',
+      avarias: 'damaged'
+    };
+    const resolvedCondition = return_condition || conditionFromForm[equipment_condition] || 'excellent';
 
     if (!equipment_id) {
       return res.status(400).json({ error: 'equipment_id is required' });
@@ -1225,12 +1277,12 @@ inventoryRouter.post('/terms/retroactive-return', async (req: Request, res: Resp
         finalIssuedById,
         finalIssuedByName,
         finalReturnDate,
-        return_condition || 'excellent',
+        resolvedCondition,
         JSON.stringify(return_checklist || {}),
         return_problems || resolvedReturnReason,
         resolvedReturnDestination,
         issued_by_id || null,
-        issued_by_name || finalIssuedByName,
+        received_by || issued_by_name || finalIssuedByName,
       ]
     );
 

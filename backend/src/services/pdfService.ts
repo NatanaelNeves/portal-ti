@@ -60,7 +60,7 @@ interface ReturnTermData {
   };
   inspection: {
     condition: string;
-    checklist: Record<string, boolean>;
+    checklist: Record<string, boolean | { name: string; checked: boolean }>;
     notes?: string;
     damageDescription?: string;
   };
@@ -319,9 +319,18 @@ export class PDFService {
     
     let hasCheckItems = false;
     for (const item of checkItems) {
-      if (cl[item.key] !== undefined) {
-        const mark = cl[item.key] ? '✓' : '✗';
+      const value = cl[item.key];
+      if (value !== undefined && !(value && typeof value === 'object')) {
+        const mark = value ? '✓' : '✗';
         doc.text(`  [${mark}] ${item.label}`);
+        hasCheckItems = true;
+      }
+    }
+    // Termo retroativo grava cada item como { name, checked }
+    for (const value of Object.values(cl)) {
+      if (value && typeof value === 'object' && 'name' in value) {
+        const mark = value.checked ? '✓' : '✗';
+        doc.text(`  [${mark}] ${value.name}`);
         hasCheckItems = true;
       }
     }
