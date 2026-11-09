@@ -40,6 +40,7 @@ interface SuccessData {
   ticketCode: string;
   timestamp: Date;
   slaHours: number;
+  onBehalf: boolean;
 }
 
 const REQUESTER_STORAGE_KEY = 'opn_ticket_requester';
@@ -102,6 +103,11 @@ export default function OpenTicketPage() {
   const [stepDirection, setStepDirection] = useState<'forward' | 'back'>('forward');
   const [isReturningUser, setIsReturningUser] = useState(false);
   const [prefillFromAccount, setPrefillFromAccount] = useState(false);
+  // De quem eram os dados que a pessoa apagou com "Trocar": do último chamado
+  // feito no aparelho ou da conta. Enquanto houver troca, o aparelho continua
+  // sendo de quem já estava lá, a menos que a pessoa peça para lembrar.
+  const [switchedFrom, setSwitchedFrom] = useState<'remembered' | 'account' | null>(null);
+  const [rememberRequester, setRememberRequester] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     email: '',
     name: '',
@@ -429,6 +435,18 @@ export default function OpenTicketPage() {
 
   const hasContactInfo = () => !!(formData.email && formData.name && !fieldErrors.email && !fieldErrors.name);
 
+  // Abrir o chamado em nome de outra pessoa: limpa os dados lembrados do
+  // último chamado (ou da conta) e leva para a etapa "Seus dados".
+  const switchRequester = () => {
+    if (isReturningUser) setSwitchedFrom(prefillFromAccount ? 'account' : 'remembered');
+    setFormData(prev => ({ ...prev, name: '', email: '', department: '', unit: '' }));
+    setFieldErrors(prev => ({ ...prev, name: undefined, email: undefined }));
+    setIsReturningUser(false);
+    setPrefillFromAccount(false);
+    if (currentStep !== 3) goToStep(3);
+    setTimeout(() => document.getElementById('name')?.focus(), 0);
+  };
+
   const handleNextStep = () => {
     if (isStepValid(currentStep)) {
       goToStep(currentStep + 1);
@@ -622,21 +640,25 @@ export default function OpenTicketPage() {
 
       const { id } = await ticketResponse.json();
 
-      // Store tokens in localStorage for tracking
-      localStorage.setItem('user_token', user_token);
+      // Este chamado sempre pode ser acompanhado deste aparelho.
       localStorage.setItem(`ticket_token_${id}`, user_token);
-      localStorage.setItem(`ticket_email`, formData.email);
 
-      // Remember the requester so the next visit can skip straight to the details step
-      try {
-        localStorage.setItem(REQUESTER_STORAGE_KEY, JSON.stringify({
-          email: formData.email,
-          name: formData.name,
-          department: formData.department,
-          unit: formData.unit,
-        }));
-      } catch {
-        // ignore storage failures (private browsing, quota, etc.)
+      // Chamado aberto para outra pessoa: "Meus chamados" e o próximo chamado
+      // continuam com quem já usava o aparelho.
+      const onBehalf = switchedFrom === 'account' || (switchedFrom === 'remembered' && !rememberRequester);
+      if (!onBehalf) {
+        localStorage.setItem('user_token', user_token);
+        localStorage.setItem('ticket_email', formData.email);
+        try {
+          localStorage.setItem(REQUESTER_STORAGE_KEY, JSON.stringify({
+            email: formData.email,
+            name: formData.name,
+            department: formData.department,
+            unit: formData.unit,
+          }));
+        } catch {
+          // ignore storage failures (private browsing, quota, etc.)
+        }
       }
 
       // Upload pending files (best-effort — ticket already created)
@@ -665,6 +687,7 @@ export default function OpenTicketPage() {
         ticketCode,
         timestamp,
         slaHours,
+        onBehalf,
       });
 
     } catch (err: any) {
@@ -717,8 +740,10 @@ export default function OpenTicketPage() {
         <div className="pub-wrap otp-done">
           <h1 className="otp-done__title">Chamado enviado</h1>
           <p className="otp-done__lead">
-            A equipe de {departmentMeta?.label ?? 'atendimento'} já recebeu seu pedido.
-            Você acompanha cada etapa em Meus chamados.
+            A equipe de {departmentMeta?.label ?? 'atendimento'} já recebeu {successData.onBehalf ? 'o pedido' : 'seu pedido'}.
+            {successData.onBehalf
+              ? ` As atualizações chegam no e-mail de ${formData.name}.`
+              : ' Você acompanha cada etapa em Meus chamados.'}
           </p>
 
           <div className="otp-stub">
@@ -900,12 +925,19 @@ export default function OpenTicketPage() {
               <div className="otp-step" data-step="3">
                 <SelectionTrail />
                 {isReturningUser && (
-                  <p className="otp-note">
+                  <div className="otp-note">
                     <i className="ti ti-user-check" aria-hidden="true" />
-                    {prefillFromAccount
-                      ? 'Preenchemos com os dados da sua conta. Confira e siga em frente.'
-                      : 'Preenchemos com os dados do seu último chamado. Se não for você, é só editar.'}
-                  </p>
+                    <div className="otp-note__copy">
+                      <span>
+                        {prefillFromAccount
+                          ? 'Preenchemos com os dados da sua conta.'
+                          : 'Preenchemos com os dados do último chamado feito neste aparelho.'}
+                      </span>
+                      <button type="button" className="otp-note__action" onClick={switchRequester}>
+                        É para outra pessoa? Apagar e preencher de novo
+                      </button>
+                    </div>
+                  </div>
                 )}
 
                 <div className="otp-panel">
@@ -981,6 +1013,20 @@ export default function OpenTicketPage() {
                       ))}
                     </select>
                   </div>
+
+                  {switchedFrom === 'remembered' && (
+                    <label className="otp-remember">
+                      <input
+                        type="checkbox"
+                        checked={rememberRequester}
+                        onChange={(e) => setRememberRequester(e.target.checked)}
+                      />
+                      <span>
+                        <strong>Usar estes dados nos próximos chamados deste aparelho</strong>
+                        <small>Deixe desmarcado se está abrindo para outra pessoa.</small>
+                      </span>
+                    </label>
+                  )}
                 </div>
               </div>
             )}
@@ -989,6 +1035,21 @@ export default function OpenTicketPage() {
             {currentStep === 4 && (
               <div className="otp-step" data-step="4">
                 <SelectionTrail />
+                {formData.name && formData.email && (
+                  <div className="otp-who">
+                    <span className="otp-who__icon" aria-hidden="true">
+                      <i className="ti ti-user" />
+                    </span>
+                    <div className="otp-who__copy">
+                      <span className="otp-who__label">Chamado em nome de</span>
+                      <strong>{formData.name}</strong>
+                      <span className="otp-who__email">{formData.email}</span>
+                    </div>
+                    <button type="button" className="otp-who__switch" onClick={switchRequester}>
+                      Não é você? Trocar
+                    </button>
+                  </div>
+                )}
                 <div className="otp-panel">
                   <div className="pub-field">
                     <label htmlFor="title">Resumo</label>
