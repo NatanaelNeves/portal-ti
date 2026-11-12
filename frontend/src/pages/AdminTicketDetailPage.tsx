@@ -185,17 +185,6 @@ export default function AdminTicketDetailPage() {
       .catch(() => {});
   }, [internalToken, navigate, fetchTicket, fetchHistory, authHeaders]);
 
-  // Atualiza sozinho quando alguém responde ou muda o chamado.
-  useEffect(() => {
-    const refresh = (event: Event) => {
-      const ticketId = (event as CustomEvent<any>).detail?.ticketId;
-      if (!ticketId || ticketId === id) { void fetchTicket(); void fetchHistory(); }
-    };
-    const names = ['ticket:updated', 'ticket:resolved', 'ticket:reopened'];
-    names.forEach((n) => window.addEventListener(n, refresh));
-    return () => names.forEach((n) => window.removeEventListener(n, refresh));
-  }, [id, fetchTicket, fetchHistory]);
-
   const backRoute = role === 'rh_staff' ? '/rh/chamados' : '/admin/chamados';
 
   const update = async (payload: Record<string, unknown>, success: string) => {

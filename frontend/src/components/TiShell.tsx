@@ -36,18 +36,10 @@ const AREA_LABEL: Record<string, string> = {
 
 const KIND_ICON: Record<NotificationKind, string> = {
   new: 'ti-ticket',
-  updated: 'ti-refresh',
-  resolved: 'ti-circle-check',
-  reopened: 'ti-arrow-back-up',
-  warning: 'ti-alert-triangle',
 };
 
 const KIND_LABEL: Record<NotificationKind, string> = {
   new: 'Novo',
-  updated: 'Atualização',
-  resolved: 'Resolvido',
-  reopened: 'Reaberto',
-  warning: 'Prazo',
 };
 
 const relativeTime = (iso: string) => {

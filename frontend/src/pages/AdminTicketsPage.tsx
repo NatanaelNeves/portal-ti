@@ -179,30 +179,12 @@ export default function AdminTicketsPage() {
   useEffect(() => {
     if (!isContextReady) return;
 
-    let debounceTimer = 0;
-    const handleRealtimeUpdate = () => {
-      window.clearTimeout(debounceTimer);
-      debounceTimer = window.setTimeout(() => refreshRef.current(), 400);
-    };
-
-    window.addEventListener('ticket:new', handleRealtimeUpdate);
-    window.addEventListener('ticket:updated', handleRealtimeUpdate);
-    window.addEventListener('ticket:resolved', handleRealtimeUpdate);
-    window.addEventListener('ticket:reopened', handleRealtimeUpdate);
-    window.addEventListener('ticket:auto_close_warning', handleRealtimeUpdate);
-
     const refreshInterval = window.setInterval(() => {
       if (document.visibilityState === 'visible') refreshRef.current();
     }, 30000);
 
     return () => {
-      window.removeEventListener('ticket:new', handleRealtimeUpdate);
-      window.removeEventListener('ticket:updated', handleRealtimeUpdate);
-      window.removeEventListener('ticket:resolved', handleRealtimeUpdate);
-      window.removeEventListener('ticket:reopened', handleRealtimeUpdate);
-      window.removeEventListener('ticket:auto_close_warning', handleRealtimeUpdate);
       window.clearInterval(refreshInterval);
-      window.clearTimeout(debounceTimer);
     };
   }, [isContextReady]);
 

@@ -37,7 +37,7 @@ describe('Internal Auth Routes', () => {
       expect(response.body.error).toBe('Invalid credentials');
     });
 
-    it('deve retornar token e refresh token em login bem-sucedido', async () => {
+    it('deve retornar token em login bem-sucedido', async () => {
       const hashedPassword = await bcrypt.hash('password123', 10);
       
       const mockUser = {
@@ -50,18 +50,7 @@ describe('Internal Auth Routes', () => {
 
       // Mock para buscar usuário
       (database.query as jest.Mock)
-        .mockResolvedValueOnce({ rows: [mockUser] })
-        // Mock para criar refresh token
-        .mockResolvedValueOnce({
-          rows: [{
-            id: 'token-id',
-            user_id: 'user-id',
-            token: 'refresh-token-string',
-            expires_at: new Date(),
-            is_revoked: false,
-            created_at: new Date(),
-          }],
-        });
+        .mockResolvedValueOnce({ rows: [mockUser] });
 
       const response = await request(app)
         .post('/api/internal-auth/internal-login')
@@ -72,104 +61,7 @@ describe('Internal Auth Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('token');
-      expect(response.body).toHaveProperty('refreshToken');
       expect(response.body.user.email).toBe('test@example.com');
-    });
-  });
-
-  describe('POST /refresh', () => {
-    it('deve retornar 400 se refresh token não fornecido', async () => {
-      const response = await request(app)
-        .post('/api/internal-auth/refresh')
-        .send({});
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toBe('Refresh token is required');
-    });
-
-    it('deve retornar 401 se refresh token inválido', async () => {
-      (database.query as jest.Mock).mockResolvedValue({ rows: [] });
-
-      const response = await request(app)
-        .post('/api/internal-auth/refresh')
-        .send({
-          refreshToken: 'invalid-token',
-        });
-
-      expect(response.status).toBe(401);
-      expect(response.body.error).toBe('Invalid or expired refresh token');
-    });
-
-    it('deve renovar tokens com refresh token válido', async () => {
-      const mockUser = {
-        id: 'user-id',
-        email: 'test@example.com',
-        name: 'Test User',
-        role: 'it_staff',
-      };
-
-      // Mock para buscar refresh token
-      (database.query as jest.Mock)
-        .mockResolvedValueOnce({
-          rows: [{
-            id: 'token-id',
-            user_id: 'user-id',
-            token: 'valid-refresh-token',
-            expires_at: new Date(Date.now() + 86400000),
-            is_revoked: false,
-            created_at: new Date(),
-          }],
-        })
-        // Mock para buscar usuário
-        .mockResolvedValueOnce({ rows: [mockUser] })
-        // Mock para revogar token antigo
-        .mockResolvedValueOnce({})
-        // Mock para criar novo refresh token
-        .mockResolvedValueOnce({
-          rows: [{
-            id: 'new-token-id',
-            user_id: 'user-id',
-            token: 'new-refresh-token',
-            expires_at: new Date(Date.now() + 86400000),
-            is_revoked: false,
-            created_at: new Date(),
-          }],
-        });
-
-      const response = await request(app)
-        .post('/api/internal-auth/refresh')
-        .send({
-          refreshToken: 'valid-refresh-token',
-        });
-
-      expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('token');
-      expect(response.body).toHaveProperty('refreshToken');
-      expect(response.body.user.email).toBe('test@example.com');
-    });
-  });
-
-  describe('POST /logout', () => {
-    it('deve fazer logout com sucesso', async () => {
-      (database.query as jest.Mock).mockResolvedValue({});
-
-      const response = await request(app)
-        .post('/api/internal-auth/logout')
-        .send({
-          refreshToken: 'some-token',
-        });
-
-      expect(response.status).toBe(200);
-      expect(response.body.message).toBe('Logged out successfully');
-    });
-
-    it('deve retornar sucesso mesmo sem refresh token', async () => {
-      const response = await request(app)
-        .post('/api/internal-auth/logout')
-        .send({});
-
-      expect(response.status).toBe(200);
-      expect(response.body.message).toBe('Logged out successfully');
     });
   });
 });

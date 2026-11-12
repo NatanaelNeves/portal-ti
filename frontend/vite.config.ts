@@ -13,7 +13,6 @@ export default defineConfig(({ mode }) => ({
         manualChunks: {
           'vendor-react':   ['react', 'react-dom', 'react-router-dom'],
           'vendor-charts':  ['recharts'],
-          'vendor-socket':  ['socket.io-client'],
           'vendor-xlsx':    ['xlsx'],
         },
       },

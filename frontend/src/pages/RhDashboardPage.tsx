@@ -53,11 +53,8 @@ export default function RhDashboardPage() {
   useEffect(() => {
     void load();
     const refresh = () => void load();
-    const events = ['ticket:new', 'ticket:updated', 'ticket:resolved', 'ticket:reopened'];
-    events.forEach((name) => window.addEventListener(name, refresh));
     const timer = window.setInterval(refresh, 60_000);
     return () => {
-      events.forEach((name) => window.removeEventListener(name, refresh));
       window.clearInterval(timer);
     };
   }, [load]);

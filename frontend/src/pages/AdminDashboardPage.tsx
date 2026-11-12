@@ -161,16 +161,10 @@ export default function AdminDashboardPage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  // Acompanha a fila em tempo real, sem piscar a tela.
+  // Recarrega a cada minuto, sem piscar a tela.
   useEffect(() => {
-    const refresh = () => void load(true);
-    const events = ['ticket:new', 'ticket:updated', 'ticket:resolved', 'ticket:reopened'];
-    events.forEach((name) => window.addEventListener(name, refresh));
-    const timer = window.setInterval(refresh, 60_000);
-    return () => {
-      events.forEach((name) => window.removeEventListener(name, refresh));
-      window.clearInterval(timer);
-    };
+    const timer = window.setInterval(() => void load(true), 60_000);
+    return () => window.clearInterval(timer);
   }, [load]);
 
   const bands = useMemo(() => {

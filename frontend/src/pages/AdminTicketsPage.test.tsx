@@ -52,7 +52,7 @@ describe('continuidade da fila de chamados', () => {
     const row = screen.getByText('Solicitação de suporte 15');
     fireEvent.click(row.closest('.ticket-card')!.querySelector('input')!);
     vi.mocked(api.get).mockResolvedValue(response([{ ...tickets[0], id: 'new-ticket', title: 'Novo chamado recebido' }, ...tickets]));
-    await act(async () => { window.dispatchEvent(new Event('ticket:new')); vi.advanceTimersByTime(500); });
+    await act(async () => { vi.advanceTimersByTime(30000); });
     expect(screen.queryByText('Novo chamado recebido')).not.toBeInTheDocument();
     expect(row.isConnected).toBe(true);
     expect(row.closest('.ticket-card')!.querySelector('input')).toBeChecked();
@@ -95,7 +95,7 @@ describe('continuidade da fila de chamados', () => {
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'suporte' } });
     await act(async () => { vi.advanceTimersByTime(300); });
     vi.mocked(api.get).mockClear();
-    await act(async () => { window.dispatchEvent(new Event('ticket:updated')); vi.advanceTimersByTime(400); });
+    await act(async () => { vi.advanceTimersByTime(30000); });
     const url = vi.mocked(api.get).mock.calls[0][0];
     const params = new URLSearchParams(url.split('?')[1]);
     expect(params.get('search')).toBe('suporte');
@@ -134,7 +134,7 @@ describe('continuidade da fila de chamados', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: tickets[15].title })); });
     const details = screen.getByRole('region', { name: `Detalhes de ${tickets[15].title}` });
     vi.mocked(api.get).mockResolvedValue(response([{ ...tickets[0], id: 'new-ticket', title: 'Novidade' }, ...tickets]));
-    await act(async () => { window.dispatchEvent(new Event('ticket:updated')); vi.advanceTimersByTime(400); });
+    await act(async () => { vi.advanceTimersByTime(30000); });
     expect(details.isConnected).toBe(true);
     expect(screen.getByRole('button', { name: tickets[15].title })).toHaveAttribute('aria-expanded', 'true');
     expect(screen.queryByText('Novidade')).not.toBeInTheDocument();
