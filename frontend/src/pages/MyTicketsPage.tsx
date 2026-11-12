@@ -146,21 +146,8 @@ export default function MyTicketsPage() {
     const refresh = () => fetchTickets(token, { quiet: true });
     const interval = window.setInterval(refresh, 30000);
 
-    const onRealtime = (event: Event) => {
-      const detail = (event as CustomEvent<any>).detail;
-      if (!detail?.ticketId) return;
-      refresh();
-    };
-
-    window.addEventListener('ticket:updated', onRealtime);
-    window.addEventListener('ticket:resolved', onRealtime);
-    window.addEventListener('ticket:reopened', onRealtime);
-
     return () => {
       window.clearInterval(interval);
-      window.removeEventListener('ticket:updated', onRealtime);
-      window.removeEventListener('ticket:resolved', onRealtime);
-      window.removeEventListener('ticket:reopened', onRealtime);
     };
   }, [showEmailForm]);
 

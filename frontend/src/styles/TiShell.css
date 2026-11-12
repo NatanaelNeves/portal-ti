@@ -445,9 +445,6 @@
   font-size: 1.05rem;
 }
 
-.tsh-notif__icon.kind-warning { color: var(--ti-late); background: #fdeae8; }
-.tsh-notif__icon.kind-reopened { color: #9a5a10; background: #fbf0df; }
-.tsh-notif__icon.kind-updated { color: #1f5f8b; background: #e6f0f7; }
 
 .tsh-notif__copy {
   display: grid;

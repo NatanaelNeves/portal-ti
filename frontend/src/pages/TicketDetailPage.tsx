@@ -183,27 +183,6 @@ export default function TicketDetailPage() {
     return () => window.clearInterval(interval);
   }, [id]);
 
-  useEffect(() => {
-    if (!id) return;
-
-    const handleRealtimeUpdate = (event: Event) => {
-      const custom = event as CustomEvent<any>;
-      if (custom.detail?.ticketId === id) {
-        silentRefresh(id, true);
-      }
-    };
-
-    window.addEventListener('ticket:updated', handleRealtimeUpdate);
-    window.addEventListener('ticket:resolved', handleRealtimeUpdate);
-    window.addEventListener('ticket:reopened', handleRealtimeUpdate);
-
-    return () => {
-      window.removeEventListener('ticket:updated', handleRealtimeUpdate);
-      window.removeEventListener('ticket:resolved', handleRealtimeUpdate);
-      window.removeEventListener('ticket:reopened', handleRealtimeUpdate);
-    };
-  }, [id]);
-
   const buildHeaders = () => {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',

@@ -49,9 +49,6 @@ export const PERMISSIONS = {
   'dashboard:administrativo': [UserRole.ADMIN_STAFF, UserRole.ADMIN],
   'dashboard:coordenador': [UserRole.MANAGER, UserRole.ADMIN],
 
-  // Reservas de equipamentos
-  'reservations:manage': [UserRole.IT_STAFF, UserRole.ADMIN],
-  'reservations:types:manage': [UserRole.ADMIN],
 } as Record<string, UserRole[]>;
 
 /**
@@ -113,61 +110,4 @@ export function authorize(...permissions: (keyof typeof PERMISSIONS)[]) {
 
     next();
   };
-}
-
-/**
- * Middleware para validar propriedade do recurso
- * Garante que usuário sem privilégios só acessa seus próprios dados
- */
-export function requireOwnership(
-  getOwnerId: (req: Request) => string | Promise<string>
-) {
-  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      if (!req.user) {
-        res.status(401).json({ error: 'Autenticação necessária' });
-        return;
-      }
-
-      // Admin e TI podem acessar qualquer recurso
-      if ([UserRole.ADMIN, UserRole.IT_STAFF].includes(req.user.role)) {
-        next();
-        return;
-      }
-
-      const ownerId = await getOwnerId(req);
-      
-      if (ownerId !== req.user.id) {
-        res.status(403).json({ 
-          error: 'Acesso negado',
-          message: 'Você só pode acessar seus próprios dados'
-        });
-        return;
-      }
-
-      next();
-    } catch (error) {
-      res.status(500).json({ error: 'Erro ao validar propriedade' });
-    }
-  };
-}
-
-/**
- * Helper para verificar se usuário tem papel específico
- */
-export function hasRole(user: AuthUser | undefined, ...roles: UserRole[]): boolean {
-  if (!user) return false;
-  return roles.includes(user.role);
-}
-
-/**
- * Helper para verificar permissão
- */
-export function hasPermission(
-  user: AuthUser | undefined, 
-  permission: keyof typeof PERMISSIONS
-): boolean {
-  if (!user) return false;
-  const allowedRoles = PERMISSIONS[permission];
-  return allowedRoles.includes(user.role);
 }

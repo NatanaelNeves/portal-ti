@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../stores/authStore';
+import { showToast } from '../utils/toast';
 import ChatWidget from './ChatWidget';
 import AdmShell from './AdmShell';
 import RhShell from './RhShell';
@@ -21,13 +21,12 @@ export default function Navigation() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { logout } = useAuthStore();
   const isInternalUser = !!localStorage.getItem('internal_token');
 
   const handleLogout = () => {
-    logout();
     localStorage.removeItem('internal_token');
     localStorage.removeItem('internal_user');
+    showToast.info('Você saiu do sistema');
     navigate('/admin/login');
   };
 

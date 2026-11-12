@@ -17,7 +17,6 @@ import {
 } from '../middleware/validation';
 import { TEAM_CATEGORIES, TEAM_DEFAULT_CATEGORY, type ServiceTeam } from '../config/ticketCategories';
 import { pollingLimiter } from '../middleware/rateLimiter';
-import { getWebSocketService } from '../services/websocketService';
 import path from 'path';
 import { getQueuePriorityRank, getTicketServiceCycleStartedAt } from '../services/ticketQueueVisibility';
 import { resolveServiceDepartment, serviceDepartmentLabel, canSelectServiceDepartment } from '../services/reportFilterScope';
@@ -174,23 +173,6 @@ const getHistoryInternalActorType = (role: string): 'it_staff' | 'admin_staff' |
   if (role === UserRole.ADMIN) return 'admin';
   if (role === UserRole.MANAGER || role === 'gestor') return 'manager';
   return 'it_staff';
-};
-
-const emitTicketEvent = (event: string, payload: any) => {
-  try {
-    const ws = getWebSocketService();
-    if (!ws) return;
-    ws.getIO().emit(event, {
-      ...payload,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    console.error(`Error emitting websocket event ${event}:`, error);
-  }
-};
-
-const emitTicketUpdatedEvent = (payload: any) => {
-  emitTicketEvent('ticket:updated', payload);
 };
 
 const notifyResponsibleTeamForReopenedTicket = async (ticket: any): Promise<void> => {
@@ -1246,14 +1228,6 @@ ticketsRouter.post('/', validate(createTicketSchema), async (req: Request, res: 
       ],
     ).catch(() => undefined);
 
-    emitTicketEvent('ticket:new', {
-      ticketId: ticket.rows[0].id,
-      title: ticket.rows[0].title,
-      status: ticket.rows[0].status,
-      priority: ticket.rows[0].priority,
-      department: ticket.rows[0].department,
-      action: 'created',
-    });
 
     // 📧 NOTIFICAÇÃO: Novo chamado para equipe responsável
     try {
@@ -1515,13 +1489,6 @@ ticketsRouter.post('/:id/messages', validate(addMessageSchema), async (req: Requ
     const currentTicketStatus = ticketStatus.rows[0]?.status;
     console.log(`[AUTO-STATUS] Ticket ${id}: ticket_status retornado = ${currentTicketStatus}`);
 
-    emitTicketUpdatedEvent({
-      ticketId: id,
-      status: currentTicketStatus,
-      action: authorType === 'public' ? 'reopened_by_message' : 'message_added',
-      authorType,
-      message,
-    });
 
     // 📧 NOTIFICAÇÃO: Nova mensagem (não enviar se for mensagem interna)
     if (!is_internal) {
@@ -1664,17 +1631,6 @@ ticketsRouter.post('/:id/confirm-resolution', validate(confirmResolutionSchema),
         [id, publicUser.rows[0].id, ticket.status, JSON.stringify({ confirmed_resolved: true })],
       ).catch(() => undefined);
 
-      emitTicketUpdatedEvent({
-        ticketId: id,
-        action: 'resolved_confirmed',
-        oldStatus: ticket.status,
-        status: 'closed',
-      });
-      emitTicketEvent('ticket:resolved', {
-        ticketId: id,
-        title: ticket.title,
-        status: 'closed',
-      });
 
       return res.json({
         message: 'Confirmação registrada com sucesso',
@@ -1713,19 +1669,6 @@ ticketsRouter.post('/:id/confirm-resolution', validate(confirmResolutionSchema),
       console.error('Error notifying team about reopened ticket:', emailError);
     });
 
-    emitTicketUpdatedEvent({
-      ticketId: id,
-      action: 'reopened_by_requester',
-      oldStatus: ticket.status,
-      status: 'open',
-      reopen_reason: reason,
-    });
-    emitTicketEvent('ticket:reopened', {
-      ticketId: id,
-      title: ticket.title,
-      reopen_reason: reason,
-      status: 'open',
-    });
 
     return res.json({
       message: 'Chamado reaberto e equipe notificada',
@@ -1813,14 +1756,6 @@ ticketsRouter.post('/:id/close-by-requester', validate(closeByRequesterSchema), 
 
     const row = updated.rows[0];
     void notifyAssigneeOfRequesterClosure(row);
-    emitTicketUpdatedEvent({
-      ticketId: id,
-      title: ticket.title,
-      action: 'closed_by_requester',
-      oldStatus: ticket.status,
-      status: 'cancelled',
-      requester_closure: reason,
-    });
 
     return res.json({ message: 'Chamado encerrado', ticket: row });
   } catch (error) {
@@ -1894,13 +1829,6 @@ ticketsRouter.post('/:id/reopen-by-requester', async (req: Request, res: Respons
     ).catch(() => undefined);
 
     void notifyResponsibleTeamForReopenedTicket(reopened.rows[0]);
-    emitTicketUpdatedEvent({
-      ticketId: id,
-      title: ticket.title,
-      action: 'reopened_by_requester',
-      oldStatus: 'cancelled',
-      status: 'open',
-    });
 
     return res.json({ message: 'Chamado reaberto', ticket: reopened.rows[0] });
   } catch (error) {
@@ -1971,11 +1899,6 @@ ticketsRouter.post('/:id/rating', validate(ticketRatingSchema), async (req: Requ
       [id, publicUser.rows[0].id, String(rating), JSON.stringify({ feedback: feedback || null })],
     ).catch(() => undefined);
 
-    emitTicketEvent('ticket:rated', {
-      ticketId: id,
-      rating,
-      action: 'rating_submitted',
-    });
 
     return res.status(201).json({
       message: 'Avaliação registrada com sucesso',
@@ -2031,12 +1954,6 @@ ticketsRouter.post('/:id/manual-close', authenticate, async (req: Request, res: 
       [id, historyActorType, user.id, ticket.status, JSON.stringify({ auto_closed: false, reason: 'manual_close' })],
     ).catch(() => undefined);
 
-    emitTicketUpdatedEvent({
-      ticketId: id,
-      action: 'manual_closed',
-      oldStatus: ticket.status,
-      status: 'closed',
-    });
 
     if (ticket.requester_type === 'public') {
       const publicUser = await database.query(
@@ -2216,21 +2133,6 @@ ticketsRouter.post('/:id/encaminhar', authenticate, validate(forwardTicketSchema
   }
 
   // A fila antiga tira o chamado; a nova recebe como chegada.
-  emitTicketUpdatedEvent({
-    ticketId: id,
-    action: 'department_changed',
-    oldDepartment: from,
-    department: target,
-    status: 'open',
-  });
-  emitTicketEvent('ticket:new', {
-    ticketId: id,
-    title: ticket.title,
-    status: ticket.status,
-    priority: ticket.priority,
-    department: target,
-    action: 'forwarded',
-  });
 
   try {
     const [staff, requester] = await Promise.all([
@@ -2474,11 +2376,10 @@ ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (r
      * operacoes independentes: se a segunda falhasse, o chamado ficava em
      * espera com o SLA correndo. Agora ou tudo persiste, ou nada.
      *
-     * Efeitos externos (websocket, e-mail) NAO entram aqui — eles nao fazem
-     * rollback. Sao enfileirados e disparados depois do COMMIT.
+     * Efeitos externos (e-mail) NAO entram aqui — eles nao fazem rollback
+     * e so sao disparados depois do COMMIT.
      */
     const client = await database.getClient();
-    const afterCommit: Array<() => void> = [];
     let result: any;
     const historyActorType = getHistoryInternalActorType(userRole);
     let updatedStatus: string;
@@ -2523,21 +2424,6 @@ ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (r
           ) VALUES ($1, 'status_changed', $2, $3, $4, $5, $6::jsonb)`,
           [id, historyActorType, userId, lockedStatus, updatedStatus, JSON.stringify({ requested_status: status })],
         );
-
-        afterCommit.push(() => emitTicketUpdatedEvent({
-          ticketId: id,
-          action: updatedStatus === STATUS_AWAITING_CONFIRMATION ? 'marked_resolved_pending_confirmation' : 'status_changed',
-          oldStatus: lockedStatus,
-          status: updatedStatus,
-        }));
-
-        if (updatedStatus === STATUS_AWAITING_CONFIRMATION) {
-          afterCommit.push(() => emitTicketEvent('ticket:resolved', {
-            ticketId: id,
-            title: result.rows[0].title,
-            status: updatedStatus,
-          }));
-        }
       }
 
     // A prioridade muda o prazo do chamado, entao ela pertence ao historico
@@ -2598,11 +2484,6 @@ ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (r
           ],
         );
 
-        afterCommit.push(() => emitTicketUpdatedEvent({
-          ticketId: id,
-          action: assigned_to_id ? 'assigned' : 'unassigned',
-          assigned_to_id,
-        }));
       }
 
       // AUDITORIA. Fica fora da garantia de atomicidade porque a tabela pode
@@ -2634,10 +2515,6 @@ ticketsRouter.patch('/:id', authenticate, validate(updateTicketSchema), async (r
     }
 
     // ── Somente apos o COMMIT: efeitos que nao fazem rollback. ──
-    afterCommit.forEach((emit) => {
-      try { emit(); } catch (err) { console.error('Falha ao emitir evento pos-commit:', err); }
-    });
-
     // 📧 NOTIFICAÇÕES: Atribuição ou mudança de status
     try {
       const ticket = result.rows[0];

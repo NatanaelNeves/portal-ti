@@ -1236,28 +1236,6 @@ export async function initializeDatabase(): Promise<void> {
       console.warn('⚠ Could not seed admin user:', e);
     }
 
-    // ── Seed: RH users ───────────────────────────────────────────────
-    try {
-      const rhPassword = 'Opn@1234!';
-      const rhHash = await bcrypt.hash(rhPassword, 12);
-      const rhUsers = [
-        { email: 'rh@opequenonazareno.org.br',  name: 'Marina Carvalho' },
-        { email: 'rh1@opequenonazareno.org.br', name: 'Ester Silva' },
-        { email: 'rh2@opequenonazareno.org.br', name: 'Natalia Felix' },
-      ];
-      for (const u of rhUsers) {
-        await database.query(
-          `INSERT INTO internal_users (email, name, password_hash, role, is_active)
-           VALUES ($1, $2, $3, 'rh_staff', true)
-           ON CONFLICT (email) DO NOTHING`,
-          [u.email, u.name, rhHash]
-        );
-      }
-      console.log('✓ RH users seeded (rh@, rh1@, rh2@)');
-    } catch (e) {
-      console.warn('⚠ Could not seed RH users:', e);
-    }
-
     // ── Seed: information articles ────────────────────────────────────
     if (seedAdminId) {
       try {
