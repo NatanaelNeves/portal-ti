@@ -15,7 +15,7 @@ import {
   ticketRatingSchema,
   forwardTicketSchema,
 } from '../middleware/validation';
-import { TEAM_CATEGORIES, TEAM_DEFAULT_CATEGORY, type ServiceTeam } from '../config/ticketCategories';
+import { NOTEBOOK_CLASS_CATEGORY, TEAM_CATEGORIES, TEAM_DEFAULT_CATEGORY, type ServiceTeam } from '../config/ticketCategories';
 import { pollingLimiter } from '../middleware/rateLimiter';
 import path from 'path';
 import { getQueuePriorityRank, getTicketServiceCycleStartedAt } from '../services/ticketQueueVisibility';
@@ -1183,7 +1183,9 @@ ticketsRouter.post('/', validate(createTicketSchema), async (req: Request, res: 
     console.log('POST /tickets - Ticket created:', ticket.rows[0].id);
 
     // ── Classificação automática por IA (assíncrona, não bloqueia resposta) ───
-    setImmediate(async () => {
+    // O pedido de notebooks para aula já chega com assunto, tipo e prioridade
+    // (calculada pela data da aula): a IA não tem o que acrescentar.
+    if (category !== NOTEBOOK_CLASS_CATEGORY) setImmediate(async () => {
       try {
         const { classifyTicket } = await import('../services/aiService');
         const classification = await classifyTicket(title, description, department || 'ti');

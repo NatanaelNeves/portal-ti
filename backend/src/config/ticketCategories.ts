@@ -62,10 +62,19 @@ export const RH_INTERNAL_CATEGORIES = RH_CATEGORIES.filter(
 
 export type ServiceTeam = 'ti' | 'administrativo' | 'rh';
 
+/**
+ * Pedido de notebooks para uma aula. Tem formulário próprio: quantos, onde e
+ * em quais dias/horários. Vai em `tickets.metadata` como:
+ *   { quantity, location, sessions: [{ date, start, end? }], chargers?, notes? }
+ */
+export const NOTEBOOK_CLASS_CATEGORY = 'notebook_aula';
+export const NOTEBOOK_CLASS_MAX_QUANTITY = 60;
+export const NOTEBOOK_CLASS_MAX_SESSIONS = 10;
+
 // Assuntos que cada equipe recebe, os mesmos do formulário de abertura.
 // Usado ao encaminhar um chamado de uma equipe para outra.
 export const TEAM_CATEGORIES: Record<ServiceTeam, string[]> = {
-  ti: ['computador', 'internet', 'impressora', 'sistema', 'outro'],
+  ti: ['computador', 'internet', 'impressora', 'sistema', NOTEBOOK_CLASS_CATEGORY, 'outro'],
   administrativo: ['copia_chave', 'apoio_evento', 'buscar_doacao', 'solicitar_documento', 'outro'],
   rh: RH_PUBLIC_CATEGORIES,
 };
@@ -82,6 +91,7 @@ export const CATEGORY_SECTOR_MAP: Record<string, TicketSector> = {
   internet: 'TI',
   impressora: 'TI',
   sistema: 'TI',
+  [NOTEBOOK_CLASS_CATEGORY]: 'TI',
   outro: 'TI',
 
   // Administrativo categories

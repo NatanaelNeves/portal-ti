@@ -95,6 +95,31 @@ async function autoCloseAwaitingConfirmationTickets(): Promise<void> {
   }
 }
 
+// ─── Varredura dos chamados aguardando confirmação ───────────────────────────
+//
+// Antes rodava uma única vez por dia, às 03:00 UTC (meia-noite aqui). O
+// servidor dorme quando ninguém usa o portal, então nesse horário ele quase
+// nunca estava de pé e os chamados ficavam em "aguardando confirmação" até
+// alguém da TI fechar na mão. Agora a varredura roda assim que o servidor
+// sobe e a cada 30 minutos enquanto ele estiver ligado. Ela só mexe em
+// chamados que já passaram do prazo, então rodar várias vezes não muda nada.
+let sweepInFlight: Promise<void> | null = null;
+
+export function sweepAwaitingConfirmationTickets(): Promise<void> {
+  if (sweepInFlight) return sweepInFlight;
+
+  sweepInFlight = (async () => {
+    // O aviso vem antes do fechamento: quem ainda está dentro do prazo
+    // recebe o e-mail; quem já passou é fechado na mesma rodada.
+    await notifyTicketsNearAutoClose();
+    await autoCloseAwaitingConfirmationTickets();
+  })().finally(() => {
+    sweepInFlight = null;
+  });
+
+  return sweepInFlight;
+}
+
 // ─── Job: Alertas de garantia de equipamentos ────────────────────────────────
 async function notifyWarrantyExpiring(): Promise<void> {
   try {
@@ -167,10 +192,10 @@ async function notifyWarrantyExpiring(): Promise<void> {
 
 // ─── Registrar jobs ──────────────────────────────────────────────────────────
 export function initializeScheduler(): void {
-  // Tickets: todo dia às 03:00 UTC
-  cron.schedule('0 3 * * *', () => {
-    notifyTicketsNearAutoClose();
-    autoCloseAwaitingConfirmationTickets();
+  // Chamados aguardando confirmação: ao subir e a cada 30 minutos.
+  void sweepAwaitingConfirmationTickets();
+  cron.schedule('*/30 * * * *', () => {
+    void sweepAwaitingConfirmationTickets();
   });
 
   // Garantias: todo dia às 09:00 UTC
@@ -179,6 +204,6 @@ export function initializeScheduler(): void {
   });
 
   console.log(
-    `✓ Scheduler iniciado: tickets (03:00), garantias (09:00)`,
+    `✓ Scheduler iniciado: fechamento automático de chamados (agora e a cada 30 min), garantias (09:00)`,
   );
 }

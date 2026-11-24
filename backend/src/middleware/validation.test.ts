@@ -96,3 +96,50 @@ describe('Validation Schemas', () => {
     });
   });
 });
+
+describe('createTicketSchema: notebooks para aula', () => {
+  const base = {
+    title: 'Notebooks para aula: 15 em 26/11',
+    description: 'Pedido de 15 notebooks para aula na Sala 3.',
+    type: 'request',
+    priority: 'medium',
+    department: 'ti',
+    category: 'notebook_aula',
+  };
+  const details = {
+    quantity: 15,
+    location: 'Sala 3, turma de informática',
+    sessions: [{ date: '2026-11-26', start: '14:00', end: '17:00' }],
+  };
+
+  it('aceita quantidade, local e um dia com horário', () => {
+    expect(createTicketSchema.safeParse({ ...base, requestDetails: details }).success).toBe(true);
+  });
+
+  it('aceita vários dias e término em branco', () => {
+    const result = createTicketSchema.safeParse({
+      ...base,
+      requestDetails: { ...details, sessions: [...details.sessions, { date: '2026-11-28', start: '08:00', end: '' }] },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('exige quantidade, local e dia', () => {
+    const result = createTicketSchema.safeParse({ ...base, requestDetails: {} });
+    expect(result.success).toBe(false);
+    const fields = result.success ? [] : result.error.issues.map((issue) => issue.path.join('.'));
+    expect(fields).toEqual(expect.arrayContaining([
+      'requestDetails.quantity',
+      'requestDetails.location',
+      'requestDetails.sessions',
+    ]));
+  });
+
+  it('recusa término antes do início', () => {
+    const result = createTicketSchema.safeParse({
+      ...base,
+      requestDetails: { ...details, sessions: [{ date: '2026-11-26', start: '14:00', end: '13:00' }] },
+    });
+    expect(result.success).toBe(false);
+  });
+});

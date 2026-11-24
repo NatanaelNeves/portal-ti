@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import { Request, Response, NextFunction } from 'express';
-import { RH_CATEGORY_SCHEMAS } from '../config/ticketCategories';
+import {
+  NOTEBOOK_CLASS_CATEGORY,
+  NOTEBOOK_CLASS_MAX_QUANTITY,
+  NOTEBOOK_CLASS_MAX_SESSIONS,
+  RH_CATEGORY_SCHEMAS,
+} from '../config/ticketCategories';
 
 /**
  * Middleware genérico para validação de requisições com Zod
@@ -30,6 +35,51 @@ export const validate = (schema: z.ZodSchema) => {
  */
 
 const MAX_METADATA_BYTES = 10 * 1024;
+
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+const textOf = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
+
+/**
+ * Pedido de notebooks para aula: quantos, onde e pelo menos um dia com o
+ * horário de início. O horário de término é opcional, mas se vier precisa
+ * ser depois do início.
+ */
+function refineNotebookClassDetails(details: Record<string, unknown>, ctx: z.RefinementCtx) {
+  const issue = (path: Array<string | number>, message: string) =>
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['requestDetails', ...path], message });
+
+  const quantity = Number(details.quantity);
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > NOTEBOOK_CLASS_MAX_QUANTITY) {
+    issue(['quantity'], `Informe quantos notebooks, de 1 a ${NOTEBOOK_CLASS_MAX_QUANTITY}`);
+  }
+
+  if (!textOf(details.location)) {
+    issue(['location'], 'Informe a sala ou turma');
+  }
+
+  const sessions = details.sessions;
+  if (!Array.isArray(sessions) || sessions.length === 0) {
+    issue(['sessions'], 'Informe o dia da aula');
+    return;
+  }
+  if (sessions.length > NOTEBOOK_CLASS_MAX_SESSIONS) {
+    issue(['sessions'], `No máximo ${NOTEBOOK_CLASS_MAX_SESSIONS} dias por chamado`);
+  }
+
+  sessions.forEach((session, index) => {
+    const item = (session ?? {}) as Record<string, unknown>;
+    const date = textOf(item.date);
+    const start = textOf(item.start);
+    const end = textOf(item.end);
+
+    if (!DATE_PATTERN.test(date)) issue(['sessions', index, 'date'], 'Campo obrigatório');
+    if (!TIME_PATTERN.test(start)) issue(['sessions', index, 'start'], 'Campo obrigatório');
+    if (end && (!TIME_PATTERN.test(end) || (TIME_PATTERN.test(start) && end <= start))) {
+      issue(['sessions', index, 'end'], 'O término precisa ser depois do início');
+    }
+  });
+}
 
 export const createTicketSchema = z.object({
   title: z.string()
@@ -64,6 +114,10 @@ export const createTicketSchema = z.object({
         message: 'Detalhes excedem o limite de 10KB',
       });
     }
+  }
+
+  if (data.category === NOTEBOOK_CLASS_CATEGORY) {
+    refineNotebookClassDetails(data.requestDetails ?? {}, ctx);
   }
 
   if (data.category && RH_CATEGORY_SCHEMAS[data.category]) {

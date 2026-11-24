@@ -2,6 +2,12 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import { canAssume, canChangeStatus, canResolve } from './ticketPermissions';
+import { ADMIN_CATEGORIES, RH_CATEGORIES, TI_CATEGORIES } from '../../utils/ticketCategories';
+
+// Assuntos do formulário pelo nome; o resto (texto da IA) como veio.
+const categoryLabel = (code: string) =>
+  [...TI_CATEGORIES, ...ADMIN_CATEGORIES, ...RH_CATEGORIES].find((category) => category.value === code)?.label
+  ?? code.replace(/_/g, ' ');
 
 interface InlineTicket {
   id: string;
@@ -116,7 +122,7 @@ export default function TicketInlineDetails({ ticket, role, userId, ownerName, t
             {location && <div><dt>Localização</dt><dd>{location}</dd></div>}
             <div><dt>Responsável</dt><dd>{ownerName}</dd></div>
             <div><dt>Equipe / tipo</dt><dd>{ticket.department === 'administrativo' ? 'Administrativo' : ticket.department === 'rh' ? 'RH' : 'TI'} · {typeLabel}</dd></div>
-            {ticket.category && <div><dt>Categoria</dt><dd>{ticket.category.replace(/_/g, ' ')}</dd></div>}
+            {ticket.category && <div><dt>Categoria</dt><dd>{categoryLabel(ticket.category)}</dd></div>}
             <div><dt>Aberto em</dt><dd><time dateTime={ticket.created_at}>{formatDate(ticket.created_at)}</time></dd></div>
           </dl>
         </aside>
