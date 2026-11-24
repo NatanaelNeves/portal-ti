@@ -6,6 +6,21 @@ import { BACKEND_URL } from '../services/api';
 import { INSTITUTION_DEPARTMENTS, INSTITUTION_UNITS } from '../utils/institutionOptions';
 import { findShortcut, TICKET_SHORTCUTS, type TicketShortcut } from '../utils/ticketShortcuts';
 import { ADMIN_CATEGORIES, mentionsPonto, pontoCategory, RH_CATEGORIES, TI_CATEGORIES } from '../utils/ticketCategories';
+import {
+  buildNotebookTicket,
+  createEmptyNotebookRequest,
+  createEmptyNotebookSession,
+  firstNotebookSession,
+  formatSessionDay,
+  localToday,
+  NOTEBOOK_CLASS_CATEGORY,
+  NOTEBOOK_CLASS_MAX_QUANTITY,
+  NOTEBOOK_CLASS_MAX_SESSIONS,
+  notebookRequestError,
+  notebookRequestPriority,
+  readNotebookRequest,
+  type NotebookSession,
+} from '../utils/notebookRequest';
 import { aiService, type ArticleSuggestion } from '../services/aiService';
 
 interface FormData {
@@ -41,6 +56,8 @@ interface SuccessData {
   timestamp: Date;
   slaHours: number;
   onBehalf: boolean;
+  /** Pedido de notebooks: a primeira aula, no lugar da meta de atendimento. */
+  firstClass: NotebookSession | null;
 }
 
 const REQUESTER_STORAGE_KEY = 'opn_ticket_requester';
@@ -55,7 +72,7 @@ const STEPS = [
 ];
 
 const DEPARTMENTS = [
-  { value: 'ti', label: 'Suporte de TI', icon: 'ti-device-laptop', desc: 'Computador, internet, acessos, impressora e sistemas' },
+  { value: 'ti', label: 'Suporte de TI', icon: 'ti-device-laptop', desc: 'Computador, internet, acessos, impressora, sistemas e notebooks para aula' },
   { value: 'administrativo', label: 'Administrativo', icon: 'ti-building', desc: 'Cópia de chave, apoio em evento, doações e documentos' },
   { value: 'rh', label: 'Recursos Humanos', icon: 'ti-users', desc: 'Atestado, ponto, folha de pagamento, benefícios e declarações' },
 ];
@@ -195,8 +212,24 @@ export default function OpenTicketPage() {
     return levelNames[level];
   };
 
+  const isNotebookRequest = formData.category === NOTEBOOK_CLASS_CATEGORY;
+
+  // Pedido de notebooks: resumo, descrição e prioridade saem do formulário
+  // (quantos, onde, quando). A pessoa não precisa escrever nada.
+  useEffect(() => {
+    if (!isNotebookRequest) return;
+    const details = readNotebookRequest(formData.requestDetails);
+    const draft = { ...buildNotebookTicket(details), priority: notebookRequestPriority(details) };
+    setFormData(prev => (
+      prev.title === draft.title && prev.description === draft.description && prev.priority === draft.priority
+        ? prev
+        : { ...prev, ...draft }
+    ));
+  }, [isNotebookRequest, formData.requestDetails]);
+
   // Recalculate priority automatically whenever relevant fields change
   useEffect(() => {
+    if (isNotebookRequest) return;
     const newPriority = calculatePriority(
       formData.ticketDepartment,
       formData.category,
@@ -210,7 +243,7 @@ export default function OpenTicketPage() {
   // Sugestão de artigos com debounce ao digitar a descrição
   useEffect(() => {
     const query = `${formData.title} ${formData.description}`.trim();
-    if (query.length < 30) {
+    if (query.length < 30 || isNotebookRequest) {
       setArticleSuggestions([]);
       return;
     }
@@ -399,12 +432,38 @@ export default function OpenTicketPage() {
     });
   };
 
-  const handleRequestDetailChange = (field: string, value: string) => {
+  const handleRequestDetailChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({
       ...prev,
       requestDetails: { ...prev.requestDetails, [field]: value },
     }));
   };
+
+  const updateNotebookSessions = (change: (sessions: NotebookSession[]) => NotebookSession[]) => {
+    setFormData(prev => {
+      const sessions = change(readNotebookRequest(prev.requestDetails).sessions);
+      return {
+        ...prev,
+        requestDetails: {
+          ...prev.requestDetails,
+          sessions: sessions.length > 0 ? sessions : [createEmptyNotebookSession()],
+        },
+      };
+    });
+  };
+
+  const updateNotebookSession = (index: number, field: keyof NotebookSession, value: string) =>
+    updateNotebookSessions(sessions => sessions.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
+
+  // O dia seguinte costuma ter o mesmo horário: a nova linha já vem com ele.
+  const addNotebookSession = () =>
+    updateNotebookSessions(sessions => {
+      const last = sessions[sessions.length - 1];
+      return [...sessions, { date: '', start: last?.start ?? '', end: last?.end ?? '' }];
+    });
+
+  const removeNotebookSession = (index: number) =>
+    updateNotebookSessions(sessions => sessions.filter((_, i) => i !== index));
 
   // Check if current step is valid
   const isStepValid = (step: number): boolean => {
@@ -416,6 +475,7 @@ export default function OpenTicketPage() {
       case 3:
         return !!(formData.email && formData.name && !fieldErrors.email && !fieldErrors.name);
       case 4:
+        if (isNotebookRequest) return !notebookRequestError(readNotebookRequest(formData.requestDetails));
         return !!(formData.title && formData.description && !fieldErrors.title && !fieldErrors.description);
       case 5:
         return true;
@@ -483,9 +543,16 @@ export default function OpenTicketPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Resumo e descrição do pedido de notebooks são gerados; ao trocar de
+  // assunto eles não podem ficar parecendo texto da pessoa.
+  const withoutGeneratedText = (prev: FormData) => (
+    prev.category === NOTEBOOK_CLASS_CATEGORY ? { title: '', description: '' } : {}
+  );
+
   const handleSelectDepartment = (dept: string) => {
     setFormData(prev => ({
       ...prev,
+      ...withoutGeneratedText(prev),
       ticketDepartment: dept,
       type: dept === 'ti' ? 'incident' : 'request',
       category: '',
@@ -495,11 +562,19 @@ export default function OpenTicketPage() {
   };
 
   const handleSelectCategory = (catValue: string) => {
-    setFormData(prev => ({
-      ...prev,
-      category: catValue,
-      requestDetails: catValue === 'RH_PONTO' ? { adjustments: [createEmptyRhAdjustment()] } : {},
-    }));
+    const isNotebook = catValue === NOTEBOOK_CLASS_CATEGORY;
+    setFormData(prev => {
+      if (prev.category === catValue) return prev;
+      return {
+        ...prev,
+        ...withoutGeneratedText(prev),
+        type: isNotebook ? 'request' : prev.ticketDepartment === 'ti' ? 'incident' : 'request',
+        category: catValue,
+        requestDetails: catValue === 'RH_PONTO'
+          ? { adjustments: [createEmptyRhAdjustment()] }
+          : isNotebook ? { ...createEmptyNotebookRequest() } : {},
+      };
+    });
     goToStep(hasContactInfo() ? 4 : 3);
   };
 
@@ -586,6 +661,24 @@ export default function OpenTicketPage() {
       }
 
       requestDetailsPayload = normalizedDetails;
+    }
+
+    if (isNotebookRequest) {
+      const details = readNotebookRequest(formData.requestDetails);
+      const problem = notebookRequestError(details);
+      if (problem) {
+        setError(problem);
+        showToast.error(problem);
+        setLoading(false);
+        return;
+      }
+      requestDetailsPayload = {
+        quantity: Number(details.quantity),
+        location: details.location.trim(),
+        sessions: details.sessions.map(({ date, start, end }) => ({ date, start, ...(end ? { end } : {}) })),
+        chargers: details.chargers,
+        ...(details.notes.trim() ? { notes: details.notes.trim() } : {}),
+      };
     }
 
     try {
@@ -688,6 +781,7 @@ export default function OpenTicketPage() {
         timestamp,
         slaHours,
         onBehalf,
+        firstClass: isNotebookRequest ? firstNotebookSession(readNotebookRequest(formData.requestDetails)) : null,
       });
 
     } catch (err: any) {
@@ -702,8 +796,13 @@ export default function OpenTicketPage() {
     }
   };
 
-  const stepMeta = STEPS[currentStep - 1];
+  const stepMeta = currentStep === 4 && isNotebookRequest
+    ? { ...STEPS[3], title: 'Quantos, onde e quando?', lead: 'Com isso a TI separa e prepara os notebooks para a aula.' }
+    : STEPS[currentStep - 1];
   const rhAdjustments = getRhAdjustments(formData.requestDetails);
+  const notebookRequest = readNotebookRequest(formData.requestDetails);
+  const notebookMissing = isNotebookRequest ? notebookRequestError(notebookRequest) : null;
+  const today = localToday();
 
   const renderError = (id: string, message?: string) => message && (
     <span id={id} className="pub-field__error" role="alert">
@@ -760,10 +859,17 @@ export default function OpenTicketPage() {
                   {successData.timestamp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                 </dd>
               </div>
-              <div>
-                <dt>Meta de atendimento</dt>
-                <dd>até {successData.slaHours}h</dd>
-              </div>
+              {successData.firstClass ? (
+                <div>
+                  <dt>Aula</dt>
+                  <dd>{formatSessionDay(successData.firstClass.date)} às {successData.firstClass.start}</dd>
+                </div>
+              ) : (
+                <div>
+                  <dt>Meta de atendimento</dt>
+                  <dd>até {successData.slaHours}h</dd>
+                </div>
+              )}
             </dl>
           </div>
 
@@ -1051,6 +1157,138 @@ export default function OpenTicketPage() {
                   </div>
                 )}
                 <div className="otp-panel">
+                  {isNotebookRequest && (
+                    <div className="otp-notebook">
+                      <div className="otp-notebook__row">
+                        <div className="pub-field">
+                          <label htmlFor="nbQuantity">Quantos notebooks?</label>
+                          <input
+                            id="nbQuantity"
+                            type="number"
+                            inputMode="numeric"
+                            min={1}
+                            max={NOTEBOOK_CLASS_MAX_QUANTITY}
+                            value={notebookRequest.quantity}
+                            onChange={e => handleRequestDetailChange('quantity', e.target.value)}
+                            placeholder="Ex.: 15"
+                          />
+                        </div>
+                        <div className="pub-field">
+                          <label htmlFor="nbLocation">Sala ou turma</label>
+                          <input
+                            id="nbLocation"
+                            type="text"
+                            value={notebookRequest.location}
+                            onChange={e => handleRequestDetailChange('location', e.target.value)}
+                            placeholder="Ex.: Sala 3, turma de informática"
+                            maxLength={120}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="otp-adjustments">
+                        <p className="pub-field__hint">
+                          Tem aula em mais de um dia? Coloque todos os dias neste mesmo chamado.
+                        </p>
+                        {notebookRequest.sessions.map((session, index) => (
+                          <fieldset key={index} className="otp-adjustment">
+                            <legend>
+                              {notebookRequest.sessions.length > 1 ? `Aula ${index + 1}` : 'Dia da aula'}
+                              {notebookRequest.sessions.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => removeNotebookSession(index)}
+                                  className="otp-adjustment__remove"
+                                >
+                                  Remover
+                                </button>
+                              )}
+                            </legend>
+                            <div className="pub-field">
+                              <label htmlFor={`nbDate-${index}`}>Dia</label>
+                              <input
+                                id={`nbDate-${index}`}
+                                type="date"
+                                min={today}
+                                value={session.date}
+                                onChange={e => updateNotebookSession(index, 'date', e.target.value)}
+                              />
+                            </div>
+                            <div className="otp-adjustment__grid">
+                              <div className="pub-field">
+                                <label htmlFor={`nbStart-${index}`}>Começa às</label>
+                                <input
+                                  id={`nbStart-${index}`}
+                                  type="time"
+                                  value={session.start}
+                                  onChange={e => updateNotebookSession(index, 'start', e.target.value)}
+                                />
+                              </div>
+                              <div className="pub-field">
+                                <label htmlFor={`nbEnd-${index}`}>
+                                  Termina às <span className="pub-field__optional">(opcional)</span>
+                                </label>
+                                <input
+                                  id={`nbEnd-${index}`}
+                                  type="time"
+                                  value={session.end}
+                                  onChange={e => updateNotebookSession(index, 'end', e.target.value)}
+                                />
+                              </div>
+                            </div>
+                          </fieldset>
+                        ))}
+                        {notebookRequest.sessions.length < NOTEBOOK_CLASS_MAX_SESSIONS && (
+                          <button type="button" onClick={addNotebookSession} className="otp-add">
+                            <i className="ti ti-plus" aria-hidden="true" />
+                            Adicionar outro dia
+                          </button>
+                        )}
+                      </div>
+
+                      <label className="otp-remember otp-notebook__check">
+                        <input
+                          type="checkbox"
+                          checked={notebookRequest.chargers}
+                          onChange={e => handleRequestDetailChange('chargers', e.target.checked)}
+                        />
+                        <span>
+                          <strong>Precisa dos carregadores</strong>
+                          <small>Para aulas longas, em que a bateria pode não dar conta.</small>
+                        </span>
+                      </label>
+
+                      <div className="pub-field">
+                        <label htmlFor="nbNotes">
+                          O que a turma vai usar <span className="pub-field__optional">(opcional)</span>
+                        </label>
+                        <textarea
+                          id="nbNotes"
+                          value={notebookRequest.notes}
+                          onChange={e => handleRequestDetailChange('notes', e.target.value)}
+                          placeholder="Programa, site ou arquivo que precisa estar pronto. Ex.: Canva, Word, um vídeo do YouTube."
+                          rows={3}
+                          maxLength={500}
+                        />
+                      </div>
+
+                      <p className="otp-notebook__status" role="status" aria-live="polite">
+                        {notebookMissing ? (
+                          <>
+                            <i className="ti ti-info-circle" aria-hidden="true" />
+                            Para continuar: {notebookMissing.charAt(0).toLowerCase() + notebookMissing.slice(1)}
+                          </>
+                        ) : (
+                          <>
+                            <i className="ti ti-circle-check" aria-hidden="true" />
+                            Tudo certo. Toque em Continuar para revisar.
+                          </>
+                        )}
+                      </p>
+                    </div>
+                  )}
+
+                  {!isNotebookRequest && (<>
                   <div className="pub-field">
                     <label htmlFor="title">Resumo</label>
                     <input
@@ -1142,6 +1380,7 @@ export default function OpenTicketPage() {
                       </div>
                     )}
                   </div>
+                  </>)}
 
                   {/* RH extra fields based on category */}
                   {formData.ticketDepartment === 'rh' && formData.category === 'RH_ATESTADO' && (
@@ -1361,7 +1600,7 @@ export default function OpenTicketPage() {
                     <dt>Pedido</dt>
                     <dd>
                       <strong>{formData.title}</strong>
-                      <span className="otp-review__text">{formData.description}</span>
+                      <span className={`otp-review__text${isNotebookRequest ? ' otp-review__text--full' : ''}`}>{formData.description}</span>
                       {pendingFiles.length > 0 && (
                         <span>{pendingFiles.length} {pendingFiles.length === 1 ? 'anexo' : 'anexos'}</span>
                       )}
@@ -1375,7 +1614,11 @@ export default function OpenTicketPage() {
                         <span className={`otp-priority otp-priority--${formData.priority}`}>
                           {PRIORITY_LABEL[formData.priority]}
                         </span>
-                        <span>Calculada pelo sistema a partir do assunto e da descrição.</span>
+                        <span>
+                          {isNotebookRequest
+                            ? 'Calculada pela data da aula: hoje ou amanhã é alta.'
+                            : 'Calculada pelo sistema a partir do assunto e da descrição.'}
+                        </span>
                       </dd>
                     </div>
                   )}

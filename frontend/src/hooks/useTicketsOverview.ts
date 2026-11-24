@@ -61,11 +61,7 @@ export function useTicketsOverview(department: string, enabled: boolean) {
     return () => { alive.current = false; requestVersion.current += 1; inFlight.current = false; };
   }, []);
 
-  /**
-   * Uma alteração dispara duas coisas ao mesmo tempo: o recarregamento
-   * explícito de quem fez a ação e o evento de websocket que volta do
-   * servidor. Sem a trava, o mesmo agregado seria pedido duas vezes.
-   */
+  // A trava evita pedir o mesmo agregado duas vezes em recargas simultâneas.
   const load = useCallback(async () => {
     if (!enabled || inFlight.current) return;
     inFlight.current = true;
@@ -94,23 +90,6 @@ export function useTicketsOverview(department: string, enabled: boolean) {
     setLoading(true);
     load();
   }, [load]);
-
-  // A fila recebe eventos em tempo real; o panorama acompanha os mesmos.
-  useEffect(() => {
-    if (!enabled) return;
-    let timer = 0;
-    // Acao em lote emite um evento por chamado; agrupamos numa recarga so.
-    const refresh = () => {
-      window.clearTimeout(timer);
-      timer = window.setTimeout(load, 400);
-    };
-    const events = ['ticket:new', 'ticket:updated', 'ticket:resolved', 'ticket:reopened'];
-    events.forEach((name) => window.addEventListener(name, refresh));
-    return () => {
-      window.clearTimeout(timer);
-      events.forEach((name) => window.removeEventListener(name, refresh));
-    };
-  }, [enabled, load]);
 
   return { overview, loading, error, reload: load };
 }

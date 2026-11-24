@@ -567,6 +567,65 @@
   font: 700 0.95rem/1 var(--pub-body);
 }
 
+/* Notebooks para aula (TI) */
+.otp-notebook {
+  display: grid;
+  gap: 18px;
+}
+
+.otp-notebook .pub-field + .pub-field {
+  margin-top: 0;
+}
+
+.otp-notebook + .pub-field {
+  margin-top: 22px;
+}
+
+.otp-notebook__row {
+  display: grid;
+  gap: 18px;
+}
+
+.otp-notebook .otp-adjustment > .pub-field {
+  margin-bottom: 10px;
+}
+
+/* "Termina às (opcional)" quebra a linha em tela estreita: os campos de
+   horário ficam alinhados pela base, não pelo rótulo. */
+.otp-notebook .otp-adjustment__grid {
+  align-items: end;
+}
+
+.otp-notebook__check {
+  margin-top: 0;
+}
+
+.otp-notebook__status {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  color: var(--pub-muted);
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.otp-notebook__status i {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  font-size: 1.1rem;
+}
+
+.otp-notebook__status .ti-circle-check {
+  color: var(--pub-leaf);
+}
+
+@media (min-width: 720px) {
+  .otp-notebook__row {
+    grid-template-columns: minmax(0, 11rem) minmax(0, 1fr);
+  }
+}
+
 /* Anexos */
 .otp-drop {
   min-height: 64px;
@@ -706,6 +765,13 @@
   -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* O pedido de notebooks é gerado e curto: mostra todos os dias. */
+.otp-review__text--full {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
 }
 
 .otp-review__row > button {

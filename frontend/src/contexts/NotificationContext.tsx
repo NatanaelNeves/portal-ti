@@ -10,7 +10,7 @@ interface NewTicket {
   created_at: string;
 }
 
-export type NotificationKind = 'new' | 'updated' | 'resolved' | 'reopened' | 'warning';
+export type NotificationKind = 'new';
 
 export interface AppNotification {
   id: string;
@@ -143,12 +143,6 @@ function saveStoredNotifications(items: AppNotification[]) {
   } catch {
     // cota cheia ou modo privado — ignorar
   }
-}
-
-let notificationSeq = 0;
-function makeNotificationId(prefix: string) {
-  notificationSeq += 1;
-  return `${prefix}-${Date.now()}-${notificationSeq}`;
 }
 
 // ─── POLL_INTERVAL ────────────────────────────────────────────────────────────
@@ -295,67 +289,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
     schedule();
 
-    // ── eventos em tempo real (websocket) viram itens da lista do sino ──
-    const describe = (kind: NotificationKind, detail: any): { title: string; body?: string } => {
-      const ticketTitle = detail?.title
-        || (detail?.ticketId ? `Chamado ${String(detail.ticketId).slice(0, 8)}` : undefined);
-
-      switch (kind) {
-        case 'resolved':
-          return { title: 'Chamado marcado como resolvido', body: ticketTitle };
-        case 'reopened':
-          return { title: 'Chamado reaberto pelo solicitante', body: detail?.reopen_reason || ticketTitle };
-        case 'warning':
-          return { title: 'Chamado perto do encerramento automático', body: ticketTitle };
-        default: {
-          const action = detail?.action;
-          if (action === 'reopened_by_requester') return { title: 'Chamado reaberto pelo usuário', body: ticketTitle };
-          if (action === 'marked_resolved_pending_confirmation') return { title: 'Chamado aguardando confirmação do usuário', body: ticketTitle };
-          if (action === 'auto_closed') return { title: 'Chamado encerrado automaticamente por prazo', body: ticketTitle };
-          if (action === 'manual_closed') return { title: 'Chamado encerrado manualmente', body: ticketTitle };
-          if (action === 'closed_by_requester') {
-            return {
-              title: detail?.requester_closure === 'not_needed'
-                ? 'Solicitante não precisa mais do atendimento'
-                : 'Solicitante resolveu por conta própria',
-              body: ticketTitle,
-            };
-          }
-          return { title: 'Um chamado foi atualizado', body: ticketTitle };
-        }
-      }
-    };
-
-    const makeHandler = (kind: NotificationKind) => (event: Event) => {
-      const detail = (event as CustomEvent).detail ?? {};
-      const { title, body } = describe(kind, detail);
-      pushNotifications([
-        {
-          id: makeNotificationId(kind),
-          kind,
-          title,
-          body,
-          ticketId: detail?.ticketId ? String(detail.ticketId) : undefined,
-          createdAt: detail?.timestamp || new Date().toISOString(),
-          read: false,
-        },
-      ]);
-    };
-
-    const handlers: Array<[string, EventListener]> = [
-      ['ticket:updated', makeHandler('updated')],
-      ['ticket:resolved', makeHandler('resolved')],
-      ['ticket:reopened', makeHandler('reopened')],
-      ['ticket:auto_close_warning', makeHandler('warning')],
-    ];
-
-    handlers.forEach(([name, handler]) => window.addEventListener(name, handler));
-
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       document.removeEventListener('click', unlockAudioCtx);
       document.removeEventListener('keydown', unlockAudioCtx);
-      handlers.forEach(([name, handler]) => window.removeEventListener(name, handler));
     };
   }, [poll, pushNotifications]);
 

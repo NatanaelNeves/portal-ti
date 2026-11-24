@@ -447,14 +447,4 @@ router.post('/users/:id/reset-password', async (req: Request, res: Response) => 
   }
 });
 
-// Logout - sem necessidade de revogar token (frontend apenas limpa localStorage)
-router.post('/logout', async (req: Request, res: Response) => {
-  try {
-    res.json({ message: 'Logged out successfully' });
-  } catch (error) {
-    console.error('Error logging out:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
 export default router;

@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import { Request, Response, NextFunction } from 'express';
-import { RH_CATEGORY_SCHEMAS } from '../config/ticketCategories';
+import {
+  NOTEBOOK_CLASS_CATEGORY,
+  NOTEBOOK_CLASS_MAX_QUANTITY,
+  NOTEBOOK_CLASS_MAX_SESSIONS,
+  RH_CATEGORY_SCHEMAS,
+} from '../config/ticketCategories';
 
 /**
  * Middleware genérico para validação de requisições com Zod
@@ -30,6 +35,51 @@ export const validate = (schema: z.ZodSchema) => {
  */
 
 const MAX_METADATA_BYTES = 10 * 1024;
+
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+const textOf = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
+
+/**
+ * Pedido de notebooks para aula: quantos, onde e pelo menos um dia com o
+ * horário de início. O horário de término é opcional, mas se vier precisa
+ * ser depois do início.
+ */
+function refineNotebookClassDetails(details: Record<string, unknown>, ctx: z.RefinementCtx) {
+  const issue = (path: Array<string | number>, message: string) =>
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['requestDetails', ...path], message });
+
+  const quantity = Number(details.quantity);
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > NOTEBOOK_CLASS_MAX_QUANTITY) {
+    issue(['quantity'], `Informe quantos notebooks, de 1 a ${NOTEBOOK_CLASS_MAX_QUANTITY}`);
+  }
+
+  if (!textOf(details.location)) {
+    issue(['location'], 'Informe a sala ou turma');
+  }
+
+  const sessions = details.sessions;
+  if (!Array.isArray(sessions) || sessions.length === 0) {
+    issue(['sessions'], 'Informe o dia da aula');
+    return;
+  }
+  if (sessions.length > NOTEBOOK_CLASS_MAX_SESSIONS) {
+    issue(['sessions'], `No máximo ${NOTEBOOK_CLASS_MAX_SESSIONS} dias por chamado`);
+  }
+
+  sessions.forEach((session, index) => {
+    const item = (session ?? {}) as Record<string, unknown>;
+    const date = textOf(item.date);
+    const start = textOf(item.start);
+    const end = textOf(item.end);
+
+    if (!DATE_PATTERN.test(date)) issue(['sessions', index, 'date'], 'Campo obrigatório');
+    if (!TIME_PATTERN.test(start)) issue(['sessions', index, 'start'], 'Campo obrigatório');
+    if (end && (!TIME_PATTERN.test(end) || (TIME_PATTERN.test(start) && end <= start))) {
+      issue(['sessions', index, 'end'], 'O término precisa ser depois do início');
+    }
+  });
+}
 
 export const createTicketSchema = z.object({
   title: z.string()
@@ -64,6 +114,10 @@ export const createTicketSchema = z.object({
         message: 'Detalhes excedem o limite de 10KB',
       });
     }
+  }
+
+  if (data.category === NOTEBOOK_CLASS_CATEGORY) {
+    refineNotebookClassDetails(data.requestDetails ?? {}, ctx);
   }
 
   if (data.category && RH_CATEGORY_SCHEMAS[data.category]) {
@@ -198,106 +252,3 @@ export const publicAccessSchema = z.object({
     .min(2, 'Nome deve ter no mínimo 2 caracteres')
     .max(255, 'Nome muito longo'),
 });
-
-/**
- * Schemas de validação para Inventário
- */
-
-export const createEquipmentSchema = z.object({
-  internal_code: z.string()
-    .min(1, 'Código interno é obrigatório')
-    .max(50, 'Código muito longo'),
-  
-  type: z.string()
-    .min(1, 'Tipo é obrigatório')
-    .max(100, 'Tipo muito longo'),
-  
-  brand: z.string().max(100).optional(),
-  model: z.string().max(100).optional(),
-  serial_number: z.string().max(100).optional(),
-  physical_condition: z.string().max(50).optional(),
-  current_status: z.enum(['in_stock', 'in_use', 'maintenance', 'retired']).optional(),
-  current_location: z.string().max(255).optional(),
-  acquisition_date: z.string().optional(), // ISO date string
-  warranty_expiration: z.string().optional(), // ISO date string
-});
-
-export const createTermSchema = z.object({
-  equipment_id: z.string().uuid('ID de equipamento inválido'),
-  responsible_name: z.string().min(2, 'Nome do responsável é obrigatório'),
-  responsible_cpf: z.string().regex(/^\d{11}$/, 'CPF deve ter 11 dígitos'),
-  responsible_position: z.string().optional(),
-  responsible_department: z.string().optional(),
-  equipment_details: z.object({
-    code: z.string(),
-    brand: z.string().optional(),
-    model: z.string().optional(),
-    serial_number: z.string().optional(),
-  }),
-  accessories: z.array(z.string()).optional(),
-  lgpd_consent: z.boolean().refine((val) => val === true, {
-    message: 'Consentimento LGPD é obrigatório',
-  }),
-});
-
-/**
- * Schemas de validação para Compras
- */
-
-export const createPurchaseSchema = z.object({
-  description: z.string()
-    .min(5, 'Descrição deve ter no mínimo 5 caracteres')
-    .max(500, 'Descrição muito longa'),
-  
-  quantity: z.number()
-    .int('Quantidade deve ser um número inteiro')
-    .positive('Quantidade deve ser positiva'),
-  
-  estimated_value: z.number()
-    .nonnegative('Valor não pode ser negativo')
-    .optional(),
-  
-  priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
-});
-
-/**
- * Schemas de validação para Usuários
- */
-
-export const createUserSchema = z.object({
-  email: z.string()
-    .email('Email inválido')
-    .max(255, 'Email muito longo'),
-  
-  name: z.string()
-    .min(2, 'Nome deve ter no mínimo 2 caracteres')
-    .max(255, 'Nome muito longo'),
-  
-  password: z.string()
-    .min(6, 'Senha deve ter no mínimo 6 caracteres')
-    .max(100, 'Senha muito longa'),
-  
-  role: z.enum(['admin', 'it_staff', 'admin_staff', 'rh_staff', 'manager', 'user']),
-});
-
-export const updateUserSchema = z.object({
-  email: z.string().email('Email inválido').max(255).optional(),
-  name: z.string().min(2).max(255).optional(),
-  role: z.enum(['admin', 'it_staff', 'admin_staff', 'rh_staff', 'manager', 'user']).optional(),
-  password: z.string().min(6).max(100).optional(),
-}).refine((data) => Object.keys(data).length > 0, {
-  message: 'Pelo menos um campo deve ser fornecido',
-});
-
-// Tipos TypeScript derivados dos schemas
-export type CreateTicketInput = z.infer<typeof createTicketSchema>;
-export type UpdateTicketInput = z.infer<typeof updateTicketSchema>;
-export type AddMessageInput = z.infer<typeof addMessageSchema>;
-export type LoginInput = z.infer<typeof loginSchema>;
-export type RegisterInput = z.infer<typeof registerSchema>;
-export type PublicAccessInput = z.infer<typeof publicAccessSchema>;
-export type CreateEquipmentInput = z.infer<typeof createEquipmentSchema>;
-export type CreateTermInput = z.infer<typeof createTermSchema>;
-export type CreatePurchaseInput = z.infer<typeof createPurchaseSchema>;
-export type CreateUserInput = z.infer<typeof createUserSchema>;
-export type UpdateUserInput = z.infer<typeof updateUserSchema>;

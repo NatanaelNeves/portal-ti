@@ -79,7 +79,7 @@ const TEAM: Record<string, { label: string; tone: string }> = {
 };
 
 const CATEGORY_LABEL: Record<string, string> = {
-  computador: 'Computador', internet: 'Internet', impressora: 'Impressora', sistema: 'Sistema', outro: 'Outro assunto',
+  computador: 'Computador', internet: 'Internet', impressora: 'Impressora', sistema: 'Sistema', notebook_aula: 'Notebooks para aula', outro: 'Outro assunto',
   copia_chave: 'Cópia de chave', apoio_evento: 'Apoio em evento', buscar_doacao: 'Buscar doação', solicitar_documento: 'Solicitar documento',
   RH_ATESTADO: 'Atestado médico', RH_PONTO: 'Ajuste de ponto', RH_ACESSO_PONTO: 'Acesso ao iPonto', RH_FOLHA: 'Folha de pagamento', RH_DECLARACAO: 'Declaração',
   RH_BENEFICIOS: 'Benefícios', RH_OUTROS: 'Outro assunto', RH_CONFIDENCIAL: 'Confidencial',
@@ -184,17 +184,6 @@ export default function AdminTicketDetailPage() {
       .then((data: { equipment?: Equipment[]; data?: Equipment[] }) => setEquipment(data.equipment || data.data || []))
       .catch(() => {});
   }, [internalToken, navigate, fetchTicket, fetchHistory, authHeaders]);
-
-  // Atualiza sozinho quando alguém responde ou muda o chamado.
-  useEffect(() => {
-    const refresh = (event: Event) => {
-      const ticketId = (event as CustomEvent<any>).detail?.ticketId;
-      if (!ticketId || ticketId === id) { void fetchTicket(); void fetchHistory(); }
-    };
-    const names = ['ticket:updated', 'ticket:resolved', 'ticket:reopened'];
-    names.forEach((n) => window.addEventListener(n, refresh));
-    return () => names.forEach((n) => window.removeEventListener(n, refresh));
-  }, [id, fetchTicket, fetchHistory]);
 
   const backRoute = role === 'rh_staff' ? '/rh/chamados' : '/admin/chamados';
 

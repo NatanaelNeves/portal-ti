@@ -17,9 +17,6 @@ jest.mock('../database/connection');
 jest.mock('../services/emailService', () => ({
   EmailService: { notifyNewTicket: jest.fn().mockResolvedValue(undefined) },
 }));
-jest.mock('../services/websocketService', () => ({
-  getWebSocketService: () => null,
-}));
 
 const app = express();
 app.use(express.json());

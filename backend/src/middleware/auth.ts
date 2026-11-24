@@ -43,9 +43,3 @@ export function requireRole(...roles: UserRole[]) {
     next();
   };
 }
-
-export function generateToken(user: AuthUser): string {
-  return jwt.sign(user, config.jwt.secret as string, {
-    expiresIn: config.jwt.expiration,
-  } as any);
-}

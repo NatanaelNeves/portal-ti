@@ -80,9 +80,6 @@ export const upload = multer({
   }
 });
 
-// Middleware para múltiplos arquivos (até 5 fotos)
-export const uploadMultiplePhotos = upload.array('photos', 5);
-
 // Middleware para foto única de equipamento
 export const uploadEquipmentPhoto = upload.single('equipmentPhoto');
 
@@ -142,5 +139,3 @@ export const getFileUrl = (
   const typePath = type === 'photo' ? 'equipment-photos' : type === 'document' ? 'documents' : 'terms';
   return `${resolvedBaseUrl}/uploads/${typePath}/${filename}`;
 };
-
-export default upload;

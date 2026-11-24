@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from 'react';
  * Aproxima o número exibido do valor real ao longo de `duration`, em vez de
  * trocá-lo de uma vez.
  *
- * Numa central operacional os números mudam sozinhos — a fila recebe eventos
- * de websocket. Sem a transição, o usuário não percebe QUE mudou; com ela, o
+ * Numa central operacional os números mudam sozinhos, a cada recarga
+ * periódica. Sem a transição, o usuário não percebe QUE mudou; com ela, o
  * movimento chama o olho para o indicador que se mexeu.
  *
  * Respeita `prefers-reduced-motion`: quem pediu menos movimento recebe o

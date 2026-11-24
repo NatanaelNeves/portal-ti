@@ -1,20 +1,17 @@
 import express, { Express, Response } from 'express';
 import cors, { CorsOptions } from 'cors';
 import path from 'path';
-import http from 'http';
 import { config } from './config/environment';
 import { database } from './database/connection';
 import { initializeDatabase } from './database/schema';
 import { applyPendingMigrations } from './database/migrationRunner';
 import { generalLimiter } from './middleware/rateLimiter';
-import { initializeWebSocket } from './services/websocketService';
 import { initializeScheduler } from './services/schedulerService';
 
 console.log('🚀 Starting Portal TI Backend...');
 console.log('📝 Loading configuration...');
 
 const app: Express = express();
-const httpServer = http.createServer(app);
 
 console.log('✓ Express app created');
 
@@ -71,7 +68,7 @@ app.use((req, res, next) => {
 
 // Rate limiting geral (excluindo endpoints de polling que têm limiter próprio)
 app.use('/api/', (req, res, next) => {
-  if (/^\/(auth|public-auth|internal-auth)(\/|$)/.test(req.path)) return next();
+  if (/^\/(public-auth|internal-auth)(\/|$)/.test(req.path)) return next();
   if (req.path.includes('/tickets/new-since')) return next();
   return generalLimiter(req, res, next);
 });
@@ -96,23 +93,7 @@ app.get('/api/health', (_, res: Response) => {
   res.json({ status: 'ok', db: dbReady, version: BUILD_VERSION, build: BUILD_TIMESTAMP, timestamp: new Date().toISOString() });
 });
 
-// Self-restart endpoint — used by deploy workflow to force container restart
-app.post('/api/internal/restart', (req, res) => {
-  const token = req.get('x-restart-token');
-  if (!token || token !== (process.env.RESTART_TOKEN || 'deploy-restart-2026')) {
-    res.status(403).json({ error: 'Forbidden' });
-    return;
-  }
-  console.log('[RESTART] Restart requested via deploy workflow');
-  res.json({ message: 'Restarting in 2 seconds...', version: BUILD_VERSION });
-  setTimeout(() => {
-    console.log('[RESTART] Exiting process — Azure will auto-restart container');
-    process.exit(0);
-  }, 2000);
-});
-
 // Rotas da API
-app.use('/api/auth', require('./routes/auth').default);
 app.use('/api/public-auth', require('./routes/publicAuth').default);
 app.use('/api/internal-auth', require('./routes/internalAuth').default);
 app.use('/api/tickets', require('./routes/tickets').default);
@@ -123,22 +104,20 @@ app.use('/api/documents', require('./routes/documents').default);
 app.use('/api', require('./routes/knowledge').default);
 app.use('/api/dashboard', require('./routes/dashboard').default);
 app.use('/api/reports', require('./routes/reports').default);
-app.use('/api/reservations', require('./routes/reservations').default);
 app.use('/api/ai', require('./routes/ai').default);
 app.use('/api/status', require('./routes/status').default);
-app.use('/api/recurring', require('./routes/recurring').default);
 
 // Error handling
 app.use((err: any, req: any, res: Response, next: any) => {
   console.error('Error:', err?.message || err, err?.stack);
-  res.status(500).json({ error: 'Internal server error', details: err?.message || String(err) });
+  res.status(500).json({ error: 'Internal server error' });
 });
 
 // Start server — listen FIRST, connect DB after
 async function startServer(): Promise<void> {
   // Start HTTP server immediately so Azure health checks pass
   await new Promise<void>((resolve) => {
-    httpServer.listen(config.port, () => {
+    app.listen(config.port, () => {
       console.log(`
 ╔═══════════════════════════════════════╗
     ║   Portal de Serviços Internos         ║
@@ -164,9 +143,6 @@ async function startServer(): Promise<void> {
         console.log('✓ Database initialized');
         dbReady = true;
 
-        console.log('🔌 Initializing WebSocket...');
-        initializeWebSocket(httpServer);
-        console.log('✓ WebSocket initialized');
 
         console.log('⏰ Initializing Scheduler...');
         initializeScheduler();

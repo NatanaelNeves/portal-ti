@@ -16,6 +16,8 @@ export const TI_CATEGORIES: CategoryOption[] = [
   { value: 'internet', label: 'Internet', icon: 'ti-wifi' },
   { value: 'impressora', label: 'Impressora', icon: 'ti-printer' },
   { value: 'sistema', label: 'Sistema', icon: 'ti-apps' },
+  // Formulário próprio: quantos, onde e quando (utils/notebookRequest.ts).
+  { value: 'notebook_aula', label: 'Notebooks para aula', icon: 'ti-device-laptop' },
   { value: 'outro', label: 'Outro assunto', icon: 'ti-dots' },
 ];
 

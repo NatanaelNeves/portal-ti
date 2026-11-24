@@ -115,17 +115,6 @@ export default function RhTicketDetailPage() {
       .catch(() => { /* só serve para mostrar nomes */ });
   }, [token, navigate, loadTicket, loadHistory]);
 
-  // Atualiza sozinho quando a pessoa responde.
-  useEffect(() => {
-    const refresh = (event: Event) => {
-      const ticketId = (event as CustomEvent<any>).detail?.ticketId;
-      if (!ticketId || ticketId === id) { void loadTicket(); void loadHistory(); }
-    };
-    const events = ['ticket:updated', 'ticket:resolved', 'ticket:reopened'];
-    events.forEach((name) => window.addEventListener(name, refresh));
-    return () => events.forEach((name) => window.removeEventListener(name, refresh));
-  }, [id, loadTicket, loadHistory]);
-
   const update = async (payload: Record<string, unknown>, success: string) => {
     if (!id) return false;
     try {

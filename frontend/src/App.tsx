@@ -4,8 +4,6 @@ import './styles/RhShell.css';
 import './styles/TiShell.css';
 import './styles/TiPages.css';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
-import { useAuthStore } from './stores/authStore';
 import { Toaster } from 'react-hot-toast';
 
 // Public Pages
@@ -94,23 +92,6 @@ function TicketsRouter() {
 }
 
 function App() {
-  const { loadStoredUser } = useAuthStore();
-  const [isReady, setIsReady] = useState(false);
-
-  useEffect(() => {
-    loadStoredUser();
-    setIsReady(true);
-  }, [loadStoredUser]);
-
-  if (!isReady) {
-    return (
-      <div className="app-loading">
-        <div className="app-loading__spinner" />
-        <span className="app-loading__text">Carregando...</span>
-      </div>
-    );
-  }
-
   return (
     <NotificationProvider>
       <Router>

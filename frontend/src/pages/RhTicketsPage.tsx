@@ -130,11 +130,8 @@ export default function RhTicketsPage() {
   useEffect(() => {
     const refresh = () => void load(true);
     const timer = window.setInterval(refresh, POLL_MS);
-    const events = ['ticket:new', 'ticket:updated', 'ticket:resolved', 'ticket:reopened'];
-    events.forEach((name) => window.addEventListener(name, refresh));
     return () => {
       window.clearInterval(timer);
-      events.forEach((name) => window.removeEventListener(name, refresh));
     };
   }, [load]);
 

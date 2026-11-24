@@ -44,7 +44,7 @@ const priorityTone = (p: string) => (PRIORITY_RANK[p] ?? 2) <= 1 ? 'high' : p ==
 
 // Assuntos dos formulários de abertura (TI, Administrativo e RH).
 const CATEGORY_LABEL: Record<string, string> = {
-  computador: 'Computador', internet: 'Internet', impressora: 'Impressora', sistema: 'Sistema', outro: 'Outro assunto',
+  computador: 'Computador', internet: 'Internet', impressora: 'Impressora', sistema: 'Sistema', notebook_aula: 'Notebooks para aula', outro: 'Outro assunto',
   copia_chave: 'Cópia de chave', apoio_evento: 'Apoio em evento', buscar_doacao: 'Buscar doação', solicitar_documento: 'Solicitar documento',
   RH_ATESTADO: 'Atestado médico', RH_PONTO: 'Ajuste de ponto', RH_ACESSO_PONTO: 'Acesso ao iPonto', RH_FOLHA: 'Folha de pagamento', RH_DECLARACAO: 'Declaração',
   RH_BENEFICIOS: 'Benefícios', RH_OUTROS: 'Outro assunto (RH)', RH_CONFIDENCIAL: 'Confidencial',
@@ -161,16 +161,10 @@ export default function AdminDashboardPage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  // Acompanha a fila em tempo real, sem piscar a tela.
+  // Recarrega a cada minuto, sem piscar a tela.
   useEffect(() => {
-    const refresh = () => void load(true);
-    const events = ['ticket:new', 'ticket:updated', 'ticket:resolved', 'ticket:reopened'];
-    events.forEach((name) => window.addEventListener(name, refresh));
-    const timer = window.setInterval(refresh, 60_000);
-    return () => {
-      events.forEach((name) => window.removeEventListener(name, refresh));
-      window.clearInterval(timer);
-    };
+    const timer = window.setInterval(() => void load(true), 60_000);
+    return () => window.clearInterval(timer);
   }, [load]);
 
   const bands = useMemo(() => {

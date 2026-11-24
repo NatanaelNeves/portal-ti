@@ -11,10 +11,12 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Deploy and runtime artifacts
-backend/backend-deploy.zip
-backend/backend-full-deploy.zip
-webapp-logs/*.zip
+# Deploy and runtime artifacts (nunca versionar: o deploy sai do CI)
+*.zip
+*.PublishSettings
+publish-profile*.xml
+webapp-logs/
+backend/uploads/
 
 # IDEs
 .vscode/
