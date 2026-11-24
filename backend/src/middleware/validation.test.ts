@@ -100,7 +100,7 @@ describe('Validation Schemas', () => {
 describe('createTicketSchema: notebooks para aula', () => {
   const base = {
     title: 'Notebooks para aula: 15 em 26/11',
-    description: 'Pedido de 15 notebooks para aula na Sala 3.',
+    description: 'Pedido de 15 notebooks para a sala de aula.',
     type: 'request',
     priority: 'medium',
     department: 'ti',
@@ -108,38 +108,51 @@ describe('createTicketSchema: notebooks para aula', () => {
   };
   const details = {
     quantity: 15,
-    location: 'Sala 3, turma de informática',
-    sessions: [{ date: '2026-11-26', start: '14:00', end: '17:00' }],
+    unit: 'Senador Alencar - Fortaleza/CE',
+    sessions: [{ date: '2026-11-26', start: '14:00' }],
   };
 
-  it('aceita quantidade, local e um dia com horário', () => {
+  it('aceita quantidade, unidade e um dia com horário', () => {
     expect(createTicketSchema.safeParse({ ...base, requestDetails: details }).success).toBe(true);
   });
 
-  it('aceita vários dias e término em branco', () => {
+  it('aceita vários dias', () => {
     const result = createTicketSchema.safeParse({
       ...base,
-      requestDetails: { ...details, sessions: [...details.sessions, { date: '2026-11-28', start: '08:00', end: '' }] },
+      requestDetails: { ...details, sessions: [...details.sessions, { date: '2026-11-28', start: '08:00' }] },
     });
     expect(result.success).toBe(true);
   });
 
-  it('exige quantidade, local e dia', () => {
+  it('exige quantidade, unidade e dia', () => {
     const result = createTicketSchema.safeParse({ ...base, requestDetails: {} });
     expect(result.success).toBe(false);
     const fields = result.success ? [] : result.error.issues.map((issue) => issue.path.join('.'));
     expect(fields).toEqual(expect.arrayContaining([
       'requestDetails.quantity',
-      'requestDetails.location',
+      'requestDetails.unit',
       'requestDetails.sessions',
     ]));
   });
 
-  it('recusa término antes do início', () => {
+  it('exige o horário da aula', () => {
     const result = createTicketSchema.safeParse({
       ...base,
-      requestDetails: { ...details, sessions: [{ date: '2026-11-26', start: '14:00', end: '13:00' }] },
+      requestDetails: { ...details, sessions: [{ date: '2026-11-26', start: '' }] },
     });
     expect(result.success).toBe(false);
+  });
+
+  it('aceita o pedido da primeira versão do formulário, com sala em vez de unidade', () => {
+    const result = createTicketSchema.safeParse({
+      ...base,
+      requestDetails: {
+        quantity: 15,
+        location: 'Sala 3',
+        sessions: [{ date: '2026-11-26', start: '14:00', end: '17:00' }],
+        notes: 'Canva',
+      },
+    });
+    expect(result.success).toBe(true);
   });
 });

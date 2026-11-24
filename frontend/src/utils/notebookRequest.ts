@@ -1,40 +1,53 @@
+import { INSTITUTION_UNITS } from './institutionOptions';
+
 /**
  * Pedido de notebooks para aula.
  *
- * Quem pede (em geral professores) preenche só quantos, onde e quando; o
- * resumo e a descrição do chamado são montados daqui, para a TI ler tudo de
- * uma vez na fila, no e-mail e na exportação. O backend confere o mesmo
- * formato em `middleware/validation.ts`.
+ * Cada unidade tem uma sala de aula só, então basta saber quantos notebooks,
+ * em qual unidade e quando a aula começa. O resumo e a descrição do chamado
+ * são montados daqui, para a TI ler tudo de uma vez na fila, no e-mail e na
+ * exportação. O backend confere o mesmo formato em `middleware/validation.ts`.
  */
 export const NOTEBOOK_CLASS_CATEGORY = 'notebook_aula';
 export const NOTEBOOK_CLASS_MAX_QUANTITY = 60;
 export const NOTEBOOK_CLASS_MAX_SESSIONS = 10;
+
+/** Quantidades mais pedidas: aparecem como cartões; outra quantidade é digitada. */
+export const NOTEBOOK_CLASS_QUANTITY_PRESETS = [5, 10, 15, 20];
+
+/** Onde as aulas costumam acontecer: aparecem como botões; o resto, numa lista. */
+export const NOTEBOOK_CLASS_MAIN_UNITS: string[] = [
+  'Senador Alencar - Fortaleza/CE',
+  'Vicente Pinzón - Fortaleza/CE',
+];
+export const NOTEBOOK_CLASS_OTHER_UNITS: string[] = INSTITUTION_UNITS.filter(
+  (unit) => !NOTEBOOK_CLASS_MAIN_UNITS.includes(unit),
+);
+
+/** "Senador Alencar - Fortaleza/CE" → "Senador Alencar". */
+export const unitShortName = (unit: string) => unit.split(' - ')[0].trim();
 
 export interface NotebookSession {
   /** AAAA-MM-DD */
   date: string;
   /** HH:MM */
   start: string;
-  /** HH:MM, opcional */
-  end: string;
 }
 
 export interface NotebookRequestDetails {
   quantity: string;
-  location: string;
+  unit: string;
   sessions: NotebookSession[];
   chargers: boolean;
-  notes: string;
 }
 
-export const createEmptyNotebookSession = (): NotebookSession => ({ date: '', start: '', end: '' });
+export const createEmptyNotebookSession = (): NotebookSession => ({ date: '', start: '' });
 
-export const createEmptyNotebookRequest = (): NotebookRequestDetails => ({
+export const createEmptyNotebookRequest = (unit = ''): NotebookRequestDetails => ({
   quantity: '',
-  location: '',
+  unit,
   sessions: [createEmptyNotebookSession()],
   chargers: false,
-  notes: '',
 });
 
 /** Lê o que está no formulário, mesmo que venha incompleto. */
@@ -43,16 +56,14 @@ export const readNotebookRequest = (details: Record<string, any>): NotebookReque
     ? details.sessions.map((item: any) => ({
       date: String(item?.date ?? ''),
       start: String(item?.start ?? ''),
-      end: String(item?.end ?? ''),
     }))
     : [createEmptyNotebookSession()];
 
   return {
     quantity: String(details.quantity ?? ''),
-    location: String(details.location ?? ''),
+    unit: String(details.unit ?? ''),
     sessions,
     chargers: Boolean(details.chargers),
-    notes: String(details.notes ?? ''),
   };
 };
 
@@ -86,12 +97,11 @@ export const notebookRequestError = (
   if (!(quantity >= 1 && quantity <= NOTEBOOK_CLASS_MAX_QUANTITY)) {
     return `Informe quantos notebooks, de 1 a ${NOTEBOOK_CLASS_MAX_QUANTITY}.`;
   }
-  if (!details.location.trim()) return 'Informe a sala ou a turma.';
+  if (!details.unit.trim()) return 'Escolha a unidade da aula.';
 
   for (const session of details.sessions) {
-    if (!session.date || !session.start) return 'Cada dia precisa da data e do horário de início.';
+    if (!session.date || !session.start) return 'Cada dia precisa da data e do horário da aula.';
     if (session.date < today) return 'A data da aula já passou. Confira o dia.';
-    if (session.end && session.end <= session.start) return 'O horário de término precisa ser depois do início.';
   }
   return null;
 };
@@ -109,10 +119,7 @@ const shortDate = (isoDate: string) => {
   return `${day}/${month}`;
 };
 
-const formatSession = (session: NotebookSession) => {
-  const hours = session.end ? `das ${session.start} às ${session.end}` : `a partir das ${session.start}`;
-  return `${formatSessionDay(session.date)}, ${hours}`;
-};
+const formatSession = (session: NotebookSession) => `${formatSessionDay(session.date)}, às ${session.start}`;
 
 const joinList = (items: string[]) =>
   items.length <= 1 ? items.join('') : `${items.slice(0, -1).join(', ')} e ${items[items.length - 1]}`;
@@ -121,8 +128,7 @@ const joinList = (items: string[]) =>
 export const buildNotebookTicket = (details: NotebookRequestDetails) => {
   const quantity = parseQuantity(details.quantity);
   const sessions = sessionsInOrder(details.sessions).filter((session) => session.start);
-  const location = details.location.trim();
-  const notes = details.notes.trim();
+  const unit = details.unit.trim();
 
   const what = quantity >= 1 ? `${quantity} ${quantity === 1 ? 'notebook' : 'notebooks'}` : 'Notebooks';
   const dates = [...new Set(sessions.map((session) => shortDate(session.date)))];
@@ -131,18 +137,17 @@ export const buildNotebookTicket = (details: NotebookRequestDetails) => {
     : dates.length <= 3
       ? ` em ${joinList(dates)}`
       : ` a partir de ${dates[0]} (${dates.length} dias)`;
-  const title = `${what} para ${dates.length > 1 ? 'aulas' : 'aula'}${when}`;
+  const where = unit ? `, ${unitShortName(unit)}` : '';
+  const title = `${what} para ${dates.length > 1 ? 'aulas' : 'aula'}${when}${where}`;
 
-  const lines = [`${what} para aula.`];
-  if (location) lines.push(`Sala ou turma: ${location}`);
+  const lines = [`${what} para a sala de aula.`];
+  if (unit) lines.push(`Unidade: ${unit}`);
   if (sessions.length === 1) {
     lines.push('', `Aula: ${formatSession(sessions[0])}.`);
   } else if (sessions.length > 1) {
     lines.push('', 'Aulas:', ...sessions.map((session) => `• ${formatSession(session)}`));
   }
-  if (details.chargers || notes) lines.push('');
-  if (details.chargers) lines.push('Levar os carregadores.');
-  if (notes) lines.push(`A turma vai usar: ${notes}`);
+  if (details.chargers) lines.push('', 'Levar os carregadores.');
 
   return { title, description: lines.join('\n') };
 };

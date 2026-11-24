@@ -63,9 +63,10 @@ export const RH_INTERNAL_CATEGORIES = RH_CATEGORIES.filter(
 export type ServiceTeam = 'ti' | 'administrativo' | 'rh';
 
 /**
- * Pedido de notebooks para uma aula. Tem formulário próprio: quantos, onde e
- * em quais dias/horários. Vai em `tickets.metadata` como:
- *   { quantity, location, sessions: [{ date, start, end? }], chargers?, notes? }
+ * Pedido de notebooks para uma aula. Tem formulário próprio: quantos, em qual
+ * unidade (cada uma tem uma sala de aula só) e em quais dias/horários. Vai em
+ * `tickets.metadata` como:
+ *   { quantity, unit, sessions: [{ date, start }], chargers? }
  */
 export const NOTEBOOK_CLASS_CATEGORY = 'notebook_aula';
 export const NOTEBOOK_CLASS_MAX_QUANTITY = 60;

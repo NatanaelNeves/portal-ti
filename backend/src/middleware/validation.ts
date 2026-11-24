@@ -41,9 +41,8 @@ const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const textOf = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
 
 /**
- * Pedido de notebooks para aula: quantos, onde e pelo menos um dia com o
- * horário de início. O horário de término é opcional, mas se vier precisa
- * ser depois do início.
+ * Pedido de notebooks para aula: quantos, em qual unidade (cada unidade tem
+ * uma sala de aula só) e pelo menos um dia com o horário da aula.
  */
 function refineNotebookClassDetails(details: Record<string, unknown>, ctx: z.RefinementCtx) {
   const issue = (path: Array<string | number>, message: string) =>
@@ -54,8 +53,10 @@ function refineNotebookClassDetails(details: Record<string, unknown>, ctx: z.Ref
     issue(['quantity'], `Informe quantos notebooks, de 1 a ${NOTEBOOK_CLASS_MAX_QUANTITY}`);
   }
 
-  if (!textOf(details.location)) {
-    issue(['location'], 'Informe a sala ou turma');
+  // `location` era o campo da primeira versão do formulário; uma aba aberta
+  // antes da atualização ainda pode mandá-lo.
+  if (!textOf(details.unit) && !textOf(details.location)) {
+    issue(['unit'], 'Escolha a unidade');
   }
 
   const sessions = details.sessions;
@@ -69,15 +70,8 @@ function refineNotebookClassDetails(details: Record<string, unknown>, ctx: z.Ref
 
   sessions.forEach((session, index) => {
     const item = (session ?? {}) as Record<string, unknown>;
-    const date = textOf(item.date);
-    const start = textOf(item.start);
-    const end = textOf(item.end);
-
-    if (!DATE_PATTERN.test(date)) issue(['sessions', index, 'date'], 'Campo obrigatório');
-    if (!TIME_PATTERN.test(start)) issue(['sessions', index, 'start'], 'Campo obrigatório');
-    if (end && (!TIME_PATTERN.test(end) || (TIME_PATTERN.test(start) && end <= start))) {
-      issue(['sessions', index, 'end'], 'O término precisa ser depois do início');
-    }
+    if (!DATE_PATTERN.test(textOf(item.date))) issue(['sessions', index, 'date'], 'Campo obrigatório');
+    if (!TIME_PATTERN.test(textOf(item.start))) issue(['sessions', index, 'start'], 'Campo obrigatório');
   });
 }
 
