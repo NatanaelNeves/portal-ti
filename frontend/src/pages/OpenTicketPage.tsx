@@ -14,11 +14,15 @@ import {
   formatSessionDay,
   localToday,
   NOTEBOOK_CLASS_CATEGORY,
+  NOTEBOOK_CLASS_MAIN_UNITS,
   NOTEBOOK_CLASS_MAX_QUANTITY,
   NOTEBOOK_CLASS_MAX_SESSIONS,
+  NOTEBOOK_CLASS_OTHER_UNITS,
+  NOTEBOOK_CLASS_QUANTITY_PRESETS,
   notebookRequestError,
   notebookRequestPriority,
   readNotebookRequest,
+  unitShortName,
   type NotebookSession,
 } from '../utils/notebookRequest';
 import { aiService, type ArticleSuggestion } from '../services/aiService';
@@ -226,6 +230,13 @@ export default function OpenTicketPage() {
         : { ...prev, ...draft }
     ));
   }, [isNotebookRequest, formData.requestDetails]);
+
+  // A aula costuma ser na unidade de quem pede: se a pessoa informou a dela em
+  // "Seus dados" e ainda não escolheu outra, já vem marcada.
+  useEffect(() => {
+    if (!isNotebookRequest || !formData.unit || formData.requestDetails.unit) return;
+    setFormData(prev => ({ ...prev, requestDetails: { ...prev.requestDetails, unit: prev.unit } }));
+  }, [isNotebookRequest, formData.unit, formData.requestDetails.unit]);
 
   // Recalculate priority automatically whenever relevant fields change
   useEffect(() => {
@@ -459,7 +470,7 @@ export default function OpenTicketPage() {
   const addNotebookSession = () =>
     updateNotebookSessions(sessions => {
       const last = sessions[sessions.length - 1];
-      return [...sessions, { date: '', start: last?.start ?? '', end: last?.end ?? '' }];
+      return [...sessions, { date: '', start: last?.start ?? '' }];
     });
 
   const removeNotebookSession = (index: number) =>
@@ -572,7 +583,7 @@ export default function OpenTicketPage() {
         category: catValue,
         requestDetails: catValue === 'RH_PONTO'
           ? { adjustments: [createEmptyRhAdjustment()] }
-          : isNotebook ? { ...createEmptyNotebookRequest() } : {},
+          : isNotebook ? { ...createEmptyNotebookRequest(prev.unit) } : {},
       };
     });
     goToStep(hasContactInfo() ? 4 : 3);
@@ -674,10 +685,9 @@ export default function OpenTicketPage() {
       }
       requestDetailsPayload = {
         quantity: Number(details.quantity),
-        location: details.location.trim(),
-        sessions: details.sessions.map(({ date, start, end }) => ({ date, start, ...(end ? { end } : {}) })),
+        unit: details.unit.trim(),
+        sessions: details.sessions.map(({ date, start }) => ({ date, start })),
         chargers: details.chargers,
-        ...(details.notes.trim() ? { notes: details.notes.trim() } : {}),
       };
     }
 
@@ -1159,9 +1169,25 @@ export default function OpenTicketPage() {
                 <div className="otp-panel">
                   {isNotebookRequest && (
                     <div className="otp-notebook">
-                      <div className="otp-notebook__row">
-                        <div className="pub-field">
-                          <label htmlFor="nbQuantity">Quantos notebooks?</label>
+                      <fieldset className="otp-choose">
+                        <legend>Quantos notebooks?</legend>
+                        <div className="otp-choose__options otp-choose__options--qty" role="radiogroup" aria-label="Quantidade de notebooks">
+                          {NOTEBOOK_CLASS_QUANTITY_PRESETS.map(amount => (
+                            <button
+                              key={amount}
+                              type="button"
+                              role="radio"
+                              aria-checked={notebookRequest.quantity === String(amount)}
+                              className={`otp-choose__option otp-choose__option--qty ${notebookRequest.quantity === String(amount) ? 'is-selected' : ''}`}
+                              onClick={() => handleRequestDetailChange('quantity', String(amount))}
+                            >
+                              <strong>{amount}</strong>
+                              <span>notebooks</span>
+                            </button>
+                          ))}
+                        </div>
+                        <div className="pub-field otp-notebook__qty">
+                          <label htmlFor="nbQuantity">Ou digite a quantidade</label>
                           <input
                             id="nbQuantity"
                             type="number"
@@ -1170,21 +1196,44 @@ export default function OpenTicketPage() {
                             max={NOTEBOOK_CLASS_MAX_QUANTITY}
                             value={notebookRequest.quantity}
                             onChange={e => handleRequestDetailChange('quantity', e.target.value)}
-                            placeholder="Ex.: 15"
+                            placeholder="Ex.: 8"
                           />
+                        </div>
+                      </fieldset>
+
+                      <fieldset className="otp-choose">
+                        <legend>Em qual unidade?</legend>
+                        <div className="otp-choose__options" role="radiogroup" aria-label="Unidade da aula">
+                          {NOTEBOOK_CLASS_MAIN_UNITS.map(unit => (
+                            <button
+                              key={unit}
+                              type="button"
+                              role="radio"
+                              aria-checked={notebookRequest.unit === unit}
+                              className={`otp-choose__option ${notebookRequest.unit === unit ? 'is-selected' : ''}`}
+                              onClick={() => handleRequestDetailChange('unit', unit)}
+                            >
+                              <i className="ti ti-school" aria-hidden="true" />
+                              {unitShortName(unit)}
+                            </button>
+                          ))}
                         </div>
                         <div className="pub-field">
-                          <label htmlFor="nbLocation">Sala ou turma</label>
-                          <input
-                            id="nbLocation"
-                            type="text"
-                            value={notebookRequest.location}
-                            onChange={e => handleRequestDetailChange('location', e.target.value)}
-                            placeholder="Ex.: Sala 3, turma de informática"
-                            maxLength={120}
-                          />
+                          <label htmlFor="nbOtherUnit">
+                            Outra unidade <span className="pub-field__optional">(se não for nenhuma das duas)</span>
+                          </label>
+                          <select
+                            id="nbOtherUnit"
+                            value={NOTEBOOK_CLASS_OTHER_UNITS.includes(notebookRequest.unit) ? notebookRequest.unit : ''}
+                            onChange={e => handleRequestDetailChange('unit', e.target.value)}
+                          >
+                            <option value="">Selecione</option>
+                            {NOTEBOOK_CLASS_OTHER_UNITS.map(unit => (
+                              <option key={unit} value={unit}>{unit}</option>
+                            ))}
+                          </select>
                         </div>
-                      </div>
+                      </fieldset>
 
                       <div className="otp-adjustments">
                         <p className="pub-field__hint">
@@ -1193,7 +1242,7 @@ export default function OpenTicketPage() {
                         {notebookRequest.sessions.map((session, index) => (
                           <fieldset key={index} className="otp-adjustment">
                             <legend>
-                              {notebookRequest.sessions.length > 1 ? `Aula ${index + 1}` : 'Dia da aula'}
+                              {notebookRequest.sessions.length > 1 ? `Aula ${index + 1}` : 'Quando é a aula'}
                               {notebookRequest.sessions.length > 1 && (
                                 <button
                                   type="button"
@@ -1204,35 +1253,24 @@ export default function OpenTicketPage() {
                                 </button>
                               )}
                             </legend>
-                            <div className="pub-field">
-                              <label htmlFor={`nbDate-${index}`}>Dia</label>
-                              <input
-                                id={`nbDate-${index}`}
-                                type="date"
-                                min={today}
-                                value={session.date}
-                                onChange={e => updateNotebookSession(index, 'date', e.target.value)}
-                              />
-                            </div>
                             <div className="otp-adjustment__grid">
                               <div className="pub-field">
-                                <label htmlFor={`nbStart-${index}`}>Começa às</label>
+                                <label htmlFor={`nbDate-${index}`}>Dia</label>
+                                <input
+                                  id={`nbDate-${index}`}
+                                  type="date"
+                                  min={today}
+                                  value={session.date}
+                                  onChange={e => updateNotebookSession(index, 'date', e.target.value)}
+                                />
+                              </div>
+                              <div className="pub-field">
+                                <label htmlFor={`nbStart-${index}`}>Horário</label>
                                 <input
                                   id={`nbStart-${index}`}
                                   type="time"
                                   value={session.start}
                                   onChange={e => updateNotebookSession(index, 'start', e.target.value)}
-                                />
-                              </div>
-                              <div className="pub-field">
-                                <label htmlFor={`nbEnd-${index}`}>
-                                  Termina às <span className="pub-field__optional">(opcional)</span>
-                                </label>
-                                <input
-                                  id={`nbEnd-${index}`}
-                                  type="time"
-                                  value={session.end}
-                                  onChange={e => updateNotebookSession(index, 'end', e.target.value)}
                                 />
                               </div>
                             </div>
@@ -1257,20 +1295,6 @@ export default function OpenTicketPage() {
                           <small>Para aulas longas, em que a bateria pode não dar conta.</small>
                         </span>
                       </label>
-
-                      <div className="pub-field">
-                        <label htmlFor="nbNotes">
-                          O que a turma vai usar <span className="pub-field__optional">(opcional)</span>
-                        </label>
-                        <textarea
-                          id="nbNotes"
-                          value={notebookRequest.notes}
-                          onChange={e => handleRequestDetailChange('notes', e.target.value)}
-                          placeholder="Programa, site ou arquivo que precisa estar pronto. Ex.: Canva, Word, um vídeo do YouTube."
-                          rows={3}
-                          maxLength={500}
-                        />
-                      </div>
 
                       <p className="otp-notebook__status" role="status" aria-live="polite">
                         {notebookMissing ? (

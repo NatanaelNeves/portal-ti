@@ -581,19 +581,119 @@
   margin-top: 22px;
 }
 
-.otp-notebook__row {
-  display: grid;
-  gap: 18px;
+.otp-notebook__qty {
+  max-width: 11rem;
 }
 
-.otp-notebook .otp-adjustment > .pub-field {
-  margin-bottom: 10px;
+/* Cartões de quantidade: número grande. Em tela estreita só o número cabe
+   (a pergunta já diz "notebooks"); a palavra aparece a partir de 480px. */
+.otp-choose__options.otp-choose__options--qty {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-/* "Termina às (opcional)" quebra a linha em tela estreita: os campos de
-   horário ficam alinhados pela base, não pelo rótulo. */
+.otp-choose__option.otp-choose__option--qty {
+  min-height: 64px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 10px 6px;
+  text-align: center;
+}
+
+.otp-choose__option.otp-choose__option--qty strong {
+  font: 800 1.6rem/1 var(--pub-display);
+  color: var(--pub-ink);
+}
+
+.otp-choose__option.otp-choose__option--qty span {
+  display: none;
+  color: var(--pub-muted);
+  font: 600 0.8rem/1.2 var(--pub-body);
+}
+
+@media (min-width: 480px) {
+  .otp-choose__option.otp-choose__option--qty {
+    min-height: 76px;
+  }
+
+  .otp-choose__option.otp-choose__option--qty span {
+    display: block;
+  }
+}
+
+.otp-choose__option.otp-choose__option--qty.is-selected strong {
+  color: var(--pub-leaf);
+}
+
+/* Dia e horário lado a lado: o campo de data precisa de mais espaço e, sem
+   min-width: 0, invade o de horário em tela estreita. */
 .otp-notebook .otp-adjustment__grid {
-  align-items: end;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  margin-bottom: 0;
+}
+
+.otp-notebook .otp-adjustment__grid input {
+  width: 100%;
+  min-width: 0;
+}
+
+.otp-choose {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.otp-choose legend {
+  float: left;
+  width: 100%;
+  margin-bottom: 6px;
+  padding: 0;
+  color: var(--pub-ink);
+  font: 600 0.92rem/1.3 var(--pub-body);
+}
+
+.otp-choose legend + * {
+  clear: both;
+}
+
+.otp-choose__options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.otp-choose__option {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  color: var(--pub-ink);
+  background: var(--pub-paper);
+  border: 1.5px solid var(--pub-line);
+  border-radius: 10px;
+  font: 700 0.95rem/1.25 var(--pub-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+.otp-choose__option i {
+  flex: 0 0 auto;
+  color: var(--pub-leaf);
+  font-size: 1.25rem;
+}
+
+.otp-choose__option:hover {
+  border-color: var(--pub-leaf);
+}
+
+.otp-choose__option.is-selected {
+  background: var(--pub-leaf-wash);
+  border-color: var(--pub-leaf);
+  box-shadow: inset 0 0 0 1px var(--pub-leaf);
 }
 
 .otp-notebook__check {
@@ -618,12 +718,6 @@
 
 .otp-notebook__status .ti-circle-check {
   color: var(--pub-leaf);
-}
-
-@media (min-width: 720px) {
-  .otp-notebook__row {
-    grid-template-columns: minmax(0, 11rem) minmax(0, 1fr);
-  }
 }
 
 /* Anexos */
